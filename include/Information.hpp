@@ -78,6 +78,7 @@ private:
      * @note Format: [label]
      */
     void set_unit_label();
+
     /**
      * Gets the unit label of the data.
      *
