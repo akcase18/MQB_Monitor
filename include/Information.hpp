@@ -1,3 +1,6 @@
+#ifndef INFORMATION_H
+#define INFORMATION_H
+
 #include "Arduino.h"
 
 using namespace std;
@@ -284,3 +287,5 @@ public:
      */
     uint16_t get_refresh_rate();
 };
+
+#endif
