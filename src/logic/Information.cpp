@@ -150,6 +150,7 @@ Information::Unit_Region Information::get_unit_region()
 
 void Information::set_num_decimals_metric(uint8_t decimals)
 {
+    // Clamp to only 2 decimal places
     if (decimals > 2)
     {
         decimals = 2;
@@ -163,6 +164,7 @@ uint8_t Information::get_num_decimals_metric()
 
 void Information::set_num_decimals_imperial(uint8_t decimals)
 {
+    // Clamp to only 2 decimal places
     if (decimals > 2)
     {
         decimals = 2;
@@ -299,11 +301,12 @@ char *Information::get_unit_label()
 uint8_t Information::calc_num_digits()
 {
     uint8_t num_digits = 1;
-    if (_data < 0)
+    if (_data < 0) // Check if data is negative
     {
         num_digits++; // Add space for negative sign
     }
     uint16_t temp = abs(_data);
+    /* Checks for number of spaces to allocate for decimal places and decimal point */
     if (_unit_region == IMPERIAL)
     {
         if (get_num_decimals_imperial() > 0)
@@ -326,6 +329,7 @@ uint8_t Information::calc_num_digits()
             }
         }
     }
+    /* Check for number of spaces to allocate for full number digits */
     if (int(log10(temp)) > 0)
     {
         for (int i = 0; i < int(log10(temp)) + 1; i++)

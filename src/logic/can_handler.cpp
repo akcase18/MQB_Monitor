@@ -8,29 +8,23 @@
 #define NO_OFFSET 0  // No CAN data offset
 #define NO_SCALE 1   // No CAN data scaling
 
-/*************
- * CAN Setup *
- *************/
-
-FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> CAN; // Initialize the CAN port
-
 /******************
  * Main Functions *
  ******************/
 
 void can_init()
 {
-    CAN.begin();                 // Start CAN
-    CAN.setBaudRate(500000);     // Set baudrate to 500k
-    CAN.setMBFilter(REJECT_ALL); // Initialize mailbox to reject all CAN messages
-    CAN.setMBFilter(MB1, 0x7E8); // Allow mailbox 1 to accept CAN messages from MQB
-    CAN.enableMBInterrupt(MB1);  // Enable interrupts for mailbox 1
-    CAN.onReceive(can_recv);     // Run can_recv() when a CAN message is received
+    MQB_CAN.begin();                 // Start CAN
+    MQB_CAN.setBaudRate(500000);     // Set baudrate to 500k
+    MQB_CAN.setMBFilter(REJECT_ALL); // Initialize mailbox to reject all CAN messages
+    MQB_CAN.setMBFilter(MB1, 0x7E8); // Allow mailbox 1 to accept CAN messages from MQB
+    MQB_CAN.enableMBInterrupt(MB1);  // Enable interrupts for mailbox 1
+    MQB_CAN.onReceive(can_recv);     // Setup callback function for receiving CAN message
 }
 
 void can_loop()
 {
-    CAN.events();
+    MQB_CAN.events();
 }
 
 void can_send(Information info)
@@ -43,7 +37,7 @@ void can_send(Information info)
 
     msg.id = CAN_ID;
 
-    CAN.write(msg);
+    MQB_CAN.write(msg);
 }
 
 void can_recv(const CAN_message_t &msg)
@@ -73,9 +67,19 @@ void can_recv(const CAN_message_t &msg)
 
 Information get_information_panel(uint8_t byte_1, uint8_t byte_2)
 {
-    // Loop through potential Information objects (ideally through the panels that are available)
-    // Find which one matches the correct bytes
-    // Return correct Information object
+    /* Loop through potential Information objects */
+    for (uint i = 0; i < Layout::info_list.size(); i++)
+    {
+        Information info = Layout::info_list[i]; // Get current Information object
+        if (byte_1 == info.get_byte_1())         // Check if first byte of UDS request matches
+        {
+            if (byte_2 == info.get_byte_2()) // Check if second byte of UDS request matches
+            {
+                return info; // Return if both bytes of UDS request match
+            }
+        }
+    }
+    return nullptr; // Return NULL if no matches are found
 }
 
 void convert_units(Information info)

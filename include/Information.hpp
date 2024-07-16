@@ -11,6 +11,8 @@ using namespace std;
 
 #define MAX_REFRESH 20   // The fastest refresh time for an Information object (20 ms)
 #define MIN_REFRESH 5000 // The slowest refresh time for an Information object (5000 ms)
+#define NO_OFFSET 0      // Constant for when there is no offset value
+#define NO_SCALE 1       // Constant for when there is no scaling value
 
 class Information
 {

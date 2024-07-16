@@ -1,0 +1,12 @@
+{
+    "files.associations": {
+        "vector": "cpp",
+        "*.tpp": "cpp",
+        "atomic": "cpp",
+        "*.tcc": "cpp",
+        "bitset": "cpp",
+        "random": "cpp",
+        "fstream": "cpp",
+        "regex": "cpp"
+    }
+}

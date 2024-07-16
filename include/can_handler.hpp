@@ -1,5 +1,14 @@
+#ifndef CAN_HANDLER_H
+#define CAN_HANDLER_H
+
 #include <FlexCAN_T4.h>
-#include "Panel.hpp"
+#include "Layout.hpp"
+
+/*************
+ * CAN Setup *
+ *************/
+
+FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> MQB_CAN; // Initialize the CAN port
 
 /******************
  * Main Functions *
@@ -74,3 +83,5 @@ void round_data(Information info);
  * @return The rounded value with the correct number of decimal places
  */
 float round(float value, uint8_t decimal_places);
+
+#endif
