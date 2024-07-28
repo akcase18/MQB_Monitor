@@ -22,11 +22,11 @@ public:
      * Public Constants *
      ********************/
 
-    enum Panel_Number
+    enum Panel_Location
     {
         TOP_LEFT = 0,
         TOP_CENTER,
-        TOP_RIGHT, 
+        TOP_RIGHT,
         BOTTOM_LEFT,
         BOTTOM_RIGHT
     };
@@ -45,11 +45,11 @@ public:
      * Public Variables *
      ********************/
 
-    static Panel top_left_panel;                // Panel in the top left position
-    static Panel top_center_panel;              // Panel in the top center position
-    static Panel top_right_panel;               // Panel in the top right position
-    static Panel bottom_left_panel;             // Panel in the bottom left position
-    static Panel bottom_right_panel;            // Panel in the bottom right position
+    static Panel top_left_panel;          // Panel in the top left position
+    static Panel top_center_panel;        // Panel in the top center position
+    static Panel top_right_panel;         // Panel in the top right position
+    static Panel bottom_left_panel;       // Panel in the bottom left position
+    static Panel bottom_right_panel;      // Panel in the bottom right position
     static vector<Information> info_list; // Stores the Information objects that are on screen
 
     /********************
@@ -81,12 +81,12 @@ public:
      * @param new_panel Panel object that will be added
      * @param old_panel Panel object to replace
      */
-    void update_layout(Panel new_panel, Panel_Number old_panel);
+    void update_layout(Panel new_panel, Panel_Location old_panel);
 
     /**
      * @brief Ensures that the info_list is up to date with the most recent Panel
      * objects that are in the Layout.
-    */
+     */
     void update_info_list();
 };
 

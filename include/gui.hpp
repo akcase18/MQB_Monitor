@@ -4,6 +4,8 @@
  * Global Constants *
  ********************/
 
+#define LCD_HORZ 480 // Horizontal resolution of the display in pixels
+#define LCD_VERT 320 // Vertical resolution of the display in pixels
 
 /**********
  * Styles *
@@ -22,8 +24,8 @@ static lv_style_t style_btn_done;    // Done button style
 static lv_style_t style_label_top; // Top row label style
 static lv_style_t style_label_btm; // Bottom row label style
 /* Radio Button Styles */
-static lv_style_t style_radio;
-static lv_style_t style_radio_chk;
+static lv_style_t style_radio; // Radio button style (unchecked)
+static lv_style_t style_radio_chk; // Radio button style (checked)
 
 /*********
  * Fonts *
@@ -234,4 +236,95 @@ static void style_init(void)
     lv_style_set_border_width(&style_flex, 0);
     lv_style_set_text_color(&style_flex, lv_palette_lighten(LV_PALETTE_GREY, 5));
     lv_style_set_text_font(&style_flex, drop_down_font);
+}
+
+/*******************
+ * Window Creation *
+ *******************/
+
+static void main_window_create(void)
+{
+}
+
+static void config_window_create(void)
+{
+}
+
+/*******************
+ * Object Creation *
+ *******************/
+
+static void add_main_objects(void)
+{
+}
+
+static void add_main_labels(void)
+{
+}
+
+static void add_config_objects(void)
+{
+}
+
+static void radiobutton_create(lv_obj_t *parent, lv_obj_t *child, const char *text)
+{
+}
+
+/*************
+ * Callbacks *
+ *************/
+
+static void button_config_cb(lv_event_t *e)
+{
+}
+
+static void close_window_cb(lv_event_t *e)
+{
+}
+
+static void radio_cb(lv_event_t *e)
+{
+}
+
+/**************
+ * Transforms *
+ **************/
+
+static lv_color_t darken(const lv_color_filter_dsc_t *dsc, lv_color_t color, lv_opa_t opa)
+{
+    LV_UNUSED(dsc);
+    return lv_color_darken(color, opa);
+}
+
+/***********
+ * Helpers *
+ ***********/
+
+static uint8_t get_config_dropdown_state(lv_obj_t *dropdown)
+{
+}
+
+/******************
+ * Update Display *
+ ******************/
+
+void top_left_timer_cb(lv_timer_t *timer)
+{
+    
+}
+
+void top_center_timer_cb(lv_timer_t *timer)
+{
+}
+
+void top_right_timer_cb(lv_timer_t *timer)
+{
+}
+
+void bottom_left_timer_cb(lv_timer_t *timer)
+{
+}
+
+void bottom_right_timer_cb(lv_timer_t *timer)
+{
 }

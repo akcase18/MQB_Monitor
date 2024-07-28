@@ -25,6 +25,10 @@ public:
     /********************
      * Public Constants *
      ********************/
+
+    /**
+     * Represents the different types that each data can be
+    */
     enum Unit_Type
     {
         NONE = 0,
@@ -38,6 +42,9 @@ public:
         VOLUME
     };
 
+    /**
+     * Represents the "region" that the data will be in
+    */
     enum Unit_Region
     {
         METRIC = 0,
