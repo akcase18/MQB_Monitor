@@ -188,7 +188,7 @@ public:
     /**
      * Gets the value of the first byte of the UDS request code.
      *
-     * @return THe first byte of the UDS request code in hex.
+     * @return The first byte of the UDS request code in hex.
      */
     uint16_t get_byte_1();
 

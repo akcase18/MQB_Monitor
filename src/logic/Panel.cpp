@@ -6,12 +6,17 @@
 
 Panel::Panel()
 {
-    panel_info = Information();
+    /* Pls don't use this */
 }
 
-Panel::Panel(Information *info)
+Panel::Panel(Information *info, lv_obj_t *panel_button, lv_obj_t *panel_button_data, lv_obj_t *panel_label, lv_style_t *panel_button_style, lv_style_t *panel_label_style)
 {
-    panel_info = Information(info);
+    panel_info = info;
+    button = panel_button;
+    button_data = panel_button_data;
+    label = panel_label;
+    button_style = panel_button_style;
+    label_style = panel_label_style;
 }
 
 /******************************

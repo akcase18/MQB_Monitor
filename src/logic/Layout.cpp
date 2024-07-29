@@ -6,15 +6,21 @@
 
 Layout::Layout()
 {
+    /* EMPTY FOR A REASON. KINDA USELESS */
 }
 
-Layout::Layout(Panel top_left, Panel top_center, Panel top_right, Panel bottom_left, Panel bottom_right)
+Layout::Layout(Panel *top_left, Panel *top_center, Panel *top_right, Panel *bottom_left, Panel *bottom_right)
 {
-    
+    top_left_panel = top_left;
+    top_center_panel = top_center;
+    top_right_panel = top_right;
+    bottom_left_panel = bottom_left;
+    bottom_right_panel = bottom_right;
 }
 
-void Layout::update_layout(Panel new_panel, Panel_Number old_panel)
+void Layout::update_layout(Panel *new_panel, Panel_Location old_panel)
 {
+    /* Check what panel you want to switch out and replace it with the new one */
     switch (old_panel)
     {
     case Layout::TOP_LEFT:
@@ -49,11 +55,11 @@ void Layout::update_info_list()
 {
     vector<Information> new_info_list; // Create new vector of Information objects
     /* Add Information objects from Panels into new vector */
-    new_info_list.push_back(Layout::top_left_panel.panel_info);
-    new_info_list.push_back(Layout::top_center_panel.panel_info);
-    new_info_list.push_back(Layout::top_right_panel.panel_info);
-    new_info_list.push_back(Layout::bottom_left_panel.panel_info);
-    new_info_list.push_back(Layout::bottom_right_panel.panel_info);
+    new_info_list.push_back(top_left_panel->panel_info);
+    new_info_list.push_back(top_center_panel->panel_info);
+    new_info_list.push_back(top_right_panel->panel_info);
+    new_info_list.push_back(bottom_left_panel->panel_info);
+    new_info_list.push_back(bottom_right_panel->panel_info);
 
     Layout::info_list.swap(new_info_list); // Swap contents of new list into old list
 }

@@ -1,8 +1,8 @@
 #include "gui.hpp"
 
-/**********************************
- * Information Object Definitions *
- **********************************/
+/*******************************
+ * Information Object Creation *
+ *******************************/
 
 /***** Performance Metrics *****/
 Information coolant_temp = Information("Coolant Temp", 0xF4, 0x05, -40, NO_SCALE, Information::TEMP, 0, 0, 2500);
@@ -34,8 +34,25 @@ Information timing_corr_2 = Information("Timing Corr. Cyl 2", 0x20, 0x0B, NO_OFF
 Information timing_corr_3 = Information("Timing Corr. Cyl 3", 0x20, 0x0C, NO_OFFSET, 0.01, Information::DEGREES, 0, 0, 100);
 Information timing_corr_4 = Information("Timing Corr. Cyl 4", 0x20, 0x0D, NO_OFFSET, 0.01, Information::DEGREES, 0, 0, 100);
 
+/*******************
+ * Button Creation *
+ *******************/
+
+/************************
+ * Button Data Creation *
+ ************************/
+
+/******************
+ * Label Creation *
+ ******************/
+
+/******************
+ * Style Creation *
+ ******************/
+
 void setup()
 {
+    
 }
 
 void loop()

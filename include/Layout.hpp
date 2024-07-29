@@ -45,11 +45,11 @@ public:
      * Public Variables *
      ********************/
 
-    static Panel top_left_panel;          // Panel in the top left position
-    static Panel top_center_panel;        // Panel in the top center position
-    static Panel top_right_panel;         // Panel in the top right position
-    static Panel bottom_left_panel;       // Panel in the bottom left position
-    static Panel bottom_right_panel;      // Panel in the bottom right position
+    static Panel *top_left_panel;         // Panel in the top left position
+    static Panel *top_center_panel;       // Panel in the top center position
+    static Panel *top_right_panel;        // Panel in the top right position
+    static Panel *bottom_left_panel;      // Panel in the bottom left position
+    static Panel *bottom_right_panel;     // Panel in the bottom right position
     static vector<Information> info_list; // Stores the Information objects that are on screen
 
     /********************
@@ -57,7 +57,7 @@ public:
      ********************/
 
     /**
-     * @brief Default constructor for Layout.
+     * @brief Default constructor for Layout. Don't really use this. Ever.
      */
     Layout();
 
@@ -72,7 +72,7 @@ public:
      * @param bottom_left The Panel object that will be in the bottom left position
      * @param bottom_right The Panel object that will be in the bottom right position
      */
-    Layout(Panel top_left, Panel top_center, Panel top_right, Panel bottom_left, Panel bottom_right);
+    Layout(Panel *top_left, Panel *top_center, Panel *top_right, Panel *bottom_left, Panel *bottom_right);
 
     /**
      * @brief Updates the layout by replacing an old Panel object with a new Panel
@@ -81,7 +81,7 @@ public:
      * @param new_panel Panel object that will be added
      * @param old_panel Panel object to replace
      */
-    void update_layout(Panel new_panel, Panel_Location old_panel);
+    void update_layout(Panel *new_panel, Panel_Location old_panel);
 
     /**
      * @brief Ensures that the info_list is up to date with the most recent Panel
