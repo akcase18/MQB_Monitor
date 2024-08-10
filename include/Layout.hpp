@@ -1,6 +1,24 @@
 #ifndef LAYOUT_H
 #define LAYOUT_H
 
+/**
+ * This is the Layout class.
+ *
+ * The Layout class is an organization of Panel objects. Currently,
+ * it only supports a 5-Panel configuration, with 3 Panels on the top
+ * row, 2 Panels on the bottom row, and the display in a landscape
+ * orientation. Eventually, this will support multiple different
+ * display configurations, through this may be done with different
+ * classes rather than expanding functionality of this class. Each
+ * Layout class holds:
+ * -> A window object to hold all elements
+ * -> A number (5) of Panel objects
+ * -> A list of all Information objects in the Panels
+ *
+ * Used in:
+ * -> Configurator (But only kinda)
+ */
+
 #include <vector>
 #include "Panel.hpp"
 
@@ -45,11 +63,12 @@ public:
      * Public Variables *
      ********************/
 
-    static Panel *top_left_panel;         // Panel in the top left position
-    static Panel *top_center_panel;       // Panel in the top center position
-    static Panel *top_right_panel;        // Panel in the top right position
-    static Panel *bottom_left_panel;      // Panel in the bottom left position
-    static Panel *bottom_right_panel;     // Panel in the bottom right position
+    static lv_obj_t *window;              // Window object that holds all other elements
+    static Panel *panel_tl;               // Panel in the top left position
+    static Panel *panel_tc;               // Panel in the top center position
+    static Panel *panel_tr;               // Panel in the top right position
+    static Panel *panel_bl;               // Panel in the bottom left position
+    static Panel *panel_br;               // Panel in the bottom right position
     static vector<Information> info_list; // Stores the Information objects that are on screen
 
     /********************

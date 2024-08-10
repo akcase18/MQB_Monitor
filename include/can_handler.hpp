@@ -2,7 +2,7 @@
 #define CAN_HANDLER_H
 
 #include <FlexCAN_T4.h>
-#include "Layout.hpp"
+#include "Configurator.hpp"
 
 /*************
  * CAN Setup *

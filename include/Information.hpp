@@ -1,6 +1,25 @@
 #ifndef INFORMATION_H
 #define INFORMATION_H
 
+/**
+ * This is the Information class.
+ * 
+ * The Information class holds data specific to each bit of information
+ * that is requested from the car. This includes but is not limited to:
+ * -> CAN-specific information such as scale, offset, and request bytes
+ * -> Current values
+ * -> Information name
+ * -> Displaying specifications
+ * -> Refresh rate
+ * -> Etc.
+ * The goal for each Information object is to be used in Panel objects,
+ * where they can then be swapped out for other Information objects as 
+ * different configurations are chosen.
+ * 
+ * Used in:
+ * -> Panel
+*/
+
 #include "Arduino.h"
 
 using namespace std;

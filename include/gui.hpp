@@ -7,9 +7,39 @@
 #define LCD_HORZ 480 // Horizontal resolution of the display in pixels
 #define LCD_VERT 320 // Vertical resolution of the display in pixels
 
-/**********
- * Styles *
- **********/
+/*******************
+ * Button Creation *
+ *******************/
+
+lv_obj_t *btn_tl; // Top left button object
+lv_obj_t *btn_tc; // Top center button object
+lv_obj_t *btn_tr; // Top right button object
+lv_obj_t *btn_bl; // Bottom left button object
+lv_obj_t *btn_br; // Bottom right button objet
+
+/************************
+ * Button Data Creation *
+ ************************/
+
+lv_obj_t *data_tl; // Top left data object
+lv_obj_t *data_tc; // Top center data object
+lv_obj_t *data_tr; // Top right data object
+lv_obj_t *data_bl; // Bottom left data object
+lv_obj_t *data_br; // Bottom right data object
+
+/******************
+ * Label Creation *
+ ******************/
+
+lv_obj_t *label_tl; // Top left label object
+lv_obj_t *label_tc; // Top center label object
+lv_obj_t *label_tr; // Top right label object
+lv_obj_t *label_bl; // Bottom left label object
+lv_obj_t *label_br; // Bottom right label object
+
+/******************
+ * Style Creation *
+ ******************/
 
 /* Window Styles */
 static lv_style_t style_main;   // Main window style
@@ -24,7 +54,7 @@ static lv_style_t style_btn_done;    // Done button style
 static lv_style_t style_label_top; // Top row label style
 static lv_style_t style_label_btm; // Bottom row label style
 /* Radio Button Styles */
-static lv_style_t style_radio; // Radio button style (unchecked)
+static lv_style_t style_radio;     // Radio button style (unchecked)
 static lv_style_t style_radio_chk; // Radio button style (checked)
 
 /*********

@@ -11,11 +11,11 @@ Layout::Layout()
 
 Layout::Layout(Panel *top_left, Panel *top_center, Panel *top_right, Panel *bottom_left, Panel *bottom_right)
 {
-    top_left_panel = top_left;
-    top_center_panel = top_center;
-    top_right_panel = top_right;
-    bottom_left_panel = bottom_left;
-    bottom_right_panel = bottom_right;
+    panel_tl = top_left;
+    panel_tc = top_center;
+    panel_tr = top_right;
+    panel_bl = bottom_left;
+    panel_br = bottom_right;
 }
 
 void Layout::update_layout(Panel *new_panel, Panel_Location old_panel)
@@ -24,23 +24,23 @@ void Layout::update_layout(Panel *new_panel, Panel_Location old_panel)
     switch (old_panel)
     {
     case Layout::TOP_LEFT:
-        Layout::top_left_panel = new_panel;
+        Layout::panel_tl = new_panel;
         break;
 
     case Layout::TOP_CENTER:
-        Layout::top_center_panel = new_panel;
+        Layout::panel_tc = new_panel;
         break;
 
     case Layout::TOP_RIGHT:
-        Layout::top_right_panel = new_panel;
+        Layout::panel_tr = new_panel;
         break;
 
     case Layout::BOTTOM_LEFT:
-        Layout::bottom_left_panel = new_panel;
+        Layout::panel_bl = new_panel;
         break;
 
     case Layout::BOTTOM_RIGHT:
-        Layout::bottom_right_panel = new_panel;
+        Layout::panel_br = new_panel;
         break;
 
     default:
@@ -55,11 +55,11 @@ void Layout::update_info_list()
 {
     vector<Information> new_info_list; // Create new vector of Information objects
     /* Add Information objects from Panels into new vector */
-    new_info_list.push_back(top_left_panel->panel_info);
-    new_info_list.push_back(top_center_panel->panel_info);
-    new_info_list.push_back(top_right_panel->panel_info);
-    new_info_list.push_back(bottom_left_panel->panel_info);
-    new_info_list.push_back(bottom_right_panel->panel_info);
+    new_info_list.push_back(panel_tl->panel_info);
+    new_info_list.push_back(panel_tc->panel_info);
+    new_info_list.push_back(panel_tr->panel_info);
+    new_info_list.push_back(panel_bl->panel_info);
+    new_info_list.push_back(panel_br->panel_info);
 
     Layout::info_list.swap(new_info_list); // Swap contents of new list into old list
 }

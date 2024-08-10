@@ -1,6 +1,26 @@
 #ifndef PANEL_H
 #define PANEL_H
 
+/**
+ * This is the Panel class.
+ *
+ * The Panel class is used hold a variety of different things, organized
+ * in a way that allows for more modular use-cases. Each Panel object can
+ * hold:
+ * -> An Information object
+ * -> A button
+ * -> Data to be displayed in the button
+ * -> A label for the button
+ * -> Style types for both the button and label
+ * The idea behind Panel objects is to be used in multiple different Layouts,
+ * where Panels can be rearranged depending on a variety of factors.
+ * All elements of each Panel object can be reconfigured as needed as
+ * different things change or different Configurations are chosen.
+ *
+ * Used in:
+ * -> Layout
+ */
+
 #include <lvgl.h>
 #include "Information.hpp"
 
@@ -36,12 +56,12 @@ public:
      * Public Variables *
      ********************/
 
-    static Information *panel_info;   // The Information object for this Panel
-    static lv_obj_t *button;         // The button this Panel handles
-    static lv_obj_t *button_data;    // The data that goes inside of the button
+    static Information *panel_info;  // The Information object for this Panel
+    static lv_obj_t *btn;         // The button this Panel handles
+    static lv_obj_t *data_btn;    // The data that goes inside of the button
     static lv_obj_t *label;          // The label associated with the button
-    static lv_style_t *button_style; // The style of the button
-    static lv_style_t *label_style;  // The style of the panel
+    static lv_style_t *style_btn; // The style of the button
+    static lv_style_t *style_label;  // The style of the panel
 
     /********************
      * Public Functions *
@@ -51,7 +71,7 @@ public:
      * @brief Default constructor for Panel objects. Creates a new Information
      * object using the default Information object constructor, and sets the Panel's
      * panel_info variable to that Information object.
-     * 
+     *
      * Please don't use. Kinda useless cuz you kinda need information for this
      * shit
      */
