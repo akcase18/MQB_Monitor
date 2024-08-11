@@ -3,7 +3,7 @@
 
 /**
  * This is the Configurator class.
- * 
+ *
  * The Configurator class is almost like a different type of Layout.
  * While the Layout class carries a bunch of different Panels that hold
  * very specific things, the Configurator is basically a very specific
@@ -13,13 +13,14 @@
  * -> A radio button for selecting unit "region"
  * -> A "Done" button
  * -> Style types for all other elements
- * 
+ *
  * Used in:
  * -> CAN Handler
  * -> Other stuff above this
-*/
+ */
 
 #include "Layout.hpp"
+#include "fonts.hpp"
 
 using namespace std;
 
@@ -50,24 +51,30 @@ private:
      * -> Drop-down menu
      * -> Radio buttons (both selected and deselected)
      * -> Done button
-    */
+     */
     void config_style_init();
+
+    /**
+     * Sets up the layout, size, and properties of the window object
+    */
+    void setup_config_window();
 
 public:
     /********************
      * Public Variables *
      ********************/
 
-    static lv_obj_t *window;
-    static lv_obj_t *drop_down;
-    static lv_obj_t *radio_imperial;
-    static lv_obj_t *radio_metric;
-    static lv_obj_t *btn_done;
-    static lv_style_t *style_window;
-    static lv_style_t *style_drop_down;
-    static lv_style_t *style_radio_checked;
-    static lv_style_t *style_radio_unchecked;
-    static lv_style_t *style_btn_done;
+    static lv_obj_t *window;                  // Window object that holds all other elements
+    static lv_obj_t *drop_down;               // Drop-down menu
+    static lv_obj_t *radio_imperial;          // Radio button for imperial units
+    static lv_obj_t *radio_metric;            // Radio button for metric units
+    static lv_obj_t *btn_done;                // Done button
+    static lv_style_t *style_window;          // Style for window
+    static lv_style_t *style_drop_down;       // Style for drop-down menu
+    static lv_style_t *style_radio_checked;   // Style for radio button when selected
+    static lv_style_t *style_radio_unchecked; // Style for radio button when deselected
+    static lv_style_t *style_btn_done;        // Style for done button
+    static lv_style_t *style_layout;          // Style for flex layout used
 
     /********************
      * Public Functions *
@@ -82,8 +89,8 @@ public:
     Configurator();
 
     /**
-     * Creates and displays the Configurator window.
-    */
+     * Displays the Configurator window.
+     */
     void show_config_window();
 };
 

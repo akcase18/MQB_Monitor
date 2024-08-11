@@ -56,12 +56,12 @@ public:
      * Public Variables *
      ********************/
 
-    static Information *panel_info;  // The Information object for this Panel
-    static lv_obj_t *btn;         // The button this Panel handles
-    static lv_obj_t *data_btn;    // The data that goes inside of the button
-    static lv_obj_t *label;          // The label associated with the button
-    static lv_style_t *style_btn; // The style of the button
-    static lv_style_t *style_label;  // The style of the panel
+    static Information *panel_info; // The Information object for this Panel
+    static lv_obj_t *btn;           // The button this Panel handles
+    static lv_obj_t *data_btn;      // The data that goes inside of the button
+    static lv_obj_t *label;         // The label associated with the button
+    static lv_style_t *style_btn;   // The style of the button
+    static lv_style_t *style_label; // The style of the panel
 
     /********************
      * Public Functions *
