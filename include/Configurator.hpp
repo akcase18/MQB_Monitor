@@ -56,7 +56,7 @@ private:
 
     /**
      * Sets up the layout, size, and properties of the window object
-    */
+     */
     void setup_config_window();
 
 public:
@@ -92,6 +92,14 @@ public:
      * Displays the Configurator window.
      */
     void show_config_window();
+
+    /**
+     * Called when "Done" button is pressed. *Should be called in button callback*
+     * Will update the panel that was selected to open the Configurator window
+     * with the Information object that was selected in the drop-down menu when
+     * the "Done" button was pressed.
+     */
+    void close_config_window();
 };
 
 #endif
