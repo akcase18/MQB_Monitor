@@ -184,7 +184,7 @@ static void style_init(void)
     lv_style_set_opa(&style_btn_top, LV_OPA_100);
     lv_style_set_bg_color(&style_btn_top, lv_palette_darken(LV_PALETTE_GREY, 4));
     lv_style_set_text_color(&style_btn_top, lv_palette_lighten(LV_PALETTE_GREY, 4));
-    lv_style_set_text_font(&style_btn_top, top_data_font);
+    lv_style_set_text_font(&style_btn_top, &digital_display_100);
     lv_style_set_text_letter_space(&style_btn_top, 0);
     lv_style_set_shadow_width(&style_btn_top, 0);
 
@@ -194,7 +194,7 @@ static void style_init(void)
     lv_style_set_opa(&style_btn_btm, LV_OPA_100);
     lv_style_set_bg_color(&style_btn_btm, lv_palette_darken(LV_PALETTE_GREY, 4));
     lv_style_set_text_color(&style_btn_btm, lv_palette_lighten(LV_PALETTE_GREY, 4));
-    lv_style_set_text_font(&style_btn_btm, btm_data_font);
+    lv_style_set_text_font(&style_btn_btm, &digital_display_140);
     lv_style_set_text_letter_space(&style_btn_btm, 0);
     lv_style_set_shadow_width(&style_btn_btm, 0);
 
@@ -204,7 +204,7 @@ static void style_init(void)
     lv_style_set_opa(&style_btn_done, LV_OPA_100);
     lv_style_set_bg_color(&style_btn_done, lv_palette_darken(LV_PALETTE_GREY, 4));
     lv_style_set_text_color(&style_btn_done, lv_palette_lighten(LV_PALETTE_GREY, 4));
-    lv_style_set_text_font(&style_btn_done, done_label_font);
+    lv_style_set_text_font(&style_btn_done, &vw_24);
     lv_style_set_text_letter_space(&style_btn_done, 0);
     lv_style_set_shadow_width(&style_btn_done, 0);
 
@@ -218,13 +218,13 @@ static void style_init(void)
     /* Set the style of the top row label object */
     lv_style_init(&style_label_top);
     lv_style_set_text_color(&style_label_top, lv_palette_lighten(LV_PALETTE_GREY, 5));
-    lv_style_set_text_font(&style_label_top, top_label_font);
+    lv_style_set_text_font(&style_label_top, &vw_16);
     lv_style_set_text_letter_space(&style_label_top, 0);
 
     /* Set the style of the bottom row label object */
     lv_style_init(&style_label_btm);
     lv_style_set_text_color(&style_label_btm, lv_palette_lighten(LV_PALETTE_GREY, 5));
-    lv_style_set_text_font(&style_label_btm, btm_label_font);
+    lv_style_set_text_font(&style_label_btm, &vw_18);
     lv_style_set_text_letter_space(&style_label_btm, 0);
 
     /* Set the style of the radio button for selecting unit region */
@@ -240,7 +240,7 @@ static void style_init(void)
     lv_style_set_bg_color(&style_flex, lv_palette_darken(LV_PALETTE_GREY, 4));
     lv_style_set_border_width(&style_flex, 0);
     lv_style_set_text_color(&style_flex, lv_palette_lighten(LV_PALETTE_GREY, 5));
-    lv_style_set_text_font(&style_flex, drop_down_font);
+    lv_style_set_text_font(&style_flex, &vw_24);
 }
 
 /*******************

@@ -3,7 +3,7 @@
 
 /**
  * This is the Information class.
- * 
+ *
  * The Information class holds data specific to each bit of information
  * that is requested from the car. This includes but is not limited to:
  * -> CAN-specific information such as scale, offset, and request bytes
@@ -13,14 +13,15 @@
  * -> Refresh rate
  * -> Etc.
  * The goal for each Information object is to be used in Panel objects,
- * where they can then be swapped out for other Information objects as 
+ * where they can then be swapped out for other Information objects as
  * different configurations are chosen.
- * 
+ *
  * Used in:
  * -> Panel
-*/
+ */
 
 #include "Arduino.h"
+#include <vector>
 
 using namespace std;
 
@@ -47,7 +48,7 @@ public:
 
     /**
      * Represents the different types that each data can be
-    */
+     */
     enum Unit_Type
     {
         NONE = 0,
@@ -63,7 +64,7 @@ public:
 
     /**
      * Represents the "region" that the data will be in
-    */
+     */
     enum Unit_Region
     {
         METRIC = 0,
@@ -121,6 +122,8 @@ public:
     /********************
      * Public Variables *
      ********************/
+
+    static vector<Information *> information_list; // List of all information objects
 
     /********************
      * Public Functions *

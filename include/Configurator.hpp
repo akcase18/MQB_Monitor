@@ -20,7 +20,6 @@
  */
 
 #include "Layout.hpp"
-#include "fonts.hpp"
 
 using namespace std;
 
@@ -59,6 +58,18 @@ private:
      */
     void setup_config_window();
 
+    /**
+     * Creates the list of options for the drop-down menu based on the
+     * list of Information objects
+    */
+    void create_drop_down_list();
+
+    /**
+     * Gets the associated Information object based on the option
+     * selected in the drop-down menu
+     */
+    Information *get_info_from_drop_down(lv_obj_t *drop_down);
+
 public:
     /********************
      * Public Variables *
@@ -75,6 +86,8 @@ public:
     static lv_style_t *style_radio_unchecked; // Style for radio button when deselected
     static lv_style_t *style_btn_done;        // Style for done button
     static lv_style_t *style_layout;          // Style for flex layout used
+    Panel *panel_selected;                    // Panel that the Configurator was opened by
+    vector<String> drop_down_list;            // Array of options for the drop-down menu
 
     /********************
      * Public Functions *
