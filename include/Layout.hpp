@@ -70,7 +70,7 @@ public:
     Panel *panel_bl;               // Panel in the bottom left position
     Panel *panel_br;               // Panel in the bottom right position
     lv_style_t *style_window;      // The style of the window
-    vector<Information> info_list; // Stores the Information objects that are on screen
+    static vector<Information> info_list; // Stores the Information objects that are on screen
 
     /********************
      * Public Functions *
