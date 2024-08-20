@@ -1,5 +1,5 @@
-#ifndef FONTS_H
-#define FONTS_H
+#ifndef GLOBALS_H
+#define GLOBALS_H
 
 #include "lvgl.h"
 

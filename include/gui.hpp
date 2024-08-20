@@ -1,5 +1,4 @@
 #include "can_handler.hpp"
-#include "fonts.hpp"
 
 /********************
  * Global Constants *

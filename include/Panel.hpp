@@ -23,7 +23,6 @@
 
 #include <lvgl.h>
 #include "Information.hpp"
-#include "fonts.hpp"
 
 using namespace std;
 
