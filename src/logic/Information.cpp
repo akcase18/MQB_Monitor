@@ -69,7 +69,8 @@ String Information::get_name()
 String Information::get_name_and_label()
 {
     // TODO: Complete
-    return _name;
+    String name_and_label = _name + " " + _unit_label;
+    return name_and_label;
 }
 
 void Information::set_data(float data)
