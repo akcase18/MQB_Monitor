@@ -9,6 +9,14 @@ Panel::Panel()
     /* Pls don't use this */
 }
 
+Panel::Panel(Information *info, lv_obj_t *panel_button, lv_obj_t *panel_button_data, lv_obj_t *panel_label)
+{
+    panel_info = info;
+    btn = panel_button;
+    data_btn = panel_button_data;
+    label = panel_label;
+}
+
 Panel::Panel(Information *info, lv_obj_t *panel_button, lv_obj_t *panel_button_data, lv_obj_t *panel_label, lv_style_t *panel_button_style, lv_style_t *panel_label_style)
 {
     panel_info = info;
