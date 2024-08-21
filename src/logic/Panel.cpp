@@ -23,6 +23,12 @@ Panel::Panel(Information *info, lv_obj_t *panel_button, lv_obj_t *panel_button_d
  * Public Getters and Setters *
  ******************************/
 
+void Panel::set_styles(lv_style_t *btn_style, lv_style_t *label_style)
+{
+    set_button_style(btn_style);
+    set_label_style(label_style);
+}
+
 void Panel::set_button_style(lv_style_t *style)
 {
     style_btn = style;

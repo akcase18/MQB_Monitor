@@ -105,6 +105,14 @@ public:
 
     /* Might not use these */
 
+    /**
+     * Sets the styles of both the button and label of the panel
+     * 
+     * @param btn_style the style of the button
+     * @param label_style the style of the label
+     */
+    void set_styles(lv_style_t *btn_style, lv_style_t *label_style);
+
     void set_button_style(lv_style_t *style);
     lv_style_t *get_button_style();
 

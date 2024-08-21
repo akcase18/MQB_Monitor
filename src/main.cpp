@@ -16,6 +16,20 @@ Panel panel_br = Panel(&throttle_position, btn_br, data_br, label_br, &style_btn
 
 Layout layout_1 = Layout(&panel_tl, &panel_tc, &panel_tr, &panel_bl, &panel_br); // Main layout creation
 
+void add_style_to_panels()
+{
+    /* Top Left Panel */
+    panel_tl.set_styles(&style_btn_top, &style_label_top);
+    /* Top Center Panel */
+    panel_tc.set_styles(&style_btn_top, &style_label_top);
+    /* Top Right Panel */
+    panel_tr.set_styles(&style_btn_top, &style_label_top);
+    /* Bottom Left Panel */
+    panel_bl.set_styles(&style_btn_btm, &style_label_btm);
+    /* Bottom Right Panel */
+    panel_br.set_styles(&style_btn_btm, &style_label_btm);
+}
+
 void setup()
 {
     style_init();
