@@ -76,16 +76,16 @@ private:
     /*********************
      * Private Variables *
      *********************/
-    char _name[40];                 // The name of the Information object
+    String _name;                 // The name of the Information object
     float _data;                    // The data received
-    char _data_str[10];             // The data received as a string
+    String _data_str;             // The data received as a string
     uint16_t _byte_1;               // The first byte of the UDS request code
     uint16_t _byte_2;               // The second byte of the UDS request code
     int16_t _offset;                // The offset value used to decode raw data
     float _scale;                   // The scaling factor used to decode raw data
     Unit_Type _unit_type;           // The unit type of the data
     Unit_Region _unit_region;       // The unit region of the data
-    char *_unit_label;              // The generated label for the units
+    String _unit_label;              // The generated label for the units
     uint8_t _num_decimals_metric;   // The number of decimal places to use for Metric data
     uint8_t _num_decimals_imperial; // The number of decimal places to use for Imperial data
     uint16_t _refresh_rate;         // The refresh rate of the data request
@@ -122,7 +122,7 @@ private:
      *
      * @note Format: [label]
      */
-    char *get_unit_label();
+    String get_unit_label();
 
 public:
     /********************
@@ -165,28 +165,28 @@ public:
      * @param num_decimals_imperial The number of decimal places for Imperial data format.
      * @param refresh_rate The cycle time of the Information object in ms. Smaller is faster.
      */
-    Information(char *name, uint16_t byte_1, uint16_t byte_2, int16_t offset, float scale, Unit_Type unit_type, uint8_t num_decimals_metric, uint8_t num_decimals_imperial, uint16_t refresh_rate);
+    Information(String name, uint16_t byte_1, uint16_t byte_2, int16_t offset, float scale, Unit_Type unit_type, uint8_t num_decimals_metric, uint8_t num_decimals_imperial, uint16_t refresh_rate);
 
     /**
      * Sets the name of the Information object.
      *
      * @param name A char array of the new name of the Information object.
      */
-    void set_name(char *name);
+    void set_name(String name);
     /**
-     * Gets the name as a char array.
+     * Gets the name of the Information object.
      *
-     * @return A char array.
+     * @return A String
      */
-    char *get_name();
+    String get_name();
     /**
      * Gets the name with the data label appended onto it as a char array.
      *
-     * @return A char array.
+     * @return A String.
      *
      * @note Format: {Name} {[Unit Label]}
      */
-    char *get_name_and_label();
+    String get_name_and_label();
 
     /**
      * Sets the data value of the Information object.
@@ -203,9 +203,9 @@ public:
     /**
      * Gets the data as a string.
      *
-     * @return A char array.
+     * @return A String.
      */
-    char *get_data_str();
+    String get_data_str();
 
     /**
      * Sets the value of the first byte of the UDS request code.

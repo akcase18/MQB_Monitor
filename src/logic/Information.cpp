@@ -36,7 +36,7 @@ Information::Information(Information *info)
     set_refresh_rate(info->get_refresh_rate());
 }
 
-Information::Information(char *name, uint16_t byte_1, uint16_t byte_2, int16_t offset, float scale, Unit_Type unit_type, uint8_t num_decimals_metric, uint8_t num_decimals_imperial, uint16_t refresh_rate)
+Information::Information(String name, uint16_t byte_1, uint16_t byte_2, int16_t offset, float scale, Unit_Type unit_type, uint8_t num_decimals_metric, uint8_t num_decimals_imperial, uint16_t refresh_rate)
 {
     set_name(name);
     set_data(0);
@@ -56,18 +56,17 @@ Information::Information(char *name, uint16_t byte_1, uint16_t byte_2, int16_t o
  * Public Getters and Setters *
  ******************************/
 
-void Information::set_name(char *name)
+void Information::set_name(String name)
 {
-    // Copy the char array into the space allocated for name
-    snprintf(_name, sizeof(_name), "%s", name);
+    _name = name;
 }
 
-char *Information::get_name()
+String Information::get_name()
 {
     return _name;
 }
 
-char *Information::get_name_and_label()
+String Information::get_name_and_label()
 {
     // TODO: Complete
     return _name;
@@ -83,11 +82,10 @@ float Information::get_data_num()
     return _data;
 }
 
-char *Information::get_data_str()
+String Information::get_data_str()
 {
     // Copy data (float) into the space allocated for the data (string)
-    snprintf(_data_str, calc_num_digits(), "%f", _data);
-    return _data_str;
+    return String(_data);
 }
 
 void Information::set_byte_1(uint16_t byte)
@@ -289,7 +287,7 @@ void Information::set_unit_label()
         break;
     }
 }
-char *Information::get_unit_label()
+String Information::get_unit_label()
 {
     return _unit_label;
 }
