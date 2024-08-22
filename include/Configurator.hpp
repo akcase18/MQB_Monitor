@@ -61,7 +61,7 @@ private:
     /**
      * Creates the list of options for the drop-down menu based on the
      * list of Information objects
-    */
+     */
     void create_drop_down_list();
 
     /**
@@ -69,6 +69,12 @@ private:
      * the Configurator window
      */
     void create_done_btn();
+
+    /**
+     * Creates the radio button for selecing unit type in the Configurator
+     * window
+     */
+    void create_radio_btns();
 
     /**
      * Gets the associated Information object based on the option
@@ -87,6 +93,8 @@ public:
      ********************/
 
     static lv_obj_t *window;                  // Window object that holds all other elements
+    static lv_obj_t *flex_col_1;              // Column 1 of flex layout
+    static lv_obj_t *flex_col_2;              // Column 2 of flex layout
     static lv_obj_t *drop_down;               // Drop-down menu
     static lv_obj_t *radio_imperial;          // Radio button for imperial units
     static lv_obj_t *radio_metric;            // Radio button for metric units
