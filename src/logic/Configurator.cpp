@@ -6,6 +6,7 @@
 
 Configurator::Configurator()
 {
+    config_style_init();
 }
 
 /***************************
@@ -20,6 +21,19 @@ void Configurator::show_config_window()
 void Configurator::close_config_window()
 {
     get_info_from_drop_down(drop_down);
+}
+
+void Configurator::create_done_btn()
+{
+    btn_done = lv_obj_create(window);
+    lv_obj_set_size(btn_done, 90, 50);
+    lv_obj_align(btn_done, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+    lv_obj_add_style(btn_done, style_btn_done, 0);
+    lv_obj_add_style(btn_done, style_btn_done, LV_STATE_PRESSED);
+    lv_obj_add_event_cb(btn_done, close_window_cb, LV_EVENT_ALL, window);
+    /* Turn off scrolling */
+    lv_obj_set_scrollbar_mode(btn_done, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_clear_flag(btn_done, LV_OBJ_FLAG_SCROLLABLE);
 }
 
 /****************************
@@ -38,7 +52,7 @@ void Configurator::config_style_init()
     lv_style_set_opa(style_btn_done, LV_OPA_100);                                    // Set to 100% opacity
     lv_style_set_bg_color(style_btn_done, lv_palette_darken(LV_PALETTE_GREY, 4));    // Set the background color to 4 steps darker than base grey
     lv_style_set_text_color(style_btn_done, lv_palette_lighten(LV_PALETTE_GREY, 4)); // Set the text color to 4 steps lighter than base grey
-    lv_style_set_text_font(style_btn_done, &vw_24);                              // Set the font
+    lv_style_set_text_font(style_btn_done, &vw_24);                                  // Set the font
     lv_style_set_text_letter_space(style_btn_done, 0);                               // Remove as much space as possible from between the letters
     lv_style_set_shadow_width(style_btn_done, 0);                                    // Remove the drop shadow
 
@@ -55,7 +69,7 @@ void Configurator::config_style_init()
     lv_style_set_bg_color(style_layout, lv_palette_darken(LV_PALETTE_GREY, 4));    // Set the background color to 4 steps darker than base grey
     lv_style_set_border_width(style_layout, 0);                                    // Remove border
     lv_style_set_text_color(style_layout, lv_palette_lighten(LV_PALETTE_GREY, 5)); // Set the text color to 5 steps lighter than base grey
-    lv_style_set_text_font(style_layout, &vw_24);                              // Set the font to the same font as the drop-down menu
+    lv_style_set_text_font(style_layout, &vw_24);                                  // Set the font to the same font as the drop-down menu
 }
 
 void Configurator::setup_config_window()
@@ -86,4 +100,16 @@ Information *Configurator::get_info_from_drop_down(lv_obj_t *drop_down)
 {
     uint8_t index = lv_dropdown_get_selected(drop_down);
     String info_name = drop_down_list[index];
+}
+
+/*************
+ * Callbacks *
+ *************/
+
+void Configurator::close_window_cb(lv_event_t *e)
+{
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+    {
+        close_config_window();
+    }
 }

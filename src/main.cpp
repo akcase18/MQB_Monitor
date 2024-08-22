@@ -4,11 +4,11 @@
  * Panel Object Creation *
  *************************/
 
-Panel panel_tl = Panel(&coolant_temp, btn_tl, data_tl, label_tl, &style_btn_top, &style_label_top);      // Top left Panel object
-Panel panel_tc = Panel(&engine_oil_temp, btn_tc, data_tc, label_tc, &style_btn_top, &style_label_top);   // Top center Panel object
-Panel panel_tr = Panel(&intake_air_temp, btn_tr, data_tr, label_tr, &style_btn_top, &style_label_top);   // Top right Panel object
-Panel panel_bl = Panel(&intake_pressure, btn_bl, data_bl, label_bl, &style_btn_btm, &style_label_btm);   // Bottom left Panel object
-Panel panel_br = Panel(&throttle_position, btn_br, data_br, label_br, &style_btn_btm, &style_label_btm); // Bottom right Panel object
+Panel panel_tl = Panel(&coolant_temp, btn_tl, data_tl, label_tl);      // Top left Panel object
+Panel panel_tc = Panel(&engine_oil_temp, btn_tc, data_tc, label_tc);   // Top center Panel object
+Panel panel_tr = Panel(&intake_air_temp, btn_tr, data_tr, label_tr);   // Top right Panel object
+Panel panel_bl = Panel(&intake_pressure, btn_bl, data_bl, label_bl);   // Bottom left Panel object
+Panel panel_br = Panel(&throttle_position, btn_br, data_br, label_br); // Bottom right Panel object
 
 /**************************
  * Layout Object Creation *
@@ -33,6 +33,7 @@ void add_style_to_panels()
 void setup()
 {
     style_init();
+    add_style_to_panels();
 }
 
 void loop()

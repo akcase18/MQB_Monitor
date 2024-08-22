@@ -65,10 +65,21 @@ private:
     void create_drop_down_list();
 
     /**
+     * Creates the "Done" button and puts it into the correct spot on
+     * the Configurator window
+     */
+    void create_done_btn();
+
+    /**
      * Gets the associated Information object based on the option
      * selected in the drop-down menu
      */
     Information *get_info_from_drop_down(lv_obj_t *drop_down);
+
+    /**
+     * Callback to service closing the Configurator object
+     */
+    static void close_window_cb(lv_event_t *e);
 
 public:
     /********************

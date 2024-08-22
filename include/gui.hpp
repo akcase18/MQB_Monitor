@@ -173,10 +173,6 @@ static void style_init(void)
     lv_style_set_border_width(&style_main, 0);
     lv_style_set_radius(&style_main, 0);
 
-    /* Set the style of the configuration window */
-    lv_style_init(&style_config);
-    lv_style_set_bg_color(&style_config, lv_palette_darken(LV_PALETTE_GREY, 4));
-
     /* Set the style of the top data buttons */
     lv_style_init(&style_btn_top);
     lv_style_set_radius(&style_btn_top, 2);
@@ -197,16 +193,6 @@ static void style_init(void)
     lv_style_set_text_letter_space(&style_btn_btm, 0);
     lv_style_set_shadow_width(&style_btn_btm, 0);
 
-    /* Set the style of the "done" button */
-    lv_style_init(&style_btn_done);
-    lv_style_set_radius(&style_btn_done, 5);
-    lv_style_set_opa(&style_btn_done, LV_OPA_100);
-    lv_style_set_bg_color(&style_btn_done, lv_palette_darken(LV_PALETTE_GREY, 4));
-    lv_style_set_text_color(&style_btn_done, lv_palette_lighten(LV_PALETTE_GREY, 4));
-    lv_style_set_text_font(&style_btn_done, &vw_24);
-    lv_style_set_text_letter_space(&style_btn_done, 0);
-    lv_style_set_shadow_width(&style_btn_done, 0);
-
     /* Darken button when pressed */
     static lv_color_filter_dsc_t color_filter_btn;
     lv_color_filter_dsc_init(&color_filter_btn, darken);
@@ -225,21 +211,6 @@ static void style_init(void)
     lv_style_set_text_color(&style_label_btm, lv_palette_lighten(LV_PALETTE_GREY, 5));
     lv_style_set_text_font(&style_label_btm, &vw_18);
     lv_style_set_text_letter_space(&style_label_btm, 0);
-
-    /* Set the style of the radio button for selecting unit region */
-    lv_style_init(&style_radio);
-    lv_style_set_radius(&style_radio, LV_RADIUS_CIRCLE);
-    lv_style_set_text_color(&style_radio, lv_palette_lighten(LV_PALETTE_GREY, 5));
-    /* Set the style of the radio button when checked */
-    lv_style_init(&style_radio_chk);
-    lv_style_set_bg_img_src(&style_radio_chk, NULL);
-
-    /* Set the style for the flex layout objects */
-    lv_style_init(&style_flex);
-    lv_style_set_bg_color(&style_flex, lv_palette_darken(LV_PALETTE_GREY, 4));
-    lv_style_set_border_width(&style_flex, 0);
-    lv_style_set_text_color(&style_flex, lv_palette_lighten(LV_PALETTE_GREY, 5));
-    lv_style_set_text_font(&style_flex, &vw_24);
 }
 
 /*******************
