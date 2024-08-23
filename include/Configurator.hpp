@@ -20,6 +20,7 @@
  */
 
 #include "Layout.hpp"
+#include "callbacks.hpp"
 
 using namespace std;
 
@@ -54,25 +55,26 @@ private:
     void config_style_init();
 
     /**
-     * Sets up the layout, size, and properties of the window object
+     * Sets up the layout, size, and properties of the window object.
+     * Also adds all of the elements that go into the Configurator.
      */
     void setup_config_window();
 
     /**
      * Creates the list of options for the drop-down menu based on the
-     * list of Information objects
+     * list of Information objects.
      */
     void create_drop_down_list();
 
     /**
      * Creates the "Done" button and puts it into the correct spot on
-     * the Configurator window
+     * the Configurator window.
      */
     void create_done_btn();
 
     /**
      * Creates the radio button for selecing unit type in the Configurator
-     * window
+     * window.
      */
     void create_radio_btns();
 
@@ -80,12 +82,7 @@ private:
      * Gets the associated Information object based on the option
      * selected in the drop-down menu
      */
-    Information *get_info_from_drop_down(lv_obj_t *drop_down);
-
-    /**
-     * Callback to service closing the Configurator object
-     */
-    static void close_window_cb(lv_event_t *e);
+    Information *get_info_from_drop_down();
 
 public:
     /********************
@@ -106,7 +103,7 @@ public:
     static lv_style_t *style_btn_done;        // Style for done button
     static lv_style_t *style_layout;          // Style for flex layout used
     Panel *panel_selected;                    // Panel that the Configurator was opened by
-    vector<String> drop_down_list;            // Array of options for the drop-down menu
+    vector<String> drop_down_list;            // List of all Information objects
 
     /********************
      * Public Functions *
