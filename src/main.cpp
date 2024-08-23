@@ -16,6 +16,12 @@ Panel panel_br = Panel(&throttle_position, btn_br, data_br, label_br); // Bottom
 
 Layout layout_1 = Layout(&panel_tl, &panel_tc, &panel_tr, &panel_bl, &panel_br); // Main layout creation
 
+/*************************
+ * Configurator Creation *
+ *************************/
+
+Configurator config = Configurator();
+
 void add_style_to_panels()
 {
     /* Top Left Panel */
