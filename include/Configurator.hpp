@@ -88,21 +88,21 @@ public:
      * Public Variables *
      ********************/
 
-    static lv_obj_t *window;                  // Window object that holds all other elements
-    static lv_obj_t *flex_col_1;              // Column 1 of flex layout
-    static lv_obj_t *flex_col_2;              // Column 2 of flex layout
-    static lv_obj_t *drop_down;               // Drop-down menu
-    static lv_obj_t *radio_imperial;          // Radio button for imperial units
-    static lv_obj_t *radio_metric;            // Radio button for metric units
-    static lv_obj_t *btn_done;                // Done button
-    static lv_style_t *style_window;          // Style for window
-    static lv_style_t *style_drop_down;       // Style for drop-down menu
-    static lv_style_t *style_radio_checked;   // Style for radio button when selected
-    static lv_style_t *style_radio_unchecked; // Style for radio button when deselected
-    static lv_style_t *style_btn_done;        // Style for done button
-    static lv_style_t *style_layout;          // Style for flex layout used
+    lv_obj_t *window;                  // Window object that holds all other elements
+    lv_obj_t *flex_col_1;              // Column 1 of flex layout
+    lv_obj_t *flex_col_2;              // Column 2 of flex layout
+    lv_obj_t *drop_down;               // Drop-down menu
+    lv_obj_t *radio_imperial;          // Radio button for imperial units
+    lv_obj_t *radio_metric;            // Radio button for metric units
+    lv_obj_t *btn_done;                // Done button
+    lv_style_t *style_window;          // Style for window
+    lv_style_t *style_drop_down;       // Style for drop-down menu
+    lv_style_t *style_radio_checked;   // Style for radio button when selected
+    lv_style_t *style_radio_unchecked; // Style for radio button when deselected
+    lv_style_t *style_btn_done;        // Style for done button
+    lv_style_t *style_layout;          // Style for flex layout used
     Panel *panel_selected;                    // Panel that the Configurator was opened by
-    static vector<String> drop_down_list;            // List of all Information objects
+    vector<String> drop_down_list;            // List of all Information objects
 
     /********************
      * Public Functions *
