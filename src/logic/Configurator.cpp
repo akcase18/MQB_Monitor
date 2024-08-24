@@ -14,12 +14,12 @@ Configurator::Configurator()
  * Public Helper Functions *
  ***************************/
 
-void Configurator::show_config_window()
+void Configurator::open_window()
 {
-    lv_screen_load(window);                  // Sets the window to be located on the active screen
+    lv_screen_load(window); // Sets the window to be located on the active screen
 }
 
-void Configurator::close_config_window()
+void Configurator::close_window()
 {
     Information *info = get_info_from_drop_down(); // Get the Information object that was chosen
     panel_selected->panel_info = info;             // Update the Information object that is attached to the Panel that was selected
@@ -113,8 +113,8 @@ void Configurator::setup_config_window()
     flex_col_2 = lv_obj_create(window);                    // Adds flex clumn to the Configurator window
     lv_obj_set_flex_flow(flex_col_2, LV_FLEX_FLOW_COLUMN); // Sets column to use flex flow layout
     lv_obj_set_size(flex_col_2, lv_pct(40), lv_pct(100));  // Set column to take up 40% of window width
-    lv_obj_set_x(flex_col_2, lv_pct(60));          // Set column to take up 60% of window height
-    lv_obj_add_style(flex_col_2, style_layout, 0); // Add flex layout style to column
+    lv_obj_set_x(flex_col_2, lv_pct(60));                  // Set column to take up 60% of window height
+    lv_obj_add_style(flex_col_2, style_layout, 0);         // Add flex layout style to column
     /***** Add elements to window *****/
     /* Drop Down */
     String drop_down_string = ""; // String to hold all values for the drop-down menu

@@ -14,7 +14,7 @@ Panel panel_br = Panel(&throttle_position, btn_br, data_br, label_br); // Bottom
  * Layout Object Creation *
  **************************/
 
-Layout layout_1 = Layout(&panel_tl, &panel_tc, &panel_tr, &panel_bl, &panel_br); // Main layout creation
+Layout layout = Layout(&panel_tl, &panel_tc, &panel_tr, &panel_bl, &panel_br); // Main layout creation
 
 /*************************
  * Configurator Creation *
@@ -32,9 +32,10 @@ Configurator config = Configurator();
  */
 void open_config_cb(lv_event_t *e)
 {
+    layout.close_window();
     Panel *panel_sel = (Panel *)lv_event_get_user_data(e); // Get the user data passed into callback
     config.panel_selected = panel_sel;                     // Keep track of the Panel that was pressed to open the Configurator
-    config.show_config_window();
+    config.open_window();
 }
 
 /**
@@ -43,7 +44,8 @@ void open_config_cb(lv_event_t *e)
  */
 void close_config_cb(lv_event_t *e)
 {
-    config.close_config_window();
+    config.close_window();
+    layout.open_window();
 }
 
 /**

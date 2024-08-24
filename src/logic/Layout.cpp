@@ -18,6 +18,16 @@ Layout::Layout(Panel *top_left, Panel *top_center, Panel *top_right, Panel *bott
     panel_br = bottom_right;
 }
 
+void Layout::open_window()
+{
+    lv_screen_load(window); // Sets the window to be located on the active screen
+}
+
+void Layout::close_window()
+{
+    // Not sure what needs to be done here
+}
+
 void Layout::setup_objects()
 {
     /***** Top Left Panel *****/

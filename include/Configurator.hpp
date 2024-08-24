@@ -120,7 +120,7 @@ public:
     /**
      * Displays the Configurator window.
      */
-    void show_config_window();
+    void open_window();
 
     /**
      * Called when "Done" button is pressed. *Should be called in button callback*
@@ -128,7 +128,7 @@ public:
      * with the Information object that was selected in the drop-down menu when
      * the "Done" button was pressed.
      */
-    void close_config_window();
+    void close_window();
 
     /**
      * Set the callback of a given object, triggered on the given state.

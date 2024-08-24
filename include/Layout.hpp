@@ -95,6 +95,16 @@ public:
     Layout(Panel *top_left, Panel *top_center, Panel *top_right, Panel *bottom_left, Panel *bottom_right);
 
     /**
+     * Displays the main Layout window.
+     */
+    void open_window();
+
+    /**
+     * Closes the main Layout window.
+     */
+    void close_window();
+    
+    /**
      * Setup the layout of the Panels in the Layout object, put everything into
      * the correct places, and add all styles.
      */
