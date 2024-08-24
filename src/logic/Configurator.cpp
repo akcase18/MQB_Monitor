@@ -22,7 +22,9 @@ void Configurator::show_config_window()
 
 void Configurator::close_config_window()
 {
-    get_info_from_drop_down();
+    Information *info = get_info_from_drop_down(); // Get the Information object that was chosen
+    panel_selected->panel_info = info;             // Update the Information object that is attached to the Panel that was selected
+    // Might need to do more to this
 }
 
 void Configurator::create_done_btn()
@@ -53,6 +55,11 @@ void Configurator::create_radio_btns()
     lv_obj_add_style(radio_metric, style_radio_checked, LV_PART_INDICATOR | LV_STATE_CHECKED); // Add style for when selected
     lv_checkbox_set_text(radio_metric, "Metric");                                              // Set text for radio button
     lv_obj_align(radio_metric, LV_ALIGN_TOP_MID, lv_pct(0), lv_pct(25));                       // Align radio button on bottom
+}
+
+void Configurator::set_callback(lv_obj_t *object, void (*function)(lv_event_t *e), lv_event_code_t state, void *user_data)
+{
+    lv_obj_add_event_cb(object, function, state, user_data);
 }
 
 /****************************
@@ -114,10 +121,9 @@ void Configurator::setup_config_window()
     /***** Add elements to window *****/
     /* Drop Down */
     String drop_down_string = ""; // String to hold all values for the drop-down menu
-    create_drop_down_list();
-    for (uint i = 0; i < drop_down_list.size(); i++)
+    for (uint i = 0; i < info_list.size(); i++)
     {
-        drop_down_string += drop_down_list[i] + "\n";
+        drop_down_string += info_list[i]->get_name() + "\n";
     }
     drop_down = lv_dropdown_create(flex_col_1);                          // Add drop-down menu to first column
     lv_dropdown_set_options_static(drop_down, drop_down_string.c_str()); // Add list of options to drop-down menu
@@ -130,16 +136,8 @@ void Configurator::setup_config_window()
     create_done_btn();
 }
 
-void Configurator::create_drop_down_list()
-{
-    for (uint i = 0; i < info_list.size(); i++)
-    {
-        drop_down_list.push_back(info_list[i].get_name());
-    }
-}
-
 Information *Configurator::get_info_from_drop_down()
 {
     uint8_t index = lv_dropdown_get_selected(drop_down);
-    String info_name = drop_down_list[index];
+    return info_list[index];
 }

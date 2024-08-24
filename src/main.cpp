@@ -22,6 +22,31 @@ Layout layout_1 = Layout(&panel_tl, &panel_tc, &panel_tr, &panel_bl, &panel_br);
 
 Configurator config = Configurator();
 
+/*************
+ * Callbacks *
+ *************/
+
+/**
+ * Callback for opening the Configurator window when a Panel button
+ * is pressed.
+ */
+void open_config_cb(lv_event_t *e)
+{
+    config.show_config_window();
+}
+
+/**
+ * Callback for the "done" button in the Configurator window to
+ * close the Configurator window.
+ */
+void close_config_cb(lv_event_t *e)
+{
+    config.close_config_window();
+}
+
+/**
+ * Add button and label styles to the Panels
+ */
 void add_style_to_panels()
 {
     /* Top Left Panel */
@@ -36,10 +61,20 @@ void add_style_to_panels()
     panel_br.set_styles(&style_btn_btm, &style_label_btm);
 }
 
+/**
+ * Add callbacks to all of the necessary objects, buttons, windows, etc.
+ */
+void setup_callbacks()
+{
+    /* Configurator */
+    config.set_callback(config.btn_done, close_config_cb, LV_EVENT_CLICKED, NULL);
+}
+
 void setup()
 {
     style_init();
     add_style_to_panels();
+    setup_callbacks();
 }
 
 void loop()

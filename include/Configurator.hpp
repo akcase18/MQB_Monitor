@@ -60,12 +60,6 @@ private:
     void setup_config_window();
 
     /**
-     * Creates the list of options for the drop-down menu based on the
-     * list of Information objects.
-     */
-    void create_drop_down_list();
-
-    /**
      * Creates the "Done" button and puts it into the correct spot on
      * the Configurator window.
      */
@@ -79,7 +73,15 @@ private:
 
     /**
      * Gets the associated Information object based on the option
-     * selected in the drop-down menu
+     * selected in the drop-down menu.
+     *
+     * @note The drop-down object has a function "lv_dropdown_get_selected()"
+     * which returns the index of the option that is currently selected.
+     * Since we generate the options from an existing list, we can use this
+     * index to figure out what Information object corresponds to the selected
+     * option.
+     *
+     * @return the Information object that corresponds to the selected option in the drop-down
      */
     Information *get_info_from_drop_down();
 
@@ -101,8 +103,7 @@ public:
     lv_style_t *style_radio_unchecked; // Style for radio button when deselected
     lv_style_t *style_btn_done;        // Style for done button
     lv_style_t *style_layout;          // Style for flex layout used
-    Panel *panel_selected;                    // Panel that the Configurator was opened by
-    vector<String> drop_down_list;            // List of all Information objects
+    Panel *panel_selected;             // Panel that the Configurator was opened by
 
     /********************
      * Public Functions *
@@ -128,6 +129,16 @@ public:
      * the "Done" button was pressed.
      */
     void close_config_window();
+
+    /**
+     * Set the callback of a given object, triggered on the given state.
+     *
+     * @param object pointer to a lv_obj_t that the callback will be attached to
+     * @param function pointer to a callback function to be called
+     * @param state enum for the state trigger that the callback will be called on
+     * @param user_data custom data that will be available in the callback (can pass in NULL)
+     */
+    void set_callback(lv_obj_t *object, void (*function)(lv_event_t *e), lv_event_code_t state, void *user_data);
 };
 
 #endif
