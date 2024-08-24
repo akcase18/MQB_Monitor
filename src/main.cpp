@@ -20,7 +20,16 @@ Layout layout_1 = Layout(&panel_tl, &panel_tc, &panel_tr, &panel_bl, &panel_br);
  * Configurator Creation *
  *************************/
 
-Configurator config = Configurator();
+// Configurator config = Configurator();
+
+/*************
+ * Callbacks *
+ *************/
+
+// void close_window_cb(lv_event_t *e)
+// {
+    
+// }
 
 void add_style_to_panels()
 {

@@ -20,7 +20,6 @@
  */
 
 #include "Layout.hpp"
-#include "callbacks.hpp"
 
 using namespace std;
 
@@ -103,7 +102,7 @@ public:
     static lv_style_t *style_btn_done;        // Style for done button
     static lv_style_t *style_layout;          // Style for flex layout used
     Panel *panel_selected;                    // Panel that the Configurator was opened by
-    vector<String> drop_down_list;            // List of all Information objects
+    static vector<String> drop_down_list;            // List of all Information objects
 
     /********************
      * Public Functions *

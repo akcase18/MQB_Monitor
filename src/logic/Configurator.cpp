@@ -22,7 +22,7 @@ void Configurator::show_config_window()
 
 void Configurator::close_config_window()
 {
-    get_info_from_drop_down(drop_down);
+    get_info_from_drop_down();
 }
 
 void Configurator::create_done_btn()
@@ -32,7 +32,7 @@ void Configurator::create_done_btn()
     lv_obj_align(btn_done, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
     lv_obj_add_style(btn_done, style_btn_done, 0);
     lv_obj_add_style(btn_done, style_btn_done, LV_STATE_PRESSED);
-    lv_obj_add_event_cb(btn_done, close_window_cb, LV_EVENT_ALL, window);
+    // lv_obj_add_event_cb(btn_done, close_window_cb, LV_EVENT_ALL, window);
     /* Turn off scrolling */
     lv_obj_set_scrollbar_mode(btn_done, LV_SCROLLBAR_MODE_OFF);
     lv_obj_clear_flag(btn_done, LV_OBJ_FLAG_SCROLLABLE);
