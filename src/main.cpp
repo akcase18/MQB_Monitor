@@ -47,6 +47,14 @@ void close_config_cb(lv_event_t *e)
 }
 
 /**
+ * Callback to service the radio buttons in the Configurator window.
+ */
+void radio_cb(lv_event_t *e)
+{
+    // TODO: Fill out
+}
+
+/**
  * Add button and label styles to the Panels
  */
 void add_style_to_panels()
@@ -76,7 +84,7 @@ void setup_callbacks()
     panel_br.set_callback(panel_br.btn, open_config_cb, LV_EVENT_CLICKED, &panel_br);
     /* Configurator */
     config.set_callback(config.btn_done, close_config_cb, LV_EVENT_CLICKED, NULL); // Close Configurator when "Done" button is pressed
-    // config.set_callback(config.flex_col_2, radio_cb, LV_EVENT_CLICKED, NULL);      // Trigger/Switch radio button selection when pressed
+    config.set_callback(config.flex_col_2, radio_cb, LV_EVENT_CLICKED, NULL);      // Trigger/Switch radio button selection when pressed
 }
 
 void setup()
