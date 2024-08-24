@@ -37,20 +37,21 @@ void Panel::set_styles(lv_style_t *btn_style, lv_style_t *label_style)
     set_label_style(label_style);
 }
 
+void Panel::set_callback(lv_obj_t *object, void (*function)(lv_event_t *e), lv_event_code_t state, void *user_data)
+{
+    lv_obj_add_event_cb(object, function, state, user_data);
+}
+
+/*******************************
+ * Private Getters and Setters *
+ *******************************/
+
 void Panel::set_button_style(lv_style_t *style)
 {
     style_btn = style;
-}
-lv_style_t *Panel::get_button_style()
-{
-    return style_btn;
 }
 
 void Panel::set_label_style(lv_style_t *style)
 {
     style_label = style;
-}
-lv_style_t *Panel::get_label_style()
-{
-    return style_label;
 }

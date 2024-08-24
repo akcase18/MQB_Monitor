@@ -120,18 +120,18 @@ static void radiobutton_create(lv_obj_t *parent, lv_obj_t *child, const char *te
 
 /***** Callbacks *****/
 
-/**
- * Open the configuration window
- */
-static void button_config_cb(lv_event_t *e);
-/**
- * Close the configuration window
- */
-static void close_window_cb(lv_event_t *e);
-/**
- * Switch the state of the radio button and store that data
- */
-static void radio_cb(lv_event_t *e);
+// /**
+//  * Open the configuration window
+//  */
+// static void button_config_cb(lv_event_t *e);
+// /**
+//  * Close the configuration window
+//  */
+// static void close_window_cb(lv_event_t *e);
+// /**
+//  * Switch the state of the radio button and store that data
+//  */
+// static void radio_cb(lv_event_t *e);
 
 /***** Transforms *****/
 
@@ -249,17 +249,17 @@ static void radiobutton_create(lv_obj_t *parent, lv_obj_t *child, const char *te
  * Callbacks *
  *************/
 
-static void button_config_cb(lv_event_t *e)
-{
-}
+// static void button_config_cb(lv_event_t *e)
+// {
+// }
 
-static void close_window_cb(lv_event_t *e)
-{
-}
+// static void close_window_cb(lv_event_t *e)
+// {
+// }
 
-static void radio_cb(lv_event_t *e)
-{
-}
+// static void radio_cb(lv_event_t *e)
+// {
+// }
 
 /**************
  * Transforms *

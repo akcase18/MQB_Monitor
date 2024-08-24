@@ -16,8 +16,7 @@ Configurator::Configurator()
 
 void Configurator::show_config_window()
 {
-    window = lv_obj_create(lv_scr_act()); // Sets the window to be located on the active screen
-    lv_scr_load(window);                  // Sets the window to be located on the active screen
+    lv_screen_load(window);                  // Sets the window to be located on the active screen
 }
 
 void Configurator::close_config_window()
@@ -34,7 +33,6 @@ void Configurator::create_done_btn()
     lv_obj_align(btn_done, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
     lv_obj_add_style(btn_done, style_btn_done, 0);
     lv_obj_add_style(btn_done, style_btn_done, LV_STATE_PRESSED);
-    // lv_obj_add_event_cb(btn_done, close_window_cb, LV_EVENT_ALL, window);
     /* Turn off scrolling */
     lv_obj_set_scrollbar_mode(btn_done, LV_SCROLLBAR_MODE_OFF);
     lv_obj_clear_flag(btn_done, LV_OBJ_FLAG_SCROLLABLE);
@@ -115,7 +113,6 @@ void Configurator::setup_config_window()
     flex_col_2 = lv_obj_create(window);                    // Adds flex clumn to the Configurator window
     lv_obj_set_flex_flow(flex_col_2, LV_FLEX_FLOW_COLUMN); // Sets column to use flex flow layout
     lv_obj_set_size(flex_col_2, lv_pct(40), lv_pct(100));  // Set column to take up 40% of window width
-    // lv_obj_add_event_cb(flex_col_2, radio_cb, LV_EVENT_CLICKED, &active_index);
     lv_obj_set_x(flex_col_2, lv_pct(60));          // Set column to take up 60% of window height
     lv_obj_add_style(flex_col_2, style_layout, 0); // Add flex layout style to column
     /***** Add elements to window *****/

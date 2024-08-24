@@ -32,6 +32,8 @@ Configurator config = Configurator();
  */
 void open_config_cb(lv_event_t *e)
 {
+    Panel *panel_sel = (Panel *)lv_event_get_user_data(e); // Get the user data passed into callback
+    config.panel_selected = panel_sel;                     // Keep track of the Panel that was pressed to open the Configurator
     config.show_config_window();
 }
 
@@ -66,8 +68,15 @@ void add_style_to_panels()
  */
 void setup_callbacks()
 {
+    /* Panels */
+    panel_tl.set_callback(panel_tl.btn, open_config_cb, LV_EVENT_CLICKED, &panel_tl);
+    panel_tc.set_callback(panel_tc.btn, open_config_cb, LV_EVENT_CLICKED, &panel_tc);
+    panel_tr.set_callback(panel_tr.btn, open_config_cb, LV_EVENT_CLICKED, &panel_tr);
+    panel_bl.set_callback(panel_bl.btn, open_config_cb, LV_EVENT_CLICKED, &panel_bl);
+    panel_br.set_callback(panel_br.btn, open_config_cb, LV_EVENT_CLICKED, &panel_br);
     /* Configurator */
-    config.set_callback(config.btn_done, close_config_cb, LV_EVENT_CLICKED, NULL);
+    config.set_callback(config.btn_done, close_config_cb, LV_EVENT_CLICKED, NULL); // Close Configurator when "Done" button is pressed
+    // config.set_callback(config.flex_col_2, radio_cb, LV_EVENT_CLICKED, NULL);      // Trigger/Switch radio button selection when pressed
 }
 
 void setup()

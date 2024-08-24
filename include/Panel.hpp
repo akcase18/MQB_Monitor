@@ -51,6 +51,20 @@ private:
      * Private Functions *
      *********************/
 
+    /**
+     * Set the style for the Panel button
+     * 
+     * @param style pointer to the style for the button
+     */
+    void set_button_style(lv_style_t *style);
+
+    /**
+     * Set the style for the Panel label
+     * 
+     * @param style pointer to the style for the label
+     */
+    void set_label_style(lv_style_t *style);
+
 public:
     /********************
      * Public Variables *
@@ -113,11 +127,15 @@ public:
      */
     void set_styles(lv_style_t *btn_style, lv_style_t *label_style);
 
-    void set_button_style(lv_style_t *style);
-    lv_style_t *get_button_style();
-
-    void set_label_style(lv_style_t *style);
-    lv_style_t *get_label_style();
+    /**
+     * Set the callback of a given object, triggered on the given state.
+     *
+     * @param object pointer to a lv_obj_t that the callback will be attached to
+     * @param function pointer to a callback function to be called
+     * @param state enum for the state trigger that the callback will be called on
+     * @param user_data custom data that will be available in the callback (can pass in NULL)
+     */
+    void set_callback(lv_obj_t *object, void (*function)(lv_event_t *e), lv_event_code_t state, void *user_data);
 };
 
 #endif
