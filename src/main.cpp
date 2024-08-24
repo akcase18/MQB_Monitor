@@ -60,15 +60,15 @@ void radio_cb(lv_event_t *e)
 void add_style_to_panels()
 {
     /* Top Left Panel */
-    panel_tl.set_styles(&style_btn_top, &style_label_top);
+    panel_tl.set_styles(&style_btn_top, &style_btn_pressed, &style_label_top);
     /* Top Center Panel */
-    panel_tc.set_styles(&style_btn_top, &style_label_top);
+    panel_tc.set_styles(&style_btn_top, &style_btn_pressed, &style_label_top);
     /* Top Right Panel */
-    panel_tr.set_styles(&style_btn_top, &style_label_top);
+    panel_tr.set_styles(&style_btn_top, &style_btn_pressed, &style_label_top);
     /* Bottom Left Panel */
-    panel_bl.set_styles(&style_btn_btm, &style_label_btm);
+    panel_bl.set_styles(&style_btn_btm, &style_btn_pressed, &style_label_btm);
     /* Bottom Right Panel */
-    panel_br.set_styles(&style_btn_btm, &style_label_btm);
+    panel_br.set_styles(&style_btn_btm, &style_btn_pressed, &style_label_btm);
 }
 
 /**

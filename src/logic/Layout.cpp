@@ -18,6 +18,33 @@ Layout::Layout(Panel *top_left, Panel *top_center, Panel *top_right, Panel *bott
     panel_br = bottom_right;
 }
 
+void Layout::setup_objects()
+{
+    /***** Top Left Panel *****/
+    /* Button */
+    panel_tl->btn = lv_obj_create(window);                                                         // Create the button in the Layout window
+    lv_obj_add_style(panel_tl->btn, panel_tl->style_btn, 0);                                       // Add the style for the button
+    lv_obj_add_style(panel_tl->btn, panel_tl->style_btn_pressed, LV_STATE_PRESSED);                // Add the style for the button when pressed
+    lv_obj_set_grid_cell(panel_tl->btn, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_STRETCH, 0, 1); // Organize the Panel into the correct spot in the grid
+    /* Data in Button */
+    panel_tl->data_btn = lv_label_create(panel_tl->btn);                                 // Create a spot for data to go into the button
+    lv_label_set_text(panel_tl->data_btn, panel_tl->panel_info->get_data_str().c_str()); // Put the data in the Information object into the button
+    lv_obj_align(panel_tl->data_btn, LV_ALIGN_CENTER, 0, 0);                             // Put the data into the center of the button
+    /* Label */
+    panel_tl->label = lv_label_create(window);                                                     // Create a label to show what data the button is holding
+    lv_label_set_text(panel_tl->label, panel_tl->panel_info->get_name().c_str());                  // Put the name of the Information object into the label
+    lv_obj_add_style(panel_tl->label, panel_tl->style_label, 0);                                   // Add the style for the label
+    lv_obj_set_grid_cell(panel_tl->label, LV_GRID_ALIGN_CENTER, 0, 2, LV_GRID_ALIGN_CENTER, 1, 1); // Put the label right below the button
+    /***** Top Center Panel *****/
+    /* Button */
+    /* Data in Button */
+    /* Label */
+
+    /***** Top Right Panel *****/
+    /***** Bottom Left Panel *****/
+    /***** Bottom Right Panel *****/
+}
+
 void Layout::update_layout(Panel *new_panel, Panel_Location old_panel)
 {
     /* Check what panel you want to switch out and replace it with the new one */

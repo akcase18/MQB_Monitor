@@ -53,14 +53,22 @@ private:
 
     /**
      * Set the style for the Panel button
-     * 
+     *
      * @param style pointer to the style for the button
      */
     void set_button_style(lv_style_t *style);
+    
+    /**
+     * Set the style for the Panel button when the button
+     * is pressed
+     *
+     * @param style pointer to the style for the button
+     */
+    void set_button_style_pressed(lv_style_t *style);
 
     /**
      * Set the style for the Panel label
-     * 
+     *
      * @param style pointer to the style for the label
      */
     void set_label_style(lv_style_t *style);
@@ -70,12 +78,13 @@ public:
      * Public Variables *
      ********************/
 
-    Information *panel_info; // The Information object for this Panel
-    lv_obj_t *btn;           // The button this Panel handles
-    lv_obj_t *data_btn;      // The data that goes inside of the button
-    lv_obj_t *label;         // The label associated with the button
-    lv_style_t *style_btn;   // The style of the button
-    lv_style_t *style_label; // The style of the panel
+    Information *panel_info;       // The Information object for this Panel
+    lv_obj_t *btn;                 // The button this Panel handles
+    lv_obj_t *data_btn;            // The data that goes inside of the button
+    lv_obj_t *label;               // The label associated with the button
+    lv_style_t *style_btn;         // The style of the button (not pressed )
+    lv_style_t *style_btn_pressed; // The style for the button (pressed)
+    lv_style_t *style_label;       // The style of the panel
 
     /********************
      * Public Functions *
@@ -121,11 +130,12 @@ public:
 
     /**
      * Sets the styles of both the button and label of the panel
-     * 
+     *
      * @param btn_style the style of the button
+     * @param btn_style_pressed the style of the button when pressed
      * @param label_style the style of the label
      */
-    void set_styles(lv_style_t *btn_style, lv_style_t *label_style);
+    void set_styles(lv_style_t *btn_style, lv_style_t *btn_style_pressed, lv_style_t *label_style);
 
     /**
      * Set the callback of a given object, triggered on the given state.

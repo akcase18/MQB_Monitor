@@ -31,7 +31,7 @@ Panel::Panel(Information *info, lv_obj_t *panel_button, lv_obj_t *panel_button_d
  * Public Getters and Setters *
  ******************************/
 
-void Panel::set_styles(lv_style_t *btn_style, lv_style_t *label_style)
+void Panel::set_styles(lv_style_t *btn_style, lv_style_t *btn_style_pressed,  lv_style_t *label_style)
 {
     set_button_style(btn_style);
     set_label_style(label_style);
@@ -49,6 +49,11 @@ void Panel::set_callback(lv_obj_t *object, void (*function)(lv_event_t *e), lv_e
 void Panel::set_button_style(lv_style_t *style)
 {
     style_btn = style;
+}
+
+void Panel::set_button_style_pressed(lv_style_t *style)
+{
+    style_btn_pressed = style;
 }
 
 void Panel::set_label_style(lv_style_t *style)
