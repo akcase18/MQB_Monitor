@@ -43,19 +43,13 @@ lv_obj_t *label_br; // Bottom right label object
 
 /* Window Styles */
 static lv_style_t style_main;   // Main window style
-static lv_style_t style_config; // Config window style
-static lv_style_t style_flex;   // Flex layout style
 /* Button Styles */
 static lv_style_t style_btn_top;     // Top row button style
 static lv_style_t style_btn_btm;     // Bottom row button style
-static lv_style_t style_btn_pressed; // Button style when pressed
-static lv_style_t style_btn_done;    // Done button style
+static lv_style_t style_btn_pressed; // Button style when pressed 
 /* Label Styles */
 static lv_style_t style_label_top; // Top row label style
 static lv_style_t style_label_btm; // Bottom row label style
-/* Radio Button Styles */
-static lv_style_t style_radio;     // Radio button style (unchecked)
-static lv_style_t style_radio_chk; // Radio button style (checked)
 
 /********
  * Grid *
@@ -63,6 +57,13 @@ static lv_style_t style_radio_chk; // Radio button style (checked)
 
 static lv_coord_t col_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
 static lv_coord_t row_dsc[] = {LV_GRID_FR(6), LV_GRID_FR(1), LV_GRID_FR(8), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
+
+/******************
+ * Display Buffer *
+ ******************/
+
+static lv_color_t disp_buf_1[(LCD_HORZ * LCD_VERT) / 10];
+static lv_color_t disp_buf_2[(LCD_HORZ * LCD_VERT) / 10];
 
 /********************
  * Static Functions *
@@ -75,78 +76,12 @@ static lv_coord_t row_dsc[] = {LV_GRID_FR(6), LV_GRID_FR(1), LV_GRID_FR(8), LV_G
  */
 static void style_init(void);
 
-/***** Window Creation *****/
-
-/**
- * Create the main layout
- *
- * Consists of:
- *
- * 5 buttons (3 small on top row, 2 large on bottom row)
- * Corresponding data labels
- * Corresponding button labels
- */
-static void main_window_create(void);
-/**
- * Create the layout for the configuration screen
- *
- * Consists of:
- *
- * Dropdown menu to select information displayed
- * Radio button to select unit for information
- * Done button
- */
-static void config_window_create(void);
-
-/***** Object Creation *****/
-
-/**
- * Add objects (buttons) to the main window
- */
-static void add_main_objects(void);
-/**
- * Adds labels to buttons in main window
- */
-static void add_main_labels(void);
-/**
- * Add objects (dropdown menu, unit select button, done button) to the
- * configuration window
- */
-static void add_config_objects(void);
-/**
- * Create a radio button
- */
-static void radiobutton_create(lv_obj_t *parent, lv_obj_t *child, const char *text);
-
-/***** Callbacks *****/
-
-// /**
-//  * Open the configuration window
-//  */
-// static void button_config_cb(lv_event_t *e);
-// /**
-//  * Close the configuration window
-//  */
-// static void close_window_cb(lv_event_t *e);
-// /**
-//  * Switch the state of the radio button and store that data
-//  */
-// static void radio_cb(lv_event_t *e);
-
 /***** Transforms *****/
 
 /**
  * Darken the button by the specified opacity
  */
 static lv_color_t darken(const lv_color_filter_dsc_t *dsc, lv_color_t color, lv_opa_t opa);
-
-/***** Helpers *****/
-
-/**
- * Gets the state of the dropdown menu in the configuration window
- * and sets the label to the correct value based on the selection
- */
-static uint8_t get_config_dropdown_state(lv_obj_t *dropdown);
 
 /***** Timer Callbacks *****/
 
@@ -213,54 +148,6 @@ static void style_init(void)
     lv_style_set_text_letter_space(&style_label_btm, 0);
 }
 
-/*******************
- * Window Creation *
- *******************/
-
-static void main_window_create(void)
-{
-}
-
-static void config_window_create(void)
-{
-}
-
-/*******************
- * Object Creation *
- *******************/
-
-static void add_main_objects(void)
-{
-}
-
-static void add_main_labels(void)
-{
-}
-
-static void add_config_objects(void)
-{
-}
-
-static void radiobutton_create(lv_obj_t *parent, lv_obj_t *child, const char *text)
-{
-}
-
-/*************
- * Callbacks *
- *************/
-
-// static void button_config_cb(lv_event_t *e)
-// {
-// }
-
-// static void close_window_cb(lv_event_t *e)
-// {
-// }
-
-// static void radio_cb(lv_event_t *e)
-// {
-// }
-
 /**************
  * Transforms *
  **************/
@@ -269,14 +156,6 @@ static lv_color_t darken(const lv_color_filter_dsc_t *dsc, lv_color_t color, lv_
 {
     LV_UNUSED(dsc);
     return lv_color_darken(color, opa);
-}
-
-/***********
- * Helpers *
- ***********/
-
-static uint8_t get_config_dropdown_state(lv_obj_t *dropdown)
-{
 }
 
 /******************
