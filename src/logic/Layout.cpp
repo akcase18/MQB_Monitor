@@ -16,6 +16,10 @@ Layout::Layout(Panel *top_left, Panel *top_center, Panel *top_right, Panel *bott
     panel_tr = top_right;
     panel_bl = bottom_left;
     panel_br = bottom_right;
+
+    main_style_init();
+    setup_window();
+    setup_objects();
 }
 
 void Layout::open_window()
@@ -26,6 +30,23 @@ void Layout::open_window()
 void Layout::close_window()
 {
     // Not sure what needs to be done here
+}
+
+void Layout::setup_window()
+{
+    window = lv_obj_create(NULL);                // Create the Layout (Main) window in the background
+    lv_obj_set_size(window, LCD_HORZ, LCD_VERT); // Set to the proper window size
+    lv_obj_center(window);                       // Puts window in the center of the display
+    lv_obj_add_style(window, style_window, 0);   // Add the style to the window
+    /* Set grid layout type */
+    lv_obj_set_grid_dsc_array(window, col_dsc, row_dsc); // Adds columns and rows to the window
+    /* Remove padding around all objects to fit them closer together */
+    lv_obj_set_style_pad_all(window, 0, 0);    // Remove padding around border of display
+    lv_obj_set_style_pad_column(window, 0, 0); // Remove padding from columns between objects
+    lv_obj_set_style_pad_row(window, 0, 0);    // Remove padding from rows between objects
+    /* Turn off scrolling */
+    lv_obj_set_scrollbar_mode(window, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_clear_flag(window, LV_OBJ_FLAG_SCROLLABLE);
 }
 
 void Layout::setup_objects()
@@ -105,6 +126,14 @@ void Layout::setup_objects()
     lv_label_set_text(panel_br->label, panel_br->panel_info->get_name().c_str());                  // Put the name of the Information object into the label
     lv_obj_add_style(panel_br->label, panel_br->style_label, 0);                                   // Add the style for the label
     lv_obj_set_grid_cell(panel_br->label, LV_GRID_ALIGN_CENTER, 0, 2, LV_GRID_ALIGN_CENTER, 1, 1); // Put the label right below the button
+}
+
+void Layout::main_style_init()
+{
+    lv_style_init(style_window);
+    lv_style_set_bg_color(style_window, lv_palette_darken(LV_PALETTE_GREY, 4));
+    lv_style_set_border_width(style_window, 0);
+    lv_style_set_radius(style_window, 0);
 }
 
 void Layout::update_layout(Panel *new_panel, Panel_Location old_panel)

@@ -57,7 +57,7 @@ private:
      * Sets up the layout, size, and properties of the window object.
      * Also adds all of the elements that go into the Configurator.
      */
-    void setup_config_window();
+    void setup_window();
 
     /**
      * Creates the "Done" button and puts it into the correct spot on

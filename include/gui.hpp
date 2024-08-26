@@ -4,9 +4,6 @@
  * Global Constants *
  ********************/
 
-#define LCD_HORZ 480 // Horizontal resolution of the display in pixels
-#define LCD_VERT 320 // Vertical resolution of the display in pixels
-
 /*******************
  * Button Creation *
  *******************/
@@ -41,8 +38,6 @@ lv_obj_t *label_br; // Bottom right label object
  * Style Creation *
  ******************/
 
-/* Window Styles */
-static lv_style_t style_main;   // Main window style
 /* Button Styles */
 static lv_style_t style_btn_top;     // Top row button style
 static lv_style_t style_btn_btm;     // Bottom row button style
@@ -50,13 +45,6 @@ static lv_style_t style_btn_pressed; // Button style when pressed
 /* Label Styles */
 static lv_style_t style_label_top; // Top row label style
 static lv_style_t style_label_btm; // Bottom row label style
-
-/********
- * Grid *
- ********/
-
-static lv_coord_t col_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
-static lv_coord_t row_dsc[] = {LV_GRID_FR(6), LV_GRID_FR(1), LV_GRID_FR(8), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
 
 /******************
  * Display Buffer *
