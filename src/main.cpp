@@ -89,9 +89,25 @@ void setup_callbacks()
     config.set_callback(config.flex_col_2, radio_cb, LV_EVENT_CLICKED, NULL);      // Trigger/Switch radio button selection when pressed
 }
 
+/**
+ * Add Information objects to the Panels. This will eventually
+ * need to pull data from some sort of config file, so changes
+ * will save when the display turns off.
+ */
+void info_init()
+{
+     // TODO: Change this to use EEPROM or other setup file data
+    panel_tl.panel_info = &coolant_temp;
+    panel_tc.panel_info = &engine_oil_temp;
+    panel_tr.panel_info = &intake_air_temp;
+    panel_bl.panel_info = &intake_pressure;
+    panel_br.panel_info = &throttle_position;
+}
+
 void setup()
 {
     style_init();
+    info_init();
     add_style_to_panels();
     setup_callbacks();
 }
