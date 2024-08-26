@@ -7,7 +7,7 @@
 Configurator::Configurator()
 {
     config_style_init();
-    setup_config_window();
+    setup_window();
 }
 
 /***************************
@@ -96,12 +96,12 @@ void Configurator::config_style_init()
     lv_style_set_text_font(style_layout, &vw_24);                                  // Set the font to the same font as the drop-down menu
 }
 
-void Configurator::setup_config_window()
+void Configurator::setup_window()
 {
-    window = lv_obj_create(NULL);              // Create the Configurator window in the background
-    lv_obj_set_size(window, 480, 320);         // Set to the proper window size
-    lv_obj_center(window);                     // Puts window in the center of the display
-    lv_obj_add_style(window, style_window, 0); // Add the style to the window
+    window = lv_obj_create(NULL);                // Create the Configurator window in the background
+    lv_obj_set_size(window, LCD_HORZ, LCD_VERT); // Set to the proper window size
+    lv_obj_center(window);                       // Puts window in the center of the display
+    lv_obj_add_style(window, style_window, 0);   // Add the style to the window
     /* Turn off scrolling */
     lv_obj_set_scrollbar_mode(window, LV_SCROLLBAR_MODE_OFF);
     lv_obj_clear_flag(window, LV_OBJ_FLAG_SCROLLABLE);

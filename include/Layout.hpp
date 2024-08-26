@@ -28,6 +28,9 @@ using namespace std;
  * Global Constants *
  ********************/
 
+#define LCD_HORZ 480 // Horizontal resolution of the display in pixels
+#define LCD_VERT 320 // Vertical resolution of the display in pixels
+
 class Layout
 {
 private:
@@ -63,13 +66,40 @@ public:
      * Public Variables *
      ********************/
 
-    lv_obj_t *window;              // Window object that holds all other elements
-    Panel *panel_tl;               // Panel in the top left position
-    Panel *panel_tc;               // Panel in the top center position
-    Panel *panel_tr;               // Panel in the top right position
-    Panel *panel_bl;               // Panel in the bottom left position
-    Panel *panel_br;               // Panel in the bottom right position
-    lv_style_t *style_window;      // The style of the window
+    lv_obj_t *window; // Window object that holds all other elements
+    /**
+     * Columns for the window layout
+     * Column 1: Start of top left, bottom left panel
+     * Column 2: End of top left panel
+     * Column 3: Start of top center panel. End of bottom left panel
+     * Column 4: Start of bottom right panel. End of top center panel
+     * Column 5: Start of top right panel
+     * Column 6: End of top right, bottom right panel
+     *
+     * Top panels take up 2 columns each
+     * Bottom panels take up 3 columns each
+     *
+     * All columns are 80 px wide
+     */
+    lv_coord_t col_dsc[7] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
+    /**
+     * Rows for the window layout
+     * Row 1: Top row of buttons
+     * -> 6 units tall (120 px)
+     * Row 2: Labels for top buttons
+     * -> 1 unit tall (20 px)
+     * Row 3: Bottom row of buttons
+     * -> 8 units tall (160 px)
+     * Row 4: Labels for bottom buttons
+     * -> 1 unit tall (20 px)
+     */
+    lv_coord_t row_dsc[5] = {LV_GRID_FR(6), LV_GRID_FR(1), LV_GRID_FR(8), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
+    Panel *panel_tl;                      // Panel in the top left position
+    Panel *panel_tc;                      // Panel in the top center position
+    Panel *panel_tr;                      // Panel in the top right position
+    Panel *panel_bl;                      // Panel in the bottom left position
+    Panel *panel_br;                      // Panel in the bottom right position
+    lv_style_t *style_window;             // The style of the window
     static vector<Information> info_list; // Stores the Information objects that are on screen
 
     /********************
@@ -103,12 +133,22 @@ public:
      * Closes the main Layout window.
      */
     void close_window();
-    
+
+    /**
+     * Setup the window with the correct parameters and layout.
+     */
+    void setup_window();
+
     /**
      * Setup the layout of the Panels in the Layout object, put everything into
      * the correct places, and add all styles.
      */
     void setup_objects();
+
+    /**
+     * Creates the style for the window itself
+     */
+    void main_style_init();
 
     /**
      * @brief Updates the layout by replacing an old Panel object with a new Panel
