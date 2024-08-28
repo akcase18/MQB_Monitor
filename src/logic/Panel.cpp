@@ -1,5 +1,46 @@
 #include "Panel.hpp"
 
+/*******************
+ * Button Creation *
+ *******************/
+
+lv_obj_t *btn_tl; // Top left button object
+lv_obj_t *btn_tc; // Top center button object
+lv_obj_t *btn_tr; // Top right button object
+lv_obj_t *btn_bl; // Bottom left button object
+lv_obj_t *btn_br; // Bottom right button objet
+
+/************************
+ * Button Data Creation *
+ ************************/
+
+lv_obj_t *data_tl; // Top left data object
+lv_obj_t *data_tc; // Top center data object
+lv_obj_t *data_tr; // Top right data object
+lv_obj_t *data_bl; // Bottom left data object
+lv_obj_t *data_br; // Bottom right data object
+
+/******************
+ * Label Creation *
+ ******************/
+
+lv_obj_t *label_tl; // Top left label object
+lv_obj_t *label_tc; // Top center label object
+lv_obj_t *label_tr; // Top right label object
+lv_obj_t *label_bl; // Bottom left label object
+lv_obj_t *label_br; // Bottom right label object
+
+/***************************
+ * Panel Object Definition *
+ ***************************/
+
+DMAMEM Panel panel_tl = Panel(&coolant_temp, btn_tl, data_tl, label_tl);      // Top left Panel object
+DMAMEM Panel panel_tc = Panel(&engine_oil_temp, btn_tc, data_tc, label_tc);   // Top center Panel object
+DMAMEM Panel panel_tr = Panel(&intake_air_temp, btn_tr, data_tr, label_tr);   // Top right Panel object
+DMAMEM Panel panel_bl = Panel(&intake_pressure, btn_bl, data_bl, label_bl);   // Bottom left Panel object
+DMAMEM Panel panel_br = Panel(&throttle_position, btn_br, data_br, label_br); // Bottom right Panel object
+
+
 /****************
  * Constructors *
  ****************/

@@ -63,40 +63,31 @@ public:
         VOLUME
     };
 
-    /**
-     * Represents the "region" that the data will be in
-     */
-    enum Unit_Region
-    {
-        METRIC = 0,
-        IMPERIAL
-    };
-
 private:
     /*********************
      * Private Variables *
      *********************/
-    String _name;                 // The name of the Information object
-    float _data;                    // The data received
-    String _data_str;             // The data received as a string
+    uint8_t _num_decimals_metric;   // The number of decimal places to use for Metric data
+    uint8_t _num_decimals_imperial; // The number of decimal places to use for Imperial data
     uint16_t _byte_1;               // The first byte of the UDS request code
     uint16_t _byte_2;               // The second byte of the UDS request code
     int16_t _offset;                // The offset value used to decode raw data
-    float _scale;                   // The scaling factor used to decode raw data
-    Unit_Type _unit_type;           // The unit type of the data
-    Unit_Region _unit_region;       // The unit region of the data
-    String _unit_label;              // The generated label for the units
-    uint8_t _num_decimals_metric;   // The number of decimal places to use for Metric data
-    uint8_t _num_decimals_imperial; // The number of decimal places to use for Imperial data
     uint16_t _refresh_rate;         // The refresh rate of the data request
+    float _data;                    // The data received
+    float _scale;                   // The scaling factor used to decode raw data
+    String _name;                   // The name of the Information object
+    String _data_str;               // The data received as a string
+    String _unit_label;             // The generated label for the units
+    Unit_Type _unit_type;           // The unit type of the data
+    bool _unit_metric;              // The unit region of the data
 
     /*********************
      * Private Functions *
      *********************/
 
     /**
-     * Initializes all 
-    */
+     * Initializes all
+     */
     void init_info();
 
     /**
@@ -273,15 +264,15 @@ public:
     /**
      * Sets the Unit Region of the Information object.
      *
-     * @param region The new Unit Region as a Unit_Region enum.
+     * @param is_metric Flag for whether Info is metric or not.
      */
-    void set_unit_region(Unit_Region region);
+    void set_is_metric(bool is_metric);
     /**
      * Gets the Unit Region of the Information object.
      *
-     * @return The new Unit Region as a Unit_Region enum.
+     * @return True if Information is metric, false if imperial.
      */
-    Unit_Region get_unit_region();
+    bool get_is_metric();
 
     /**
      * Sets the number of decimal places to use when using Metric data.
@@ -328,39 +319,35 @@ public:
  *******************************/
 
 /***** Performance Metrics *****/
-static Information coolant_temp = Information("Coolant Temp", 0xF4, 0x05, -40, NO_SCALE, Information::TEMP, 0, 0, 2500);
-static Information engine_oil_temp = Information("Engine Oil Temp", 0x20, 0x2F, -2731.4, 0.1, Information::TEMP, 0, 0, 1000);
-static Information intake_air_temp = Information("Intake Air Temp", 0xF4, 0x0F, -40, NO_SCALE, Information::TEMP, 0, 0, 100);
-static Information charge_pressure = Information("Charge Pressure", 0x20, 0x2A, NO_OFFSET, 0.001, Information::PRESSURE, 2, 1, 100);
-static Information intake_pressure = Information("Intake Pressure", 0x3E, 0x70, NO_OFFSET, 0.001, Information::PRESSURE, 2, 1, MAX_REFRESH);
-static Information ambient_pressure = Information("Ambient Pressure", 0x13, 0xCA, NO_OFFSET, 0.001, Information::PRESSURE, 2, 1, 1000);
-static Information lambda_actual = Information("Lambda (actual)", 0x10, 0xC0, NO_OFFSET, (1 / 1024), Information::NONE, 1, 1, MAX_REFRESH);
-static Information lambda_specified = Information("Lambda (specified)", 0x29, 0x50, NO_OFFSET, (1 / 1024), Information::NONE, 1, 1, MAX_REFRESH);
-static Information turbo_speed = Information("Turbo Speed", 0x10, 0x40, NO_OFFSET, 6.11, Information::RPM, 0, 0, MIN_REFRESH);
+extern Information coolant_temp;
+extern Information engine_oil_temp;
+extern Information intake_air_temp;
+extern Information charge_pressure;
+extern Information intake_pressure;
+extern Information ambient_pressure;
+extern Information lambda_actual;
+extern Information lambda_specified;
+extern Information turbo_speed;
 
 /***** Car Information *****/
-static Information engine_rpm = Information("Engine Speed", 0x20, 0x6E, NO_OFFSET, NO_SCALE, Information::RPM, 0, 0, MAX_REFRESH);
-static Information engine_torque = Information("Engine Torque", 0x43, 0x7C, NO_OFFSET, 0.1, Information::TORQUE, 0, 0, MAX_REFRESH);
-static Information vehicle_speed = Information("Vehicle Speed", 0x20, 0x33, NO_OFFSET, 0.01, Information::SPEED, 0, 0, 100);
-static Information fuel_level = Information("Fuel", 0x22, 0x06, NO_OFFSET, NO_SCALE, Information::VOLUME, 1, 1, MIN_REFRESH);
-static Information fuel_percent = Information("Fuel", 0xF4, 0x2F, NO_OFFSET, (1 / 2.55), Information::PERCENT, 0, 0, MIN_REFRESH);
-static Information throttle_position = Information("Throttle Position", 0xF4, 0x11, NO_OFFSET, (1 / 2.55), Information::PERCENT, 0, 0, MAX_REFRESH);
+extern Information engine_rpm;
+extern Information engine_torque;
+extern Information vehicle_speed;
+extern Information fuel_level;
+extern Information fuel_percent;
+extern Information throttle_position;
 
 /***** Diag/Monitoring *****/
-static Information misfire_sum = Information("Misfire Count", 0x29, 0x04, NO_OFFSET, NO_SCALE, Information::NONE, 0, 0, 500);
-static Information misfire_cyl_1 = Information("Misfire Count Cyl 1", 0x29, 0x66, NO_OFFSET, NO_SCALE, Information::NONE, 0, 0, 500);
-static Information misfire_cyl_2 = Information("Misfire Count Cyl 2", 0x29, 0x67, NO_OFFSET, NO_SCALE, Information::NONE, 0, 0, 500);
-static Information misfire_cyl_3 = Information("Misfire Count Cyl 3", 0x29, 0x68, NO_OFFSET, NO_SCALE, Information::NONE, 0, 0, 500);
-static Information misfire_cyl_4 = Information("Misfire Count Cyl 4", 0x29, 0x69, NO_OFFSET, NO_SCALE, Information::NONE, 0, 0, 500);
-static Information timing_corr_1 = Information("Timing Corr. Cyl 1", 0x20, 0x0A, NO_OFFSET, 0.01, Information::DEGREES, 0, 0, 100);
-static Information timing_corr_2 = Information("Timing Corr. Cyl 2", 0x20, 0x0B, NO_OFFSET, 0.01, Information::DEGREES, 0, 0, 100);
-static Information timing_corr_3 = Information("Timing Corr. Cyl 3", 0x20, 0x0C, NO_OFFSET, 0.01, Information::DEGREES, 0, 0, 100);
-static Information timing_corr_4 = Information("Timing Corr. Cyl 4", 0x20, 0x0D, NO_OFFSET, 0.01, Information::DEGREES, 0, 0, 100);
+extern Information misfire_sum;
+extern Information misfire_cyl_1;
+extern Information misfire_cyl_2;
+extern Information misfire_cyl_3;
+extern Information misfire_cyl_4;
+extern Information timing_corr_1;
+extern Information timing_corr_2;
+extern Information timing_corr_3;
+extern Information timing_corr_4;
 
-static vector<Information*> info_list = {&coolant_temp, &engine_oil_temp, &intake_air_temp, &charge_pressure, &intake_pressure,
-                                        &ambient_pressure, &lambda_actual, &lambda_specified, &turbo_speed, &engine_rpm,
-                                        &engine_torque, &vehicle_speed, &fuel_level, &fuel_percent, &throttle_position,
-                                        &misfire_sum, &misfire_cyl_1, &misfire_cyl_2, &misfire_cyl_3, &misfire_cyl_4, 
-                                        &timing_corr_1, &timing_corr_2, &timing_corr_3, &timing_corr_4};
+extern vector<Information *> info_list;
 
 #endif

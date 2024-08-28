@@ -1,26 +1,22 @@
 #include "gui.hpp"
+#include "ILI948x_t4_mm.h"
 
-/*************************
- * Panel Object Creation *
- *************************/
+/********************
+ * Global Constants *
+ ********************/
 
-Panel panel_tl = Panel(&coolant_temp, btn_tl, data_tl, label_tl);      // Top left Panel object
-Panel panel_tc = Panel(&engine_oil_temp, btn_tc, data_tc, label_tc);   // Top center Panel object
-Panel panel_tr = Panel(&intake_air_temp, btn_tr, data_tr, label_tr);   // Top right Panel object
-Panel panel_bl = Panel(&intake_pressure, btn_bl, data_bl, label_bl);   // Bottom left Panel object
-Panel panel_br = Panel(&throttle_position, btn_br, data_br, label_br); // Bottom right Panel object
+#define PWM_PIN 3
+#define MAX_BRIGHTNESS 256
 
-/**************************
- * Layout Object Creation *
- **************************/
+/***********************
+ * Display Constructor *
+ ***********************/
 
-Layout layout = Layout(&panel_tl, &panel_tc, &panel_tr, &panel_bl, &panel_br); // Main layout creation
-
-/*************************
- * Configurator Creation *
- *************************/
-
-Configurator config = Configurator();
+#define LCD_CS 4
+#define LCD_DC 5
+#define LCD_RST 26
+DMAMEM ILI948x_t4_mm lcd = ILI948x_t4_mm(LCD_DC, LCD_CS, LCD_RST);
+lv_display_t *display;
 
 /*************
  * Callbacks *
@@ -96,22 +92,73 @@ void setup_callbacks()
  */
 void info_init()
 {
-     // TODO: Change this to use EEPROM or other setup file data
+    // TODO: Change this to use EEPROM or other setup file data
+    /* Top Left Panel */
     panel_tl.panel_info = &coolant_temp;
+    panel_tl.panel_info->set_is_metric(false);
+    /* Top Center Panel */
     panel_tc.panel_info = &engine_oil_temp;
+    panel_tc.panel_info->set_is_metric(false);
+    /* Top Right Panel */
     panel_tr.panel_info = &intake_air_temp;
+    panel_tr.panel_info->set_is_metric(false);
+    /* Bottom Left Panel */
     panel_bl.panel_info = &intake_pressure;
+    panel_bl.panel_info->set_is_metric(false);
+    /* Bottom Right Panel */
     panel_br.panel_info = &throttle_position;
+    panel_br.panel_info->set_is_metric(false);
+}
+
+void set_brightness(int percent)
+{
+    if (percent > 100)
+    {
+        percent = 100;
+    }
+    else if (percent < 0)
+    {
+        percent = 0;
+    }
+    pinMode(PWM_PIN, OUTPUT);                  // Set the brightness pin to an output pin
+    int brightness = percent * MAX_BRIGHTNESS; // Get the brightness value
+    analogWrite(PWM_PIN, brightness);          // Set the brightness value
+}
+
+void display_flush(lv_display_t *display, const lv_area_t *area, uint8_t *data)
+{
+    lcd.pushPixels16bitDMA((uint16_t *)data, area->x1, area->y1, area->x2, area->y2);
+    lv_display_flush_ready(display);
+}
+
+void display_init()
+{
+    set_brightness(100);
+    display = lv_display_create(LCD_HORZ, LCD_VERT);
+    lv_display_set_flush_cb(display, display_flush);
+    lv_display_set_buffers(display, disp_buf_1, disp_buf_2, sizeof(disp_buf_1), LV_DISPLAY_RENDER_MODE_PARTIAL);
 }
 
 void setup()
 {
+    lv_init();
+
+    display_init();
+
+    lv_task_handler();
+
+    delay(1000);
+
+    can_init();
     style_init();
     info_init();
     add_style_to_panels();
     setup_callbacks();
+
+    layout.open_window();
 }
 
 void loop()
 {
+    lv_task_handler();
 }

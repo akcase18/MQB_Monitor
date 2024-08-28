@@ -8,7 +8,7 @@
  * CAN Setup *
  *************/
 
-static FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> MQB_CAN; // Initialize the CAN port
+DMAMEM static FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> MQB_CAN; // Initialize the CAN port
 
 /******************
  * Main Functions *

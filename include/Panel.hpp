@@ -78,13 +78,13 @@ public:
      * Public Variables *
      ********************/
 
-    Information *panel_info;       // The Information object for this Panel
     lv_obj_t *btn;                 // The button this Panel handles
     lv_obj_t *data_btn;            // The data that goes inside of the button
     lv_obj_t *label;               // The label associated with the button
-    lv_style_t *style_btn;         // The style of the button (not pressed )
+    lv_style_t *style_btn;         // The style of the button (not pressed)
     lv_style_t *style_btn_pressed; // The style for the button (pressed)
     lv_style_t *style_label;       // The style of the panel
+    Information *panel_info;       // The Information object for this Panel
 
     /********************
      * Public Functions *
@@ -147,5 +147,15 @@ public:
      */
     void set_callback(lv_obj_t *object, void (*function)(lv_event_t *e), lv_event_code_t state, void *user_data);
 };
+
+/****************************
+ * Panel Object Declaration *
+ ****************************/
+
+extern Panel panel_tl;
+extern Panel panel_tc;
+extern Panel panel_tr;
+extern Panel panel_bl;
+extern Panel panel_br;
 
 #endif

@@ -68,9 +68,9 @@ void can_recv(const CAN_message_t &msg)
 Information get_information_panel(uint8_t byte_1, uint8_t byte_2)
 {
     /* Loop through potential Information objects */
-    for (uint i = 0; i < Layout::info_list.size(); i++)
+    for (uint i = 0; i < layout.info_list.size(); i++)
     {
-        Information info = Layout::info_list[i]; // Get current Information object
+        Information info = layout.info_list[i]; // Get current Information object
         if (byte_1 == info.get_byte_1())         // Check if first byte of UDS request matches
         {
             if (byte_2 == info.get_byte_2()) // Check if second byte of UDS request matches
@@ -116,13 +116,13 @@ void round_data(Information info)
         info.set_data(round(info.get_data_num(), 1)); // Only want 1 decimal place for volume
         break;
     case Information::PRESSURE:
-        if (info.get_unit_region() == Information::IMPERIAL)
+        if (info.get_is_metric())
         {
-            info.set_data(round(info.get_data_num(), 1)); // 1 decimal place for Imperial pressure
+            info.set_data(round(info.get_data_num(), 2)); // 2 decimal places for Metric pressure
         }
         else
         {
-            info.set_data(round(info.get_data_num(), 2)); // 2 decimal places for Metric pressure
+            info.set_data(round(info.get_data_num(), 1)); // 1 decimal place for Imperial pressure
         }
         break;
     case Information::TEMP:

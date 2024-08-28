@@ -94,13 +94,13 @@ public:
      * -> 1 unit tall (20 px)
      */
     lv_coord_t row_dsc[5] = {LV_GRID_FR(6), LV_GRID_FR(1), LV_GRID_FR(8), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
-    Panel *panel_tl;                      // Panel in the top left position
-    Panel *panel_tc;                      // Panel in the top center position
-    Panel *panel_tr;                      // Panel in the top right position
-    Panel *panel_bl;                      // Panel in the bottom left position
-    Panel *panel_br;                      // Panel in the bottom right position
-    lv_style_t *style_window;             // The style of the window
-    static vector<Information> info_list; // Stores the Information objects that are on screen
+    Panel panel_tl;               // Panel in the top left position
+    Panel panel_tc;               // Panel in the top center position
+    Panel panel_tr;               // Panel in the top right position
+    Panel panel_bl;               // Panel in the bottom left position
+    Panel panel_br;               // Panel in the bottom right position
+    lv_style_t *style_window;      // The style of the window
+    vector<Information> info_list; // Stores the Information objects that are on screen
 
     /********************
      * Public Functions *
@@ -122,7 +122,7 @@ public:
      * @param bottom_left The Panel object that will be in the bottom left position
      * @param bottom_right The Panel object that will be in the bottom right position
      */
-    Layout(Panel *top_left, Panel *top_center, Panel *top_right, Panel *bottom_left, Panel *bottom_right);
+    Layout(Panel top_left, Panel top_center, Panel top_right, Panel bottom_left, Panel bottom_right);
 
     /**
      * Displays the main Layout window.
@@ -157,7 +157,7 @@ public:
      * @param new_panel Panel object that will be added
      * @param old_panel Panel object to replace
      */
-    void update_layout(Panel *new_panel, Panel_Location old_panel);
+    void update_layout(Panel new_panel, Panel_Location old_panel);
 
     /**
      * @brief Ensures that the info_list is up to date with the most recent Panel
@@ -165,5 +165,11 @@ public:
      */
     void update_info_list();
 };
+
+/*****************************
+ * Layout Object Declaration *
+ *****************************/
+
+extern Layout layout;
 
 #endif

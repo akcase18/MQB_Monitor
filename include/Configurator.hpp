@@ -141,4 +141,10 @@ public:
     void set_callback(lv_obj_t *object, void (*function)(lv_event_t *e), lv_event_code_t state, void *user_data);
 };
 
+/*************************
+ * Configurator Creation *
+ *************************/
+
+DMAMEM static Configurator config = Configurator();
+
 #endif
