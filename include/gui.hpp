@@ -428,7 +428,7 @@ static void add_main_objects(void)
     lv_obj_set_grid_cell(top_left, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_STRETCH, 0, 1);
     lv_obj_add_event_cb(top_left, button_config_cb, LV_EVENT_CLICKED, top_left);
     top_left_data = lv_label_create(top_left);
-    lv_label_set_text(top_left_data, top_left_panel.get_data_str());
+    lv_label_set_text(top_left_data, top_left_panel.get_data_str().c_str());
     lv_obj_align(top_left_data, LV_ALIGN_CENTER, 0, 0);
 
     top_center = lv_btn_create(main_window);
@@ -437,7 +437,7 @@ static void add_main_objects(void)
     lv_obj_set_grid_cell(top_center, LV_GRID_ALIGN_STRETCH, 2, 2, LV_GRID_ALIGN_STRETCH, 0, 1);
     lv_obj_add_event_cb(top_center, button_config_cb, LV_EVENT_CLICKED, top_center);
     top_center_data = lv_label_create(top_center);
-    lv_label_set_text(top_center_data, top_center_panel.get_data_str());
+    lv_label_set_text(top_center_data, top_center_panel.get_data_str().c_str());
     lv_obj_align(top_center_data, LV_ALIGN_CENTER, 0, 0);
 
     top_right = lv_btn_create(main_window);
@@ -446,7 +446,7 @@ static void add_main_objects(void)
     lv_obj_set_grid_cell(top_right, LV_GRID_ALIGN_STRETCH, 4, 2, LV_GRID_ALIGN_STRETCH, 0, 1);
     lv_obj_add_event_cb(top_right, button_config_cb, LV_EVENT_CLICKED, top_right);
     top_right_data = lv_label_create(top_right);
-    lv_label_set_text(top_right_data, top_right_panel.get_data_str());
+    lv_label_set_text(top_right_data, top_right_panel.get_data_str().c_str());
     lv_obj_align(top_right_data, LV_ALIGN_CENTER, 0, 0);
 
     bottom_left = lv_btn_create(main_window);
@@ -455,7 +455,7 @@ static void add_main_objects(void)
     lv_obj_set_grid_cell(bottom_left, LV_GRID_ALIGN_STRETCH, 0, 3, LV_GRID_ALIGN_STRETCH, 2, 1);
     lv_obj_add_event_cb(bottom_left, button_config_cb, LV_EVENT_CLICKED, bottom_left);
     bottom_left_data = lv_label_create(bottom_left);
-    lv_label_set_text(bottom_left_data, bottom_left_panel.get_data_str());
+    lv_label_set_text(bottom_left_data, bottom_left_panel.get_data_str().c_str());
     lv_obj_align(bottom_left_data, LV_ALIGN_CENTER, 0, 0);
 
     bottom_right = lv_btn_create(main_window);
@@ -464,34 +464,34 @@ static void add_main_objects(void)
     lv_obj_set_grid_cell(bottom_right, LV_GRID_ALIGN_STRETCH, 3, 3, LV_GRID_ALIGN_STRETCH, 2, 1);
     lv_obj_add_event_cb(bottom_right, button_config_cb, LV_EVENT_CLICKED, bottom_right);
     bottom_right_data = lv_label_create(bottom_right);
-    lv_label_set_text(bottom_right_data, bottom_right_panel.get_data_str());
+    lv_label_set_text(bottom_right_data, bottom_right_panel.get_data_str().c_str());
     lv_obj_align(bottom_right_data, LV_ALIGN_CENTER, 0, 0);
 }
 
 static void add_main_labels(void)
 {
     top_left_label = lv_label_create(main_window);
-    lv_label_set_text(top_left_label, top_left_panel.get_name());
+    lv_label_set_text(top_left_label, top_left_panel.get_name().c_str());
     lv_obj_add_style(top_left_label, &style_label_top, 0);
     lv_obj_set_grid_cell(top_left_label, LV_GRID_ALIGN_CENTER, 0, 2, LV_GRID_ALIGN_CENTER, 1, 1);
 
     top_center_label = lv_label_create(main_window);
-    lv_label_set_text(top_center_label, top_center_panel.get_name());
+    lv_label_set_text(top_center_label, top_center_panel.get_name().c_str());
     lv_obj_add_style(top_center_label, &style_label_top, 0);
     lv_obj_set_grid_cell(top_center_label, LV_GRID_ALIGN_CENTER, 2, 2, LV_GRID_ALIGN_CENTER, 1, 1);
 
     top_right_label = lv_label_create(main_window);
-    lv_label_set_text(top_right_label, top_right_panel.get_name());
+    lv_label_set_text(top_right_label, top_right_panel.get_name().c_str());
     lv_obj_add_style(top_right_label, &style_label_top, 0);
     lv_obj_set_grid_cell(top_right_label, LV_GRID_ALIGN_CENTER, 4, 2, LV_GRID_ALIGN_CENTER, 1, 1);
 
     bottom_left_label = lv_label_create(main_window);
-    lv_label_set_text(bottom_left_label, bottom_left_panel.get_name());
+    lv_label_set_text(bottom_left_label, bottom_left_panel.get_name().c_str());
     lv_obj_add_style(bottom_left_label, &style_label_btm, 0);
     lv_obj_set_grid_cell(bottom_left_label, LV_GRID_ALIGN_CENTER, 0, 3, LV_GRID_ALIGN_CENTER, 3, 1);
 
     bottom_right_label = lv_label_create(main_window);
-    lv_label_set_text(bottom_right_label, bottom_right_panel.get_name());
+    lv_label_set_text(bottom_right_label, bottom_right_panel.get_name().c_str());
     lv_obj_add_style(bottom_right_label, &style_label_btm, 0);
     lv_obj_set_grid_cell(bottom_right_label, LV_GRID_ALIGN_CENTER, 3, 3, LV_GRID_ALIGN_CENTER, 3, 1);
 }
@@ -777,140 +777,5 @@ static lv_color_t darken(const lv_color_filter_dsc_t *dsc, lv_color_t color, lv_
 
 static uint8_t get_config_dropdown_state(lv_obj_t *dropdown)
 {
-    char buf[32];
-    lv_dropdown_get_selected_str(dropdown, buf, sizeof(buf));
-    if (strcmp(buf, coolant_temp.get_name()) == 0)
-    {
-        return info_select::coolant_temp_enum;
-    }
-    else if (strcmp(buf, engine_oil_temp.get_name()) == 0)
-    {
-        return info_select::engine_oil_temp_enum;
-    }
-    else if (strcmp(buf, intake_air_temp.get_name()) == 0)
-    {
-        return info_select::intake_air_temp_enum;
-    }
-    else if (strcmp(buf, charge_pressure.get_name()) == 0)
-    {
-        return info_select::charge_pressure_enum;
-    }
-    else if (strcmp(buf, intake_pressure.get_name()) == 0)
-    {
-        return info_select::intake_pressure_enum;
-    }
-    else if (strcmp(buf, ambient_pressure.get_name()) == 0)
-    {
-        return info_select::ambient_pressure_enum;
-    }
-    else if (strcmp(buf, lambda_actual.get_name()) == 0)
-    {
-        return info_select::lambda_actual_enum;
-    }
-    else if (strcmp(buf, lambda_specified.get_name()) == 0)
-    {
-        return info_select::lambda_specified_enum;
-    }
-    else if (strcmp(buf, turbo_speed.get_name()) == 0)
-    {
-        return info_select::turbo_speed_enum;
-    }
-    else if (strcmp(buf, engine_rpm.get_name()) == 0)
-    {
-        return info_select::engine_speed_enum;
-    }
-    else if (strcmp(buf, engine_torque.get_name()) == 0)
-    {
-        return info_select::engine_torque_enum;
-    }
-    else if (strcmp(buf, vehicle_speed.get_name()) == 0)
-    {
-        return info_select::vehicle_speed_enum;
-    }
-    else if (strcmp(buf, fuel_level.get_name()) == 0)
-    {
-        return info_select::fuel_level_enum;
-    }
-    else if (strcmp(buf, fuel_percent.get_name()) == 0)
-    {
-        return info_select::fuel_percent_enum;
-    }
-    else if (strcmp(buf, throttle_position.get_name()) == 0)
-    {
-        return info_select::throttle_position_enum;
-    }
-    else if (strcmp(buf, misfire_sum.get_name()) == 0)
-    {
-        return info_select::misfire_count_enum;
-    }
-    else if (strcmp(buf, misfire_cyl_1.get_name()) == 0)
-    {
-        return info_select::misfire_cyl_1_enum;
-    }
-    else if (strcmp(buf, misfire_cyl_2.get_name()) == 0)
-    {
-        return info_select::misfire_cyl_2_enum;
-    }
-    else if (strcmp(buf, misfire_cyl_3.get_name()) == 0)
-    {
-        return info_select::misfire_cyl_3_enum;
-    }
-    else if (strcmp(buf, misfire_cyl_4.get_name()) == 0)
-    {
-        return info_select::misfire_cyl_4_enum;
-    }
-    else if (strcmp(buf, timing_corr_1.get_name()) == 0)
-    {
-        return info_select::timing_corr_1_enum;
-    }
-    else if (strcmp(buf, timing_corr_2.get_name()) == 0)
-    {
-        return info_select::timing_corr_2_enum;
-    }
-    else if (strcmp(buf, timing_corr_3.get_name()) == 0)
-    {
-        return info_select::timing_corr_3_enum;
-    }
-    else if (strcmp(buf, timing_corr_4.get_name()) == 0)
-    {
-        return info_select::timing_corr_4_enum;
-    }
-    else
-    {
-        return info_select::coolant_temp_enum;
-    }
-}
-
-/******************
- * Update Display *
- ******************/
-
-void top_left_timer_cb(lv_timer_t *timer)
-{
-    send_msg(top_left_panel);
-    lv_label_set_text(lv_obj_get_child(top_left, 0), top_left_panel.get_data_str());
-}
-
-void top_center_timer_cb(lv_timer_t *timer)
-{
-    send_msg(top_center_panel);
-    lv_label_set_text(lv_obj_get_child(top_center, 0), top_center_panel.get_data_str());
-}
-
-void top_right_timer_cb(lv_timer_t *timer)
-{
-    send_msg(top_right_panel);
-    lv_label_set_text(lv_obj_get_child(top_right, 0), top_right_panel.get_data_str());
-}
-
-void bottom_left_timer_cb(lv_timer_t *timer)
-{
-    send_msg(bottom_left_panel);
-    lv_label_set_text(lv_obj_get_child(bottom_left, 0), bottom_left_panel.get_data_str());
-}
-
-void bottom_right_timer_cb(lv_timer_t *timer)
-{
-    send_msg(bottom_right_panel);
-    lv_label_set_text(lv_obj_get_child(bottom_right, 0), bottom_right_panel.get_data_str());
+    
 }

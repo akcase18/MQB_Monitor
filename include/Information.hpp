@@ -32,20 +32,20 @@ public:
 
     Information();
     Information(Information *info);
-    Information(char *name);
-    Information(char *name, uint16_t byte_1, uint16_t byte_2);
-    Information(char *name, uint16_t byte_1, uint16_t byte_2, Unit_Type unit_type);
-    Information(char *name, uint16_t byte_1, uint16_t byte_2, Unit_Type unit_type, uint8_t num_decimals_metric, uint8_t num_decimals_imperial, uint16_t refresh_rate);
-    Information(char *name, uint16_t byte_1, uint16_t byte_2, int16_t offset, float scale);
-    Information(char *name, uint16_t byte_1, uint16_t byte_2, int16_t offset, float scale, Unit_Type unit_type);
-    Information(char *name, uint16_t byte_1, uint16_t byte_2, int16_t offset, float scale, Unit_Type unit_type, uint8_t num_decimals_metric, uint8_t num_decimals_imperial, uint16_t refresh_rate);
+    Information(String name);
+    Information(String name, uint16_t byte_1, uint16_t byte_2);
+    Information(String name, uint16_t byte_1, uint16_t byte_2, Unit_Type unit_type);
+    Information(String name, uint16_t byte_1, uint16_t byte_2, Unit_Type unit_type, uint8_t num_decimals_metric, uint8_t num_decimals_imperial, uint16_t refresh_rate);
+    Information(String name, uint16_t byte_1, uint16_t byte_2, int16_t offset, float scale);
+    Information(String name, uint16_t byte_1, uint16_t byte_2, int16_t offset, float scale, Unit_Type unit_type);
+    Information(String name, uint16_t byte_1, uint16_t byte_2, int16_t offset, float scale, Unit_Type unit_type, uint8_t num_decimals_metric, uint8_t num_decimals_imperial, uint16_t refresh_rate);
 
-    void set_name(char *name);
-    char *get_name();
+    void set_name(String name);
+    String get_name();
 
     void set_data(float data);
     float get_data_num();
-    char *get_data_str();
+    String get_data_str();
 
     void set_byte_1(uint16_t byte);
     uint16_t get_byte_1();
@@ -77,21 +77,21 @@ public:
     uint8_t calc_num_digits();
 
     void set_unit_label();
-    char *get_unit_label();
+    String get_unit_label();
 
-    char *get_name_and_label();
+    String get_name_and_label();
 
 private:
-    char _name[40];
+    String _name;
     float _data;
-    char _data_str[10];
+    String _data_str;
     uint16_t _byte_1;
     uint16_t _byte_2;
     int16_t _offset;
     float _scale;
     Unit_Type _unit_type;
     Unit_Region _unit_region;
-    char *_unit_label;
+    String _unit_label;
     uint8_t _num_decimals_metric;
     uint8_t _num_decimals_imperial;
     uint16_t _refresh_rate;

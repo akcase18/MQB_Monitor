@@ -32,7 +32,7 @@ Information::Information(Information *info)
     set_refresh_rate(info->get_refresh_rate());
 }
 
-Information::Information(char *name)
+Information::Information(String name)
 {
     set_name(name);
     set_data(0);
@@ -47,7 +47,7 @@ Information::Information(char *name)
     set_refresh_rate(100);
 }
 
-Information::Information(char *name, uint16_t byte_1, uint16_t byte_2)
+Information::Information(String name, uint16_t byte_1, uint16_t byte_2)
 {
     set_name(name);
     set_data(0);
@@ -63,7 +63,7 @@ Information::Information(char *name, uint16_t byte_1, uint16_t byte_2)
     set_refresh_rate(100);
 }
 
-Information::Information(char *name, uint16_t byte_1, uint16_t byte_2, Information::Unit_Type unit_type)
+Information::Information(String name, uint16_t byte_1, uint16_t byte_2, Information::Unit_Type unit_type)
 {
     set_name(name);
     set_data(0);
@@ -79,7 +79,7 @@ Information::Information(char *name, uint16_t byte_1, uint16_t byte_2, Informati
     set_refresh_rate(100);
 }
 
-Information::Information(char *name, uint16_t byte_1, uint16_t byte_2, Unit_Type unit_type, uint8_t num_decimals_metric, uint8_t num_decimals_imperial, uint16_t refresh_rate)
+Information::Information(String name, uint16_t byte_1, uint16_t byte_2, Unit_Type unit_type, uint8_t num_decimals_metric, uint8_t num_decimals_imperial, uint16_t refresh_rate)
 {
     set_name(name);
     set_data(0);
@@ -95,7 +95,7 @@ Information::Information(char *name, uint16_t byte_1, uint16_t byte_2, Unit_Type
     set_refresh_rate(refresh_rate);
 }
 
-Information::Information(char *name, uint16_t byte_1, uint16_t byte_2, int16_t offset, float scale)
+Information::Information(String name, uint16_t byte_1, uint16_t byte_2, int16_t offset, float scale)
 {
     set_name(name);
     set_data(0);
@@ -111,7 +111,7 @@ Information::Information(char *name, uint16_t byte_1, uint16_t byte_2, int16_t o
     set_refresh_rate(100);
 }
 
-Information::Information(char *name, uint16_t byte_1, uint16_t byte_2, int16_t offset, float scale, Information::Unit_Type unit_type)
+Information::Information(String name, uint16_t byte_1, uint16_t byte_2, int16_t offset, float scale, Information::Unit_Type unit_type)
 {
     set_name(name);
     set_data(0);
@@ -127,7 +127,7 @@ Information::Information(char *name, uint16_t byte_1, uint16_t byte_2, int16_t o
     set_refresh_rate(100);
 }
 
-Information::Information(char *name, uint16_t byte_1, uint16_t byte_2, int16_t offset, float scale, Information::Unit_Type unit_type, uint8_t num_decimals_metric, uint8_t num_decimals_imperial, uint16_t refresh_rate)
+Information::Information(String name, uint16_t byte_1, uint16_t byte_2, int16_t offset, float scale, Information::Unit_Type unit_type, uint8_t num_decimals_metric, uint8_t num_decimals_imperial, uint16_t refresh_rate)
 {
     set_name(name);
     set_data(0);
@@ -143,11 +143,11 @@ Information::Information(char *name, uint16_t byte_1, uint16_t byte_2, int16_t o
     set_refresh_rate(refresh_rate);
 }
 
-void Information::set_name(char *name)
+void Information::set_name(String name)
 {
-    snprintf(_name, sizeof(_name), "%s", name);
+    _name = name;
 }
-char *Information::get_name()
+String Information::get_name()
 {
     return _name;
 }
@@ -160,9 +160,8 @@ float Information::get_data_num()
 {
     return _data;
 }
-char *Information::get_data_str()
+String Information::get_data_str()
 {
-    snprintf(_data_str, calc_num_digits(), "%f", _data);
     return _data_str;
 }
 
@@ -407,12 +406,12 @@ void Information::set_unit_label()
         break;
     }
 }
-char *Information::get_unit_label()
+String Information::get_unit_label()
 {
     return _unit_label;
 }
 
-char *Information::get_name_and_label()
+String Information::get_name_and_label()
 {
     return _name;
 }
