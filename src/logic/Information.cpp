@@ -162,6 +162,14 @@ float Information::get_data_num()
 }
 String Information::get_data_str()
 {
+    if (_unit_region == IMPERIAL)
+    {
+        _data_str = String(_data, get_num_decimals_imperial());
+    }
+    else
+    {
+        _data_str = String(_data, get_num_decimals_metric());
+    }
     return _data_str;
 }
 
