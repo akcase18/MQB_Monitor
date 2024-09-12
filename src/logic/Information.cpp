@@ -9,7 +9,7 @@ Information::Information()
     set_offset(0);
     set_scale(1);
     set_unit_type(Information::NONE);
-    set_unit_region(Information::METRIC);
+    set_is_metric(true);
     set_unit_label();
     set_num_decimals_metric(0);
     set_num_decimals_imperial(0);
@@ -25,7 +25,7 @@ Information::Information(Information *info)
     set_offset(info->get_offset());
     set_scale(info->get_scale());
     set_unit_type(info->get_unit_type());
-    set_unit_region(info->get_unit_region());
+    set_is_metric(info->get_is_metric());
     set_unit_label();
     set_num_decimals_metric(info->get_num_decimals_metric());
     set_num_decimals_imperial(info->get_num_decimals_imperial());
@@ -40,7 +40,7 @@ Information::Information(String name)
     set_byte_2(0x00);
     set_offset(0);
     set_scale(1);
-    set_unit_region(Information::METRIC);
+    set_is_metric(true);
     set_unit_label();
     set_num_decimals_metric(0);
     set_num_decimals_imperial(0);
@@ -56,7 +56,7 @@ Information::Information(String name, uint16_t byte_1, uint16_t byte_2)
     set_offset(0);
     set_scale(1);
     set_unit_type(Information::NONE);
-    set_unit_region(Information::METRIC);
+    set_is_metric(true);
     set_unit_label();
     set_num_decimals_metric(0);
     set_num_decimals_imperial(0);
@@ -72,7 +72,7 @@ Information::Information(String name, uint16_t byte_1, uint16_t byte_2, Informat
     set_offset(0);
     set_scale(1);
     set_unit_type(unit_type);
-    set_unit_region(Information::METRIC);
+    set_is_metric(true);
     set_unit_label();
     set_num_decimals_metric(0);
     set_num_decimals_imperial(0);
@@ -88,7 +88,7 @@ Information::Information(String name, uint16_t byte_1, uint16_t byte_2, Unit_Typ
     set_offset(0);
     set_scale(1);
     set_unit_type(unit_type);
-    set_unit_region(Information::METRIC);
+    set_is_metric(true);
     set_unit_label();
     set_num_decimals_metric(num_decimals_metric);
     set_num_decimals_imperial(num_decimals_imperial);
@@ -104,7 +104,7 @@ Information::Information(String name, uint16_t byte_1, uint16_t byte_2, int16_t 
     set_offset(offset);
     set_scale(scale);
     set_unit_type(Information::NONE);
-    set_unit_region(Information::METRIC);
+    set_is_metric(true);
     set_unit_label();
     set_num_decimals_metric(0);
     set_num_decimals_imperial(0);
@@ -120,7 +120,7 @@ Information::Information(String name, uint16_t byte_1, uint16_t byte_2, int16_t 
     set_offset(offset);
     set_scale(scale);
     set_unit_type(unit_type);
-    set_unit_region(Information::METRIC);
+    set_is_metric(true);
     set_unit_label();
     set_num_decimals_metric(0);
     set_num_decimals_imperial(0);
@@ -136,7 +136,7 @@ Information::Information(String name, uint16_t byte_1, uint16_t byte_2, int16_t 
     set_offset(offset);
     set_scale(scale);
     set_unit_type(unit_type);
-    set_unit_region(Information::METRIC);
+    set_is_metric(true);
     set_unit_label();
     set_num_decimals_metric(num_decimals_metric);
     set_num_decimals_imperial(num_decimals_imperial);
@@ -163,13 +163,13 @@ float Information::get_data_num()
 String Information::get_data_str()
 {
     String data_str;
-    if (_unit_region == IMPERIAL)
+    if (_is_metric)
     {
-        data_str = String(_data, get_num_decimals_imperial());
+        data_str = String(_data, get_num_decimals_metric());
     }
     else
     {
-        data_str = String(_data, get_num_decimals_metric());
+        data_str = String(_data, get_num_decimals_imperial());
     }
     return data_str;
 }
@@ -262,23 +262,23 @@ uint8_t Information::calc_num_digits()
         num_digits++; // Add space for negative sign
     }
     uint16_t temp = abs(_data);
-    if (_unit_region == IMPERIAL)
-    {
-        if (get_num_decimals_imperial() > 0)
-        {
-            num_digits++; // Add space for decimal point
-            for (int i = 0; i < get_num_decimals_imperial(); i++)
-            {
-                num_digits++;
-            }
-        }
-    }
-    else if (_unit_region == METRIC)
+    if (_is_metric)
     {
         if (get_num_decimals_metric() > 0)
         {
             num_digits++; // Add space for decimal point
             for (int i = 0; i < get_num_decimals_metric(); i++)
+            {
+                num_digits++;
+            }
+        }
+    }
+    else
+    {
+        if (get_num_decimals_imperial() > 0)
+        {
+            num_digits++; // Add space for decimal point
+            for (int i = 0; i < get_num_decimals_imperial(); i++)
             {
                 num_digits++;
             }
@@ -306,93 +306,72 @@ uint8_t Information::calc_num_digits()
  * Private Functions *
  *********************/
 
-void Information::set_unit_region(Information::Unit_Region region)
+void Information::set_is_metric(bool is_metric)
 {
-    _unit_region = region;
+    _is_metric = is_metric;
 }
-Information::Unit_Region Information::get_unit_region()
+bool Information::get_is_metric()
 {
-    return _unit_region;
+    return _is_metric;
 }
 
 void Information::set_unit_label()
 {
     Information::Unit_Type type = Information::get_unit_type();
-    Information::Unit_Region region = Information::get_unit_region();
     switch (type)
     {
     case Information::TEMP:
-        if (region == Information::IMPERIAL)
-        {
-            _unit_label = "[°F]";
-        }
-        else if (region == Information::METRIC)
+        if (get_is_metric())
         {
             _unit_label = "[°C]";
         }
         else
         {
-            // Error
+            _unit_label = "[°F]";
         }
         break;
 
     case Information::PRESSURE:
-        if (region == Information::IMPERIAL)
-        {
-            _unit_label = "[psi]";
-        }
-        else if (region == Information::METRIC)
+        if (get_is_metric())
         {
             _unit_label = "[bar]";
         }
         else
         {
-            // Error
+            _unit_label = "[psi]";
         }
         break;
 
     case Information::SPEED:
-        if (region == Information::IMPERIAL)
-        {
-            _unit_label = "[mph]";
-        }
-        else if (region == Information::METRIC)
+        if (get_is_metric())
         {
             _unit_label = "[kph]";
         }
         else
         {
-            // Error
+            _unit_label = "[mph]";
         }
         break;
 
     case Information::TORQUE:
-        if (region == Information::IMPERIAL)
-        {
-            _unit_label = "[ft/lbs]";
-        }
-        else if (region == Information::METRIC)
+        if (get_is_metric())
         {
             _unit_label = "[Nm]";
         }
         else
         {
-            // Error
+            _unit_label = "[ft/lbs]";
         }
         break;
 
     case Information::VOLUME:
-        if (region == Information::IMPERIAL)
-        {
-            _unit_label = "[gal]";
-        }
-        else if (region == Information::METRIC)
+        if (get_is_metric())
         {
             _unit_label = "[L]";
         }
         else
         {
-            // Error
+            _unit_label = "[gal]";
         }
         break;
 

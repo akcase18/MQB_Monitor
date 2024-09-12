@@ -104,13 +104,13 @@ void round_data(Information info)
     info.set_data(round(info.get_data_num(), 1));
     break;
   case Information::PRESSURE:
-    if (info.get_unit_region() == Information::IMPERIAL)
+    if (info.get_is_metric())
     {
-      info.set_data(round(info.get_data_num(), 1));
+      info.set_data(round(info.get_data_num(), 2));
     }
     else
     {
-      info.set_data(round(info.get_data_num(), 2));
+      info.set_data(round(info.get_data_num(), 1));
     }
     break;
   case Information::TEMP:

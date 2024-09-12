@@ -20,32 +20,20 @@
 #define LCD_RST 26 // G8
 ILI948x_t4_mm lcd = ILI948x_t4_mm(LCD_DC, LCD_CS, LCD_RST);
 
-/* LCD Wiring */
-// Pin 10: CS --> WR: 24
-// Pin 40: G0 --> D0: 3
-// Pin 41: G1 --> D1: 4
-// Pin 42: G2 --> D2: 5
-// Pin 43: G3 --> D3: 6
-// Pin 44: G4 --> D4: 7
-// Pin 45: G5 --> D5: 8
-// Pin 6:  G6 --> D6: 9
-// Pin 9:  G7 --> D7: 10
-// Pin 12: CIPO --> RD: 26
-
-/*********************
- * Touch Constructor *
- *********************/
-
-// #define CS_PIN 36 // CS1
-// #define TIRQ_PIN 2
-// XPT2046_Touchscreen ts(CS_PIN, TIRQ_PIN);
-
-/* Touch Controller Wiring */
-// Pin 36: CS1 --> RTP_/CS: 30
-// Pin 34: CIPO2 --> SDO: 32
-// Pin 35: COPI2 --> SDI: 34
-// Pin 37: SCK2 --> SCL: 33
-// Pin 4: D0 --> /RTP PEN: 31
+/**
+ * LCD Wiring
+ * 
+ * Pin 10: CS --> WR: 24
+ * Pin 40: G0 --> D0: 3
+ * Pin 41: G1 --> D1: 4
+ * Pin 42: G2 --> D2: 5
+ * Pin 43: G3 --> D3: 6
+ * Pin 44: G4 --> D4: 7
+ * Pin 45: G5 --> D5: 8
+ * Pin 6:  G6 --> D6: 9
+ * Pin 9:  G7 --> D7: 10
+ * Pin 12: CIPO --> RD: 26
+ */
 
 void lcd_init()
 {
@@ -69,11 +57,13 @@ void display_init()
 
 void set_unit_region()
 {
-  top_left_panel.set_unit_region(Information::Unit_Region::IMPERIAL);
-  top_center_panel.set_unit_region(Information::Unit_Region::IMPERIAL);
-  top_right_panel.set_unit_region(Information::Unit_Region::IMPERIAL);
-  bottom_left_panel.set_unit_region(Information::Unit_Region::IMPERIAL);
-  bottom_right_panel.set_unit_region(Information::Unit_Region::IMPERIAL);
+  // Pull from EEPROM
+
+  top_left_panel.set_is_metric(false);
+  top_center_panel.set_is_metric(false);
+  top_right_panel.set_is_metric(false);
+  bottom_left_panel.set_is_metric(false);
+  bottom_right_panel.set_is_metric(false);
 }
 
 void setup()

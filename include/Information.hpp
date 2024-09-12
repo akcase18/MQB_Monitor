@@ -1,4 +1,5 @@
 #include "Arduino.h"
+#include <vector>
 
 using namespace std;
 
@@ -11,24 +12,53 @@ using namespace std;
 
 class Information
 {
+private:
+    /*********************
+     * Private Constants *
+     *********************/
+
 public:
+    /********************
+     * Public Constants *
+     ********************/
+
+    /**
+     * Represents the different types that each data can be
+     */
     enum Unit_Type
     {
-        TEMP = 0,
-        PRESSURE,
-        SPEED,
-        TORQUE,
-        VOLUME,
-        RPM,
+        NONE = 0,
         DEGREES,
         PERCENT,
-        NONE
+        PRESSURE,
+        RPM,
+        SPEED,
+        TEMP,
+        TORQUE,
+        VOLUME
     };
-    enum Unit_Region
-    {
-        IMPERIAL = 0,
-        METRIC
-    };
+
+private:
+    /*********************
+     * Private Variables *
+     *********************/
+    uint8_t _num_decimals_metric;   // The number of decimal places to use for Metric data
+    uint8_t _num_decimals_imperial; // The number of decimal places to use for Imperial data
+    uint16_t _byte_1;               // The first byte of the UDS request code
+    uint16_t _byte_2;               // The second byte of the UDS request code
+    int16_t _offset;                // The offset value used to decode raw data
+    uint16_t _refresh_rate;         // The refresh rate of the data request
+    float _data;                    // The data received
+    float _scale;                   // The scaling factor used to decode raw data
+    String _name;                   // The name of the Information object
+    String _unit_label;             // The generated label for the units
+    Unit_Type _unit_type;           // The unit type of the data
+    bool _is_metric;                // The unit region of the data
+
+public:
+    /********************
+     * Public Functions *
+     ********************/
 
     Information();
     Information(Information *info);
@@ -62,8 +92,8 @@ public:
     void set_unit_type(Unit_Type type);
     Unit_Type get_unit_type();
 
-    void set_unit_region(Unit_Region region);
-    Unit_Region get_unit_region();
+    void set_is_metric(bool is_metric);
+    bool get_is_metric();
 
     void set_num_decimals_metric(uint8_t decimals);
     uint8_t get_num_decimals_metric();
@@ -82,16 +112,7 @@ public:
     String get_name_and_label();
 
 private:
-    String _name;
-    float _data;
-    uint16_t _byte_1;
-    uint16_t _byte_2;
-    int16_t _offset;
-    float _scale;
-    Unit_Type _unit_type;
-    Unit_Region _unit_region;
-    String _unit_label;
-    uint8_t _num_decimals_metric;
-    uint8_t _num_decimals_imperial;
-    uint16_t _refresh_rate;
+    /*********************
+     * Private Functions *
+     *********************/
 };
