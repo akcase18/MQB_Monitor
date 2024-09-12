@@ -67,9 +67,20 @@ void display_init()
   lv_display_set_buffers(display, buf_1, buf_2, sizeof(buf_1), LV_DISPLAY_RENDER_MODE_PARTIAL);
 }
 
+void set_unit_region()
+{
+  top_left_panel.set_unit_region(Information::Unit_Region::IMPERIAL);
+  top_center_panel.set_unit_region(Information::Unit_Region::IMPERIAL);
+  top_right_panel.set_unit_region(Information::Unit_Region::IMPERIAL);
+  bottom_left_panel.set_unit_region(Information::Unit_Region::IMPERIAL);
+  bottom_right_panel.set_unit_region(Information::Unit_Region::IMPERIAL);
+}
+
 void setup()
 {
   lv_init();
+
+  set_unit_region();
 
   lcd_init();
   display_init();
@@ -88,6 +99,6 @@ void setup()
 void loop()
 {
   lv_task_handler();
-  
+
   delay(10);
 }

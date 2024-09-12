@@ -84,7 +84,6 @@ public:
 private:
     String _name;
     float _data;
-    String _data_str;
     uint16_t _byte_1;
     uint16_t _byte_2;
     int16_t _offset;

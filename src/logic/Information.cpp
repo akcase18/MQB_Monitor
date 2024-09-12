@@ -162,15 +162,16 @@ float Information::get_data_num()
 }
 String Information::get_data_str()
 {
+    String data_str;
     if (_unit_region == IMPERIAL)
     {
-        _data_str = String(_data, get_num_decimals_imperial());
+        data_str = String(_data, get_num_decimals_imperial());
     }
     else
     {
-        _data_str = String(_data, get_num_decimals_metric());
+        data_str = String(_data, get_num_decimals_metric());
     }
-    return _data_str;
+    return data_str;
 }
 
 void Information::set_byte_1(uint16_t byte)
