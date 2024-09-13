@@ -103,6 +103,14 @@ public:
     Panel();
 
     /**
+     * Trying something new. Takes in only Information object and leaves it up to
+     * Panel to initialize/store the button, data, and labels.
+     * 
+     * @param info Pointer to an existing Information object
+     */
+    Panel(Information *info);
+
+    /**
      * Main constructor for Panel objects. Creates an Information object
      * using the passed-in pointer, and sets the Panel's panel_info variable to
      * that Information object. Doesn't initialize any button or label styles.
