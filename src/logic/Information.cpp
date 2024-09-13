@@ -2,14 +2,13 @@
 
 Information::Information()
 {
-    set_name("test");
+    set_name("default");
     set_data(0);
     set_byte_1(0x00);
     set_byte_2(0x00);
-    set_offset(0);
-    set_scale(1);
+    set_offset(NO_OFFSET);
+    set_scale(NO_SCALE);
     set_unit_type(Information::NONE);
-    set_is_metric(true);
     set_unit_label();
     set_num_decimals_metric(0);
     set_num_decimals_imperial(0);
@@ -32,101 +31,6 @@ Information::Information(Information *info)
     set_refresh_rate(info->get_refresh_rate());
 }
 
-Information::Information(String name)
-{
-    set_name(name);
-    set_data(0);
-    set_byte_1(0x00);
-    set_byte_2(0x00);
-    set_offset(0);
-    set_scale(1);
-    set_is_metric(true);
-    set_unit_label();
-    set_num_decimals_metric(0);
-    set_num_decimals_imperial(0);
-    set_refresh_rate(100);
-}
-
-Information::Information(String name, uint16_t byte_1, uint16_t byte_2)
-{
-    set_name(name);
-    set_data(0);
-    set_byte_1(byte_1);
-    set_byte_2(byte_2);
-    set_offset(0);
-    set_scale(1);
-    set_unit_type(Information::NONE);
-    set_is_metric(true);
-    set_unit_label();
-    set_num_decimals_metric(0);
-    set_num_decimals_imperial(0);
-    set_refresh_rate(100);
-}
-
-Information::Information(String name, uint16_t byte_1, uint16_t byte_2, Information::Unit_Type unit_type)
-{
-    set_name(name);
-    set_data(0);
-    set_byte_1(byte_1);
-    set_byte_2(byte_2);
-    set_offset(0);
-    set_scale(1);
-    set_unit_type(unit_type);
-    set_is_metric(true);
-    set_unit_label();
-    set_num_decimals_metric(0);
-    set_num_decimals_imperial(0);
-    set_refresh_rate(100);
-}
-
-Information::Information(String name, uint16_t byte_1, uint16_t byte_2, Unit_Type unit_type, uint8_t num_decimals_metric, uint8_t num_decimals_imperial, uint16_t refresh_rate)
-{
-    set_name(name);
-    set_data(0);
-    set_byte_1(byte_1);
-    set_byte_2(byte_2);
-    set_offset(0);
-    set_scale(1);
-    set_unit_type(unit_type);
-    set_is_metric(true);
-    set_unit_label();
-    set_num_decimals_metric(num_decimals_metric);
-    set_num_decimals_imperial(num_decimals_imperial);
-    set_refresh_rate(refresh_rate);
-}
-
-Information::Information(String name, uint16_t byte_1, uint16_t byte_2, int16_t offset, float scale)
-{
-    set_name(name);
-    set_data(0);
-    set_byte_1(byte_1);
-    set_byte_2(byte_2);
-    set_offset(offset);
-    set_scale(scale);
-    set_unit_type(Information::NONE);
-    set_is_metric(true);
-    set_unit_label();
-    set_num_decimals_metric(0);
-    set_num_decimals_imperial(0);
-    set_refresh_rate(100);
-}
-
-Information::Information(String name, uint16_t byte_1, uint16_t byte_2, int16_t offset, float scale, Information::Unit_Type unit_type)
-{
-    set_name(name);
-    set_data(0);
-    set_byte_1(byte_1);
-    set_byte_2(byte_2);
-    set_offset(offset);
-    set_scale(scale);
-    set_unit_type(unit_type);
-    set_is_metric(true);
-    set_unit_label();
-    set_num_decimals_metric(0);
-    set_num_decimals_imperial(0);
-    set_refresh_rate(100);
-}
-
 Information::Information(String name, uint16_t byte_1, uint16_t byte_2, int16_t offset, float scale, Information::Unit_Type unit_type, uint8_t num_decimals_metric, uint8_t num_decimals_imperial, uint16_t refresh_rate)
 {
     set_name(name);
@@ -136,7 +40,6 @@ Information::Information(String name, uint16_t byte_1, uint16_t byte_2, int16_t 
     set_offset(offset);
     set_scale(scale);
     set_unit_type(unit_type);
-    set_is_metric(true);
     set_unit_label();
     set_num_decimals_metric(num_decimals_metric);
     set_num_decimals_imperial(num_decimals_imperial);
@@ -196,7 +99,7 @@ void Information::set_offset(int16_t offset)
 {
     _offset = offset;
 }
-uint16_t Information::get_offset()
+int16_t Information::get_offset()
 {
     return _offset;
 }
