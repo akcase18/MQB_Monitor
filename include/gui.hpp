@@ -1,7 +1,6 @@
-#include <lvgl.h>
 // #include <Arduino.h>
 // #include "can_logic.hpp"
-#include "Information.hpp"
+#include "Panel.hpp"
 
 /***********
  * Defines *
@@ -13,34 +12,6 @@
 /****************
  * Enumerations *
  ****************/
-
-enum info_select
-{
-    coolant_temp_enum,
-    engine_oil_temp_enum,
-    intake_air_temp_enum,
-    charge_pressure_enum,
-    intake_pressure_enum,
-    ambient_pressure_enum,
-    lambda_actual_enum,
-    lambda_specified_enum,
-    turbo_speed_enum,
-    engine_speed_enum,
-    engine_torque_enum,
-    vehicle_speed_enum,
-    fuel_level_enum,
-    fuel_percent_enum,
-    throttle_position_enum,
-    misfire_count_enum,
-    misfire_cyl_1_enum,
-    misfire_cyl_2_enum,
-    misfire_cyl_3_enum,
-    misfire_cyl_4_enum,
-    timing_corr_1_enum,
-    timing_corr_2_enum,
-    timing_corr_3_enum,
-    timing_corr_4_enum
-};
 
 /**********
  * Styles *
@@ -598,139 +569,7 @@ static void close_window_cb(lv_event_t *e)
 {
     if (lv_event_get_code(e) == LV_EVENT_CLICKED)
     {
-        Information info;
-        uint8_t info_type = get_config_dropdown_state(msg_drop_down);
-        switch (info_type)
-        {
-        case info_select::coolant_temp_enum:
-            info = Information(coolant_temp);
-            break;
-
-        case info_select::engine_oil_temp_enum:
-            info = Information(engine_oil_temp);
-            break;
-
-        case info_select::intake_air_temp_enum:
-            info = Information(intake_air_temp);
-            break;
-
-        case info_select::charge_pressure_enum:
-            info = Information(charge_pressure);
-            break;
-
-        case info_select::intake_pressure_enum:
-            info = Information(intake_pressure);
-            break;
-
-        case info_select::ambient_pressure_enum:
-            info = Information(ambient_pressure);
-            break;
-
-        case info_select::lambda_actual_enum:
-            info = Information(lambda_actual);
-            break;
-
-        case info_select::lambda_specified_enum:
-            info = Information(lambda_specified);
-            break;
-
-        case info_select::turbo_speed_enum:
-            info = Information(turbo_speed);
-            break;
-
-        case info_select::engine_speed_enum:
-            info = Information(engine_rpm);
-            break;
-
-        case info_select::engine_torque_enum:
-            info = Information(engine_torque);
-            break;
-
-        case info_select::vehicle_speed_enum:
-            info = Information(vehicle_speed);
-            break;
-
-        case info_select::fuel_level_enum:
-            info = Information(fuel_level);
-            break;
-
-        case info_select::fuel_percent_enum:
-            info = Information(fuel_percent);
-            break;
-
-        case info_select::throttle_position_enum:
-            info = Information(throttle_position);
-            break;
-
-        case info_select::misfire_count_enum:
-            info = Information(misfire_sum);
-            break;
-
-        case info_select::misfire_cyl_1_enum:
-            info = Information(misfire_cyl_1);
-            break;
-
-        case info_select::misfire_cyl_2_enum:
-            info = Information(misfire_cyl_2);
-            break;
-
-        case info_select::misfire_cyl_3_enum:
-            info = Information(misfire_cyl_3);
-            break;
-
-        case info_select::misfire_cyl_4_enum:
-            info = Information(misfire_cyl_4);
-            break;
-
-        case info_select::timing_corr_1_enum:
-            info = Information(timing_corr_1);
-            break;
-
-        case info_select::timing_corr_2_enum:
-            info = Information(timing_corr_2);
-            break;
-
-        case info_select::timing_corr_3_enum:
-            info = Information(timing_corr_3);
-            break;
-
-        case info_select::timing_corr_4_enum:
-            info = Information(timing_corr_4);
-            break;
-
-        default:
-            info = Information(coolant_temp);
-            break;
-        }
-        // Have Information object get set here
-        // Information top_left = dropdown_selected
-        switch (curr_select_object)
-        {
-        case 0:
-            top_left_panel = info;
-            break;
-
-        case 1:
-            top_center_panel = info;
-            break;
-
-        case 2:
-            top_right_panel = info;
-            break;
-
-        case 3:
-            bottom_left_panel = info;
-            break;
-
-        case 4:
-            bottom_right_panel = info;
-            break;
         
-        default:
-            top_left_panel = info;
-            break;
-        }
-        main_window_create();
     }
 }
 
