@@ -9,9 +9,19 @@
 #define LCD_HORZ 480
 #define LCD_VERT 320
 
-/****************
- * Enumerations *
- ****************/
+/***********************
+ ***********************
+ * NEW STUFF GOES HERE *
+ ***********************
+ ***********************/
+
+// Panel panel_tl = Panel()
+
+/***********************
+ ***********************
+ * OLD STUFF GOES HERE *
+ ***********************
+ ***********************/
 
 /**********
  * Styles *
@@ -114,11 +124,11 @@ static lv_display_t *display;
 static lv_color_t buf_1[(LCD_HORZ * LCD_VERT) / 10];
 static lv_color_t buf_2[(LCD_HORZ * LCD_VERT) / 10];
 
-/*******************
- * Touch Interface *
- *******************/
-
-lv_indev_t *touch_indev;
+/**************************
+ **************************
+ * END BLOCK OF OLD STUFF *
+ **************************
+ **************************/
 
 /****************
  * CAN Messages *
