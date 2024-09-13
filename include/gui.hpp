@@ -1,6 +1,7 @@
 #include <lvgl.h>
 // #include <Arduino.h>
-#include "can_logic.hpp"
+// #include "can_logic.hpp"
+#include "Information.hpp"
 
 /***********
  * Defines *
