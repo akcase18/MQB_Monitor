@@ -284,3 +284,37 @@ public:
      */
     bool get_is_metric();
 };
+
+/**********************************
+ * Information Object Declaration *
+ **********************************/
+
+/***** Performance Metrics *****/
+extern Information coolant_temp;
+extern Information engine_oil_temp;
+extern Information intake_air_temp;
+extern Information charge_pressure;
+extern Information intake_pressure;
+extern Information ambient_pressure;
+extern Information lambda_actual;
+extern Information lambda_specified;
+extern Information turbo_speed;
+
+/***** Car Information *****/
+extern Information engine_rpm;
+extern Information engine_torque;
+extern Information vehicle_speed;
+extern Information fuel_level;
+extern Information fuel_percent;
+extern Information throttle_position;
+
+/***** Diag/Monitoring *****/
+extern Information misfire_sum;
+extern Information misfire_cyl_1;
+extern Information misfire_cyl_2;
+extern Information misfire_cyl_3;
+extern Information misfire_cyl_4;
+extern Information timing_corr_1;
+extern Information timing_corr_2;
+extern Information timing_corr_3;
+extern Information timing_corr_4;
