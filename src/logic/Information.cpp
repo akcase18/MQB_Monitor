@@ -1,5 +1,9 @@
 #include "Information.hpp"
 
+/****************
+ * Constructors *
+ ****************/
+
 Information::Information()
 {
     set_name("default");
@@ -46,6 +50,12 @@ Information::Information(String name, uint16_t byte_1, uint16_t byte_2, int16_t 
     set_refresh_rate(refresh_rate);
 }
 
+/******************************
+ * Public Getters and Setters *
+ ******************************/
+
+/***** Name *****/
+
 void Information::set_name(String name)
 {
     _name = name;
@@ -54,6 +64,12 @@ String Information::get_name()
 {
     return _name;
 }
+String Information::get_name_and_label()
+{
+    return _name;
+}
+
+/***** Data *****/
 
 void Information::set_data(float data)
 {
@@ -77,6 +93,8 @@ String Information::get_data_str()
     return data_str;
 }
 
+/**** Byte 1 *****/
+
 void Information::set_byte_1(uint16_t byte)
 {
     _byte_1 = byte;
@@ -85,6 +103,8 @@ uint16_t Information::get_byte_1()
 {
     return _byte_1;
 }
+
+/**** Byte 2 *****/
 
 void Information::set_byte_2(uint16_t byte)
 {
@@ -95,6 +115,8 @@ uint16_t Information::get_byte_2()
     return _byte_2;
 }
 
+/**** Offset *****/
+
 void Information::set_offset(int16_t offset)
 {
     _offset = offset;
@@ -103,6 +125,8 @@ int16_t Information::get_offset()
 {
     return _offset;
 }
+
+/**** Scale *****/
 
 void Information::set_scale(float scale)
 {
@@ -113,6 +137,8 @@ float Information::get_scale()
     return _scale;
 }
 
+/**** Unit Type *****/
+
 void Information::set_unit_type(Information::Unit_Type type)
 {
     _unit_type = type;
@@ -121,6 +147,8 @@ Information::Unit_Type Information::get_unit_type()
 {
     return _unit_type;
 }
+
+/**** Number of Decimals (Metric) *****/
 
 void Information::set_num_decimals_metric(uint8_t decimals)
 {
@@ -135,6 +163,8 @@ uint8_t Information::get_num_decimals_metric()
     return _num_decimals_metric;
 }
 
+/**** Number of Decimals (Imperial) *****/
+
 void Information::set_num_decimals_imperial(uint8_t decimals)
 {
     if (decimals > 2)
@@ -148,6 +178,8 @@ uint8_t Information::get_num_decimals_imperial()
     return _num_decimals_imperial;
 }
 
+/**** Refresh Rate *****/
+
 void Information::set_refresh_rate(uint16_t refresh_rate)
 {
     _refresh_rate = refresh_rate;
@@ -157,57 +189,9 @@ uint16_t Information::get_refresh_rate()
     return _refresh_rate;
 }
 
-uint8_t Information::calc_num_digits()
-{
-    uint8_t num_digits = 1;
-    if (_data < 0)
-    {
-        num_digits++; // Add space for negative sign
-    }
-    uint16_t temp = abs(_data);
-    if (_is_metric)
-    {
-        if (get_num_decimals_metric() > 0)
-        {
-            num_digits++; // Add space for decimal point
-            for (int i = 0; i < get_num_decimals_metric(); i++)
-            {
-                num_digits++;
-            }
-        }
-    }
-    else
-    {
-        if (get_num_decimals_imperial() > 0)
-        {
-            num_digits++; // Add space for decimal point
-            for (int i = 0; i < get_num_decimals_imperial(); i++)
-            {
-                num_digits++;
-            }
-        }
-    }
-    if (int(log10(temp)) > 0)
-    {
-        for (int i = 0; i < int(log10(temp)) + 1; i++)
-        {
-            num_digits++; // Add space for each digit before the decimal place
-        }
-    }
-    else
-    {
-        num_digits++;
-    }
-    if (_data == 0)
-    {
-        return 2;
-    }
-    return num_digits;
-}
-
-/*********************
- * Private Functions *
- *********************/
+/*******************************
+ * Private Getters and Setters *
+ *******************************/
 
 void Information::set_is_metric(bool is_metric)
 {
@@ -302,7 +286,54 @@ String Information::get_unit_label()
     return _unit_label;
 }
 
-String Information::get_name_and_label()
+/****************************
+ * Private Helper Functions *
+ ****************************/
+
+uint8_t Information::calc_num_digits()
 {
-    return _name;
+    uint8_t num_digits = 1;
+    if (_data < 0)
+    {
+        num_digits++; // Add space for negative sign
+    }
+    uint16_t temp = abs(_data);
+    if (_is_metric)
+    {
+        if (get_num_decimals_metric() > 0)
+        {
+            num_digits++; // Add space for decimal point
+            for (int i = 0; i < get_num_decimals_metric(); i++)
+            {
+                num_digits++;
+            }
+        }
+    }
+    else
+    {
+        if (get_num_decimals_imperial() > 0)
+        {
+            num_digits++; // Add space for decimal point
+            for (int i = 0; i < get_num_decimals_imperial(); i++)
+            {
+                num_digits++;
+            }
+        }
+    }
+    if (int(log10(temp)) > 0)
+    {
+        for (int i = 0; i < int(log10(temp)) + 1; i++)
+        {
+            num_digits++; // Add space for each digit before the decimal place
+        }
+    }
+    else
+    {
+        num_digits++;
+    }
+    if (_data == 0)
+    {
+        return 2;
+    }
+    return num_digits;
 }

@@ -71,6 +71,19 @@ private:
     uint8_t calc_num_digits();
 
     /**
+     * Sets the Unit Region of the Information object.
+     *
+     * @param is_metric Flag for whether Info is metric or not.
+     */
+    void set_is_metric(bool is_metric);
+    /**
+     * Gets the Unit Region of the Information object.
+     *
+     * @return True if Information is metric, false if imperial.
+     */
+    bool get_is_metric();
+
+    /**
      * Sets the unit label of the data. This will change based on whether that Information
      * object is using Metric or Imperial data formatting, as well as the Unit Type of the
      * data.
@@ -78,7 +91,6 @@ private:
      * @note Format: [label]
      */
     void set_unit_label();
-
     /**
      * Gets the unit label of the data.
      *
@@ -232,18 +244,6 @@ public:
      */
     Unit_Type get_unit_type();
 
-    /**
-     * Sets the Unit Region of the Information object.
-     *
-     * @param is_metric Flag for whether Info is metric or not.
-     */
-    void set_is_metric(bool is_metric);
-    /**
-     * Gets the Unit Region of the Information object.
-     *
-     * @return True if Information is metric, false if imperial.
-     */
-    bool get_is_metric();
 
     /**
      * Sets the number of decimal places to use when using Metric data.
