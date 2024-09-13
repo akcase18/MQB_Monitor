@@ -189,9 +189,7 @@ uint16_t Information::get_refresh_rate()
     return _refresh_rate;
 }
 
-/*******************************
- * Private Getters and Setters *
- *******************************/
+/***** Is Metric Flag *****/
 
 void Information::set_is_metric(bool is_metric)
 {
@@ -201,6 +199,12 @@ bool Information::get_is_metric()
 {
     return _is_metric;
 }
+
+/*******************************
+ * Private Getters and Setters *
+ *******************************/
+
+/***** Unit Label *****/
 
 void Information::set_unit_label()
 {
