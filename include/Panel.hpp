@@ -137,6 +137,14 @@ public:
      */
     Panel(Information *info, lv_obj_t *btn, lv_obj_t *data, lv_obj_t *label, lv_style_t style_btn, lv_style_t style_btn_pressed, lv_style_t style_label);
 
+    /**
+     * Sets the style of the button and label of the Panel after it has been
+     * initialized.
+     * 
+     * @param style_btn style of the button
+     * @param style_btn_pressed style of the button when pressed
+     * @param style_label style of the label
+     */
     void set_styles(lv_style_t style_btn, lv_style_t style_btn_pressed, lv_style_t style_label);
 
     // void set_callback(lv_obj_t *obj, void (*function)(lv_event_t *e), lv_event_code_t state, void *user_data);

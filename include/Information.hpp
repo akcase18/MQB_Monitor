@@ -231,7 +231,6 @@ public:
      */
     Unit_Type get_unit_type();
 
-
     /**
      * Sets the number of decimal places to use when using Metric data.
      *
@@ -270,7 +269,7 @@ public:
      * @return The refresh rate in ms.
      */
     uint16_t get_refresh_rate();
-    
+
     /**
      * Sets the Unit Region of the Information object.
      *
