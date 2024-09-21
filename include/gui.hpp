@@ -41,11 +41,12 @@ static lv_style_t style_btn_btm;     // Bottom row button style
 static lv_style_t style_btn_pressed; // Button style when pressed
 static lv_style_t style_btn_done;    // Done button style
 /* Label Styles */
-static lv_style_t style_label_top; // Top row label style
-static lv_style_t style_label_btm; // Bottom row label style
+static lv_style_t style_label_top;  // Top row label style
+static lv_style_t style_label_btm;  // Bottom row label style
+static lv_style_t style_label_done; // Done button label style
 /* Radio Button Styles */
-static lv_style_t style_radio;
-static lv_style_t style_radio_chk;
+static lv_style_t style_radio;     // Style for the radio buttons when not selected
+static lv_style_t style_radio_chk; // Style for the radio buttons when selected
 
 /***********
  * Objects *
@@ -165,7 +166,11 @@ static void style_init(void);
 /***** Window Creation *****/
 
 /**
- * Create the main layout
+ * Open the main screen
+ */
+static void open_main_window();
+/**
+ * Initialize the main screen
  *
  * Consists of:
  *
@@ -173,9 +178,13 @@ static void style_init(void);
  * Corresponding data labels
  * Corresponding button labels
  */
-static void main_window_create(void);
+static void init_main_window();
 /**
- * Create the layout for the configuration screen
+ * Open the configuration screen
+ */
+static void open_config_window();
+/**
+ * Initialize the layout for the configuration screen
  *
  * Consists of:
  *
@@ -183,7 +192,7 @@ static void main_window_create(void);
  * Radio button to select unit for information
  * Done button
  */
-static void config_window_create(void);
+static void init_config_window();
 
 /***** Object Creation *****/
 
@@ -305,6 +314,12 @@ static void style_init(void)
     lv_style_set_text_font(&style_label_btm, btm_label_font);
     lv_style_set_text_letter_space(&style_label_btm, 0);
 
+    /* Set the style of the label in the done buttons */
+    lv_style_init(&style_label_done);
+    lv_style_set_text_color(&style_label_done, lv_palette_darken(LV_PALETTE_GREY, 5));
+    lv_style_set_text_font(&style_label_done, done_label_font);
+    lv_style_set_text_letter_space(&style_label_done, 0);
+
     /* Set the style of the radio button for selecting unit region */
     lv_style_init(&style_radio);
     lv_style_set_radius(&style_radio, LV_RADIUS_CIRCLE);
@@ -325,9 +340,14 @@ static void style_init(void)
  * Window Creation *
  *******************/
 
-static void main_window_create(void)
+static void open_main_window()
 {
-    main_window = lv_obj_create(lv_scr_act());
+    lv_screen_load(main_window);
+}
+
+static void init_main_window()
+{
+    main_window = lv_obj_create(NULL);
     lv_obj_set_size(main_window, 480, 320);
     lv_obj_center(main_window);
     lv_obj_add_style(main_window, &style_main, 0);
@@ -345,9 +365,14 @@ static void main_window_create(void)
     add_main_labels();
 }
 
-static void config_window_create(void)
+static void open_config_window()
 {
-    config_window = lv_obj_create(lv_scr_act());
+    lv_screen_load(config_window);
+}
+
+static void init_config_window(void)
+{
+    config_window = lv_obj_create(NULL);
     lv_obj_set_size(config_window, 480, 320);
     lv_obj_center(config_window);
     lv_obj_add_style(config_window, &style_config, 0);
@@ -443,13 +468,13 @@ static void add_config_objects(void)
     /* Create layout */
     flex_col_1 = lv_obj_create(config_window);
     lv_obj_set_flex_flow(flex_col_1, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_size(flex_col_1, lv_pct(60), lv_pct(100));
+    lv_obj_set_size(flex_col_1, lv_pct(65), lv_pct(100));
     lv_obj_add_style(flex_col_1, &style_flex, 0);
     flex_col_2 = lv_obj_create(config_window);
     lv_obj_set_flex_flow(flex_col_2, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_size(flex_col_2, lv_pct(40), lv_pct(100));
     lv_obj_add_event_cb(flex_col_2, radio_cb, LV_EVENT_CLICKED, &active_index);
-    lv_obj_set_x(flex_col_2, lv_pct(60));
+    lv_obj_set_x(flex_col_2, lv_pct(65));
     lv_obj_add_style(flex_col_2, &style_flex, 0);
     /* Create dropdown menu for selecting data for panel */
     msg_drop_down = lv_dropdown_create(flex_col_1);
@@ -494,13 +519,14 @@ static void add_config_objects(void)
     }
     /* Create close button */
     done_btn = lv_obj_create(config_window);
-    lv_obj_set_size(done_btn, 90, 50);
-
+    lv_obj_set_size(done_btn, 100, 55);
+    lv_obj_set_pos(done_btn, 360, 245); // 20px buffer on top and side (x: 480 - btn width - 20, y: 320 - btn height - 20)
     /* Turn off scrolling */
     lv_obj_set_scrollbar_mode(done_btn, LV_SCROLLBAR_MODE_OFF);
     lv_obj_clear_flag(done_btn, LV_OBJ_FLAG_SCROLLABLE);
     /* Add "Done" text */
     done_label = lv_label_create(done_btn);
+    lv_obj_add_style(done_label, &style_label_done, 0);
     lv_label_set_text(done_label, "Done");
     lv_obj_align(done_label, LV_ALIGN_CENTER, 0, 0);
 }
@@ -532,7 +558,7 @@ static void button_config_cb(lv_event_t *e)
     {
         curr_select_panel = (lv_obj_t *)lv_event_get_target(e);
         curr_select_object = lv_obj_get_index(curr_select_panel);
-        config_window_create();
+        open_config_window();
         // top_left_panel.set_data(curr_select_object);
     }
 }
@@ -541,7 +567,6 @@ static void close_window_cb(lv_event_t *e)
 {
     if (lv_event_get_code(e) == LV_EVENT_CLICKED)
     {
-        
     }
 }
 
@@ -587,5 +612,4 @@ static lv_color_t darken(const lv_color_filter_dsc_t *dsc, lv_color_t color, lv_
 
 static uint8_t get_config_dropdown_state(lv_obj_t *dropdown)
 {
-    
 }

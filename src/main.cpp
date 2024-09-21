@@ -81,7 +81,11 @@ void setup()
 
   style_init();
 
-  main_window_create();
+  init_main_window();
+  init_config_window();
+
+  // open_main_window();
+  open_config_window();
 
   lv_tick_set_cb(millis);
 }
