@@ -322,13 +322,13 @@ static void panel_style_init()
     panel_tr.style_btn_pressed = &style_btn_pressed;
     panel_tr.style_label = &style_label_top;
     /***** Bottom Left Panel *****/
-    panel_bl.style_btn = &style_btn_top;
+    panel_bl.style_btn = &style_btn_btm;
     panel_bl.style_btn_pressed = &style_btn_pressed;
-    panel_bl.style_label = &style_label_top;
+    panel_bl.style_label = &style_label_btm;
     /***** Bottom Right Panel *****/
-    panel_br.style_btn = &style_btn_top;
+    panel_br.style_btn = &style_btn_btm;
     panel_br.style_btn_pressed = &style_btn_pressed;
-    panel_br.style_label = &style_label_top;
+    panel_br.style_label = &style_label_btm;
 }
 
 /*******************
