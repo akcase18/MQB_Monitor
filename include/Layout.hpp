@@ -46,10 +46,10 @@ private:
 
     /**
      * Initialize/setup single Panel object in the Layout window
-     * 
+     *
      * @param panel the Panel to set up
      */
-    void init_single_object(Panel panel);
+    void init_single_object(Panel *panel);
 
     /**
      * Move the Panel object into the correct locations
@@ -66,8 +66,8 @@ public:
     /********************
      * Public Variables *
      ********************/
-    lv_obj_t *window;        // Window object to hold all other objects
-    lv_style_t style_window; // Style of the window object
+    lv_obj_t *window; // Window object to hold all other objects
+    lv_style_t style_window;
     /**
      * Columns for the window layout
      * Column 1: Start of top left, bottom left panel
@@ -95,12 +95,12 @@ public:
      * -> 1 unit tall (20 px)
      */
     lv_coord_t row_dsc[5] = {LV_GRID_FR(6), LV_GRID_FR(1), LV_GRID_FR(8), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
-    Panel panel_tl;                // Panel in the top left position
-    Panel panel_tc;                // Panel in the top center position
-    Panel panel_tr;                // Panel in the top right position
-    Panel panel_bl;                // Panel in the bottom left position
-    Panel panel_br;                // Panel in the bottom right position
-    vector<Information> info_list; // Stores on-screen Information objects
+    Panel *panel_tl;                 // Panel in the top left position
+    Panel *panel_tc;                 // Panel in the top center position
+    Panel *panel_tr;                 // Panel in the top right position
+    Panel *panel_bl;                 // Panel in the bottom left position
+    Panel *panel_br;                 // Panel in the bottom right position
+    vector<Information *> info_list; // Stores on-screen Information objects
 
     /********************
      * Public Functions *
@@ -115,19 +115,14 @@ public:
      * Main constructor for Layout object. Sets up and keeps track of the Panel objects
      * that are being displayed on screen, and will eventually keep track of button
      * presses, screen states, and different screen layouts.
-     * 
+     *
      * @param top_left The Panel object that will be in the top left position
      * @param top_center The Panel object that will be in the top center position
      * @param top_right The Panel object that will be in the top right position
      * @param bottom_left The Panel object that will be in the bottom left position
      * @param bottom_right The Panel object that will be in the bottom right position
      */
-    Layout(Panel top_left, Panel top_center, Panel top_right, Panel bottom_left, Panel bottom_right);
-
-    /**
-     * Initializes all style 
-     */
-    void style_init();
+    Layout(Panel *top_left, Panel *top_center, Panel *top_right, Panel *bottom_left, Panel *bottom_right);
 
     /**
      * Opens the main window
@@ -152,11 +147,11 @@ public:
     /**
      * Updates the Layout with a new Panel object by replacing an old Panel object
      * with the new Panel object.
-     * 
+     *
      * @param new_panel the new Panel to add to the Layout
      * @param old_panel_location the location of the Panel to be replaced
      */
-    void update_layout(Panel new_panel, Panel_Location old_panel_location);
+    void update_layout(Panel *new_panel, Panel_Location old_panel_location);
 };
 
 /*****************************

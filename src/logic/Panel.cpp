@@ -54,6 +54,21 @@ void Panel::set_label(lv_obj_t *label)
     label = label;
 }
 
+void Panel::set_btn_style(lv_style_t style_btn)
+{
+    style_btn = style_btn;
+}
+
+void Panel::set_btn_pressed_style(lv_style_t style_btn_pressed)
+{
+    style_btn_pressed = style_btn_pressed;
+}
+
+void Panel::set_label_style(lv_style_t style_label)
+{
+    style_label = style_label;
+}
+
 /****************************
  * Private Helper Functions *
  ****************************/

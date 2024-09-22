@@ -16,8 +16,8 @@
  ***********************/
 
 Panel panel_tl = Panel(&coolant_temp);
-Panel panel_tc = Panel(&engine_oil_temp);
-Panel panel_tr = Panel(&intake_air_temp);
+Panel panel_tc = Panel(&ambient_pressure);
+Panel panel_tr = Panel(&ambient_pressure);
 Panel panel_bl = Panel(&intake_pressure);
 Panel panel_br = Panel(&throttle_position);
 
@@ -56,9 +56,9 @@ static lv_style_t style_radio_chk; // Style for the radio buttons when selected
 static lv_obj_t *main_window;   // Main window object
 static lv_obj_t *config_window; // Config window object
 /* Button Objects */
-static lv_obj_t *done_btn;     // Done button for config window
+static lv_obj_t *done_btn; // Done button for config window
 /* Label Objects */
-static lv_obj_t *done_label;         // Done label for config window
+static lv_obj_t *done_label; // Done label for config window
 /* Flex Objects */
 static lv_obj_t *flex_col_1;
 static lv_obj_t *flex_col_2;
@@ -145,7 +145,12 @@ static uint32_t active_index = 0; // Used to keep track of the active object in 
 /**
  * Initialize all styles for objects and labels
  */
-static void style_init(void);
+static void style_init();
+
+/**
+ * Initialize/set up the styles for all the Panels.
+ */
+static void panel_style_init();
 
 /***** Window Creation *****/
 
@@ -318,6 +323,32 @@ static void style_init()
     lv_style_set_border_width(&style_flex, 0);
     lv_style_set_text_color(&style_flex, lv_palette_lighten(LV_PALETTE_GREY, 5));
     lv_style_set_text_font(&style_flex, drop_down_font);
+
+    panel_style_init();
+}
+
+static void panel_style_init()
+{
+    /***** Top Left Panel *****/
+    panel_tl.style_btn = &style_btn_top;
+    panel_tl.style_btn_pressed = &style_btn_pressed;
+    panel_tl.style_label = &style_label_top;
+    /***** Top Center Panel *****/
+    panel_tc.style_btn = &style_btn_top;
+    panel_tc.style_btn_pressed = &style_btn_pressed;
+    panel_tc.style_label = &style_label_top;
+    /***** Top Right Panel *****/
+    panel_tr.style_btn = &style_btn_top;
+    panel_tr.style_btn_pressed = &style_btn_pressed;
+    panel_tr.style_label = &style_label_top;
+    /***** Bottom Left Panel *****/
+    panel_bl.style_btn = &style_btn_top;
+    panel_bl.style_btn_pressed = &style_btn_pressed;
+    panel_bl.style_label = &style_label_top;
+    /***** Bottom Right Panel *****/
+    panel_br.style_btn = &style_btn_top;
+    panel_br.style_btn_pressed = &style_btn_pressed;
+    panel_br.style_label = &style_label_top;
 }
 
 /*******************
@@ -374,8 +405,8 @@ static void init_config_window(void)
 static void add_main_objects()
 {
     panel_tl.btn = lv_btn_create(main_window);
-    lv_obj_add_style(panel_tl.btn, &style_btn_top, 0);
-    lv_obj_add_style(panel_tl.btn, &style_btn_pressed, LV_STATE_PRESSED);
+    lv_obj_add_style(panel_tl.btn, panel_tl.style_btn, 0);
+    lv_obj_add_style(panel_tl.btn, panel_tl.style_btn_pressed, LV_STATE_PRESSED);
     lv_obj_set_grid_cell(panel_tl.btn, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_STRETCH, 0, 1);
     lv_obj_add_event_cb(panel_tl.btn, button_config_cb, LV_EVENT_CLICKED, panel_tl.btn);
     panel_tl.data = lv_label_create(panel_tl.btn);
@@ -383,8 +414,8 @@ static void add_main_objects()
     lv_obj_align(panel_tl.data, LV_ALIGN_CENTER, 0, 0);
 
     panel_tc.btn = lv_btn_create(main_window);
-    lv_obj_add_style(panel_tc.btn, &style_btn_top, 0);
-    lv_obj_add_style(panel_tc.btn, &style_btn_pressed, LV_STATE_PRESSED);
+    lv_obj_add_style(panel_tc.btn, panel_tc.style_btn, 0);
+    lv_obj_add_style(panel_tc.btn, panel_tc.style_btn_pressed, LV_STATE_PRESSED);
     lv_obj_set_grid_cell(panel_tc.btn, LV_GRID_ALIGN_STRETCH, 2, 2, LV_GRID_ALIGN_STRETCH, 0, 1);
     lv_obj_add_event_cb(panel_tc.btn, button_config_cb, LV_EVENT_CLICKED, panel_tc.btn);
     panel_tc.data = lv_label_create(panel_tc.btn);
@@ -392,8 +423,8 @@ static void add_main_objects()
     lv_obj_align(panel_tc.data, LV_ALIGN_CENTER, 0, 0);
 
     panel_tr.btn = lv_btn_create(main_window);
-    lv_obj_add_style(panel_tr.btn, &style_btn_top, 0);
-    lv_obj_add_style(panel_tr.btn, &style_btn_pressed, LV_STATE_PRESSED);
+    lv_obj_add_style(panel_tr.btn, panel_tr.style_btn, 0);
+    lv_obj_add_style(panel_tr.btn, panel_tr.style_btn_pressed, LV_STATE_PRESSED);
     lv_obj_set_grid_cell(panel_tr.btn, LV_GRID_ALIGN_STRETCH, 4, 2, LV_GRID_ALIGN_STRETCH, 0, 1);
     lv_obj_add_event_cb(panel_tr.btn, button_config_cb, LV_EVENT_CLICKED, panel_tr.btn);
     panel_tr.data = lv_label_create(panel_tr.btn);
@@ -401,8 +432,8 @@ static void add_main_objects()
     lv_obj_align(panel_tr.data, LV_ALIGN_CENTER, 0, 0);
 
     panel_bl.btn = lv_btn_create(main_window);
-    lv_obj_add_style(panel_bl.btn, &style_btn_btm, 0);
-    lv_obj_add_style(panel_bl.btn, &style_btn_pressed, LV_STATE_PRESSED);
+    lv_obj_add_style(panel_bl.btn, panel_bl.style_btn, 0);
+    lv_obj_add_style(panel_bl.btn, panel_bl.style_btn_pressed, LV_STATE_PRESSED);
     lv_obj_set_grid_cell(panel_bl.btn, LV_GRID_ALIGN_STRETCH, 0, 3, LV_GRID_ALIGN_STRETCH, 2, 1);
     lv_obj_add_event_cb(panel_bl.btn, button_config_cb, LV_EVENT_CLICKED, panel_bl.btn);
     panel_bl.data = lv_label_create(panel_bl.btn);
@@ -410,8 +441,8 @@ static void add_main_objects()
     lv_obj_align(panel_bl.data, LV_ALIGN_CENTER, 0, 0);
 
     panel_br.btn = lv_btn_create(main_window);
-    lv_obj_add_style(panel_br.btn, &style_btn_btm, 0);
-    lv_obj_add_style(panel_br.btn, &style_btn_pressed, LV_STATE_PRESSED);
+    lv_obj_add_style(panel_br.btn, panel_br.style_btn, 0);
+    lv_obj_add_style(panel_br.btn, panel_br.style_btn_pressed, LV_STATE_PRESSED);
     lv_obj_set_grid_cell(panel_br.btn, LV_GRID_ALIGN_STRETCH, 3, 3, LV_GRID_ALIGN_STRETCH, 2, 1);
     lv_obj_add_event_cb(panel_br.btn, button_config_cb, LV_EVENT_CLICKED, panel_br.btn);
     panel_br.data = lv_label_create(panel_br.btn);

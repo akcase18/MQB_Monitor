@@ -119,6 +119,8 @@ void loop()
     {
       panel_tl.panel_info = &coolant_temp;
     }
+    lv_label_set_text(panel_tl.data, panel_tl.panel_info->get_data_str().c_str());
+    lv_label_set_text(panel_tl.label, panel_tl.panel_info->get_name_and_label().c_str());
   }
 
   counter++;

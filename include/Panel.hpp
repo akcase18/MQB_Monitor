@@ -55,14 +55,38 @@ private:
      */
     void set_label(lv_obj_t *label);
 
+    /**
+     * Sets the style of the button in the Panel.
+     *
+     * @param style_btn Style of the button
+     */
+    void set_btn_style(lv_style_t style_btn);
+
+    /**
+     * Sets the style of the button in the Panel when it is pressed.
+     *
+     * @param style_btn_pressed Style of the button when pressed
+     */
+    void set_btn_pressed_style(lv_style_t style_btn_pressed);
+
+    /**
+     * Sets the style of the label in the Panel.
+     *
+     * @param style_label Style of the label
+     */
+    void set_label_style(lv_style_t style_label);
+
 public:
     /********************
      * Public Variables *
      ********************/
-    Information *panel_info; // Information object associated with the Panel
-    lv_obj_t *btn;           // Button in the Panel
-    lv_obj_t *data;          // Data inside of and displayed on the Button
-    lv_obj_t *label;         // Label underneath the Button that tells what Data is displayed
+    Information *panel_info;       // Information object associated with the Panel
+    lv_obj_t *btn;                 // Button in the Panel
+    lv_obj_t *data;                // Data inside of and displayed on the Button
+    lv_obj_t *label;               // Label underneath the Button that tells what Data is displayed
+    lv_style_t *style_btn;         // Style for the button
+    lv_style_t *style_btn_pressed; // Style for the button when it is pressed
+    lv_style_t *style_label;       // Style for the label
 
     /********************
      * Public Functions *
