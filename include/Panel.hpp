@@ -22,13 +22,6 @@ private:
     /*********************
      * Private Variables *
      *********************/
-    Information *_panel_info;      // Information object associated with the Panel
-    lv_obj_t *_btn;                // Button in the Panel
-    lv_obj_t *_data;               // Data inside of and displayed on the Button
-    lv_obj_t *_label;              // Label underneath the Button that tells what Data is displayed
-    lv_style_t _style_btn;         // Style for the Button
-    lv_style_t _style_btn_pressed; // Style for the Button when it is pressed
-    lv_style_t _style_label;       // Style for the Label
 
     /*********************
      * Private Functions *
@@ -87,6 +80,13 @@ public:
     /********************
      * Public Variables *
      ********************/
+    Information *panel_info; // Information object associated with the Panel
+    lv_obj_t *btn;           // Button in the Panel
+    lv_obj_t *data;          // Data inside of and displayed on the Button
+    lv_obj_t *label;         // Label underneath the Button that tells what Data is displayed
+    lv_style_t style_btn;         // Style for the Button
+    lv_style_t style_btn_pressed; // Style for the Button when it is pressed
+    lv_style_t style_label;       // Style for the Label
 
     /********************
      * Public Functions *
@@ -105,7 +105,7 @@ public:
     /**
      * Trying something new. Takes in only Information object and leaves it up to
      * Panel to initialize/store the button, data, and labels.
-     * 
+     *
      * @param info Pointer to an existing Information object
      */
     Panel(Information *info);
@@ -140,14 +140,12 @@ public:
     /**
      * Sets the style of the button and label of the Panel after it has been
      * initialized.
-     * 
+     *
      * @param style_btn style of the button
      * @param style_btn_pressed style of the button when pressed
      * @param style_label style of the label
      */
     void set_styles(lv_style_t style_btn, lv_style_t style_btn_pressed, lv_style_t style_label);
-
-    // void set_callback(lv_obj_t *obj, void (*function)(lv_event_t *e), lv_event_code_t state, void *user_data);
 };
 
 #endif

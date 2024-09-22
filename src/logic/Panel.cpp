@@ -54,37 +54,57 @@ void Panel::set_styles(lv_style_t style_btn, lv_style_t style_btn_pressed, lv_st
 
 void Panel::set_info(Information *info)
 {
-    _panel_info = info;
+    panel_info = info;
+}
+
+Information *Panel::get_info()
+{
+    return panel_info;
 }
 
 void Panel::set_btn(lv_obj_t *btn)
 {
-    _btn = btn;
+    btn = btn;
+}
+
+lv_obj_t *Panel::get_btn()
+{
+    return btn;
 }
 
 void Panel::set_data(lv_obj_t *data)
 {
-    _data = data;
+    data = data;
+}
+
+lv_obj_t *Panel::get_data()
+{
+    return data;
 }
 
 void Panel::set_label(lv_obj_t *label)
 {
-    _label = label;
+    label = label;
+}
+
+lv_obj_t *Panel::get_label()
+{
+    return label;
 }
 
 void Panel::set_btn_style(lv_style_t style_btn)
 {
-    _style_btn = style_btn;
+    style_btn = style_btn;
 }
 
 void Panel::set_btn_pressed_style(lv_style_t style_btn_pressed)
 {
-    _style_btn_pressed = _style_btn_pressed;
+    style_btn_pressed = style_btn_pressed;
 }
 
 void Panel::set_label_style(lv_style_t style_label)
 {
-    _style_label = style_label;
+    style_label = style_label;
 }
 
 /****************************
