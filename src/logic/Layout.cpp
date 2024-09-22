@@ -1,0 +1,168 @@
+#include "Layout.hpp"
+
+/****************************
+ * Layout Object Definition *
+ ****************************/
+
+/****************
+ * Constructors *
+ ****************/
+
+Layout::Layout()
+{
+    // Please don't use
+}
+
+Layout::Layout(Panel top_left, Panel top_center, Panel top_right, Panel bottom_left, Panel bottom_right)
+{
+    panel_tl = top_left;
+    panel_tc = top_center;
+    panel_tr = top_right;
+    panel_bl = bottom_left;
+    panel_br = bottom_right;
+
+    style_init();
+    init_window();
+    init_objects();
+}
+
+/***************************
+ * Public Helper Functions *
+ ***************************/
+
+void Layout::style_init()
+{
+    lv_style_init(&style_window);
+    lv_style_set_bg_color(&style_window, lv_palette_darken(LV_PALETTE_GREY, 4));
+    lv_style_set_border_width(&style_window, 0);
+    lv_style_set_radius(&style_window, 0);
+}
+
+void Layout::open_window()
+{
+    lv_screen_load(window);
+}
+
+void Layout::init_window()
+{
+    window = lv_obj_create(NULL);
+    lv_obj_set_size(window, LCD_HORZ, LCD_VERT);
+    lv_obj_center(window);
+    lv_obj_add_style(window, &style_window, 0);
+    /* Set grid layout type */
+    lv_obj_set_grid_dsc_array(window, col_dsc, row_dsc);
+    /* Remove padding from all objects to fit them closer together */
+    lv_obj_set_style_pad_all(window, 0, 0);    // Remove padding around border of display
+    lv_obj_set_style_pad_column(window, 0, 0); // Remove padding from columns between objects
+    lv_obj_set_style_pad_row(window, 0, 0);    // Remove padding from rows between objects
+    /* Turn off scrolling */
+    lv_obj_set_scrollbar_mode(window, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_clear_flag(window, LV_OBJ_FLAG_SCROLLABLE);
+}
+
+void Layout::init_objects()
+{
+    /***** Top Left Panel *****/
+    init_single_object(panel_tl);
+    // /***** Top Center Panel *****/
+    // init_single_object(panel_tc);
+    // /***** Top Right Panel *****/
+    // init_single_object(panel_tr);
+    // /***** Bottom Left Panel *****/
+    // init_single_object(panel_bl);
+    // /***** Bottom Right Panel *****/
+    // init_single_object(panel_br);
+    /***** Set Locations *****/
+    init_panel_locations();
+}
+
+void Layout::close_window()
+{
+    // Unsure if to do anything for this
+}
+
+void Layout::update_layout(Panel new_panel, Panel_Location old_panel_location)
+{
+    /* Check what panel you want to switch out and replace it with the new one */
+    switch (old_panel_location)
+    {
+    case Layout::TOP_LEFT:
+        Layout::panel_tl = new_panel;
+        break;
+
+    case Layout::TOP_CENTER:
+        Layout::panel_tc = new_panel;
+        break;
+
+    case Layout::TOP_RIGHT:
+        Layout::panel_tr = new_panel;
+        break;
+
+    case Layout::BOTTOM_LEFT:
+        Layout::panel_bl = new_panel;
+        break;
+
+    case Layout::BOTTOM_RIGHT:
+        Layout::panel_br = new_panel;
+        break;
+
+    default:
+        // Do nothing
+        break;
+    }
+
+    update_info_list();
+}
+
+/****************************
+ * Private Helper Functions *
+ ****************************/
+
+void Layout::init_single_object(Panel panel)
+{
+    /* Button */
+    panel.btn = lv_btn_create(window);                                                         // Create the button in the Layout window
+    lv_obj_add_style(panel.btn, &panel_tl.style_btn, 0);                                       // Add the style for the button
+    lv_obj_add_style(panel.btn, &panel_tl.style_btn_pressed, LV_STATE_PRESSED);                // Add the style for the button when pressed
+    /* Data in Button */
+    panel.data = lv_label_create(panel.btn);                                 // Create a spot for data to go into the button
+    lv_label_set_text(panel.data, panel.panel_info->get_data_str().c_str()); // Put the data in the Information object into the button
+    lv_obj_align(panel.data, LV_ALIGN_CENTER, 0, 0);                         // Put the data into the center of the button
+    /* Label */
+    panel.label = lv_label_create(window);                                                     // Create a label to show what data the button is holding
+    lv_label_set_text(panel.label, panel.panel_info->get_name().c_str());                      // Put the name of the Information object into the label
+    lv_obj_add_style(panel.label, &panel.style_label, 0);                                      // Add the style for the label
+}
+
+void Layout::init_panel_locations()
+{
+    /***** Top Left Panel *****/
+    /* Button */
+    lv_obj_set_grid_cell(panel_tl.btn, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_STRETCH, 0, 1); // Move the Panel button to the top left of the window
+    /* Label */
+    lv_obj_set_grid_cell(panel_tl.label, LV_GRID_ALIGN_CENTER, 0, 2, LV_GRID_ALIGN_CENTER, 1, 1); // Move the Panel label below the Panel button
+    // /***** Top Center Panel *****/
+    // /* Button */
+    // lv_obj_set_grid_cell(panel_tc.btn, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_STRETCH, 0, 1); // Move the Panel button to the top center of the window
+    // /* Label */
+    // lv_obj_set_grid_cell(panel_tc.label, LV_GRID_ALIGN_CENTER, 0, 2, LV_GRID_ALIGN_CENTER, 1, 1); // Move the Panel label below the Panel button
+    // /***** Top Right Panel *****/
+    // /* Button */
+    // lv_obj_set_grid_cell(panel_tr.btn, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_STRETCH, 0, 1); // Move the Panel button to the top right of the window
+    // /* Label */
+    // lv_obj_set_grid_cell(panel_tr.label, LV_GRID_ALIGN_CENTER, 0, 2, LV_GRID_ALIGN_CENTER, 1, 1); // Move the Panel label below the Panel button
+    // /***** Bottom Left Panel *****/
+    // /* Button */
+    // lv_obj_set_grid_cell(panel_bl.btn, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_STRETCH, 0, 1); // Move the Panel button to the bottom left of the window
+    // /* Label */
+    // lv_obj_set_grid_cell(panel_bl.label, LV_GRID_ALIGN_CENTER, 0, 2, LV_GRID_ALIGN_CENTER, 1, 1); // Move the Panel label below the Panel button
+    // /***** Bottom Right Panel *****/
+    // /* Button */
+    // lv_obj_set_grid_cell(panel_br.btn, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_STRETCH, 0, 1); // Move the Panel button to the bottom right of the window
+    // /* Label */
+    // lv_obj_set_grid_cell(panel_br.label, LV_GRID_ALIGN_CENTER, 0, 2, LV_GRID_ALIGN_CENTER, 1, 1); // Move the Panel label below the Panel button
+}
+
+void Layout::update_info_list()
+{
+}
