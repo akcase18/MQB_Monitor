@@ -2,6 +2,7 @@
 #define LAYOUT_H
 
 #include <vector>
+#include <lvgl.h>
 #include "Panel.hpp"
 
 using namespace std;

@@ -64,14 +64,14 @@ void Layout::init_objects()
 {
     /***** Top Left Panel *****/
     init_single_object(panel_tl);
-    // /***** Top Center Panel *****/
-    // init_single_object(panel_tc);
-    // /***** Top Right Panel *****/
-    // init_single_object(panel_tr);
-    // /***** Bottom Left Panel *****/
-    // init_single_object(panel_bl);
-    // /***** Bottom Right Panel *****/
-    // init_single_object(panel_br);
+    /***** Top Center Panel *****/
+    init_single_object(panel_tc);
+    /***** Top Right Panel *****/
+    init_single_object(panel_tr);
+    /***** Bottom Left Panel *****/
+    init_single_object(panel_bl);
+    /***** Bottom Right Panel *****/
+    init_single_object(panel_br);
     /***** Set Locations *****/
     init_panel_locations();
 }
@@ -141,26 +141,26 @@ void Layout::init_panel_locations()
     lv_obj_set_grid_cell(panel_tl.btn, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_STRETCH, 0, 1); // Move the Panel button to the top left of the window
     /* Label */
     lv_obj_set_grid_cell(panel_tl.label, LV_GRID_ALIGN_CENTER, 0, 2, LV_GRID_ALIGN_CENTER, 1, 1); // Move the Panel label below the Panel button
-    // /***** Top Center Panel *****/
-    // /* Button */
-    // lv_obj_set_grid_cell(panel_tc.btn, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_STRETCH, 0, 1); // Move the Panel button to the top center of the window
-    // /* Label */
-    // lv_obj_set_grid_cell(panel_tc.label, LV_GRID_ALIGN_CENTER, 0, 2, LV_GRID_ALIGN_CENTER, 1, 1); // Move the Panel label below the Panel button
-    // /***** Top Right Panel *****/
-    // /* Button */
-    // lv_obj_set_grid_cell(panel_tr.btn, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_STRETCH, 0, 1); // Move the Panel button to the top right of the window
-    // /* Label */
-    // lv_obj_set_grid_cell(panel_tr.label, LV_GRID_ALIGN_CENTER, 0, 2, LV_GRID_ALIGN_CENTER, 1, 1); // Move the Panel label below the Panel button
-    // /***** Bottom Left Panel *****/
-    // /* Button */
-    // lv_obj_set_grid_cell(panel_bl.btn, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_STRETCH, 0, 1); // Move the Panel button to the bottom left of the window
-    // /* Label */
-    // lv_obj_set_grid_cell(panel_bl.label, LV_GRID_ALIGN_CENTER, 0, 2, LV_GRID_ALIGN_CENTER, 1, 1); // Move the Panel label below the Panel button
-    // /***** Bottom Right Panel *****/
-    // /* Button */
-    // lv_obj_set_grid_cell(panel_br.btn, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_STRETCH, 0, 1); // Move the Panel button to the bottom right of the window
-    // /* Label */
-    // lv_obj_set_grid_cell(panel_br.label, LV_GRID_ALIGN_CENTER, 0, 2, LV_GRID_ALIGN_CENTER, 1, 1); // Move the Panel label below the Panel button
+    /***** Top Center Panel *****/
+    /* Button */
+    lv_obj_set_grid_cell(panel_tc.btn, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_STRETCH, 0, 1); // Move the Panel button to the top center of the window
+    /* Label */
+    lv_obj_set_grid_cell(panel_tc.label, LV_GRID_ALIGN_CENTER, 0, 2, LV_GRID_ALIGN_CENTER, 1, 1); // Move the Panel label below the Panel button
+    /***** Top Right Panel *****/
+    /* Button */
+    lv_obj_set_grid_cell(panel_tr.btn, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_STRETCH, 0, 1); // Move the Panel button to the top right of the window
+    /* Label */
+    lv_obj_set_grid_cell(panel_tr.label, LV_GRID_ALIGN_CENTER, 0, 2, LV_GRID_ALIGN_CENTER, 1, 1); // Move the Panel label below the Panel button
+    /***** Bottom Left Panel *****/
+    /* Button */
+    lv_obj_set_grid_cell(panel_bl.btn, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_STRETCH, 0, 1); // Move the Panel button to the bottom left of the window
+    /* Label */
+    lv_obj_set_grid_cell(panel_bl.label, LV_GRID_ALIGN_CENTER, 0, 2, LV_GRID_ALIGN_CENTER, 1, 1); // Move the Panel label below the Panel button
+    /***** Bottom Right Panel *****/
+    /* Button */
+    lv_obj_set_grid_cell(panel_br.btn, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_STRETCH, 0, 1); // Move the Panel button to the bottom right of the window
+    /* Label */
+    lv_obj_set_grid_cell(panel_br.label, LV_GRID_ALIGN_CENTER, 0, 2, LV_GRID_ALIGN_CENTER, 1, 1); // Move the Panel label below the Panel button
 }
 
 void Layout::update_info_list()

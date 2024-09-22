@@ -1,6 +1,6 @@
 // #include <Arduino.h>
 // #include "can_logic.hpp"
-#include "Panel.hpp"
+#include "Layout.hpp"
 
 /***********
  * Defines *
@@ -20,6 +20,8 @@ Panel panel_tc = Panel(&engine_oil_temp);
 Panel panel_tr = Panel(&intake_air_temp);
 Panel panel_bl = Panel(&intake_pressure);
 Panel panel_br = Panel(&throttle_position);
+
+Layout main_layout = Layout(panel_tl, panel_tc, panel_tr, panel_bl, panel_bl);
 
 /***********************
  ***********************
@@ -314,7 +316,7 @@ static void style_init(void)
     lv_style_set_text_font(&style_label_btm, btm_label_font);
     lv_style_set_text_letter_space(&style_label_btm, 0);
 
-    /* Set the style of the label in the done buttons */
+    /* Set the style of the label in the done button */
     lv_style_init(&style_label_done);
     lv_style_set_text_color(&style_label_done, lv_palette_darken(LV_PALETTE_GREY, 5));
     lv_style_set_text_font(&style_label_done, done_label_font);

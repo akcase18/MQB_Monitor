@@ -20,6 +20,8 @@
 #define LCD_RST 26 // G8
 ILI948x_t4_mm lcd = ILI948x_t4_mm(LCD_DC, LCD_CS, LCD_RST);
 
+bool test = false;
+
 /**
  * LCD Wiring
  * 
@@ -85,14 +87,28 @@ void setup()
   init_config_window();
 
   open_main_window();
-  // open_config_window();
+  open_config_window();
+
+  // main_layout.open_window();
 
   lv_tick_set_cb(millis);
 }
 
 void loop()
 {
+
+  if (test)
+  {
+    open_main_window();
+  }
+  else
+  {
+    open_config_window();
+  }
+
   lv_task_handler();
 
-  delay(10);
+  test = !test;
+
+  delay(1000);
 }
