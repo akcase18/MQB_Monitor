@@ -15,12 +15,6 @@
  ***********************
  ***********************/
 
-Panel panel_tl = Panel(&coolant_temp);
-Panel panel_tc = Panel(&ambient_pressure);
-Panel panel_tr = Panel(&ambient_pressure);
-Panel panel_bl = Panel(&intake_pressure);
-Panel panel_br = Panel(&throttle_position);
-
 /***********************
  ***********************
  * OLD STUFF GOES HERE *
@@ -35,15 +29,6 @@ Panel panel_br = Panel(&throttle_position);
 static lv_style_t style_main;   // Main window style
 static lv_style_t style_config; // Config window style
 static lv_style_t style_flex;   // Flex layout style
-/* Button Styles */
-static lv_style_t style_btn_top;     // Top row button style
-static lv_style_t style_btn_btm;     // Bottom row button style
-static lv_style_t style_btn_pressed; // Button style when pressed
-static lv_style_t style_btn_done;    // Done button style
-/* Label Styles */
-static lv_style_t style_label_top;  // Top row label style
-static lv_style_t style_label_btm;  // Bottom row label style
-static lv_style_t style_label_done; // Done button label style
 /* Radio Button Styles */
 static lv_style_t style_radio;     // Style for the radio buttons when not selected
 static lv_style_t style_radio_chk; // Style for the radio buttons when selected
@@ -112,16 +97,6 @@ static lv_coord_t row_dsc[] = {LV_GRID_FR(6), LV_GRID_FR(1), LV_GRID_FR(8), LV_G
 static lv_display_t *display;
 static lv_color_t buf_1[(LCD_HORZ * LCD_VERT) / 10];
 static lv_color_t buf_2[(LCD_HORZ * LCD_VERT) / 10];
-
-/**********
- * Panels *
- **********/
-
-static Information top_left_panel = Information(coolant_temp);          // Information object for the top left panel
-static Information top_center_panel = Information(engine_oil_temp);     // Information object for the top center panel
-static Information top_right_panel = Information(intake_air_temp);      // Information object for the top right panel
-static Information bottom_left_panel = Information(intake_pressure);    // Information object for the bottom left panel
-static Information bottom_right_panel = Information(throttle_position); // Information object for the bottom right panel
 
 /*******************
  * Variable Status *
@@ -263,6 +238,7 @@ static void style_init()
     lv_style_set_text_font(&style_btn_top, top_data_font);
     lv_style_set_text_letter_space(&style_btn_top, 0);
     lv_style_set_shadow_width(&style_btn_top, 0);
+    LV_UNUSED(style_btn_top);
 
     /* Set the style of the bottom data buttons */
     lv_style_init(&style_btn_btm);
@@ -273,6 +249,7 @@ static void style_init()
     lv_style_set_text_font(&style_btn_btm, btm_data_font);
     lv_style_set_text_letter_space(&style_btn_btm, 0);
     lv_style_set_shadow_width(&style_btn_btm, 0);
+    LV_UNUSED(style_btn_btm);
 
     /* Set the style of the "done" button */
     lv_style_init(&style_btn_done);
@@ -290,18 +267,21 @@ static void style_init()
     lv_style_init(&style_btn_pressed);
     lv_style_set_color_filter_dsc(&style_btn_pressed, &color_filter_btn);
     lv_style_set_color_filter_opa(&style_btn_pressed, LV_OPA_20);
+    LV_UNUSED(style_btn_pressed);
 
     /* Set the style of the top row label object */
     lv_style_init(&style_label_top);
     lv_style_set_text_color(&style_label_top, lv_palette_lighten(LV_PALETTE_GREY, 5));
     lv_style_set_text_font(&style_label_top, top_label_font);
     lv_style_set_text_letter_space(&style_label_top, 0);
+    LV_UNUSED(style_label_top);
 
     /* Set the style of the bottom row label object */
     lv_style_init(&style_label_btm);
     lv_style_set_text_color(&style_label_btm, lv_palette_lighten(LV_PALETTE_GREY, 5));
     lv_style_set_text_font(&style_label_btm, btm_label_font);
     lv_style_set_text_letter_space(&style_label_btm, 0);
+    LV_UNUSED(style_label_btm);
 
     /* Set the style of the label in the done button */
     lv_style_init(&style_label_done);
@@ -454,27 +434,27 @@ static void add_main_labels()
 {
     panel_tl.label = lv_label_create(main_window);
     lv_label_set_text(panel_tl.label, panel_tl.panel_info->get_name_and_label().c_str());
-    lv_obj_add_style(panel_tl.label, &style_label_top, 0);
+    lv_obj_add_style(panel_tl.label, panel_tl.style_label, 0);
     lv_obj_set_grid_cell(panel_tl.label, LV_GRID_ALIGN_CENTER, 0, 2, LV_GRID_ALIGN_CENTER, 1, 1);
 
     panel_tc.label = lv_label_create(main_window);
     lv_label_set_text(panel_tc.label, panel_tc.panel_info->get_name_and_label().c_str());
-    lv_obj_add_style(panel_tc.label, &style_label_top, 0);
+    lv_obj_add_style(panel_tc.label, panel_tc.style_label, 0);
     lv_obj_set_grid_cell(panel_tc.label, LV_GRID_ALIGN_CENTER, 2, 2, LV_GRID_ALIGN_CENTER, 1, 1);
 
     panel_tr.label = lv_label_create(main_window);
     lv_label_set_text(panel_tr.label, panel_tr.panel_info->get_name_and_label().c_str());
-    lv_obj_add_style(panel_tr.label, &style_label_top, 0);
+    lv_obj_add_style(panel_tr.label, panel_tr.style_label, 0);
     lv_obj_set_grid_cell(panel_tr.label, LV_GRID_ALIGN_CENTER, 4, 2, LV_GRID_ALIGN_CENTER, 1, 1);
 
     panel_bl.label = lv_label_create(main_window);
     lv_label_set_text(panel_bl.label, panel_bl.panel_info->get_name_and_label().c_str());
-    lv_obj_add_style(panel_bl.label, &style_label_btm, 0);
+    lv_obj_add_style(panel_bl.label, panel_bl.style_label, 0);
     lv_obj_set_grid_cell(panel_bl.label, LV_GRID_ALIGN_CENTER, 0, 3, LV_GRID_ALIGN_CENTER, 3, 1);
 
     panel_br.label = lv_label_create(main_window);
     lv_label_set_text(panel_br.label, panel_br.panel_info->get_name_and_label().c_str());
-    lv_obj_add_style(panel_br.label, &style_label_btm, 0);
+    lv_obj_add_style(panel_br.label, panel_br.style_label, 0);
     lv_obj_set_grid_cell(panel_br.label, LV_GRID_ALIGN_CENTER, 3, 3, LV_GRID_ALIGN_CENTER, 3, 1);
 }
 

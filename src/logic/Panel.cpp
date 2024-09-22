@@ -1,5 +1,11 @@
 #include "Panel.hpp"
 
+DMAMEM Panel panel_tl = Panel(&coolant_temp);
+DMAMEM Panel panel_tc = Panel(&ambient_pressure);
+DMAMEM Panel panel_tr = Panel(&ambient_pressure);
+DMAMEM Panel panel_bl = Panel(&intake_pressure);
+DMAMEM Panel panel_br = Panel(&throttle_position);
+
 /****************
  * Constructors *
  ****************/

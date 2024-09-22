@@ -123,4 +123,20 @@ public:
     Panel(Information *info, lv_obj_t *btn, lv_obj_t *data, lv_obj_t *label);
 };
 
+/* Button Styles */
+static lv_style_t style_btn_top;     // Top row button style
+static lv_style_t style_btn_btm;     // Bottom row button style
+static lv_style_t style_btn_pressed; // Button style when pressed
+static lv_style_t style_btn_done;    // Done button style
+/* Label Styles */
+static lv_style_t style_label_top;  // Top row label style
+static lv_style_t style_label_btm;  // Bottom row label style
+static lv_style_t style_label_done; // Done button label style
+
+extern Panel panel_tl;
+extern Panel panel_tc;
+extern Panel panel_tr;
+extern Panel panel_bl;
+extern Panel panel_br;
+
 #endif

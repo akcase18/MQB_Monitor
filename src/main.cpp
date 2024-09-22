@@ -62,11 +62,13 @@ void set_unit_region()
 {
   // Pull from EEPROM
 
-  top_left_panel.set_is_metric(false);
-  top_center_panel.set_is_metric(false);
-  top_right_panel.set_is_metric(false);
-  bottom_left_panel.set_is_metric(false);
-  bottom_right_panel.set_is_metric(false);
+  /* This isn't working rn */
+
+  panel_tl.panel_info->set_is_metric(false);
+  panel_tc.panel_info->set_is_metric(false);
+  panel_tr.panel_info->set_is_metric(false);
+  panel_bl.panel_info->set_is_metric(false);
+  panel_br.panel_info->set_is_metric(false);
 }
 
 void setup()
