@@ -21,8 +21,6 @@ Panel panel_tr = Panel(&intake_air_temp);
 Panel panel_bl = Panel(&intake_pressure);
 Panel panel_br = Panel(&throttle_position);
 
-Layout main_layout = Layout(panel_tl, panel_tc, panel_tr, panel_bl, panel_bl);
-
 /***********************
  ***********************
  * OLD STUFF GOES HERE *
@@ -58,24 +56,8 @@ static lv_style_t style_radio_chk; // Style for the radio buttons when selected
 static lv_obj_t *main_window;   // Main window object
 static lv_obj_t *config_window; // Config window object
 /* Button Objects */
-static lv_obj_t *top_left;     // Top left button object
-static lv_obj_t *top_center;   // Top center button object
-static lv_obj_t *top_right;    // Top right button object
-static lv_obj_t *bottom_left;  // Bottom left button object
-static lv_obj_t *bottom_right; // Buttom right button object
 static lv_obj_t *done_btn;     // Done button for config window
-/* Button Data Objects */
-static lv_obj_t *top_left_data;     // Top left data object
-static lv_obj_t *top_center_data;   // Top center data object
-static lv_obj_t *top_right_data;    // Top right data object
-static lv_obj_t *bottom_left_data;  // Bottom left data object
-static lv_obj_t *bottom_right_data; // Bottom right data object
 /* Label Objects */
-static lv_obj_t *top_left_label;     // Top left label object
-static lv_obj_t *top_center_label;   // Top center label object
-static lv_obj_t *top_right_label;    // Top right label object
-static lv_obj_t *bottom_left_label;  // Bottom left label object
-static lv_obj_t *bottom_right_label; // Bottom right label object
 static lv_obj_t *done_label;         // Done label for config window
 /* Flex Objects */
 static lv_obj_t *flex_col_1;
@@ -255,7 +237,7 @@ void update_buttons();
  * Initialization *
  ******************/
 
-static void style_init(void)
+static void style_init()
 {
     /* Set the style of the main window */
     lv_style_init(&style_main);
@@ -389,83 +371,83 @@ static void init_config_window(void)
  * Object Creation *
  *******************/
 
-static void add_main_objects(void)
+static void add_main_objects()
 {
-    top_left = lv_btn_create(main_window);
-    lv_obj_add_style(top_left, &style_btn_top, 0);
-    lv_obj_add_style(top_left, &style_btn_pressed, LV_STATE_PRESSED);
-    lv_obj_set_grid_cell(top_left, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_STRETCH, 0, 1);
-    lv_obj_add_event_cb(top_left, button_config_cb, LV_EVENT_CLICKED, top_left);
-    top_left_data = lv_label_create(top_left);
-    lv_label_set_text(top_left_data, top_left_panel.get_data_str().c_str());
-    lv_obj_align(top_left_data, LV_ALIGN_CENTER, 0, 0);
+    panel_tl.btn = lv_btn_create(main_window);
+    lv_obj_add_style(panel_tl.btn, &style_btn_top, 0);
+    lv_obj_add_style(panel_tl.btn, &style_btn_pressed, LV_STATE_PRESSED);
+    lv_obj_set_grid_cell(panel_tl.btn, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_STRETCH, 0, 1);
+    lv_obj_add_event_cb(panel_tl.btn, button_config_cb, LV_EVENT_CLICKED, panel_tl.btn);
+    panel_tl.data = lv_label_create(panel_tl.btn);
+    lv_label_set_text(panel_tl.data, panel_tl.panel_info->get_data_str().c_str());
+    lv_obj_align(panel_tl.data, LV_ALIGN_CENTER, 0, 0);
 
-    top_center = lv_btn_create(main_window);
-    lv_obj_add_style(top_center, &style_btn_top, 0);
-    lv_obj_add_style(top_center, &style_btn_pressed, LV_STATE_PRESSED);
-    lv_obj_set_grid_cell(top_center, LV_GRID_ALIGN_STRETCH, 2, 2, LV_GRID_ALIGN_STRETCH, 0, 1);
-    lv_obj_add_event_cb(top_center, button_config_cb, LV_EVENT_CLICKED, top_center);
-    top_center_data = lv_label_create(top_center);
-    lv_label_set_text(top_center_data, top_center_panel.get_data_str().c_str());
-    lv_obj_align(top_center_data, LV_ALIGN_CENTER, 0, 0);
+    panel_tc.btn = lv_btn_create(main_window);
+    lv_obj_add_style(panel_tc.btn, &style_btn_top, 0);
+    lv_obj_add_style(panel_tc.btn, &style_btn_pressed, LV_STATE_PRESSED);
+    lv_obj_set_grid_cell(panel_tc.btn, LV_GRID_ALIGN_STRETCH, 2, 2, LV_GRID_ALIGN_STRETCH, 0, 1);
+    lv_obj_add_event_cb(panel_tc.btn, button_config_cb, LV_EVENT_CLICKED, panel_tc.btn);
+    panel_tc.data = lv_label_create(panel_tc.btn);
+    lv_label_set_text(panel_tc.data, panel_tc.panel_info->get_data_str().c_str());
+    lv_obj_align(panel_tc.data, LV_ALIGN_CENTER, 0, 0);
 
-    top_right = lv_btn_create(main_window);
-    lv_obj_add_style(top_right, &style_btn_top, 0);
-    lv_obj_add_style(top_right, &style_btn_pressed, LV_STATE_PRESSED);
-    lv_obj_set_grid_cell(top_right, LV_GRID_ALIGN_STRETCH, 4, 2, LV_GRID_ALIGN_STRETCH, 0, 1);
-    lv_obj_add_event_cb(top_right, button_config_cb, LV_EVENT_CLICKED, top_right);
-    top_right_data = lv_label_create(top_right);
-    lv_label_set_text(top_right_data, top_right_panel.get_data_str().c_str());
-    lv_obj_align(top_right_data, LV_ALIGN_CENTER, 0, 0);
+    panel_tr.btn = lv_btn_create(main_window);
+    lv_obj_add_style(panel_tr.btn, &style_btn_top, 0);
+    lv_obj_add_style(panel_tr.btn, &style_btn_pressed, LV_STATE_PRESSED);
+    lv_obj_set_grid_cell(panel_tr.btn, LV_GRID_ALIGN_STRETCH, 4, 2, LV_GRID_ALIGN_STRETCH, 0, 1);
+    lv_obj_add_event_cb(panel_tr.btn, button_config_cb, LV_EVENT_CLICKED, panel_tr.btn);
+    panel_tr.data = lv_label_create(panel_tr.btn);
+    lv_label_set_text(panel_tr.data, panel_tr.panel_info->get_data_str().c_str());
+    lv_obj_align(panel_tr.data, LV_ALIGN_CENTER, 0, 0);
 
-    bottom_left = lv_btn_create(main_window);
-    lv_obj_add_style(bottom_left, &style_btn_btm, 0);
-    lv_obj_add_style(bottom_left, &style_btn_pressed, LV_STATE_PRESSED);
-    lv_obj_set_grid_cell(bottom_left, LV_GRID_ALIGN_STRETCH, 0, 3, LV_GRID_ALIGN_STRETCH, 2, 1);
-    lv_obj_add_event_cb(bottom_left, button_config_cb, LV_EVENT_CLICKED, bottom_left);
-    bottom_left_data = lv_label_create(bottom_left);
-    lv_label_set_text(bottom_left_data, bottom_left_panel.get_data_str().c_str());
-    lv_obj_align(bottom_left_data, LV_ALIGN_CENTER, 0, 0);
+    panel_bl.btn = lv_btn_create(main_window);
+    lv_obj_add_style(panel_bl.btn, &style_btn_btm, 0);
+    lv_obj_add_style(panel_bl.btn, &style_btn_pressed, LV_STATE_PRESSED);
+    lv_obj_set_grid_cell(panel_bl.btn, LV_GRID_ALIGN_STRETCH, 0, 3, LV_GRID_ALIGN_STRETCH, 2, 1);
+    lv_obj_add_event_cb(panel_bl.btn, button_config_cb, LV_EVENT_CLICKED, panel_bl.btn);
+    panel_bl.data = lv_label_create(panel_bl.btn);
+    lv_label_set_text(panel_bl.data, panel_bl.panel_info->get_data_str().c_str());
+    lv_obj_align(panel_bl.data, LV_ALIGN_CENTER, 0, 0);
 
-    bottom_right = lv_btn_create(main_window);
-    lv_obj_add_style(bottom_right, &style_btn_btm, 0);
-    lv_obj_add_style(bottom_right, &style_btn_pressed, LV_STATE_PRESSED);
-    lv_obj_set_grid_cell(bottom_right, LV_GRID_ALIGN_STRETCH, 3, 3, LV_GRID_ALIGN_STRETCH, 2, 1);
-    lv_obj_add_event_cb(bottom_right, button_config_cb, LV_EVENT_CLICKED, bottom_right);
-    bottom_right_data = lv_label_create(bottom_right);
-    lv_label_set_text(bottom_right_data, bottom_right_panel.get_data_str().c_str());
-    lv_obj_align(bottom_right_data, LV_ALIGN_CENTER, 0, 0);
+    panel_br.btn = lv_btn_create(main_window);
+    lv_obj_add_style(panel_br.btn, &style_btn_btm, 0);
+    lv_obj_add_style(panel_br.btn, &style_btn_pressed, LV_STATE_PRESSED);
+    lv_obj_set_grid_cell(panel_br.btn, LV_GRID_ALIGN_STRETCH, 3, 3, LV_GRID_ALIGN_STRETCH, 2, 1);
+    lv_obj_add_event_cb(panel_br.btn, button_config_cb, LV_EVENT_CLICKED, panel_br.btn);
+    panel_br.data = lv_label_create(panel_br.btn);
+    lv_label_set_text(panel_br.data, panel_br.panel_info->get_data_str().c_str());
+    lv_obj_align(panel_br.data, LV_ALIGN_CENTER, 0, 0);
 }
 
-static void add_main_labels(void)
+static void add_main_labels()
 {
-    top_left_label = lv_label_create(main_window);
-    lv_label_set_text(top_left_label, top_left_panel.get_name().c_str());
-    lv_obj_add_style(top_left_label, &style_label_top, 0);
-    lv_obj_set_grid_cell(top_left_label, LV_GRID_ALIGN_CENTER, 0, 2, LV_GRID_ALIGN_CENTER, 1, 1);
+    panel_tl.label = lv_label_create(main_window);
+    lv_label_set_text(panel_tl.label, panel_tl.panel_info->get_name_and_label().c_str());
+    lv_obj_add_style(panel_tl.label, &style_label_top, 0);
+    lv_obj_set_grid_cell(panel_tl.label, LV_GRID_ALIGN_CENTER, 0, 2, LV_GRID_ALIGN_CENTER, 1, 1);
 
-    top_center_label = lv_label_create(main_window);
-    lv_label_set_text(top_center_label, top_center_panel.get_name().c_str());
-    lv_obj_add_style(top_center_label, &style_label_top, 0);
-    lv_obj_set_grid_cell(top_center_label, LV_GRID_ALIGN_CENTER, 2, 2, LV_GRID_ALIGN_CENTER, 1, 1);
+    panel_tc.label = lv_label_create(main_window);
+    lv_label_set_text(panel_tc.label, panel_tc.panel_info->get_name_and_label().c_str());
+    lv_obj_add_style(panel_tc.label, &style_label_top, 0);
+    lv_obj_set_grid_cell(panel_tc.label, LV_GRID_ALIGN_CENTER, 2, 2, LV_GRID_ALIGN_CENTER, 1, 1);
 
-    top_right_label = lv_label_create(main_window);
-    lv_label_set_text(top_right_label, top_right_panel.get_name().c_str());
-    lv_obj_add_style(top_right_label, &style_label_top, 0);
-    lv_obj_set_grid_cell(top_right_label, LV_GRID_ALIGN_CENTER, 4, 2, LV_GRID_ALIGN_CENTER, 1, 1);
+    panel_tr.label = lv_label_create(main_window);
+    lv_label_set_text(panel_tr.label, panel_tr.panel_info->get_name_and_label().c_str());
+    lv_obj_add_style(panel_tr.label, &style_label_top, 0);
+    lv_obj_set_grid_cell(panel_tr.label, LV_GRID_ALIGN_CENTER, 4, 2, LV_GRID_ALIGN_CENTER, 1, 1);
 
-    bottom_left_label = lv_label_create(main_window);
-    lv_label_set_text(bottom_left_label, bottom_left_panel.get_name().c_str());
-    lv_obj_add_style(bottom_left_label, &style_label_btm, 0);
-    lv_obj_set_grid_cell(bottom_left_label, LV_GRID_ALIGN_CENTER, 0, 3, LV_GRID_ALIGN_CENTER, 3, 1);
+    panel_bl.label = lv_label_create(main_window);
+    lv_label_set_text(panel_bl.label, panel_bl.panel_info->get_name_and_label().c_str());
+    lv_obj_add_style(panel_bl.label, &style_label_btm, 0);
+    lv_obj_set_grid_cell(panel_bl.label, LV_GRID_ALIGN_CENTER, 0, 3, LV_GRID_ALIGN_CENTER, 3, 1);
 
-    bottom_right_label = lv_label_create(main_window);
-    lv_label_set_text(bottom_right_label, bottom_right_panel.get_name().c_str());
-    lv_obj_add_style(bottom_right_label, &style_label_btm, 0);
-    lv_obj_set_grid_cell(bottom_right_label, LV_GRID_ALIGN_CENTER, 3, 3, LV_GRID_ALIGN_CENTER, 3, 1);
+    panel_br.label = lv_label_create(main_window);
+    lv_label_set_text(panel_br.label, panel_br.panel_info->get_name_and_label().c_str());
+    lv_obj_add_style(panel_br.label, &style_label_btm, 0);
+    lv_obj_set_grid_cell(panel_br.label, LV_GRID_ALIGN_CENTER, 3, 3, LV_GRID_ALIGN_CENTER, 3, 1);
 }
 
-static void add_config_objects(void)
+static void add_config_objects()
 {
     /* Create layout */
     flex_col_1 = lv_obj_create(config_window);

@@ -100,7 +100,7 @@ String Information::get_name()
 }
 String Information::get_name_and_label()
 {
-    return _name;
+    return _name + " " + _unit_label;
 }
 
 /***** Data *****/

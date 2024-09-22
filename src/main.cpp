@@ -21,6 +21,7 @@
 ILI948x_t4_mm lcd = ILI948x_t4_mm(LCD_DC, LCD_CS, LCD_RST);
 
 bool test = false;
+int counter = 0;
 
 /**
  * LCD Wiring
@@ -74,20 +75,18 @@ void setup()
 
   set_unit_region();
 
-  lcd_init();
-  display_init();
-
   lv_task_handler();
 
-  delay(1000);
-
   style_init();
+
+  lcd_init();
+  display_init();
 
   init_main_window();
   init_config_window();
 
-  open_main_window();
   open_config_window();
+  open_main_window();
 
   // main_layout.open_window();
 
@@ -97,18 +96,32 @@ void setup()
 void loop()
 {
 
-  if (test)
-  {
-    open_main_window();
-  }
-  else
-  {
-    open_config_window();
-  }
+  // if (test)
+  // {
+  //   open_main_window();
+  // }
+  // else
+  // {
+  //   open_config_window();
+  // }
 
   lv_task_handler();
 
   test = !test;
+
+  if (!(counter % 3))
+  {
+    if (test)
+    {
+      panel_tl.panel_info = &ambient_pressure;
+    }
+    else
+    {
+      panel_tl.panel_info = &coolant_temp;
+    }
+  }
+
+  counter++;
 
   delay(1000);
 }

@@ -122,8 +122,8 @@ void Layout::init_single_object(Panel panel)
 {
     /* Button */
     panel.btn = lv_btn_create(window);                                                         // Create the button in the Layout window
-    lv_obj_add_style(panel.btn, &panel_tl.style_btn, 0);                                       // Add the style for the button
-    lv_obj_add_style(panel.btn, &panel_tl.style_btn_pressed, LV_STATE_PRESSED);                // Add the style for the button when pressed
+    // lv_obj_add_style(panel.btn, &panel_tl.style_btn, 0);                                       // Add the style for the button
+    // lv_obj_add_style(panel.btn, &panel_tl.style_btn_pressed, LV_STATE_PRESSED);                // Add the style for the button when pressed
     /* Data in Button */
     panel.data = lv_label_create(panel.btn);                                 // Create a spot for data to go into the button
     lv_label_set_text(panel.data, panel.panel_info->get_data_str().c_str()); // Put the data in the Information object into the button
@@ -131,7 +131,7 @@ void Layout::init_single_object(Panel panel)
     /* Label */
     panel.label = lv_label_create(window);                                                     // Create a label to show what data the button is holding
     lv_label_set_text(panel.label, panel.panel_info->get_name().c_str());                      // Put the name of the Information object into the label
-    lv_obj_add_style(panel.label, &panel.style_label, 0);                                      // Add the style for the label
+    // lv_obj_add_style(panel.label, &panel.style_label, 0);                                      // Add the style for the label
 }
 
 void Layout::init_panel_locations()
