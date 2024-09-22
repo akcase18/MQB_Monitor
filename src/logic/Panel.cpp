@@ -57,19 +57,9 @@ void Panel::set_info(Information *info)
     panel_info = info;
 }
 
-Information *Panel::get_info()
-{
-    return panel_info;
-}
-
 void Panel::set_btn(lv_obj_t *btn)
 {
     btn = btn;
-}
-
-lv_obj_t *Panel::get_btn()
-{
-    return btn;
 }
 
 void Panel::set_data(lv_obj_t *data)
@@ -77,19 +67,9 @@ void Panel::set_data(lv_obj_t *data)
     data = data;
 }
 
-lv_obj_t *Panel::get_data()
-{
-    return data;
-}
-
 void Panel::set_label(lv_obj_t *label)
 {
     label = label;
-}
-
-lv_obj_t *Panel::get_label()
-{
-    return label;
 }
 
 void Panel::set_btn_style(lv_style_t style_btn)
