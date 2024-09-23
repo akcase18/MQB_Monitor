@@ -42,6 +42,18 @@ private:
     void init_window();
 
     /**
+     * Sets up the layout structure of the Configurator window. This
+     * utilizes the LVGL flex layout with 2 columns, allowing for easy
+     * resizing of elements and easy layout creation.
+     */
+    void init_window_layout();
+
+    /**
+     * Initializes the drop-down menu in the Configurator.
+     */
+    void init_drop_down();
+
+    /**
      * Creates the "Done" button and puts it into the correct spot on
      * the Configurator window.
      */
@@ -72,20 +84,22 @@ public:
      * Public Variables *
      ********************/
 
-    lv_obj_t *window;                  // Window object that holds all other elements
-    lv_obj_t *flex_col_1;              // Column 1 of flex layout
-    lv_obj_t *flex_col_2;              // Column 2 of flex layout
-    lv_obj_t *drop_down;               // Drop-down menu
-    lv_obj_t *radio_imperial;          // Radio button for imperial units
-    lv_obj_t *radio_metric;            // Radio button for metric units
-    lv_obj_t *btn_done;                // Done button
-    lv_style_t *style_window;          // Style for window
-    lv_style_t *style_drop_down;       // Style for drop-down menu
-    lv_style_t *style_radio_checked;   // Style for radio button when selected
-    lv_style_t *style_radio_unchecked; // Style for radio button when deselected
-    lv_style_t *style_btn_done;        // Style for done button
-    lv_style_t *style_layout;          // Style for flex layout used
-    Panel *panel_selected;             // Panel that the Configurator was opened by
+    lv_obj_t *window;                 // Window object that holds all other elements
+    lv_obj_t *flex_col_1;             // Column 1 of flex layout
+    lv_obj_t *flex_col_2;             // Column 2 of flex layout
+    lv_obj_t *drop_down;              // Drop-down menu
+    lv_obj_t *radio_imperial;         // Radio button for imperial units
+    lv_obj_t *radio_metric;           // Radio button for metric units
+    lv_obj_t *btn_done;               // Done button
+    lv_obj_t *label_done;             // Label for done button
+    lv_style_t style_window;          // Style for window
+    lv_style_t style_drop_down;       // Style for drop-down menu
+    lv_style_t style_radio_checked;   // Style for radio button when selected
+    lv_style_t style_radio_unchecked; // Style for radio button when deselected
+    lv_style_t style_btn_done;        // Style for done button
+    lv_style_t style_label_done;      // Style for the labe for the done button
+    lv_style_t style_layout;          // Style for flex layout used
+    Panel *panel_selected;            // Panel that the Configurator was opened by
 
     /********************
      * Public Functions *
@@ -127,6 +141,12 @@ public:
      */
     void set_callback(lv_obj_t *object, void (*function)(lv_event_t *e), lv_event_code_t state, void *user_data);
 };
+
+/*********************************
+ * Configurator Font Declaration *
+ *********************************/
+
+LV_FONT_DECLARE(vw_24);
 
 /***********************************
  * Configurator Object Declaration *

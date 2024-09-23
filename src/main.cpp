@@ -90,9 +90,12 @@ void setup()
   // open_config_window();
   // open_main_window();
 
-  main_layout.init_layout();
+  // main_layout.init_layout();
 
-  main_layout.open_window();
+  // main_layout.open_window();
+
+  config.init_configurator();
+  config.open_window();
 
   lv_tick_set_cb(millis);
 }
@@ -110,23 +113,23 @@ void loop()
 
   lv_task_handler();
 
-  test = !test;
+  // test = !test;
 
-  if (!(counter % 3))
-  {
-    if (test)
-    {
-      panel_tl.panel_info = &ambient_pressure;
-    }
-    else
-    {
-      panel_tl.panel_info = &coolant_temp;
-    }
-    lv_label_set_text(panel_tl.data, panel_tl.panel_info->get_data_str().c_str());
-    lv_label_set_text(panel_tl.label, panel_tl.panel_info->get_name_and_label().c_str());
-  }
+  // if (!(counter % 3))
+  // {
+  //   if (test)
+  //   {
+  //     panel_tl.panel_info = &ambient_pressure;
+  //   }
+  //   else
+  //   {
+  //     panel_tl.panel_info = &coolant_temp;
+  //   }
+  //   lv_label_set_text(panel_tl.data, panel_tl.panel_info->get_data_str().c_str());
+  //   lv_label_set_text(panel_tl.label, panel_tl.panel_info->get_name_and_label().c_str());
+  // }
 
-  counter++;
+  // counter++;
 
-  delay(1000);
+  delay(10);
 }

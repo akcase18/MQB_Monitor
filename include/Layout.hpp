@@ -58,7 +58,7 @@ private:
      * Initialize the objects in the main window
      */
     void init_objects();
-    
+
     /**
      * Initialize/setup single Panel object in the Layout window
      *
@@ -110,12 +110,12 @@ public:
      * -> 1 unit tall (20 px)
      */
     lv_coord_t row_dsc[5] = {LV_GRID_FR(6), LV_GRID_FR(1), LV_GRID_FR(8), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
-    Panel *panel_tl;                 // Panel in the top left position
-    Panel *panel_tc;                 // Panel in the top center position
-    Panel *panel_tr;                 // Panel in the top right position
-    Panel *panel_bl;                 // Panel in the bottom left position
-    Panel *panel_br;                 // Panel in the bottom right position
-    vector<Information *> info_list; // Stores on-screen Information objects
+    Panel *panel_tl;                   // Panel in the top left position
+    Panel *panel_tc;                   // Panel in the top center position
+    Panel *panel_tr;                   // Panel in the top right position
+    Panel *panel_bl;                   // Panel in the bottom left position
+    Panel *panel_br;                   // Panel in the bottom right position
+    vector<Information *> active_info; // Stores on-screen Information objects
 
     /********************
      * Public Functions *

@@ -74,13 +74,13 @@ LV_FONT_DECLARE(digital_display_140);
 LV_FONT_DECLARE(vw_14);
 LV_FONT_DECLARE(vw_16);
 LV_FONT_DECLARE(vw_18);
-LV_FONT_DECLARE(vw_24);
+// LV_FONT_DECLARE(vw_24);
 /* Font Objects */
 const lv_font_t *top_data_font = &digital_display_100;
 const lv_font_t *btm_data_font = &digital_display_140;
 const lv_font_t *top_label_font = &vw_16;
 const lv_font_t *btm_label_font = &vw_18;
-const lv_font_t *done_label_font = &vw_24;
+// const lv_font_t *done_label_font = &vw_24;
 const lv_font_t *drop_down_font = &vw_24;
 
 /********
@@ -255,9 +255,9 @@ static void style_init()
     lv_style_init(&style_btn_done);
     lv_style_set_radius(&style_btn_done, 5);
     lv_style_set_opa(&style_btn_done, LV_OPA_100);
-    lv_style_set_bg_color(&style_btn_done, lv_palette_darken(LV_PALETTE_GREY, 4));
-    lv_style_set_text_color(&style_btn_done, lv_palette_lighten(LV_PALETTE_GREY, 4));
-    lv_style_set_text_font(&style_btn_done, done_label_font);
+    lv_style_set_bg_color(&style_btn_done, lv_palette_lighten(LV_PALETTE_GREY, 4));
+    lv_style_set_text_color(&style_btn_done, lv_palette_darken(LV_PALETTE_GREY, 4));
+    lv_style_set_text_font(&style_btn_done, drop_down_font);
     lv_style_set_text_letter_space(&style_btn_done, 0);
     lv_style_set_shadow_width(&style_btn_done, 0);
 
@@ -286,7 +286,7 @@ static void style_init()
     /* Set the style of the label in the done button */
     lv_style_init(&style_label_done);
     lv_style_set_text_color(&style_label_done, lv_palette_darken(LV_PALETTE_GREY, 5));
-    lv_style_set_text_font(&style_label_done, done_label_font);
+    lv_style_set_text_font(&style_label_done, drop_down_font);
     lv_style_set_text_letter_space(&style_label_done, 0);
 
     /* Set the style of the radio button for selecting unit region */
@@ -468,7 +468,7 @@ static void add_config_objects()
     lv_obj_add_style(flex_col_1, &style_flex, 0);
     flex_col_2 = lv_obj_create(config_window);
     lv_obj_set_flex_flow(flex_col_2, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_size(flex_col_2, lv_pct(40), lv_pct(100));
+    lv_obj_set_size(flex_col_2, lv_pct(35), lv_pct(100));
     lv_obj_add_event_cb(flex_col_2, radio_cb, LV_EVENT_CLICKED, &active_index);
     lv_obj_set_x(flex_col_2, lv_pct(65));
     lv_obj_add_style(flex_col_2, &style_flex, 0);
@@ -515,6 +515,7 @@ static void add_config_objects()
     }
     /* Create close button */
     done_btn = lv_obj_create(config_window);
+    lv_obj_add_style(done_btn, &style_btn_done, 0);
     lv_obj_set_size(done_btn, 100, 55);
     lv_obj_set_pos(done_btn, 360, 245); // 20px buffer on top and side (x: 480 - btn width - 20, y: 320 - btn height - 20)
     /* Turn off scrolling */

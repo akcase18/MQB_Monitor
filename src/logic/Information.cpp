@@ -34,6 +34,13 @@ Information timing_corr_2 = Information("Timing Corr. Cyl 2", 0x20, 0x0B, NO_OFF
 Information timing_corr_3 = Information("Timing Corr. Cyl 3", 0x20, 0x0C, NO_OFFSET, 0.01, Information::DEGREES, 0, 0, 100);
 Information timing_corr_4 = Information("Timing Corr. Cyl 4", 0x20, 0x0D, NO_OFFSET, 0.01, Information::DEGREES, 0, 0, 100);
 
+/***** Information Object List/Vector *****/
+vector<Information *> info_list = {&coolant_temp, &engine_oil_temp, &intake_air_temp, &charge_pressure, &intake_pressure,
+                                   &ambient_pressure, &lambda_actual, &lambda_specified, &turbo_speed, &engine_rpm,
+                                   &engine_torque, &vehicle_speed, &fuel_level, &fuel_percent, &throttle_position, &misfire_sum,
+                                   &misfire_cyl_1, &misfire_cyl_2, &misfire_cyl_3, &misfire_cyl_4, &timing_corr_1, &timing_corr_2,
+                                   &timing_corr_3, &timing_corr_4};
+
 /****************
  * Constructors *
  ****************/

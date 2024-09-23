@@ -317,3 +317,6 @@ extern Information timing_corr_1;
 extern Information timing_corr_2;
 extern Information timing_corr_3;
 extern Information timing_corr_4;
+
+/***** Information Object List/Vector *****/
+extern vector<Information *> info_list;
