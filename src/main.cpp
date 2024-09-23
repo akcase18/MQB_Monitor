@@ -84,11 +84,11 @@ void setup()
   lcd_init();
   display_init();
 
-  // init_main_window();
-  // init_config_window();
+  init_main_window();
+  init_config_window();
 
-  // open_config_window();
-  // open_main_window();
+  open_config_window();
+  open_main_window();
 
   main_layout.init_layout();
 
@@ -99,14 +99,13 @@ void setup()
 
 void loop()
 {
-
   // if (test)
   // {
   //   open_main_window();
   // }
   // else
   // {
-  //   open_config_window();
+  //   main_layout.open_window(); 
   // }
 
   lv_task_handler();
