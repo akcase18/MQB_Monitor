@@ -46,13 +46,6 @@ const lv_font_t *top_label_font = &vw_16;
 const lv_font_t *btm_label_font = &vw_18;
 const lv_font_t *drop_down_font = &vw_24;
 
-/********
- * Grid *
- ********/
-
-static lv_coord_t col_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
-static lv_coord_t row_dsc[] = {LV_GRID_FR(6), LV_GRID_FR(1), LV_GRID_FR(8), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
-
 /***********
  * Display *
  ***********/
@@ -60,12 +53,6 @@ static lv_coord_t row_dsc[] = {LV_GRID_FR(6), LV_GRID_FR(1), LV_GRID_FR(8), LV_G
 static lv_display_t *display;
 static lv_color_t buf_1[(LCD_HORZ * LCD_VERT) / 10];
 static lv_color_t buf_2[(LCD_HORZ * LCD_VERT) / 10];
-
-/*******************
- * Variable Status *
- *******************/
-
-static bool imperial = true;      // Whether the unit radio button selected imperial or not
 
 /**************************
  **************************
