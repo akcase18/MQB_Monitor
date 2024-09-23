@@ -132,6 +132,22 @@ public:
     void close_window();
 
     /**
+     * Selects the imperial radio button in the Configurator window and
+     * deselects the metric radio button. Does this by setting the state
+     * of the imperial radio button to LV_STATE_CHECKED, and clearing the
+     * state of the metric radio button.
+     */
+    void select_imperial_radio_btn();
+
+    /**
+     * Selects the metric radio button in the Configurator window and
+     * deselects the imperial radio button. Does this by setting the state
+     * of the imperial metric button to LV_STATE_CHECKED, and clearing the
+     * state of the imperial radio button.
+     */
+    void select_metric_radio_btn();
+
+    /**
      * Set the callback of a given object, triggered on the given state.
      *
      * @param object pointer to a lv_obj_t that the callback will be attached to

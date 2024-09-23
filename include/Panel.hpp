@@ -135,15 +135,6 @@ static lv_style_t style_btn_pressed; // Button style when pressed
 static lv_style_t style_label_top;  // Top row label style
 static lv_style_t style_label_btm;  // Bottom row label style
 
-/***************************
- * Styles for Configurator *
- ***************************/
-
-/* Button Styles */
-static lv_style_t style_btn_done;    // Done button style
-/* Label Styles */
-static lv_style_t style_label_done; // Done button label style
-
 /****************************
  * Panel Object Declaration *
  ****************************/

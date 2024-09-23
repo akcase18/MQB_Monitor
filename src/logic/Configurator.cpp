@@ -37,6 +37,18 @@ void Configurator::close_window()
 {
 }
 
+void Configurator::select_imperial_radio_btn()
+{
+    lv_obj_add_state(radio_imperial, LV_STATE_CHECKED);
+    lv_obj_clear_state(radio_metric, LV_STATE_CHECKED);
+}
+
+void Configurator::select_metric_radio_btn()
+{
+    lv_obj_clear_state(radio_imperial, LV_STATE_CHECKED);
+    lv_obj_add_state(radio_metric, LV_STATE_CHECKED);
+}
+
 void Configurator::set_callback(lv_obj_t *object, void (*function)(lv_event_t *e), lv_event_code_t state, void *user_data)
 {
 }

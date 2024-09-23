@@ -25,7 +25,7 @@ int counter = 0;
 
 /**
  * LCD Wiring
- * 
+ *
  * Pin 10: CS --> WR: 24
  * Pin 40: G0 --> D0: 3
  * Pin 41: G1 --> D1: 4
@@ -62,8 +62,6 @@ void set_unit_region()
 {
   // Pull from EEPROM
 
-  /* This isn't working rn */
-
   panel_tl.panel_info->set_is_metric(false);
   panel_tc.panel_info->set_is_metric(false);
   panel_tr.panel_info->set_is_metric(false);
@@ -84,17 +82,10 @@ void setup()
   lcd_init();
   display_init();
 
-  // init_main_window();
-  // init_config_window();
-
-  // open_config_window();
-  // open_main_window();
-
-  // main_layout.init_layout();
+  main_layout.init_layout();
+  config.init_configurator();
 
   // main_layout.open_window();
-
-  config.init_configurator();
   config.open_window();
 
   lv_tick_set_cb(millis);
@@ -102,34 +93,34 @@ void setup()
 
 void loop()
 {
-  // if (test)
-  // {
-  //   open_main_window();
-  // }
-  // else
-  // {
-  //   main_layout.open_window(); 
-  // }
+  if (test)
+  {
+    config.select_imperial_radio_btn();
+  }
+  else
+  {
+    config.select_metric_radio_btn();
+  }
 
   lv_task_handler();
 
-  // test = !test;
+  test = !test;
 
-  // if (!(counter % 3))
-  // {
-  //   if (test)
-  //   {
-  //     panel_tl.panel_info = &ambient_pressure;
-  //   }
-  //   else
-  //   {
-  //     panel_tl.panel_info = &coolant_temp;
-  //   }
-  //   lv_label_set_text(panel_tl.data, panel_tl.panel_info->get_data_str().c_str());
-  //   lv_label_set_text(panel_tl.label, panel_tl.panel_info->get_name_and_label().c_str());
-  // }
+  if (!(counter % 3))
+  {
+    if (test)
+    {
+      panel_tl.panel_info = &ambient_pressure;
+    }
+    else
+    {
+      panel_tl.panel_info = &coolant_temp;
+    }
+    lv_label_set_text(panel_tl.data, panel_tl.panel_info->get_data_str().c_str());
+    lv_label_set_text(panel_tl.label, panel_tl.panel_info->get_name_and_label().c_str());
+  }
 
-  // counter++;
+  counter++;
 
-  delay(10);
+  delay(1000);
 }
