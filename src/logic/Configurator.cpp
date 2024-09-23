@@ -128,14 +128,16 @@ void Configurator::init_drop_down()
     drop_down = lv_dropdown_create(flex_col_1);
     lv_dropdown_set_options_static(drop_down, drop_down_string.c_str());
     lv_obj_set_align(drop_down, LV_ALIGN_TOP_MID);
-    lv_obj_set_size(drop_down, lv_pct(100), 55);
+    lv_obj_set_size(drop_down, lv_pct(100), 50);
 }
 
 void Configurator::init_done_btn()
 {
+    int32_t btn_w = 120;
+    int32_t btn_h = 65;
     btn_done = lv_obj_create(window);
-    lv_obj_set_size(btn_done, 100, 55);
-    lv_obj_set_pos(btn_done, 360, 245);
+    lv_obj_set_size(btn_done, btn_w, btn_h);
+    lv_obj_set_pos(btn_done, LCD_HORZ - btn_w - 20, LCD_VERT - btn_h - 20);
     /* Turn off scrolling */
     lv_obj_set_scrollbar_mode(btn_done, LV_SCROLLBAR_MODE_OFF);
     lv_obj_clear_flag(btn_done, LV_OBJ_FLAG_SCROLLABLE);
@@ -143,7 +145,7 @@ void Configurator::init_done_btn()
     label_done = lv_label_create(btn_done);
     lv_obj_add_style(label_done, &style_label_done, 0);
     lv_label_set_text(label_done, "Done");
-    lv_obj_align(label_done, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_align(label_done, LV_ALIGN_CENTER);
 }
 
 void Configurator::init_radio_btns()
