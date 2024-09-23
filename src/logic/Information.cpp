@@ -228,6 +228,7 @@ uint16_t Information::get_refresh_rate()
 void Information::set_is_metric(bool is_metric)
 {
     _is_metric = is_metric;
+    set_unit_label();
 }
 bool Information::get_is_metric()
 {

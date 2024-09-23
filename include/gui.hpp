@@ -304,6 +304,7 @@ static void style_init()
     lv_style_set_text_color(&style_flex, lv_palette_lighten(LV_PALETTE_GREY, 5));
     lv_style_set_text_font(&style_flex, drop_down_font);
 
+    
     panel_style_init();
 }
 

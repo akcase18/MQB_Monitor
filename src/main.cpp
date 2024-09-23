@@ -84,13 +84,15 @@ void setup()
   lcd_init();
   display_init();
 
-  init_main_window();
-  init_config_window();
+  // init_main_window();
+  // init_config_window();
 
-  open_config_window();
-  open_main_window();
+  // open_config_window();
+  // open_main_window();
 
-  // main_layout.open_window();
+  main_layout.init_layout();
+
+  main_layout.open_window();
 
   lv_tick_set_cb(millis);
 }

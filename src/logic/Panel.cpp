@@ -1,5 +1,9 @@
 #include "Panel.hpp"
 
+/***************************
+ * Panel Object Definition *
+ ***************************/
+
 DMAMEM Panel panel_tl = Panel(&coolant_temp);
 DMAMEM Panel panel_tc = Panel(&ambient_pressure);
 DMAMEM Panel panel_tr = Panel(&ambient_pressure);

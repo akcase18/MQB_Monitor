@@ -45,6 +45,21 @@ private:
      *********************/
 
     /**
+     * Sets up the style of the window
+     */
+    void style_init();
+
+    /**
+     * Initialize the main window
+     */
+    void init_window();
+
+    /**
+     * Initialize the objects in the main window
+     */
+    void init_objects();
+    
+    /**
      * Initialize/setup single Panel object in the Layout window
      *
      * @param panel the Panel to set up
@@ -66,8 +81,8 @@ public:
     /********************
      * Public Variables *
      ********************/
-    lv_obj_t *window; // Window object to hold all other objects
-    lv_style_t style_window;
+    lv_obj_t *window;        // Window object to hold all other objects
+    lv_style_t style_window; // Style for the window object
     /**
      * Columns for the window layout
      * Column 1: Start of top left, bottom left panel
@@ -125,19 +140,17 @@ public:
     Layout(Panel *top_left, Panel *top_center, Panel *top_right, Panel *bottom_left, Panel *bottom_right);
 
     /**
+     * Initializes the Layout object (outside of the constructor). This
+     * is necessary because calling functions like style_init(), init_window(),
+     * etc. rely on lv_init() to be called first, which isn't done until the
+     * setup() in main.cpp.
+     */
+    void init_layout();
+
+    /**
      * Opens the main window
      */
     void open_window();
-
-    /**
-     * Initialize the main window
-     */
-    void init_window();
-
-    /**
-     * Initialize the objects in the main window
-     */
-    void init_objects();
 
     /**
      * Closes the main window
@@ -157,5 +170,7 @@ public:
 /*****************************
  * Layout Object Declaration *
  *****************************/
+
+extern Layout main_layout;
 
 #endif
