@@ -1,6 +1,11 @@
 #include "Configurator.hpp"
 
+/********************************
+ * Configurator Font Definition *
+ ********************************/
+
 const lv_font_t *done_label_font = &vw_24;
+const lv_font_t *drop_down_font = &vw_24;
 
 /**********************************
  * Configurator Object Definition *

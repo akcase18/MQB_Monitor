@@ -123,6 +123,19 @@ public:
     Panel(Information *info, lv_obj_t *btn, lv_obj_t *data, lv_obj_t *label);
 };
 
+/***************************
+ * Fonts for Panel Objects *
+ ***************************/
+
+/* Data */
+LV_FONT_DECLARE(digital_display_100);
+LV_FONT_DECLARE(digital_display_140);
+/* Labels */
+LV_FONT_DECLARE(vw_14);
+LV_FONT_DECLARE(vw_16);
+LV_FONT_DECLARE(vw_18);
+LV_FONT_DECLARE(vw_24);
+
 /****************************
  * Styles for Panel Objects *
  ****************************/

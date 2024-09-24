@@ -50,6 +50,12 @@ private:
     void style_init();
 
     /**
+     * Sets up the style of the Panels and the objects held in each
+     * Panel
+     */
+    void panel_style_init();
+
+    /**
      * Initialize the main window
      */
     void init_window();

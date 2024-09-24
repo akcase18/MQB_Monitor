@@ -1,5 +1,14 @@
 #include "Layout.hpp"
 
+/**************************
+ * Layout Font Definition *
+ **************************/
+
+const lv_font_t *top_data_font = &digital_display_100;
+const lv_font_t *btm_data_font = &digital_display_140;
+const lv_font_t *top_label_font = &vw_16;
+const lv_font_t *btm_label_font = &vw_18;
+
 /****************************
  * Layout Object Definition *
  ****************************/
@@ -41,6 +50,63 @@ void Layout::style_init()
     lv_style_set_bg_color(&style_window, lv_palette_darken(LV_PALETTE_GREY, 4));
     lv_style_set_border_width(&style_window, 0);
     lv_style_set_radius(&style_window, 0);
+
+    panel_style_init();
+}
+
+void Layout::panel_style_init()
+{
+    /***** Top Panels *****/
+    /* Buttons */
+    lv_style_init(&style_btn_top);
+    lv_style_set_radius(&style_btn_top, 2);
+    lv_style_set_opa(&style_btn_top, LV_OPA_100);
+    lv_style_set_bg_color(&style_btn_top, lv_palette_darken(LV_PALETTE_GREY, 4));
+    lv_style_set_text_color(&style_btn_top, lv_palette_lighten(LV_PALETTE_GREY, 4));
+    lv_style_set_text_font(&style_btn_top, top_data_font);
+    lv_style_set_text_letter_space(&style_btn_top, 0);
+    lv_style_set_shadow_width(&style_btn_top, 0);
+    /* Labels */
+    lv_style_init(&style_label_top);
+    lv_style_set_text_color(&style_label_top, lv_palette_lighten(LV_PALETTE_GREY, 5));
+    lv_style_set_text_font(&style_label_top, top_label_font);
+    lv_style_set_text_letter_space(&style_label_top, 0);
+    /***** Bottom Panels *****/
+    /* Buttons */
+    lv_style_init(&style_btn_btm);
+    lv_style_set_radius(&style_btn_btm, 2);
+    lv_style_set_opa(&style_btn_btm, LV_OPA_100);
+    lv_style_set_bg_color(&style_btn_btm, lv_palette_darken(LV_PALETTE_GREY, 4));
+    lv_style_set_text_color(&style_btn_btm, lv_palette_lighten(LV_PALETTE_GREY, 4));
+    lv_style_set_text_font(&style_btn_btm, btm_data_font);
+    lv_style_set_text_letter_space(&style_btn_btm, 0);
+    lv_style_set_shadow_width(&style_btn_btm, 0);
+    /* Labels */
+    lv_style_init(&style_label_btm);
+    lv_style_set_text_color(&style_label_btm, lv_palette_lighten(LV_PALETTE_GREY, 5));
+    lv_style_set_text_font(&style_label_btm, btm_label_font);
+    lv_style_set_text_letter_space(&style_label_btm, 0);
+
+    /***** Top Left Panel *****/
+    panel_tl->style_btn = &style_btn_top;
+    panel_tl->style_btn_pressed = &style_btn_pressed;
+    panel_tl->style_label = &style_label_top;
+    /***** Top Center Panel *****/
+    panel_tc->style_btn = &style_btn_top;
+    panel_tc->style_btn_pressed = &style_btn_pressed;
+    panel_tc->style_label = &style_label_top;
+    /***** Top Right Panel *****/
+    panel_tr->style_btn = &style_btn_top;
+    panel_tr->style_btn_pressed = &style_btn_pressed;
+    panel_tr->style_label = &style_label_top;
+    /***** Bottom Left Panel *****/
+    panel_bl->style_btn = &style_btn_btm;
+    panel_bl->style_btn_pressed = &style_btn_pressed;
+    panel_bl->style_label = &style_label_btm;
+    /***** Bottom Right Panel *****/
+    panel_br->style_btn = &style_btn_btm;
+    panel_br->style_btn_pressed = &style_btn_pressed;
+    panel_br->style_label = &style_label_btm;
 }
 
 void Layout::open_window()

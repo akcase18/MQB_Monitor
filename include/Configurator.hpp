@@ -158,12 +158,6 @@ public:
     void set_callback(lv_obj_t *object, void (*function)(lv_event_t *e), lv_event_code_t state, void *user_data);
 };
 
-/*********************************
- * Configurator Font Declaration *
- *********************************/
-
-LV_FONT_DECLARE(vw_24);
-
 /***********************************
  * Configurator Object Declaration *
  ***********************************/

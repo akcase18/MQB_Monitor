@@ -85,8 +85,7 @@ void setup()
   main_layout.init_layout();
   config.init_configurator();
 
-  // main_layout.open_window();
-  config.open_window();
+  main_layout.open_window();
 
   lv_tick_set_cb(millis);
 }
