@@ -107,6 +107,11 @@ void Layout::panel_style_init()
     panel_br->style_btn = &style_btn_btm;
     panel_br->style_btn_pressed = &style_btn_pressed;
     panel_br->style_label = &style_label_btm;
+
+    LV_UNUSED(style_btn_top);
+    LV_UNUSED(style_btn_btm);
+    LV_UNUSED(style_label_top);
+    LV_UNUSED(style_label_btm);
 }
 
 void Layout::open_window()
