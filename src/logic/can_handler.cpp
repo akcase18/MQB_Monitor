@@ -46,6 +46,11 @@ void can_recv(const CAN_message_t &msg)
     uint8_t byte_1 = msg.buf[2]; // Get the first byte that the message is responding to
     uint8_t byte_2 = msg.buf[3]; // Get the second byte that the message is responding to
 
+    if (msg.buf[1] != ENHANCE_DATA_REQ)
+    {
+        return;
+    }
+
     Information *info = get_info_panel(byte_1, byte_2);
 
     int32_t x = 0; // This is where data will go
