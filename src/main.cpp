@@ -1,181 +1,134 @@
 #include "gui.hpp"
 #include "ILI948x_t4_mm.h"
+#include "XPT2046_Touchscreen.h"
+#include "SPI.h"
 
-/********************
- * Global Constants *
- ********************/
+/***********
+ * Defines *
+ ***********/
 
-#define PWM_PIN 3 // PWM0 on Carrier Board
+#define PWM_PIN 3
+#define BRIGHTNESS 1
 #define MAX_BRIGHTNESS 256
 
 /***********************
  * Display Constructor *
  ***********************/
 
-#define LCD_CS 4   // D0 on Carrier Board
-#define LCD_DC 5   // D1 on Carrier Board
-#define LCD_RST 26 // G8 on Carrier Board
-DMAMEM ILI948x_t4_mm lcd = ILI948x_t4_mm(LCD_DC, LCD_CS, LCD_RST);
-static lv_display_t *display;
+#define LCD_CS 4   // D0
+#define LCD_DC 5   // D1
+#define LCD_RST 26 // G8
+ILI948x_t4_mm lcd = ILI948x_t4_mm(LCD_DC, LCD_CS, LCD_RST);
 
-/***********
- * Windows *
- ***********/
-
-/*************
- * Callbacks *
- *************/
+bool test = false;
+int counter = 0;
 
 /**
- * Callback for opening the Configurator window when a Panel button
- * is pressed.
+ * LCD Wiring
+ *
+ * Pin 10: CS --> WR: 24
+ * Pin 40: G0 --> D0: 3
+ * Pin 41: G1 --> D1: 4
+ * Pin 42: G2 --> D2: 5
+ * Pin 43: G3 --> D3: 6
+ * Pin 44: G4 --> D4: 7
+ * Pin 45: G5 --> D5: 8
+ * Pin 6:  G6 --> D6: 9
+ * Pin 9:  G7 --> D7: 10
+ * Pin 12: CIPO --> RD: 26
  */
-void open_config_cb(lv_event_t *e)
-{
-    layout.close_window();
-    Panel *panel_sel = (Panel *)lv_event_get_user_data(e); // Get the user data passed into callback
-    config.panel_selected = panel_sel;                     // Keep track of the Panel that was pressed to open the Configurator
-    config.open_window();
-}
 
 /**
- * Callback for the "done" button in the Configurator window to
- * close the Configurator window.
+ * Sets the brightness of the display from 0-100% by setting
+ * the duty cycle of a PWM pin connected to the backlight
+ * control pin on the display
+ *
+ * @param percent brightness of the display (0-100%)
  */
-void close_config_cb(lv_event_t *e)
+void set_brightness(uint8_t percent)
 {
-    config.close_window();
-    layout.open_window();
-}
-
-/**
- * Callback to service the radio buttons in the Configurator window.
- */
-void radio_cb(lv_event_t *e)
-{
-    // TODO: Fill out
+  /* Clamp brightness if over 100% */
+  if (percent > 100)
+  {
+    percent = 100;
+  }
+  pinMode(PWM_PIN, OUTPUT);                  // Set up pin to control brightness
+  int brightness = percent * MAX_BRIGHTNESS; // Multiply the percent brightness level by the max brighness value
+  analogWrite(PWM_PIN, brightness);
 }
 
 /**
- * Add button and label styles to the Panels
+ * Initialize the display driver object
  */
-void add_style_to_panels()
+void lcd_init()
 {
-    /* Top Left Panel */
-    layout.panel_tl.set_styles(&style_btn_top, &style_btn_pressed, &style_label_top);
-    /* Top Center Panel */
-    layout.panel_tc.set_styles(&style_btn_top, &style_btn_pressed, &style_label_top);
-    /* Top Right Panel */
-    layout.panel_tr.set_styles(&style_btn_top, &style_btn_pressed, &style_label_top);
-    /* Bottom Left Panel */
-    layout.panel_bl.set_styles(&style_btn_btm, &style_btn_pressed, &style_label_btm);
-    /* Bottom Right Panel */
-    layout.panel_br.set_styles(&style_btn_btm, &style_btn_pressed, &style_label_btm);
+  lcd.begin(12);
+  lcd.setBitDepth(16);
+  lcd.setRotation(1);
 }
 
 /**
- * Add callbacks to all of the necessary objects, buttons, windows, etc.
+ * Set up the function to push pixels to the display when
+ * refreshing it
  */
-void setup_callbacks()
+void display_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *data)
 {
-    /* Panels */
-    layout.panel_tl.set_callback(panel_tl.btn, open_config_cb, LV_EVENT_CLICKED, &panel_tl);
-    layout.panel_tc.set_callback(panel_tc.btn, open_config_cb, LV_EVENT_CLICKED, &panel_tc);
-    layout.panel_tr.set_callback(panel_tr.btn, open_config_cb, LV_EVENT_CLICKED, &panel_tr);
-    layout.panel_bl.set_callback(panel_bl.btn, open_config_cb, LV_EVENT_CLICKED, &panel_bl);
-    layout.panel_br.set_callback(panel_br.btn, open_config_cb, LV_EVENT_CLICKED, &panel_br);
-    /* Configurator */
-    config.set_callback(config.btn_done, close_config_cb, LV_EVENT_CLICKED, NULL); // Close Configurator when "Done" button is pressed
-    config.set_callback(config.flex_col_2, radio_cb, LV_EVENT_CLICKED, NULL);      // Trigger/Switch radio button selection when pressed
+  lcd.pushPixels16bitDMA((uint16_t *)data, area->x1, area->y1, area->x2, area->y2);
+  lv_display_flush_ready(disp);
 }
 
 /**
- * Add Information objects to the Panels. This will eventually
- * need to pull data from some sort of config file, so changes
- * will save when the display turns off.
+ * Set up the display, including the display driver and
+ * registering the display for LVGL
  */
-void info_init()
-{
-    // TODO: Change this to use EEPROM or other setup file data
-    /* Top Left Panel */
-    layout.panel_tl.panel_info = &coolant_temp;
-    layout.panel_tl.panel_info->set_is_metric(false);
-    /* Top Center Panel */
-    layout.panel_tc.panel_info = &engine_oil_temp;
-    layout.panel_tc.panel_info->set_is_metric(false);
-    /* Top Right Panel */
-    layout.panel_tr.panel_info = &intake_air_temp;
-    layout.panel_tr.panel_info->set_is_metric(false);
-    /* Bottom Left Panel */
-    layout.panel_bl.panel_info = &intake_pressure;
-    layout.panel_bl.panel_info->set_is_metric(false);
-    /* Bottom Right Panel */
-    layout.panel_br.panel_info = &throttle_position;
-    layout.panel_br.panel_info->set_is_metric(false);
-}
-
-void set_brightness(int percent)
-{
-    if (percent > 100)
-    {
-        percent = 100;
-    }
-    else if (percent < 0)
-    {
-        percent = 0;
-    }
-    pinMode(PWM_PIN, OUTPUT);                  // Set the brightness pin to an output pin
-    int brightness = percent * MAX_BRIGHTNESS; // Get the brightness value
-    analogWrite(PWM_PIN, brightness);          // Set the brightness value
-}
-
-void display_driver_init()
-{
-    lcd.begin(12);
-    lcd.setBitDepth(16);
-    lcd.setRotation(1);
-}
-
-void display_flush(lv_display_t *display, const lv_area_t *area, uint8_t *data)
-{
-    lcd.pushPixels16bitDMA((uint16_t *)data, area->x1, area->y1, area->x2, area->y2);
-    lv_display_flush_ready(display);
-}
-
 void display_init()
 {
-    set_brightness(100);                             // Set the brightness of the display (in %)
-    display_driver_init();                           // Start the display_driver
-    display = lv_display_create(LCD_HORZ, LCD_VERT); // Create the display
-    lv_display_set_flush_cb(display, display_flush); // Setup the display update function
-    lv_display_set_buffers(display, disp_buf_1, disp_buf_2, sizeof(disp_buf_1), LV_DISPLAY_RENDER_MODE_PARTIAL);
-    lv_display_set_default(display); // Tell LVGL to use display as the default display
+  set_brightness(100); // Can pull from EEPROM or something
+  lcd_init();
+  display = lv_display_create(LCD_HORZ, LCD_VERT);
+  lv_display_set_flush_cb(display, display_flush);
+  lv_display_set_buffers(display, buf_1, buf_2, sizeof(buf_1), LV_DISPLAY_RENDER_MODE_PARTIAL);
+}
+
+void set_unit_region()
+{
+  // Pull from EEPROM
+
+  panel_tl.panel_info->set_is_metric(false);
+  panel_tc.panel_info->set_is_metric(false);
+  panel_tr.panel_info->set_is_metric(false);
+  panel_bl.panel_info->set_is_metric(false);
+  panel_br.panel_info->set_is_metric(false);
+}
+
+void init_windows()
+{
+  main_layout.init_layout();  // Initialize the main window
+  config.init_configurator(); // Initialize the configurator window
 }
 
 void setup()
 {
-    lv_init();
+  lv_init();
 
-    display_init();
+  set_unit_region();
 
-    lv_task_handler();
-    lv_tick_set_cb(millis);
+  lv_task_handler();
 
-    delay(1000);
+  style_init();
 
-    can_init();
-    style_init();
-    info_init();
-    add_style_to_panels();
-    setup_callbacks();
+  can_init();
 
-    setup_layout_screen();
-    open_layout_screen();
+  display_init();
+
+  main_layout.open_window();
+
+  lv_tick_set_cb(millis);
 }
 
 void loop()
 {
-    lv_task_handler();
+  lv_task_handler();
 
-    delay(10);
+  can_loop();
 }

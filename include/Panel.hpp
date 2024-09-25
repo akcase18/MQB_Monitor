@@ -1,34 +1,10 @@
 #ifndef PANEL_H
 #define PANEL_H
 
-/**
- * This is the Panel class.
- *
- * The Panel class is used hold a variety of different things, organized
- * in a way that allows for more modular use-cases. Each Panel object can
- * hold:
- * -> An Information object
- * -> A button
- * -> Data to be displayed in the button
- * -> A label for the button
- * -> Style types for both the button and label
- * The idea behind Panel objects is to be used in multiple different Layouts,
- * where Panels can be rearranged depending on a variety of factors.
- * All elements of each Panel object can be reconfigured as needed as
- * different things change or different Configurations are chosen.
- *
- * Used in:
- * -> Layout
- */
-
 #include <lvgl.h>
 #include "Information.hpp"
 
 using namespace std;
-
-/********************
- * Global Constants *
- ********************/
 
 class Panel
 {
@@ -52,101 +28,125 @@ private:
      *********************/
 
     /**
-     * Set the style for the Panel button
+     * Sets the Information object referenced by the Panel.
      *
-     * @param style pointer to the style for the button
+     * @param info Information object for the panel
      */
-    void set_button_style(lv_style_t *style);
-    
-    /**
-     * Set the style for the Panel button when the button
-     * is pressed
-     *
-     * @param style pointer to the style for the button
-     */
-    void set_button_style_pressed(lv_style_t *style);
+    void set_info(Information *info);
 
     /**
-     * Set the style for the Panel label
+     * Sets the button for the Panel.
      *
-     * @param style pointer to the style for the label
+     * @param btn Button for the Panel
      */
-    void set_label_style(lv_style_t *style);
+    void set_btn(lv_obj_t *btn);
+
+    /**
+     * Sets the data that goes inside the button in the Panel.
+     *
+     * @param btn Data for the Panel
+     */
+    void set_data(lv_obj_t *data);
+
+    /**
+     * Sets the label for the Panel.
+     *
+     * @param btn Label for the Panel
+     */
+    void set_label(lv_obj_t *label);
+
+    /**
+     * Sets the style of the button in the Panel.
+     *
+     * @param style_btn Style of the button
+     */
+    void set_btn_style(lv_style_t style_btn);
+
+    /**
+     * Sets the style of the button in the Panel when it is pressed.
+     *
+     * @param style_btn_pressed Style of the button when pressed
+     */
+    void set_btn_pressed_style(lv_style_t style_btn_pressed);
+
+    /**
+     * Sets the style of the label in the Panel.
+     *
+     * @param style_label Style of the label
+     */
+    void set_label_style(lv_style_t style_label);
 
 public:
     /********************
      * Public Variables *
      ********************/
-
-    lv_obj_t *btn;                 // The button this Panel handles
-    lv_obj_t *data_btn;            // The data that goes inside of the button
-    lv_obj_t *label;               // The label associated with the button
-    lv_style_t *style_btn;         // The style of the button (not pressed)
-    lv_style_t *style_btn_pressed; // The style for the button (pressed)
-    lv_style_t *style_label;       // The style of the panel
-    Information *panel_info;       // The Information object for this Panel
+    Information *panel_info;       // Information object associated with the Panel
+    lv_obj_t *btn;                 // Button in the Panel
+    lv_obj_t *data;                // Data inside of and displayed on the Button
+    lv_obj_t *label;               // Label underneath the Button that tells what Data is displayed
+    lv_style_t *style_btn;         // Style for the button
+    lv_style_t *style_btn_pressed; // Style for the button when it is pressed
+    lv_style_t *style_label;       // Style for the label
 
     /********************
      * Public Functions *
      ********************/
 
     /**
-     * @brief Default constructor for Panel objects. Creates a new Information
+     * Default constructor for Panel objects. Creates a new Information
      * object using the default Information object constructor, and sets the Panel's
-     * panel_info variable to that Information object.
+     * panel_info that that Information object.
      *
-     * Please don't use. Kinda useless cuz you kinda need information for this
-     * shit
+     * @note Please done use this. Kinda useless cuz you kinda need more information
+     * in order to actually use this shit.
      */
     Panel();
 
     /**
-     * @brief Main constructor for Panel objects. Creates an Information object
+     * Trying something new. Takes in only Information object and leaves it up to
+     * Panel to initialize/store the button, data, and labels.
+     *
+     * @param info Pointer to an existing Information object
+     */
+    Panel(Information *info);
+
+    /**
+     * Main constructor for Panel objects. Creates an Information object
      * using the passed-in pointer, and sets the Panel's panel_info variable to
      * that Information object. Doesn't initialize any button or label styles.
      *
      * @param info Pointer to an existing Information object
-     * @param panel_button Pointer to lv_obj_t for a button
-     * @param panel_button_data Pointer to lv_obj_t for button data
-     * @param panel_label Pointer to lv_obj_t for a label
+     * @param btn Pointer to lv_obj_t for a button
+     * @param data Pointer to lv_obj_t for button data
+     * @param label Pointer to lv_obj_t for a label
      */
-    Panel(Information *info, lv_obj_t *panel_button, lv_obj_t *panel_button_data, lv_obj_t *panel_label);
-
-    /**
-     * @brief Main constructor for Panel objects. Creates an Information object
-     * using the passed-in pointer, and sets the Panel's panel_info variable to
-     * that Information object. Initializes button and label styles.
-     *
-     * @param info Pointer to an existing Information object
-     * @param panel_button Pointer to lv_obj_t for a button
-     * @param panel_button_data Pointer to lv_obj_t for button data
-     * @param panel_label Pointer to lv_obj_t for a label
-     * @param panel_button_style Pointer to lv_style_t for button style
-     * @param panel_label_style Pointer to lv_style_t for label style
-     */
-    Panel(Information *info, lv_obj_t *panel_button, lv_obj_t *panel_button_data, lv_obj_t *panel_label, lv_style_t *panel_button_style, lv_style_t *panel_label_style);
-
-    /* Might not use these */
-
-    /**
-     * Sets the styles of both the button and label of the panel
-     *
-     * @param btn_style the style of the button
-     * @param btn_style_pressed the style of the button when pressed
-     * @param label_style the style of the label
-     */
-    void set_styles(lv_style_t *btn_style, lv_style_t *btn_style_pressed, lv_style_t *label_style);
-
-    /**
-     * Set the callback of a given object, triggered on the given state.
-     *
-     * @param object pointer to a lv_obj_t that the callback will be attached to
-     * @param function pointer to a callback function to be called
-     * @param state enum for the state trigger that the callback will be called on
-     * @param user_data custom data that will be available in the callback (can pass in NULL)
-     */
-    void set_callback(lv_obj_t *object, void (*function)(lv_event_t *e), lv_event_code_t state, void *user_data);
+    Panel(Information *info, lv_obj_t *btn, lv_obj_t *data, lv_obj_t *label);
 };
+
+/***************************
+ * Fonts for Panel Objects *
+ ***************************/
+
+/* Data */
+LV_FONT_DECLARE(digital_display_100);
+LV_FONT_DECLARE(digital_display_140);
+/* Labels */
+LV_FONT_DECLARE(vw_14);
+LV_FONT_DECLARE(vw_16);
+LV_FONT_DECLARE(vw_18);
+LV_FONT_DECLARE(vw_24);
+
+/****************************
+ * Styles for Panel Objects *
+ ****************************/
+
+/* Button Styles */
+static lv_style_t style_btn_top;     // Top row button style
+static lv_style_t style_btn_btm;     // Bottom row button style
+static lv_style_t style_btn_pressed; // Button style when pressed
+/* Label Styles */
+static lv_style_t style_label_top;  // Top row label style
+static lv_style_t style_label_btm;  // Bottom row label style
 
 /****************************
  * Panel Object Declaration *

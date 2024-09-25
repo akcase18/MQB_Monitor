@@ -1,140 +1,176 @@
 #include "Configurator.hpp"
 
+/********************************
+ * Configurator Font Definition *
+ ********************************/
+
+const lv_font_t *done_label_font = &vw_24;
+const lv_font_t *drop_down_font = &vw_24;
+
+/**********************************
+ * Configurator Object Definition *
+ **********************************/
+
+DMAMEM Configurator config = Configurator();
+
 /****************
  * Constructors *
  ****************/
 
-Configurator::Configurator()
-{
-    config_style_init();
-    setup_window();
-}
+Configurator::Configurator() {}
 
 /***************************
  * Public Helper Functions *
  ***************************/
 
+void Configurator::init_configurator()
+{
+    style_init();
+    init_window();
+    init_window_layout();
+    init_drop_down();
+    init_radio_btns();
+    init_done_btn();
+}
+
 void Configurator::open_window()
 {
-    lv_screen_load(window); // Sets the window to be located on the active screen
+    lv_screen_load(window);
 }
 
 void Configurator::close_window()
 {
-    Information *info = get_info_from_drop_down(); // Get the Information object that was chosen
-    panel_selected->panel_info = info;             // Update the Information object that is attached to the Panel that was selected
-    // Might need to do more to this
 }
 
-void Configurator::create_done_btn()
+void Configurator::select_imperial_radio_btn()
 {
-    btn_done = lv_obj_create(window);
-    lv_obj_set_size(btn_done, 90, 50);
-    lv_obj_align(btn_done, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
-    lv_obj_add_style(btn_done, style_btn_done, 0);
-    lv_obj_add_style(btn_done, style_btn_done, LV_STATE_PRESSED);
-    /* Turn off scrolling */
-    lv_obj_set_scrollbar_mode(btn_done, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_clear_flag(btn_done, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_state(radio_imperial, LV_STATE_CHECKED);
+    lv_obj_clear_state(radio_metric, LV_STATE_CHECKED);
 }
 
-void Configurator::create_radio_btns()
+void Configurator::select_metric_radio_btn()
 {
-    radio_imperial = lv_checkbox_create(flex_col_2); // Add radio button to Column 2 of flex layout
-    lv_obj_add_flag(radio_imperial, LV_OBJ_FLAG_EVENT_BUBBLE);
-    lv_obj_add_style(radio_imperial, style_radio_unchecked, LV_PART_INDICATOR);                  // Add style for when not selected
-    lv_obj_add_style(radio_imperial, style_radio_checked, LV_PART_INDICATOR | LV_STATE_CHECKED); // Add style for when selected
-    lv_checkbox_set_text(radio_imperial, "Imperial");                                            // Set text for radio button
-    lv_obj_align(radio_imperial, LV_ALIGN_TOP_MID, lv_pct(0), lv_pct(0));                        // Align radio button on top
-
-    radio_metric = lv_checkbox_create(flex_col_2); // Add radio button to Column 2 of flex layout
-    lv_obj_add_flag(radio_metric, LV_OBJ_FLAG_EVENT_BUBBLE);
-    lv_obj_add_style(radio_metric, style_radio_unchecked, LV_PART_INDICATOR);                  // Add style for when not selected
-    lv_obj_add_style(radio_metric, style_radio_checked, LV_PART_INDICATOR | LV_STATE_CHECKED); // Add style for when selected
-    lv_checkbox_set_text(radio_metric, "Metric");                                              // Set text for radio button
-    lv_obj_align(radio_metric, LV_ALIGN_TOP_MID, lv_pct(0), lv_pct(25));                       // Align radio button on bottom
+    lv_obj_clear_state(radio_imperial, LV_STATE_CHECKED);
+    lv_obj_add_state(radio_metric, LV_STATE_CHECKED);
 }
 
 void Configurator::set_callback(lv_obj_t *object, void (*function)(lv_event_t *e), lv_event_code_t state, void *user_data)
 {
-    lv_obj_add_event_cb(object, function, state, user_data);
 }
 
 /****************************
  * Private Helper Functions *
  ****************************/
 
-void Configurator::config_style_init()
+void Configurator::style_init()
 {
-    /* Set the style of the configuration window */
-    lv_style_init(style_window);                                                // Initialize the style for the window
-    lv_style_set_bg_color(style_window, lv_palette_darken(LV_PALETTE_GREY, 4)); // Set the background color to 4 steps darker than base grey
+    /* Set the style of the configurator window */
+    lv_style_init(&style_window);
+    lv_style_set_bg_color(&style_window, lv_palette_darken(LV_PALETTE_GREY, 4));
 
-    /* Set the style of the "done" button */
-    lv_style_init(style_btn_done);                                                   // Initialize the style for the done button
-    lv_style_set_radius(style_btn_done, 5);                                          // Set the radius of the border to 5 pixels
-    lv_style_set_opa(style_btn_done, LV_OPA_100);                                    // Set to 100% opacity
-    lv_style_set_bg_color(style_btn_done, lv_palette_darken(LV_PALETTE_GREY, 4));    // Set the background color to 4 steps darker than base grey
-    lv_style_set_text_color(style_btn_done, lv_palette_lighten(LV_PALETTE_GREY, 4)); // Set the text color to 4 steps lighter than base grey
-    lv_style_set_text_font(style_btn_done, &vw_24);                                  // Set the font
-    lv_style_set_text_letter_space(style_btn_done, 0);                               // Remove as much space as possible from between the letters
-    lv_style_set_shadow_width(style_btn_done, 0);                                    // Remove the drop shadow
+    /* Set the style of the done button */
+    lv_style_init(&style_btn_done);
+    lv_style_set_radius(&style_btn_done, 5);
+    lv_style_set_bg_color(&style_btn_done, lv_palette_lighten(LV_PALETTE_GREY, 4));
+    lv_style_set_text_color(&style_btn_done, lv_palette_darken(LV_PALETTE_GREY, 4));
+    // lv_style_set_text_font(&style_btn_done, done_label_font);
+    lv_style_set_text_letter_space(&style_btn_done, 0);
+    lv_style_set_shadow_width(&style_btn_done, 0);
 
-    /* Set the style of the radio button for selecting unit region */
-    lv_style_init(style_radio_unchecked);                                                   // Initialize the style for the radio button
-    lv_style_set_radius(style_radio_unchecked, LV_RADIUS_CIRCLE);                           // Make the buttons a circle
-    lv_style_set_text_color(style_radio_unchecked, lv_palette_lighten(LV_PALETTE_GREY, 5)); // Set the text color to 5 steps lighter than base grey
-    /* Set the style of the radio button when checked */
-    lv_style_init(style_radio_checked);                 // Initialize the style for when a radio button is selected
-    lv_style_set_bg_img_src(style_radio_checked, NULL); // Remove any special background image for when a radio button is selected
+    /* Set the style of the label in the done button */
+    lv_style_init(&style_label_done);
+    lv_style_set_text_font(&style_label_done, done_label_font);
+
+    /* Set the style of the radio buttons (for selecting unit region) */
+    lv_style_init(&style_radio_unchecked);
+    lv_style_set_radius(&style_radio_unchecked, LV_RADIUS_CIRCLE);
+    lv_style_set_text_color(&style_radio_unchecked, lv_palette_lighten(LV_PALETTE_GREY, 5));
+
+    /* Set the style of the radio buttons when selected */
+    lv_style_init(&style_radio_checked);
+    lv_style_set_bg_img_src(&style_radio_checked, NULL);
 
     /* Set the style for the flex layout objects */
-    lv_style_init(style_layout);                                                   // Initialize the style for the objects in the layout
-    lv_style_set_bg_color(style_layout, lv_palette_darken(LV_PALETTE_GREY, 4));    // Set the background color to 4 steps darker than base grey
-    lv_style_set_border_width(style_layout, 0);                                    // Remove border
-    lv_style_set_text_color(style_layout, lv_palette_lighten(LV_PALETTE_GREY, 5)); // Set the text color to 5 steps lighter than base grey
-    lv_style_set_text_font(style_layout, &vw_24);                                  // Set the font to the same font as the drop-down menu
+    lv_style_init(&style_layout);
+    lv_style_set_bg_color(&style_layout, lv_palette_darken(LV_PALETTE_GREY, 4));
+    lv_style_set_border_width(&style_layout, 0);
+    lv_style_set_text_color(&style_layout, lv_palette_lighten(LV_PALETTE_GREY, 5));
+    lv_style_set_text_font(&style_layout, &vw_24);
 }
 
-void Configurator::setup_window()
+void Configurator::init_window()
 {
-    window = lv_obj_create(NULL);                // Create the Configurator window in the background
-    lv_obj_set_size(window, LCD_HORZ, LCD_VERT); // Set to the proper window size
-    lv_obj_center(window);                       // Puts window in the center of the display
-    lv_obj_add_style(window, style_window, 0);   // Add the style to the window
+    window = lv_obj_create(NULL);
+    lv_obj_set_size(window, LCD_HORZ, LCD_VERT);
+    lv_obj_center(window);
+    lv_obj_add_style(window, &style_window, 0);
     /* Turn off scrolling */
     lv_obj_set_scrollbar_mode(window, LV_SCROLLBAR_MODE_OFF);
     lv_obj_clear_flag(window, LV_OBJ_FLAG_SCROLLABLE);
+}
+
+void Configurator::init_window_layout()
+{
     /* Add formatting to window */
     flex_col_1 = lv_obj_create(window);                    // Adds flex column to the Configurator window
     lv_obj_set_flex_flow(flex_col_1, LV_FLEX_FLOW_COLUMN); // Sets column to use flex flow layout
-    lv_obj_set_size(flex_col_1, lv_pct(60), lv_pct(100));  // Set column to take up 60% of window width
-    lv_obj_add_style(flex_col_1, style_layout, 0);         // Add flex layout style to column
+    lv_obj_set_size(flex_col_1, lv_pct(65), lv_pct(100));  // Set column to take up 65% of window width
+    lv_obj_add_style(flex_col_1, &style_layout, 0);        // Add flex layout style to column
     flex_col_2 = lv_obj_create(window);                    // Adds flex clumn to the Configurator window
     lv_obj_set_flex_flow(flex_col_2, LV_FLEX_FLOW_COLUMN); // Sets column to use flex flow layout
-    lv_obj_set_size(flex_col_2, lv_pct(40), lv_pct(100));  // Set column to take up 40% of window width
-    lv_obj_set_x(flex_col_2, lv_pct(60));                  // Set column to take up 60% of window height
-    lv_obj_add_style(flex_col_2, style_layout, 0);         // Add flex layout style to column
-    /***** Add elements to window *****/
-    /* Drop Down */
-    String drop_down_string = ""; // String to hold all values for the drop-down menu
+    lv_obj_set_size(flex_col_2, lv_pct(35), lv_pct(100));  // Set column to take up 35% of window width
+    lv_obj_set_x(flex_col_2, lv_pct(65));                  // Set column to take up 60% of window height
+    lv_obj_add_style(flex_col_2, &style_layout, 0);        // Add flex layout style to column
+}
+
+void Configurator::init_drop_down()
+{
+    String drop_down_string;
     for (uint i = 0; i < info_list.size(); i++)
     {
         drop_down_string += info_list[i]->get_name() + "\n";
     }
-    drop_down = lv_dropdown_create(flex_col_1);                          // Add drop-down menu to first column
-    lv_dropdown_set_options_static(drop_down, drop_down_string.c_str()); // Add list of options to drop-down menu
-    lv_obj_align(drop_down, LV_ALIGN_TOP_MID, 0, 0);                     // Put drop-dwon in the top-center of the first column
-    lv_obj_set_size(drop_down, lv_pct(100), 55);                         // Let the drop-down take up the entire width of the first column, and 55px height
-    /* Unit Radio Button */
-    create_radio_btns();
-    // Start with both unchecked, and select the correct one when the window opens
-    /* Done Button */
-    create_done_btn();
+    drop_down = lv_dropdown_create(flex_col_1);
+    lv_dropdown_set_options_static(drop_down, drop_down_string.c_str());
+    lv_obj_set_align(drop_down, LV_ALIGN_TOP_MID);
+    lv_obj_set_size(drop_down, lv_pct(100), 50);
+}
+
+void Configurator::init_done_btn()
+{
+    int32_t btn_w = 120;
+    int32_t btn_h = 65;
+    btn_done = lv_obj_create(window);
+    lv_obj_set_size(btn_done, btn_w, btn_h);
+    lv_obj_set_pos(btn_done, LCD_HORZ - btn_w - 20, LCD_VERT - btn_h - 20);
+    /* Turn off scrolling */
+    lv_obj_set_scrollbar_mode(btn_done, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_clear_flag(btn_done, LV_OBJ_FLAG_SCROLLABLE);
+    /* Add "Done" text */
+    label_done = lv_label_create(btn_done);
+    lv_obj_add_style(label_done, &style_label_done, 0);
+    lv_label_set_text(label_done, "Done");
+    lv_obj_set_align(label_done, LV_ALIGN_CENTER);
+}
+
+void Configurator::init_radio_btns()
+{
+    /* Imperial Radio Button */
+    radio_imperial = lv_checkbox_create(flex_col_2);
+    lv_checkbox_set_text(radio_imperial, "Imperial");
+    lv_obj_add_flag(radio_imperial, LV_OBJ_FLAG_EVENT_BUBBLE);
+    lv_obj_add_style(radio_imperial, &style_radio_unchecked, LV_PART_INDICATOR);
+    lv_obj_add_style(radio_imperial, &style_radio_checked, LV_PART_INDICATOR | LV_STATE_CHECKED);
+    lv_obj_set_align(radio_imperial, LV_ALIGN_TOP_MID);
+    /* Metric Radio Button */
+    radio_metric = lv_checkbox_create(flex_col_2);
+    lv_checkbox_set_text(radio_metric, "Metric");
+    lv_obj_add_flag(radio_metric, LV_OBJ_FLAG_EVENT_BUBBLE);
+    lv_obj_add_style(radio_metric, &style_radio_unchecked, LV_PART_INDICATOR);
+    lv_obj_add_style(radio_metric, &style_radio_checked, LV_PART_INDICATOR | LV_STATE_CHECKED);
+    lv_obj_align(radio_metric, LV_ALIGN_TOP_MID, lv_pct(0), lv_pct(25));
 }
 
 Information *Configurator::get_info_from_drop_down()
 {
-    uint8_t index = lv_dropdown_get_selected(drop_down);
-    return info_list[index];
 }

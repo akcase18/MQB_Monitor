@@ -1,39 +1,16 @@
-#ifndef INFORMATION_H
-#define INFORMATION_H
-
-/**
- * This is the Information class.
- *
- * The Information class holds data specific to each bit of information
- * that is requested from the car. This includes but is not limited to:
- * -> CAN-specific information such as scale, offset, and request bytes
- * -> Current values
- * -> Information name
- * -> Displaying specifications
- * -> Refresh rate
- * -> Etc.
- * The goal for each Information object is to be used in Panel objects,
- * where they can then be swapped out for other Information objects as
- * different configurations are chosen.
- *
- * Used in:
- * -> Panel
- */
-
 #include "Arduino.h"
 #include <vector>
-#include "Globals.hpp"
 
 using namespace std;
 
-/********************
- * Global Constants *
- ********************/
+/***********
+ * Defines *
+ ***********/
 
-#define MAX_REFRESH 20   // The fastest refresh time for an Information object (20 ms)
-#define MIN_REFRESH 5000 // The slowest refresh time for an Information object (5000 ms)
-#define NO_OFFSET 0      // Constant for when there is no offset value
-#define NO_SCALE 1       // Constant for when there is no scaling value
+#define MAX_REFRESH 20
+#define MIN_REFRESH 5000
+#define NO_OFFSET 0
+#define NO_SCALE 1
 
 class Information
 {
@@ -76,19 +53,13 @@ private:
     float _data;                    // The data received
     float _scale;                   // The scaling factor used to decode raw data
     String _name;                   // The name of the Information object
-    String _data_str;               // The data received as a string
     String _unit_label;             // The generated label for the units
     Unit_Type _unit_type;           // The unit type of the data
-    bool _unit_metric;              // The unit region of the data
+    bool _is_metric = true;         // The unit region of the data
 
     /*********************
      * Private Functions *
      *********************/
-
-    /**
-     * Initializes all
-     */
-    void init_info();
 
     /**
      * Calculates the number of digits in a number. This is used within the
@@ -107,7 +78,6 @@ private:
      * @note Format: [label]
      */
     void set_unit_label();
-
     /**
      * Gets the unit label of the data.
      *
@@ -262,19 +232,6 @@ public:
     Unit_Type get_unit_type();
 
     /**
-     * Sets the Unit Region of the Information object.
-     *
-     * @param is_metric Flag for whether Info is metric or not.
-     */
-    void set_is_metric(bool is_metric);
-    /**
-     * Gets the Unit Region of the Information object.
-     *
-     * @return True if Information is metric, false if imperial.
-     */
-    bool get_is_metric();
-
-    /**
      * Sets the number of decimal places to use when using Metric data.
      *
      * @param decimals The number of decimal places.
@@ -312,11 +269,24 @@ public:
      * @return The refresh rate in ms.
      */
     uint16_t get_refresh_rate();
+
+    /**
+     * Sets the Unit Region of the Information object.
+     *
+     * @param is_metric Flag for whether Info is metric or not.
+     */
+    void set_is_metric(bool is_metric);
+    /**
+     * Gets the Unit Region of the Information object.
+     *
+     * @return True if Information is metric, false if imperial.
+     */
+    bool get_is_metric();
 };
 
-/*******************************
- * Information Object Creation *
- *******************************/
+/**********************************
+ * Information Object Declaration *
+ **********************************/
 
 /***** Performance Metrics *****/
 extern Information coolant_temp;
@@ -348,6 +318,5 @@ extern Information timing_corr_2;
 extern Information timing_corr_3;
 extern Information timing_corr_4;
 
+/***** Information Object List/Vector *****/
 extern vector<Information *> info_list;
-
-#endif

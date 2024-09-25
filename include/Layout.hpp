@@ -1,25 +1,8 @@
 #ifndef LAYOUT_H
 #define LAYOUT_H
 
-/**
- * This is the Layout class.
- *
- * The Layout class is an organization of Panel objects. Currently,
- * it only supports a 5-Panel configuration, with 3 Panels on the top
- * row, 2 Panels on the bottom row, and the display in a landscape
- * orientation. Eventually, this will support multiple different
- * display configurations, through this may be done with different
- * classes rather than expanding functionality of this class. Each
- * Layout class holds:
- * -> A window object to hold all elements
- * -> A number (5) of Panel objects
- * -> A list of all Information objects in the Panels
- *
- * Used in:
- * -> Configurator (But only kinda)
- */
-
 #include <vector>
+#include <lvgl.h>
 #include "Panel.hpp"
 
 using namespace std;
@@ -61,12 +44,51 @@ private:
      * Private Functions *
      *********************/
 
+    /**
+     * Sets up the style of the window
+     */
+    void style_init();
+
+    /**
+     * Sets up the style of the Panels and the objects held in each
+     * Panel
+     */
+    void panel_style_init();
+
+    /**
+     * Initialize the main window
+     */
+    void init_window();
+
+    /**
+     * Initialize the objects in the main window
+     */
+    void init_objects();
+
+    /**
+     * Initialize/setup single Panel object in the Layout window
+     *
+     * @param panel the Panel to set up
+     */
+    void init_single_object(Panel *panel);
+
+    /**
+     * Move the Panel object into the correct locations
+     */
+    void init_panel_locations();
+
+    /**
+     * Updates info_list to the most recent Information objects that are
+     * in the Panel objects.
+     */
+    void update_info_list();
+
 public:
     /********************
      * Public Variables *
      ********************/
-
-    // lv_obj_t *window; // Window object that holds all other elements
+    lv_obj_t *window;        // Window object to hold all other objects
+    lv_style_t style_window; // Style for the window object
     /**
      * Columns for the window layout
      * Column 1: Start of top left, bottom left panel
@@ -81,7 +103,7 @@ public:
      *
      * All columns are 80 px wide
      */
-    // lv_coord_t col_dsc[7] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
+    lv_coord_t col_dsc[7] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
     /**
      * Rows for the window layout
      * Row 1: Top row of buttons
@@ -93,27 +115,26 @@ public:
      * Row 4: Labels for bottom buttons
      * -> 1 unit tall (20 px)
      */
-    // lv_coord_t row_dsc[5] = {LV_GRID_FR(6), LV_GRID_FR(1), LV_GRID_FR(8), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
-    Panel panel_tl;               // Panel in the top left position
-    Panel panel_tc;               // Panel in the top center position
-    Panel panel_tr;               // Panel in the top right position
-    Panel panel_bl;               // Panel in the bottom left position
-    Panel panel_br;               // Panel in the bottom right position
-    // lv_style_t *style_window;      // The style of the window
-    vector<Information> info_list; // Stores the Information objects that are on screen
+    lv_coord_t row_dsc[5] = {LV_GRID_FR(6), LV_GRID_FR(1), LV_GRID_FR(8), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
+    Panel *panel_tl;                   // Panel in the top left position
+    Panel *panel_tc;                   // Panel in the top center position
+    Panel *panel_tr;                   // Panel in the top right position
+    Panel *panel_bl;                   // Panel in the bottom left position
+    Panel *panel_br;                   // Panel in the bottom right position
+    vector<Information *> active_info; // Stores on-screen Information objects
 
     /********************
      * Public Functions *
      ********************/
 
     /**
-     * @brief Default constructor for Layout. Don't really use this. Ever.
+     * Default constructor for Layout. Don't use this, ever
      */
     Layout();
 
     /**
-     * @brief Main constructor for Layout. Sets up and keeps track of the Panel objects
-     * that are being displayed on the screen, and will eventually keep track of button
+     * Main constructor for Layout object. Sets up and keeps track of the Panel objects
+     * that are being displayed on screen, and will eventually keep track of button
      * presses, screen states, and different screen layouts.
      *
      * @param top_left The Panel object that will be in the top left position
@@ -122,54 +143,40 @@ public:
      * @param bottom_left The Panel object that will be in the bottom left position
      * @param bottom_right The Panel object that will be in the bottom right position
      */
-    Layout(Panel top_left, Panel top_center, Panel top_right, Panel bottom_left, Panel bottom_right);
+    Layout(Panel *top_left, Panel *top_center, Panel *top_right, Panel *bottom_left, Panel *bottom_right);
 
     /**
-     * Displays the main Layout window.
+     * Initializes the Layout object (outside of the constructor). This
+     * is necessary because calling functions like style_init(), init_window(),
+     * etc. rely on lv_init() to be called first, which isn't done until the
+     * setup() in main.cpp.
+     */
+    void init_layout();
+
+    /**
+     * Opens the main window
      */
     void open_window();
 
     /**
-     * Closes the main Layout window.
+     * Closes the main window
      */
     void close_window();
 
     /**
-     * Setup the window with the correct parameters and layout.
-     */
-    // void setup_window();
-
-    /**
-     * Setup the layout of the Panels in the Layout object, put everything into
-     * the correct places, and add all styles.
-     */
-    // void setup_objects();
-
-    /**
-     * Creates the style for the window itself
-     */
-    // void main_style_init();
-
-    /**
-     * @brief Updates the layout by replacing an old Panel object with a new Panel
-     * object.
+     * Updates the Layout with a new Panel object by replacing an old Panel object
+     * with the new Panel object.
      *
-     * @param new_panel Panel object that will be added
-     * @param old_panel Panel object to replace
+     * @param new_panel the new Panel to add to the Layout
+     * @param old_panel_location the location of the Panel to be replaced
      */
-    void update_layout(Panel new_panel, Panel_Location old_panel);
-
-    /**
-     * @brief Ensures that the info_list is up to date with the most recent Panel
-     * objects that are in the Layout.
-     */
-    void update_info_list();
+    void update_layout(Panel *new_panel, Panel_Location old_panel_location);
 };
 
 /*****************************
  * Layout Object Declaration *
  *****************************/
 
-extern Layout layout;
+extern Layout main_layout;
 
 #endif
