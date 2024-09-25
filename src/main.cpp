@@ -79,6 +79,8 @@ void setup()
 
   style_init();
 
+  can_init();
+
   lcd_init();
   display_init();
 
@@ -92,34 +94,7 @@ void setup()
 
 void loop()
 {
-  if (test)
-  {
-    config.select_imperial_radio_btn();
-  }
-  else
-  {
-    config.select_metric_radio_btn();
-  }
-
   lv_task_handler();
 
-  test = !test;
-
-  if (!(counter % 3))
-  {
-    if (test)
-    {
-      panel_tl.panel_info = &ambient_pressure;
-    }
-    else
-    {
-      panel_tl.panel_info = &coolant_temp;
-    }
-    lv_label_set_text(panel_tl.data, panel_tl.panel_info->get_data_str().c_str());
-    lv_label_set_text(panel_tl.label, panel_tl.panel_info->get_name_and_label().c_str());
-  }
-
-  counter++;
-
-  delay(1000);
+  can_loop();
 }
