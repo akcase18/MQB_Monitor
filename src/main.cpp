@@ -38,6 +38,28 @@ int counter = 0;
  * Pin 12: CIPO --> RD: 26
  */
 
+/**
+ * Sets the brightness of the display from 0-100% by setting
+ * the duty cycle of a PWM pin connected to the backlight
+ * control pin on the display
+ *
+ * @param percent brightness of the display (0-100%)
+ */
+void set_brightness(uint8_t percent)
+{
+  /* Clamp brightness if over 100% */
+  if (percent > 100)
+  {
+    percent = 100;
+  }
+  pinMode(PWM_PIN, OUTPUT);                  // Set up pin to control brightness
+  int brightness = percent * MAX_BRIGHTNESS; // Multiply the percent brightness level by the max brighness value
+  analogWrite(PWM_PIN, brightness);
+}
+
+/**
+ * Initialize the display driver object
+ */
 void lcd_init()
 {
   lcd.begin(12);
@@ -45,14 +67,24 @@ void lcd_init()
   lcd.setRotation(1);
 }
 
+/**
+ * Set up the function to push pixels to the display when
+ * refreshing it
+ */
 void display_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *data)
 {
   lcd.pushPixels16bitDMA((uint16_t *)data, area->x1, area->y1, area->x2, area->y2);
   lv_display_flush_ready(disp);
 }
 
+/**
+ * Set up the display, including the display driver and
+ * registering the display for LVGL
+ */
 void display_init()
 {
+  set_brightness(100); // Can pull from EEPROM or something
+  lcd_init();
   display = lv_display_create(LCD_HORZ, LCD_VERT);
   lv_display_set_flush_cb(display, display_flush);
   lv_display_set_buffers(display, buf_1, buf_2, sizeof(buf_1), LV_DISPLAY_RENDER_MODE_PARTIAL);
@@ -69,6 +101,12 @@ void set_unit_region()
   panel_br.panel_info->set_is_metric(false);
 }
 
+void init_windows()
+{
+  main_layout.init_layout();  // Initialize the main window
+  config.init_configurator(); // Initialize the configurator window
+}
+
 void setup()
 {
   lv_init();
@@ -81,11 +119,7 @@ void setup()
 
   can_init();
 
-  lcd_init();
   display_init();
-
-  main_layout.init_layout();
-  config.init_configurator();
 
   main_layout.open_window();
 
