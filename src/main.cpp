@@ -103,7 +103,7 @@ void set_unit_region()
 
 void init_windows()
 {
-  main_layout.init_layout();  // Initialize the main window
+  layout.init_layout();  // Initialize the main window
   config.init_configurator(); // Initialize the configurator window
 }
 
@@ -121,14 +121,27 @@ void setup()
 
   display_init();
 
-  main_layout.open_window();
+  layout.open_window();
 
   lv_tick_set_cb(millis);
 }
 
 void loop()
 {
+  // if (!(counter % 6))
+  // {
+  //   config.open_window();
+  // }
+  // else
+  // {
+  //   layout.open_window();
+  // }
+
+  counter++;
+
   lv_task_handler();
 
-  can_loop();
+  // can_loop();
+
+  delay(500);
 }

@@ -177,6 +177,6 @@ public:
  * Layout Object Declaration *
  *****************************/
 
-extern Layout main_layout;
+extern Layout layout;
 
 #endif

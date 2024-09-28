@@ -74,9 +74,9 @@ void can_recv(const CAN_message_t &msg)
 Information *get_info_panel(uint8_t byte_1, uint8_t byte_2)
 {
     /* Loop through potential Information objects */
-    for (uint8_t i = 0; i < main_layout.active_info.size(); i++)
+    for (uint8_t i = 0; i < layout.active_info.size(); i++)
     {
-        Information *info = main_layout.active_info[i];                       // Get the current Information object
+        Information *info = layout.active_info[i];                       // Get the current Information object
         if ((byte_1 == info->get_byte_1()) && (byte_2 == info->get_byte_2())) // Check if both UDS request bytes match
         {
             return info; // Return the Information object if both matches are found

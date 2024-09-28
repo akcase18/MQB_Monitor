@@ -13,7 +13,7 @@ const lv_font_t *btm_label_font = &vw_18;
  * Layout Object Definition *
  ****************************/
 
-DMAMEM Layout main_layout = Layout(&panel_tl, &panel_tc, &panel_tr, &panel_bl, &panel_br);
+DMAMEM Layout layout = Layout(&panel_tl, &panel_tc, &panel_tr, &panel_bl, &panel_br);
 
 /****************
  * Constructors *
