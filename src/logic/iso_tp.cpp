@@ -24,11 +24,10 @@ void tp_loop()
 
 void tp_send(vector<Information *> infos)
 {
-    ISOTP_data config =
-        {
-            .id = 0x7E0,
-            .flags.extended = 0,
-            .separation_time = 10};
+    ISOTP_data config;
+    config.id = 0x7E0;
+    config.flags.extended = 0;
+    config.separation_time = 10;
     uint8_t buf[infos.size() * 4]; // 4 bytes per Information object request
     /* Loop through all Information objects to send */
     for (uint8_t i = 0; i < infos.size(); i++)
@@ -79,9 +78,9 @@ void tp_recv(const ISOTP_data &config, const uint8_t *buf)
 Information *get_info_panel_tp(uint8_t byte_1, uint8_t byte_2)
 {
     /* Loop through potential Information objects */
-    for (uint8_t i = 0; i < main_layout.active_info.size(); i++)
+    for (uint8_t i = 0; i < layout.active_info.size(); i++)
     {
-        Information *info = main_layout.active_info[i];                       // Get the current Information object
+        Information *info = layout.active_info[i];                            // Get the current Information object
         if ((byte_1 == info->get_byte_1()) && (byte_2 == info->get_byte_2())) // Check if both UDS request bytes match
         {
             return info; // Return the Information object if both matches are found

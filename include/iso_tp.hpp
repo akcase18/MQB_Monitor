@@ -36,23 +36,4 @@ void round_data_tp(Information *info);
 
 float round_tp(float value, uint8_t decimal_places);
 
-void callback(const ISOTP_data &config, const uint8_t *buf)
-{
-}
-
-void funtion()
-{
-    /* Put data to send into a buffer of uint8_t */
-    uint8_t buf[] = {};
-    /* Configure ISO_TP message */
-    ISOTP_data config =
-        {
-            .id = 0x7E0,
-            .flags.extended = 0,  // Standard CAN ID
-            .separation_time = 10 // 10ms between frames
-        };
-    /* Send ISO_TP message */
-    tp.write(config, buf, sizeof(buf));
-}
-
 #endif
