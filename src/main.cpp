@@ -121,6 +121,8 @@ void setup()
 
   display_init();
 
+  init_windows();
+
   main_layout.open_window();
 
   lv_tick_set_cb(millis);
