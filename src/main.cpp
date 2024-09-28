@@ -132,20 +132,24 @@ void setup()
 
 void loop()
 {
-  // if (!(counter % 6))
-  // {
-  //   config.open_window();
-  // }
-  // else
-  // {
-  //   layout.open_window();
-  // }
+  if (!(counter % 6))
+  {
+    if (test)
+    {
+      layout.open_window();
+    }
+    else
+    {
+      config.open_window();
+    }
+    test = !test;
+  }
 
   counter++;
 
   lv_task_handler();
 
-  // can_loop();
+  can_loop();
 
   delay(500);
 }
