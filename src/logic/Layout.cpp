@@ -1,5 +1,7 @@
 #include "Layout.hpp"
 
+#define LED 1
+
 /**************************
  * Layout Font Definition *
  **************************/
@@ -196,8 +198,10 @@ void Layout::update_layout(Panel *new_panel, Panel_Location old_panel_location)
 
 void Layout::init_single_object(Panel *panel)
 {
+    bool led = 1;
+
     /* Button */
-    panel->btn = lv_btn_create(window);                                          // Create the button in the Layout window
+    panel->btn = lv_btn_create(window);                                       // Create the button in the Layout window
     lv_obj_add_style(panel->btn, panel->style_btn, 0);                        // Add the style for the button
     lv_obj_add_style(panel->btn, panel->style_btn_pressed, LV_STATE_PRESSED); // Add the style for the button when pressed
     /* Data in Button */
@@ -208,6 +212,20 @@ void Layout::init_single_object(Panel *panel)
     panel->label = lv_label_create(window);                                           // Create a label to show what data the button is holding
     lv_label_set_text(panel->label, panel->panel_info->get_name_and_label().c_str()); // Put the name of the Information object into the label
     lv_obj_add_style(panel->label, panel->style_label, 0);                            // Add the style for the label
+    /* Warning LED */
+    if (led) // Base this off of configuration settings(?)
+    {
+        panel->led = lv_led_create(panel->btn);
+        lv_obj_align(panel->led, LV_ALIGN_TOP_LEFT, 5, 5);
+        lv_led_set_brightness(panel->led, 255);
+        lv_led_set_color(panel->led, lv_palette_main(LV_PALETTE_RED));
+        lv_obj_set_size(panel->led, 10, 10);
+        lv_led_off(panel->led);
+    }
+    else
+    {
+        panel->led = lv_led_create(NULL); // Don't create an LED, but still need to potentially access it
+    }
 }
 
 void Layout::init_panel_locations()

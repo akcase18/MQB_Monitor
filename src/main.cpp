@@ -190,18 +190,24 @@ void setup()
 
 void loop()
 {
-  // if (!(counter % 6))
-  // {
-  //   if (test)
-  //   {
-  //     layout.open_window();
-  //   }
-  //   else
-  //   {
-  //     config.open_window();
-  //   }
-  //   test = !test;
-  // }
+  if (!(counter % 6))
+  {
+    if (test)
+    {
+      // layout.open_window();
+      lv_obj_set_size(panel_tl.led, 20, 20);
+      lv_obj_align(panel_tl.led, LV_ALIGN_TOP_LEFT, 0, 0);
+      lv_led_on(panel_tl.led);
+    }
+    else
+    {
+      // config.open_window();
+      lv_obj_set_size(panel_tl.led, 10, 10);
+      lv_obj_align(panel_tl.led, LV_ALIGN_TOP_LEFT, 5, 5);
+      lv_led_off(panel_tl.led);
+    }
+    test = !test;
+  }
 
   counter++;
 

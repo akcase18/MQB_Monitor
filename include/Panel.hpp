@@ -82,11 +82,12 @@ public:
      ********************/
     Information *panel_info;       // Information object associated with the Panel
     lv_obj_t *btn;                 // Button in the Panel
-    lv_obj_t *data;                // Data inside of and displayed on the Button
-    lv_obj_t *label;               // Label underneath the Button that tells what Data is displayed
     lv_style_t *style_btn;         // Style for the button
     lv_style_t *style_btn_pressed; // Style for the button when it is pressed
+    lv_obj_t *data;                // Data inside of and displayed on the Button
+    lv_obj_t *label;               // Label underneath the Button that tells what Data is displayed
     lv_style_t *style_label;       // Style for the label
+    lv_obj_t *led;                 // LED object for warning light
 
     /********************
      * Public Functions *
@@ -145,8 +146,8 @@ static lv_style_t style_btn_top;     // Top row button style
 static lv_style_t style_btn_btm;     // Bottom row button style
 static lv_style_t style_btn_pressed; // Button style when pressed
 /* Label Styles */
-static lv_style_t style_label_top;  // Top row label style
-static lv_style_t style_label_btm;  // Bottom row label style
+static lv_style_t style_label_top; // Top row label style
+static lv_style_t style_label_btm; // Bottom row label style
 
 /****************************
  * Panel Object Declaration *
