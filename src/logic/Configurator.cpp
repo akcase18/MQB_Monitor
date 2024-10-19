@@ -30,6 +30,7 @@ void Configurator::init_configurator()
     init_window_layout();
     init_drop_down();
     init_radio_btns();
+    init_warning_btn();
     init_done_btn();
 }
 
@@ -136,6 +137,23 @@ void Configurator::init_drop_down()
     lv_obj_set_size(drop_down, lv_pct(100), 50);
 }
 
+void Configurator::init_warning_btn()
+{
+    int32_t btn_w = 215;
+    int32_t btn_h = 65;
+    btn_warning = lv_obj_create(window);
+    lv_obj_set_size(btn_warning, btn_w, btn_h);
+    lv_obj_set_pos(btn_warning, 20, LCD_VERT - btn_h - 20);
+    /* Turn off scrolling */
+    lv_obj_set_scrollbar_mode(btn_warning, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_clear_flag(btn_warning, LV_OBJ_FLAG_SCROLLABLE);
+    /* Add "Done" text */
+    label_warning = lv_label_create(btn_warning);
+    lv_obj_add_style(label_warning, &style_label_done, 0);
+    lv_label_set_text(label_warning, "Warning Setup");
+    lv_obj_set_align(label_warning, LV_ALIGN_CENTER);
+}
+
 void Configurator::init_done_btn()
 {
     int32_t btn_w = 120;
@@ -169,6 +187,8 @@ void Configurator::init_radio_btns()
     lv_obj_add_style(radio_metric, &style_radio_unchecked, LV_PART_INDICATOR);
     lv_obj_add_style(radio_metric, &style_radio_checked, LV_PART_INDICATOR | LV_STATE_CHECKED);
     lv_obj_align(radio_metric, LV_ALIGN_TOP_MID, lv_pct(0), lv_pct(25));
+    /* Select metric by default */
+    lv_obj_add_state(radio_metric, LV_STATE_CHECKED);
 }
 
 Information *Configurator::get_info_from_drop_down()

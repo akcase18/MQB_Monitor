@@ -54,6 +54,12 @@ private:
     void init_drop_down();
 
     /**
+     * Creates the "warning" button and puts it into the correct spot on
+     * the Configurator window.
+     */
+    void init_warning_btn();
+
+    /**
      * Creates the "Done" button and puts it into the correct spot on
      * the Configurator window.
      */
@@ -95,6 +101,7 @@ public:
     lv_obj_t *radio_imperial;         // Radio button for imperial units
     lv_obj_t *radio_metric;           // Radio button for metric units
     lv_obj_t *btn_warning;            // Button that opens warning configuration screen
+    lv_obj_t *label_warning;          // Label for warning button
     lv_obj_t *btn_done;               // Done button
     lv_obj_t *label_done;             // Label for done button
     lv_style_t style_window;          // Style for window

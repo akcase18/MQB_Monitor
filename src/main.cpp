@@ -184,7 +184,7 @@ void setup()
 
   layout.open_window();
 
-  // config.open_window();
+  config.open_window();
 
   lv_tick_set_cb(millis);
 }
