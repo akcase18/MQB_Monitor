@@ -192,6 +192,36 @@ void Layout::update_layout(Panel *new_panel, Panel_Location old_panel_location)
     update_info_list();
 }
 
+void Layout::set_led_on(Panel *panel, bool led_on)
+{
+    if (led_on)
+    {
+        lv_obj_set_size(panel->led, 20, 20);
+        lv_obj_align(panel->led, LV_ALIGN_TOP_LEFT, 0, 0);
+        lv_led_on(panel->led);
+    }
+    else
+    {
+        lv_obj_set_size(panel->led, 10, 10);
+        lv_obj_align(panel->led, LV_ALIGN_TOP_LEFT, 5, 5);
+        lv_led_off(panel->led);
+    }
+}
+
+void Layout::set_warning(Panel *panel, bool warning_on)
+{
+    if (warning_on)
+    {
+        lv_obj_set_style_text_color(panel->data, lv_palette_lighten(LV_PALETTE_RED, 1), 0);
+        set_led_on(panel, true);
+    }
+    else
+    {
+        lv_obj_set_style_text_color(panel->data, lv_palette_lighten(LV_PALETTE_GREY, 5), 0);
+        set_led_on(panel, false);
+    }
+}
+
 /****************************
  * Private Helper Functions *
  ****************************/
@@ -207,7 +237,7 @@ void Layout::init_single_object(Panel *panel)
     /* Data in Button */
     panel->data = lv_label_create(panel->btn);                                 // Create a spot for data to go into the button
     lv_label_set_text(panel->data, panel->panel_info->get_data_str().c_str()); // Put the data in the Information object into the button
-    lv_obj_align(panel->data, LV_ALIGN_CENTER, 0, 0);                          // Put the data into the center of the button
+    lv_obj_align(panel->data, LV_ALIGN_CENTER, 0, 10);                          // Put the data into the center of the button
     /* Label */
     panel->label = lv_label_create(window);                                           // Create a label to show what data the button is holding
     lv_label_set_text(panel->label, panel->panel_info->get_name_and_label().c_str()); // Put the name of the Information object into the label

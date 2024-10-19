@@ -183,6 +183,7 @@ void setup()
   init_windows();
 
   layout.open_window();
+
   // config.open_window();
 
   lv_tick_set_cb(millis);
@@ -195,16 +196,12 @@ void loop()
     if (test)
     {
       // layout.open_window();
-      lv_obj_set_size(panel_tl.led, 20, 20);
-      lv_obj_align(panel_tl.led, LV_ALIGN_TOP_LEFT, 0, 0);
-      lv_led_on(panel_tl.led);
+      layout.set_warning(&panel_tl, true);
     }
     else
     {
       // config.open_window();
-      lv_obj_set_size(panel_tl.led, 10, 10);
-      lv_obj_align(panel_tl.led, LV_ALIGN_TOP_LEFT, 5, 5);
-      lv_led_off(panel_tl.led);
+      layout.set_warning(&panel_tl, false);
     }
     test = !test;
   }
