@@ -174,3 +174,16 @@ void Configurator::init_radio_btns()
 Information *Configurator::get_info_from_drop_down()
 {
 }
+
+void Configurator::warning_button_cb(lv_event_t *e)
+{
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+    {
+        open_warning_config();
+    }
+}
+
+void Configurator::open_warning_config()
+{
+    
+}

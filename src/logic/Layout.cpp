@@ -1,7 +1,5 @@
 #include "Layout.hpp"
 
-#define LED 1
-
 /**************************
  * Layout Font Definition *
  **************************/
@@ -61,8 +59,10 @@ void Layout::panel_style_init()
     /***** Top Panels *****/
     /* Buttons */
     lv_style_init(&style_btn_top);
-    lv_style_set_radius(&style_btn_top, 2);
+    lv_style_set_radius(&style_btn_top, 10);
     lv_style_set_opa(&style_btn_top, LV_OPA_100);
+    lv_style_set_border_color(&style_btn_top, lv_palette_darken(LV_PALETTE_GREY, 4));
+    lv_style_set_border_width(&style_btn_top, 2);
     lv_style_set_bg_color(&style_btn_top, lv_palette_darken(LV_PALETTE_GREY, 4));
     lv_style_set_text_color(&style_btn_top, lv_palette_lighten(LV_PALETTE_GREY, 4));
     lv_style_set_text_font(&style_btn_top, top_data_font);
@@ -76,8 +76,10 @@ void Layout::panel_style_init()
     /***** Bottom Panels *****/
     /* Buttons */
     lv_style_init(&style_btn_btm);
-    lv_style_set_radius(&style_btn_btm, 2);
+    lv_style_set_radius(&style_btn_btm, 15);
     lv_style_set_opa(&style_btn_btm, LV_OPA_100);
+    lv_style_set_border_color(&style_btn_btm, lv_palette_darken(LV_PALETTE_GREY, 4));
+    lv_style_set_border_width(&style_btn_btm, 2);
     lv_style_set_bg_color(&style_btn_btm, lv_palette_darken(LV_PALETTE_GREY, 4));
     lv_style_set_text_color(&style_btn_btm, lv_palette_lighten(LV_PALETTE_GREY, 4));
     lv_style_set_text_font(&style_btn_btm, btm_data_font);
@@ -192,33 +194,15 @@ void Layout::update_layout(Panel *new_panel, Panel_Location old_panel_location)
     update_info_list();
 }
 
-void Layout::set_led_on(Panel *panel, bool led_on)
-{
-    if (led_on)
-    {
-        lv_obj_set_size(panel->led, 20, 20);
-        lv_obj_align(panel->led, LV_ALIGN_TOP_LEFT, 0, 0);
-        lv_led_on(panel->led);
-    }
-    else
-    {
-        lv_obj_set_size(panel->led, 10, 10);
-        lv_obj_align(panel->led, LV_ALIGN_TOP_LEFT, 5, 5);
-        lv_led_off(panel->led);
-    }
-}
-
 void Layout::set_warning(Panel *panel, bool warning_on)
 {
     if (warning_on)
     {
-        lv_obj_set_style_text_color(panel->data, lv_palette_lighten(LV_PALETTE_RED, 1), 0);
-        set_led_on(panel, true);
+        lv_obj_set_style_bg_color(panel->btn, lv_palette_darken(LV_PALETTE_RED, 2), 0);
     }
     else
     {
-        lv_obj_set_style_text_color(panel->data, lv_palette_lighten(LV_PALETTE_GREY, 5), 0);
-        set_led_on(panel, false);
+        lv_obj_set_style_bg_color(panel->btn, lv_palette_darken(LV_PALETTE_GREY, 4), 0);
     }
 }
 
@@ -228,8 +212,6 @@ void Layout::set_warning(Panel *panel, bool warning_on)
 
 void Layout::init_single_object(Panel *panel)
 {
-    bool led = 1;
-
     /* Button */
     panel->btn = lv_btn_create(window);                                       // Create the button in the Layout window
     lv_obj_add_style(panel->btn, panel->style_btn, 0);                        // Add the style for the button
@@ -237,25 +219,11 @@ void Layout::init_single_object(Panel *panel)
     /* Data in Button */
     panel->data = lv_label_create(panel->btn);                                 // Create a spot for data to go into the button
     lv_label_set_text(panel->data, panel->panel_info->get_data_str().c_str()); // Put the data in the Information object into the button
-    lv_obj_align(panel->data, LV_ALIGN_CENTER, 0, 10);                          // Put the data into the center of the button
+    lv_obj_align(panel->data, LV_ALIGN_CENTER, 0, 0);                          // Put the data into the center of the button
     /* Label */
     panel->label = lv_label_create(window);                                           // Create a label to show what data the button is holding
     lv_label_set_text(panel->label, panel->panel_info->get_name_and_label().c_str()); // Put the name of the Information object into the label
     lv_obj_add_style(panel->label, panel->style_label, 0);                            // Add the style for the label
-    /* Warning LED */
-    if (led) // Base this off of configuration settings(?)
-    {
-        panel->led = lv_led_create(panel->btn);
-        lv_obj_align(panel->led, LV_ALIGN_TOP_LEFT, 5, 5);
-        lv_led_set_brightness(panel->led, 255);
-        lv_led_set_color(panel->led, lv_palette_main(LV_PALETTE_RED));
-        lv_obj_set_size(panel->led, 10, 10);
-        lv_led_off(panel->led);
-    }
-    else
-    {
-        panel->led = lv_led_create(NULL); // Don't create an LED, but still need to potentially access it
-    }
 }
 
 void Layout::init_panel_locations()

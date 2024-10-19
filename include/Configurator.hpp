@@ -79,6 +79,10 @@ private:
      */
     Information *get_info_from_drop_down();
 
+    void warning_button_cb(lv_event_t *e);
+
+    void open_warning_config();
+
 public:
     /********************
      * Public Variables *
@@ -90,6 +94,7 @@ public:
     lv_obj_t *drop_down;              // Drop-down menu
     lv_obj_t *radio_imperial;         // Radio button for imperial units
     lv_obj_t *radio_metric;           // Radio button for metric units
+    lv_obj_t *btn_warning;            // Button that opens warning configuration screen
     lv_obj_t *btn_done;               // Done button
     lv_obj_t *label_done;             // Label for done button
     lv_style_t style_window;          // Style for window

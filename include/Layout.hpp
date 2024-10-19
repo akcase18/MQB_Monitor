@@ -173,15 +173,6 @@ public:
     void update_layout(Panel *new_panel, Panel_Location old_panel_location);
 
     /**
-     * Sets the warning LED to the given value on the given Panel
-     * object.
-     * 
-     * @param panel the Panel whose LED you want to control
-     * @param led_on 1/true if the LED will be turned on, 0/false if the LED will be turned off
-     */
-    void set_led_on(Panel *panel, bool led_on);
-
-    /**
      * Sets the Panel to its warning state, which involves turning on the
      * warning LED in the top left corner, and changing the color of the 
      * data text to red. If set to false, the Panel will go back to its
