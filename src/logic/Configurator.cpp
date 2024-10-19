@@ -140,7 +140,7 @@ void Configurator::init_drop_down()
 void Configurator::init_warning_btn()
 {
     int32_t btn_w = 215;
-    int32_t btn_h = 65;
+    int32_t btn_h = 50;
     btn_warning = lv_obj_create(window);
     lv_obj_set_size(btn_warning, btn_w, btn_h);
     lv_obj_set_pos(btn_warning, 20, LCD_VERT - btn_h - 20);
@@ -157,7 +157,7 @@ void Configurator::init_warning_btn()
 void Configurator::init_done_btn()
 {
     int32_t btn_w = 120;
-    int32_t btn_h = 65;
+    int32_t btn_h = 50;
     btn_done = lv_obj_create(window);
     lv_obj_set_size(btn_done, btn_w, btn_h);
     lv_obj_set_pos(btn_done, LCD_HORZ - btn_w - 20, LCD_VERT - btn_h - 20);
