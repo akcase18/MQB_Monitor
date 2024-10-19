@@ -35,6 +35,7 @@ void can_send(Information *info)
     msg.buf[1] = ENHANCE_DATA_REQ;   // Request enhanced service data from the car
     msg.buf[2] = info->get_byte_1(); // UDS request byte 1
     msg.buf[3] = info->get_byte_2(); // UDS request byte 2
+    msg.len = 4;
 
     msg.id = CAN_ID;
 

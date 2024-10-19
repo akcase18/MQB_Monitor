@@ -20,8 +20,17 @@
 #define LCD_RST 26 // G8
 ILI948x_t4_mm lcd = ILI948x_t4_mm(LCD_DC, LCD_CS, LCD_RST);
 
+/*********************
+ * Touch Constructor *
+ *********************/
+
+#define CS_PIN 8
+XPT2046_Touchscreen ts = XPT2046_Touchscreen(CS_PIN);
+
 bool test = false;
 int counter = 0;
+
+FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> Can0;
 
 /**
  * LCD Wiring
@@ -90,6 +99,30 @@ void display_init()
   lv_display_set_buffers(display, buf_1, buf_2, sizeof(buf_1), LV_DISPLAY_RENDER_MODE_PARTIAL);
 }
 
+void touch_read(lv_indev_t *indev, lv_indev_data_t *data)
+{
+  if (ts.touched())
+  {
+    TS_Point ts_point = ts.getPoint();
+    data->point.x = ts_point.x;
+    data->point.y = ts_point.y;
+    data->state = LV_INDEV_STATE_PRESSED;
+  }
+  else
+  {
+    data->state = LV_INDEV_STATE_RELEASED;
+  }
+}
+
+void touch_init()
+{
+  ts.begin();
+  ts.setRotation(1);
+  touch = lv_indev_create();
+  lv_indev_set_type(touch, LV_INDEV_TYPE_POINTER);
+  lv_indev_set_read_cb(touch, touch_read);
+}
+
 void set_unit_region()
 {
   // Pull from EEPROM
@@ -103,8 +136,31 @@ void set_unit_region()
 
 void init_windows()
 {
-  layout.init_layout();  // Initialize the main window
+  layout.init_layout();       // Initialize the main window
   config.init_configurator(); // Initialize the configurator window
+}
+
+void canSniff(const CAN_message_t &msg)
+{
+  Serial.print("MB ");
+  Serial.print(msg.mb);
+  Serial.print("  OVERRUN: ");
+  Serial.print(msg.flags.overrun);
+  Serial.print("  LEN: ");
+  Serial.print(msg.len);
+  Serial.print(" EXT: ");
+  Serial.print(msg.flags.extended);
+  Serial.print(" TS: ");
+  Serial.print(msg.timestamp);
+  Serial.print(" ID: ");
+  Serial.print(msg.id, HEX);
+  Serial.print(" Buffer: ");
+  for (uint8_t i = 0; i < msg.len; i++)
+  {
+    Serial.print(msg.buf[i], HEX);
+    Serial.print(" ");
+  }
+  Serial.println();
 }
 
 void setup()
@@ -120,30 +176,32 @@ void setup()
   can_init();
 
   display_init();
+  // touch_init();
 
   init_windows();
 
   init_windows();
 
   layout.open_window();
+  // config.open_window();
 
   lv_tick_set_cb(millis);
 }
 
 void loop()
 {
-  if (!(counter % 6))
-  {
-    if (test)
-    {
-      layout.open_window();
-    }
-    else
-    {
-      config.open_window();
-    }
-    test = !test;
-  }
+  // if (!(counter % 6))
+  // {
+  //   if (test)
+  //   {
+  //     layout.open_window();
+  //   }
+  //   else
+  //   {
+  //     config.open_window();
+  //   }
+  //   test = !test;
+  // }
 
   counter++;
 
@@ -151,5 +209,5 @@ void loop()
 
   can_loop();
 
-  delay(500);
+  lv_delay_ms(500);
 }

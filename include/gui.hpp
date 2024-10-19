@@ -19,6 +19,12 @@ static lv_display_t *display;
 static lv_color_t buf_1[(LCD_HORZ * LCD_VERT) / 10];
 static lv_color_t buf_2[(LCD_HORZ * LCD_VERT) / 10];
 
+/***************
+ * Touchscreen *
+ ***************/
+
+static lv_indev_t *touch;
+
 /********************
  * Static Functions *
  ********************/
