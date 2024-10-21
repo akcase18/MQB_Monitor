@@ -85,10 +85,6 @@ private:
      */
     Information *get_info_from_drop_down();
 
-    void warning_button_cb(lv_event_t *e);
-
-    void open_warning_config();
-
 public:
     /********************
      * Public Variables *
@@ -168,6 +164,10 @@ public:
      * @param user_data custom data that will be available in the callback (can pass in NULL)
      */
     void set_callback(lv_obj_t *object, void (*function)(lv_event_t *e), lv_event_code_t state, void *user_data);
+
+    void warning_button_cb(lv_event_t *e);
+
+    void open_warning_config();
 };
 
 /***********************************

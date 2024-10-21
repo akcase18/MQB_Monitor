@@ -87,6 +87,7 @@ public:
     lv_style_t *style_btn;         // Style for the button
     lv_style_t *style_btn_pressed; // Style for the button when it is pressed
     lv_style_t *style_label;       // Style for the label
+    bool use_warning;              // Flag for warning or not
 
     /********************
      * Public Functions *
