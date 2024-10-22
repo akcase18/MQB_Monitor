@@ -87,6 +87,7 @@ public:
     lv_style_t *style_btn;         // Style for the button
     lv_style_t *style_btn_pressed; // Style for the button when it is pressed
     lv_style_t *style_label;       // Style for the label
+    bool use_warning;              // Flag for warning or not
 
     /********************
      * Public Functions *
@@ -145,8 +146,8 @@ static lv_style_t style_btn_top;     // Top row button style
 static lv_style_t style_btn_btm;     // Bottom row button style
 static lv_style_t style_btn_pressed; // Button style when pressed
 /* Label Styles */
-static lv_style_t style_label_top;  // Top row label style
-static lv_style_t style_label_btm;  // Bottom row label style
+static lv_style_t style_label_top; // Top row label style
+static lv_style_t style_label_btm; // Bottom row label style
 
 /****************************
  * Panel Object Declaration *

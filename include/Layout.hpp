@@ -171,6 +171,17 @@ public:
      * @param old_panel_location the location of the Panel to be replaced
      */
     void update_layout(Panel *new_panel, Panel_Location old_panel_location);
+
+    /**
+     * Sets the Panel to its warning state, which involves turning on the
+     * warning LED in the top left corner, and changing the color of the 
+     * data text to red. If set to false, the Panel will go back to its
+     * normal state.
+     * 
+     * @param panel the Panel to change the warning state of
+     * @param warning_on true if the Panel should be in warning, 0 if not
+     */
+    void set_warning(Panel *panel, bool warning_on);
 };
 
 /*****************************

@@ -30,6 +30,7 @@ Panel::Panel(Information *info, lv_obj_t *btn, lv_obj_t *data, lv_obj_t *label)
     set_btn(btn);
     set_data(data);
     set_label(label);
+    use_warning = false;
 }
 
 /******************************

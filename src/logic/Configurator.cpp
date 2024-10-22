@@ -30,6 +30,7 @@ void Configurator::init_configurator()
     init_window_layout();
     init_drop_down();
     init_radio_btns();
+    init_warning_btn();
     init_done_btn();
 }
 
@@ -136,13 +137,32 @@ void Configurator::init_drop_down()
     lv_obj_set_size(drop_down, lv_pct(100), 50);
 }
 
+void Configurator::init_warning_btn()
+{
+    int32_t btn_w = 215;
+    int32_t btn_h = 50;
+    btn_warning = lv_btn_create(window);
+    lv_obj_set_size(btn_warning, btn_w, btn_h);
+    lv_obj_set_pos(btn_warning, 20, LCD_VERT - btn_h - 20);
+    lv_obj_add_style(btn_warning, &style_btn_done, 0);
+    /* Turn off scrolling */
+    lv_obj_set_scrollbar_mode(btn_warning, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_clear_flag(btn_warning, LV_OBJ_FLAG_SCROLLABLE);
+    /* Add "Done" text */
+    label_warning = lv_label_create(btn_warning);
+    lv_obj_add_style(label_warning, &style_label_done, 0);
+    lv_label_set_text(label_warning, "Warning Setup");
+    lv_obj_set_align(label_warning, LV_ALIGN_CENTER);
+}
+
 void Configurator::init_done_btn()
 {
     int32_t btn_w = 120;
-    int32_t btn_h = 65;
-    btn_done = lv_obj_create(window);
+    int32_t btn_h = 50;
+    btn_done = lv_btn_create(window);
     lv_obj_set_size(btn_done, btn_w, btn_h);
     lv_obj_set_pos(btn_done, LCD_HORZ - btn_w - 20, LCD_VERT - btn_h - 20);
+    lv_obj_add_style(btn_done, &style_btn_done, 0);
     /* Turn off scrolling */
     lv_obj_set_scrollbar_mode(btn_done, LV_SCROLLBAR_MODE_OFF);
     lv_obj_clear_flag(btn_done, LV_OBJ_FLAG_SCROLLABLE);
@@ -169,8 +189,72 @@ void Configurator::init_radio_btns()
     lv_obj_add_style(radio_metric, &style_radio_unchecked, LV_PART_INDICATOR);
     lv_obj_add_style(radio_metric, &style_radio_checked, LV_PART_INDICATOR | LV_STATE_CHECKED);
     lv_obj_align(radio_metric, LV_ALIGN_TOP_MID, lv_pct(0), lv_pct(25));
+    /* Select metric by default */
+    lv_obj_add_state(radio_metric, LV_STATE_CHECKED);
 }
 
 Information *Configurator::get_info_from_drop_down()
 {
+}
+
+void Configurator::warning_button_cb(lv_event_t *e)
+{
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+    {
+        open_warning_config();
+    }
+}
+
+void Configurator::open_warning_config()
+{
+    /***** Setup window *****/
+    lv_obj_t *warning_window = lv_obj_create(NULL);
+    lv_obj_set_size(warning_window, LCD_HORZ, LCD_VERT);
+    lv_obj_center(warning_window);
+    lv_obj_add_style(warning_window, &style_window, 0);
+    /* Turn off scrolling */
+    lv_obj_set_scrollbar_mode(warning_window, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_clear_flag(warning_window, LV_OBJ_FLAG_SCROLLABLE);
+    /***** Setup window layout *****/
+    lv_obj_t *warn_flex_col_1 = lv_obj_create(warning_window); // Adds flex column to the Configurator window
+    lv_obj_set_flex_flow(warn_flex_col_1, LV_FLEX_FLOW_COLUMN);     // Sets column to use flex flow layout
+    lv_obj_set_size(warn_flex_col_1, lv_pct(50), lv_pct(100));      // Set column to take up 65% of window width
+    lv_obj_add_style(warn_flex_col_1, &style_layout, 0);            // Add flex layout style to column
+    lv_obj_t *warn_flex_col_2 = lv_obj_create(warning_window); // Adds flex clumn to the Configurator window
+    lv_obj_set_flex_flow(warn_flex_col_2, LV_FLEX_FLOW_COLUMN);     // Sets column to use flex flow layout
+    lv_obj_set_size(warn_flex_col_2, lv_pct(50), lv_pct(100));      // Set column to take up 35% of window width
+    lv_obj_set_x(warn_flex_col_2, lv_pct(50));                      // Set column to take up 60% of window height
+    lv_obj_add_style(warn_flex_col_2, &style_layout, 0);            // Add flex layout style to column
+    /***** Setup radio buttons *****/
+    lv_obj_t *radio_warn_on = lv_checkbox_create(warn_flex_col_1);
+    lv_checkbox_set_text(radio_warn_on, "Warning On");
+    lv_obj_add_flag(radio_warn_on, LV_OBJ_FLAG_EVENT_BUBBLE);
+    lv_obj_add_style(radio_warn_on, &style_radio_unchecked, LV_PART_INDICATOR);
+    lv_obj_add_style(radio_warn_on, &style_radio_checked, LV_PART_INDICATOR | LV_STATE_CHECKED);
+    lv_obj_set_align(radio_warn_on, LV_ALIGN_TOP_LEFT);
+    lv_obj_t *radio_warn_off = lv_checkbox_create(warn_flex_col_1);
+    lv_checkbox_set_text(radio_warn_off, "Warning Off");
+    lv_obj_add_flag(radio_warn_off, LV_OBJ_FLAG_EVENT_BUBBLE);
+    lv_obj_add_style(radio_warn_off, &style_radio_unchecked, LV_PART_INDICATOR);
+    lv_obj_add_style(radio_warn_off, &style_radio_checked, LV_PART_INDICATOR | LV_STATE_CHECKED);
+    lv_obj_align(radio_warn_off, LV_ALIGN_TOP_LEFT, lv_pct(0), lv_pct(25));
+    /* Select Warning Off by default */
+    lv_obj_add_state(radio_warn_on, LV_STATE_CHECKED);
+    /***** Setup Done button *****/
+    int32_t btn_w = 120;
+    int32_t btn_h = 50;
+    lv_obj_t *done_btn = lv_btn_create(warning_window);
+    lv_obj_set_size(done_btn, btn_w, btn_h);
+    lv_obj_set_pos(done_btn, LCD_HORZ - btn_w - 20, LCD_VERT - btn_h - 20);
+    lv_obj_add_style(done_btn, &style_btn_done, 0);
+    /* Turn off scrolling */
+    lv_obj_set_scrollbar_mode(done_btn, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_clear_flag(done_btn, LV_OBJ_FLAG_SCROLLABLE);
+    /* Add "Done" text */
+    lv_obj_t *done_label = lv_label_create(done_btn);
+    lv_obj_add_style(done_label, &style_label_done, 0);
+    lv_label_set_text(done_label, "Done");
+    lv_obj_set_align(done_label, LV_ALIGN_CENTER);
+    /***** Open warning window *****/
+    lv_screen_load(warning_window);
 }

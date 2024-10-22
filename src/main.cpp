@@ -183,25 +183,36 @@ void setup()
   init_windows();
 
   layout.open_window();
-  // config.open_window();
+
+  config.open_window();
+
+  config.open_warning_config();
 
   lv_tick_set_cb(millis);
 }
 
 void loop()
 {
-  // if (!(counter % 6))
-  // {
-  //   if (test)
-  //   {
-  //     layout.open_window();
-  //   }
-  //   else
-  //   {
-  //     config.open_window();
-  //   }
-  //   test = !test;
-  // }
+  if (!(counter % 6))
+  {
+    if (test)
+    {
+      // layout.set_warning(&panel_tl, true);
+      // layout.set_warning(&panel_tc, true);
+      // layout.set_warning(&panel_tr, true);
+      // layout.set_warning(&panel_bl, true);
+      // layout.set_warning(&panel_br, true);
+    }
+    else
+    {
+      // layout.set_warning(&panel_tl, false);
+      // layout.set_warning(&panel_tc, false);
+      // layout.set_warning(&panel_tr, false);
+      // layout.set_warning(&panel_bl, false);
+      // layout.set_warning(&panel_br, false);
+    }
+    test = !test;
+  }
 
   counter++;
 

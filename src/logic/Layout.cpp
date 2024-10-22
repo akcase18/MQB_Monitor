@@ -59,8 +59,10 @@ void Layout::panel_style_init()
     /***** Top Panels *****/
     /* Buttons */
     lv_style_init(&style_btn_top);
-    lv_style_set_radius(&style_btn_top, 2);
+    lv_style_set_radius(&style_btn_top, 10);
     lv_style_set_opa(&style_btn_top, LV_OPA_100);
+    lv_style_set_border_color(&style_btn_top, lv_palette_darken(LV_PALETTE_GREY, 4));
+    lv_style_set_border_width(&style_btn_top, 2);
     lv_style_set_bg_color(&style_btn_top, lv_palette_darken(LV_PALETTE_GREY, 4));
     lv_style_set_text_color(&style_btn_top, lv_palette_lighten(LV_PALETTE_GREY, 4));
     lv_style_set_text_font(&style_btn_top, top_data_font);
@@ -74,8 +76,10 @@ void Layout::panel_style_init()
     /***** Bottom Panels *****/
     /* Buttons */
     lv_style_init(&style_btn_btm);
-    lv_style_set_radius(&style_btn_btm, 2);
+    lv_style_set_radius(&style_btn_btm, 15);
     lv_style_set_opa(&style_btn_btm, LV_OPA_100);
+    lv_style_set_border_color(&style_btn_btm, lv_palette_darken(LV_PALETTE_GREY, 4));
+    lv_style_set_border_width(&style_btn_btm, 2);
     lv_style_set_bg_color(&style_btn_btm, lv_palette_darken(LV_PALETTE_GREY, 4));
     lv_style_set_text_color(&style_btn_btm, lv_palette_lighten(LV_PALETTE_GREY, 4));
     lv_style_set_text_font(&style_btn_btm, btm_data_font);
@@ -190,6 +194,18 @@ void Layout::update_layout(Panel *new_panel, Panel_Location old_panel_location)
     update_info_list();
 }
 
+void Layout::set_warning(Panel *panel, bool warning_on)
+{
+    if (warning_on)
+    {
+        lv_obj_set_style_bg_color(panel->btn, lv_palette_darken(LV_PALETTE_RED, 2), 0);
+    }
+    else
+    {
+        lv_obj_set_style_bg_color(panel->btn, lv_palette_darken(LV_PALETTE_GREY, 4), 0);
+    }
+}
+
 /****************************
  * Private Helper Functions *
  ****************************/
@@ -197,7 +213,7 @@ void Layout::update_layout(Panel *new_panel, Panel_Location old_panel_location)
 void Layout::init_single_object(Panel *panel)
 {
     /* Button */
-    panel->btn = lv_btn_create(window);                                          // Create the button in the Layout window
+    panel->btn = lv_btn_create(window);                                       // Create the button in the Layout window
     lv_obj_add_style(panel->btn, panel->style_btn, 0);                        // Add the style for the button
     lv_obj_add_style(panel->btn, panel->style_btn_pressed, LV_STATE_PRESSED); // Add the style for the button when pressed
     /* Data in Button */
