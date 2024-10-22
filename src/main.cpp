@@ -1,7 +1,7 @@
 #include "gui.hpp"
-#include "ILI948x_t4_mm.h"
+// #include "ILI948x_t4_mm.h"
 #include "XPT2046_Touchscreen.h"
-#include "SPI.h"
+// #include "SPI.h"
 
 /***********
  * Defines *
@@ -18,7 +18,7 @@
 #define LCD_CS 4   // D0
 #define LCD_DC 5   // D1
 #define LCD_RST 26 // G8
-ILI948x_t4_mm lcd = ILI948x_t4_mm(LCD_DC, LCD_CS, LCD_RST);
+// ILI948x_t4_mm lcd = ILI948x_t4_mm(LCD_DC, LCD_CS, LCD_RST);
 
 /*********************
  * Touch Constructor *
@@ -29,8 +29,6 @@ XPT2046_Touchscreen ts = XPT2046_Touchscreen(CS_PIN);
 
 bool test = false;
 int counter = 0;
-
-FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> Can0;
 
 /**
  * LCD Wiring
@@ -66,15 +64,15 @@ void set_brightness(uint8_t percent)
   analogWrite(PWM_PIN, brightness);
 }
 
-/**
- * Initialize the display driver object
- */
-void lcd_init()
-{
-  lcd.begin(12);
-  lcd.setBitDepth(16);
-  lcd.setRotation(1);
-}
+// /**
+//  * Initialize the display driver object
+//  */
+// void lcd_init()
+// {
+//   lcd.begin(12);
+//   lcd.setBitDepth(16);
+//   lcd.setRotation(1);
+// }
 
 /**
  * Set up the function to push pixels to the display when
@@ -82,7 +80,7 @@ void lcd_init()
  */
 void display_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *data)
 {
-  lcd.pushPixels16bitDMA((uint16_t *)data, area->x1, area->y1, area->x2, area->y2);
+  // lcd.pushPixels16bitDMA((uint16_t *)data, area->x1, area->y1, area->x2, area->y2);
   lv_display_flush_ready(disp);
 }
 
@@ -93,7 +91,7 @@ void display_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *data)
 void display_init()
 {
   set_brightness(100); // Can pull from EEPROM or something
-  lcd_init();
+  // lcd_init();
   display = lv_display_create(LCD_HORZ, LCD_VERT);
   lv_display_set_flush_cb(display, display_flush);
   lv_display_set_buffers(display, buf_1, buf_2, sizeof(buf_1), LV_DISPLAY_RENDER_MODE_PARTIAL);
@@ -140,36 +138,23 @@ void init_windows()
   config.init_configurator(); // Initialize the configurator window
 }
 
-void canSniff(const CAN_message_t &msg)
+void init_timers()
 {
-  Serial.print("MB ");
-  Serial.print(msg.mb);
-  Serial.print("  OVERRUN: ");
-  Serial.print(msg.flags.overrun);
-  Serial.print("  LEN: ");
-  Serial.print(msg.len);
-  Serial.print(" EXT: ");
-  Serial.print(msg.flags.extended);
-  Serial.print(" TS: ");
-  Serial.print(msg.timestamp);
-  Serial.print(" ID: ");
-  Serial.print(msg.id, HEX);
-  Serial.print(" Buffer: ");
-  for (uint8_t i = 0; i < msg.len; i++)
-  {
-    Serial.print(msg.buf[i], HEX);
-    Serial.print(" ");
-  }
-  Serial.println();
+  lv_timer_t *panel_tl_timer = lv_timer_create(panel_tl_timer_cb, panel_tl.panel_info->get_refresh_rate(), NULL);
+  lv_timer_t *panel_tc_timer = lv_timer_create(panel_tc_timer_cb, panel_tc.panel_info->get_refresh_rate(), NULL);
+  lv_timer_t *panel_tr_timer = lv_timer_create(panel_tr_timer_cb, panel_tr.panel_info->get_refresh_rate(), NULL);
+  lv_timer_t *panel_bl_timer = lv_timer_create(panel_bl_timer_cb, panel_bl.panel_info->get_refresh_rate(), NULL);
+  lv_timer_t *panel_br_timer = lv_timer_create(panel_br_timer_cb, panel_br.panel_info->get_refresh_rate(), NULL);
 }
 
 void setup()
 {
+  Serial.begin(115200);
+  delay(2000);
+
   lv_init();
 
   set_unit_region();
-
-  lv_task_handler();
 
   style_init();
 
@@ -180,14 +165,13 @@ void setup()
 
   init_windows();
 
-  init_windows();
+  // layout.open_window();
 
-  layout.open_window();
+  // config.open_window();
 
-  config.open_window();
+  // config.open_warning_config();
 
-  config.open_warning_config();
-
+  init_timers();
   lv_tick_set_cb(millis);
 }
 
@@ -216,9 +200,17 @@ void loop()
 
   counter++;
 
+  // if (counter == 100)
+  // {
+  //   Serial.println(panel_tl.panel_info->get_name_and_label() + ": " + panel_tl.panel_info->get_data_str());
+  //   Serial.println(panel_tc.panel_info->get_name_and_label() + ": " + panel_tc.panel_info->get_data_str());
+  //   Serial.println(panel_tr.panel_info->get_name_and_label() + ": " + panel_tr.panel_info->get_data_str());
+  //   Serial.println(panel_bl.panel_info->get_name_and_label() + ": " + panel_bl.panel_info->get_data_str());
+  //   Serial.println(panel_br.panel_info->get_name_and_label() + ": " + panel_br.panel_info->get_data_str());
+  //   counter = 0;
+  // }
+
   lv_task_handler();
 
   can_loop();
-
-  lv_delay_ms(500);
 }

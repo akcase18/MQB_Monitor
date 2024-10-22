@@ -164,7 +164,7 @@ void Information::set_offset(int16_t offset)
 }
 int16_t Information::get_offset()
 {
-    return _offset;
+   return _offset;
 }
 
 /**** Scale *****/

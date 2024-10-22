@@ -67,3 +67,32 @@ static lv_color_t darken(const lv_color_filter_dsc_t *dsc, lv_color_t color, lv_
     LV_UNUSED(dsc);
     return lv_color_darken(color, opa);
 }
+
+/**********
+ * Timers *
+ **********/
+
+void panel_tl_timer_cb(lv_timer_t *timer)
+{
+    can_send(panel_tl.panel_info);
+}
+
+void panel_tc_timer_cb(lv_timer_t *timer)
+{
+    can_send(panel_tc.panel_info);
+}
+
+void panel_tr_timer_cb(lv_timer_t *timer)
+{
+    can_send(panel_tr.panel_info);
+}
+
+void panel_bl_timer_cb(lv_timer_t *timer)
+{
+    can_send(panel_bl.panel_info);
+}
+
+void panel_br_timer_cb(lv_timer_t *timer)
+{
+    can_send(panel_br.panel_info);
+}

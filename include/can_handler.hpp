@@ -3,12 +3,13 @@
 
 #include <FlexCAN_T4.h>
 #include "Configurator.hpp"
+// #include "SPI.h"
 
 /*************
  * CAN Setup *
  *************/
 
-DMAMEM static FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> MQB_CAN;
+static FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> MQB_CAN;
 
 /******************
  * Main Functions *
