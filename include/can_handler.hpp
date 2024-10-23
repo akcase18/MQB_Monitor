@@ -2,14 +2,17 @@
 #define CAN_HANDLER_H
 
 #include <FlexCAN_T4.h>
+#include <queue>
 #include "Configurator.hpp"
-// #include "SPI.h"
+
+using namespace std;
 
 /*************
  * CAN Setup *
  *************/
 
-static FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> MQB_CAN;
+// static FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> MQB_CAN;
+static FlexCAN_T4<CAN3, RX_SIZE_256, TX_SIZE_16> MQB_CAN;
 
 /******************
  * Main Functions *
@@ -30,8 +33,6 @@ void can_loop();
 /**
  * Sends a UDP request message on the CAN buf for the given Information
  * object.
- * 
- * @param info the Information object to request data for
  */
 void can_send(Information *info);
 
@@ -66,7 +67,7 @@ Information *get_info_panel(uint8_t byte_1, uint8_t byte_2);
  * 
  * @param info the Information object that holds the data to convert
  */
-void convert_units(Information *info);
+void convert_units(Information *info, float data);
 
 /**
  * Automatically rounds the data in an Information object based on the type

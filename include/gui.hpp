@@ -74,7 +74,7 @@ static lv_color_t darken(const lv_color_filter_dsc_t *dsc, lv_color_t color, lv_
 
 void panel_tl_timer_cb(lv_timer_t *timer)
 {
-    can_send(panel_tl.panel_info);
+    can_send(panel_tl.panel_info); 
 }
 
 void panel_tc_timer_cb(lv_timer_t *timer)

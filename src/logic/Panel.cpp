@@ -14,10 +14,10 @@ DMAMEM Panel panel_br = Panel(&throttle_position);
  * Constructors *
  ****************/
 
-Panel::Panel()
-{
-    /* Pretty please don't use this */
-}
+// Panel::Panel()
+// {
+//     /* Pretty please don't use this */
+// }
 
 Panel::Panel(Information *info)
 {
