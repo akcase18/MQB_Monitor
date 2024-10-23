@@ -10,6 +10,8 @@
 #include "../lvgl/lvgl.h"
 #endif
 
+#include "avr/pgmspace.h"
+
 #ifndef DIGITAL_DISPLAY_140
 #define DIGITAL_DISPLAY_140 1
 #endif
@@ -21,7 +23,7 @@
  *----------------*/
 
 /*Store the image of the glyphs*/
-static LV_ATTRIBUTE_LARGE_CONST const uint8_t glyph_bitmap[] = {
+static LV_ATTRIBUTE_LARGE_CONST const uint8_t glyph_bitmap[] PROGMEM = {
     /* U+002D "-" */
     0x1f, 0xff, 0xff, 0xfe, 0xf, 0xff, 0xff, 0xff,
     0xc7, 0xff, 0xff, 0xff, 0xf9, 0xff, 0xff, 0xff,

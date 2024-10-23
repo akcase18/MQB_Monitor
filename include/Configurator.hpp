@@ -1,7 +1,7 @@
 #ifndef CONFIGURATOR_H
 #define CONFIGURATOR_H
 
-#include "Layout.hpp"
+#include "Panel.hpp"
 
 using namespace std;
 

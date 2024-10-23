@@ -4,6 +4,9 @@
 #include <lvgl.h>
 #include "Information.hpp"
 
+#define LCD_HORZ 480
+#define LCD_VERT 320
+
 using namespace std;
 
 class Panel

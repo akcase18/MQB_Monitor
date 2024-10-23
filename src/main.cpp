@@ -1,4 +1,5 @@
-#include "gui.hpp"
+#include <queue>
+#include "can_handler.hpp"
 #include "ILI948x_t4_mm.h"
 #include "XPT2046_Touchscreen.h"
 
@@ -14,6 +15,10 @@
  * Display Constructor *
  ***********************/
 
+static lv_display_t *display;
+static lv_color_t buf_1[(LCD_HORZ * LCD_VERT) / 10];
+static lv_color_t buf_2[(LCD_HORZ * LCD_VERT) / 10];
+
 #define LCD_CS 4   // D0
 #define LCD_DC 5   // D1
 #define LCD_RST 26 // G8
@@ -23,8 +28,98 @@ ILI948x_t4_mm lcd = ILI948x_t4_mm(LCD_DC, LCD_CS, LCD_RST);
  * Touch Constructor *
  *********************/
 
+static lv_indev_t *touch;
+
 #define CS_PIN 8
 XPT2046_Touchscreen ts = XPT2046_Touchscreen(CS_PIN);
+
+/*********
+ * Queue *
+ *********/
+
+static queue<Information *> can_queue; // This queue holds the CAN messages that are ready to be requested (sent)
+
+/**************************************
+ * Initialization and Darken Function *
+ **************************************/
+
+static lv_color_t darken(const lv_color_filter_dsc_t *dsc, lv_color_t color, lv_opa_t opa)
+{
+    LV_UNUSED(dsc);
+    return lv_color_darken(color, opa);
+}
+
+static void style_init()
+{
+    /* Darken button when pressed */
+    static lv_color_filter_dsc_t color_filter_btn;
+    lv_color_filter_dsc_init(&color_filter_btn, darken);
+    lv_style_init(&style_btn_pressed);
+    lv_style_set_color_filter_dsc(&style_btn_pressed, &color_filter_btn);
+    lv_style_set_color_filter_opa(&style_btn_pressed, LV_OPA_20);
+    LV_UNUSED(style_btn_pressed);
+}
+
+/**********
+ * Timers *
+ **********/
+
+/**
+ * Adds the Information object held in the top left panel
+ * to the CAN queue to be sent off.
+ */
+void panel_tl_timer_cb(lv_timer_t *timer)
+{
+    can_queue.push(panel_tl.panel_info);
+}
+
+/**
+ * Adds the Information object held in the top center panel
+ * to the CAN queue to be sent off.
+ */
+void panel_tc_timer_cb(lv_timer_t *timer)
+{
+    can_queue.push(panel_tc.panel_info);
+}
+
+/**
+ * Adds the Information object held in the top right panel
+ * to the CAN queue to be sent off.
+ */
+void panel_tr_timer_cb(lv_timer_t *timer)
+{
+    can_queue.push(panel_tr.panel_info);
+}
+
+/**
+ * Adds the Information object held in the bottom left panel
+ * to the CAN queue to be sent off.
+ */
+void panel_bl_timer_cb(lv_timer_t *timer)
+{
+    can_queue.push(panel_bl.panel_info);
+}
+
+/**
+ * Adds the Information object held in the bottom right panel
+ * to the CAN queue to be sent off.
+ */
+void panel_br_timer_cb(lv_timer_t *timer)
+{
+    can_queue.push(panel_br.panel_info);
+}
+
+/**
+ * Calls can_send() to send the first CAN message in the queue.
+ */
+void can_send_timer_cb(lv_timer_t *timer)
+{
+    if (!can_queue.empty())
+    {
+        can_send(can_queue.front());
+        can_queue.pop();
+    }
+}
 
 bool test = false;
 int counter = 0;

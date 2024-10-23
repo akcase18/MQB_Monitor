@@ -2,7 +2,7 @@
 #define CAN_HANDLER_H
 
 #include <FlexCAN_T4.h>
-#include <queue>
+#include "Layout.hpp"
 #include "Configurator.hpp"
 
 using namespace std;
