@@ -14,23 +14,9 @@ DMAMEM Panel panel_br = Panel(&throttle_position);
  * Constructors *
  ****************/
 
-// Panel::Panel()
-// {
-//     /* Pretty please don't use this */
-// }
-
 Panel::Panel(Information *info)
 {
     set_info(info);
-}
-
-Panel::Panel(Information *info, lv_obj_t *btn, lv_obj_t *data, lv_obj_t *label)
-{
-    set_info(info);
-    set_btn(btn);
-    set_data(data);
-    set_label(label);
-    use_warning = false;
 }
 
 /******************************

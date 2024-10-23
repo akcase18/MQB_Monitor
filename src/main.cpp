@@ -209,7 +209,7 @@ unsigned long current_time = 0;
 
 void loop()
 {
-  if (!(counter % 6))
+  if (millis() > current_time + 500)
   {
     if (test)
     {
@@ -228,6 +228,7 @@ void loop()
       // layout.set_warning(&panel_br, false);
     }
     test = !test;
+    current_time = millis();
   }
 
   counter++;

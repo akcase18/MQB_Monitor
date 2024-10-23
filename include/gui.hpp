@@ -86,7 +86,6 @@ static lv_color_t darken(const lv_color_filter_dsc_t *dsc, lv_color_t color, lv_
  */
 void panel_tl_timer_cb(lv_timer_t *timer)
 {
-    // can_send(panel_tl.panel_info);
     can_queue.push(panel_tl.panel_info);
 }
 
@@ -96,7 +95,6 @@ void panel_tl_timer_cb(lv_timer_t *timer)
  */
 void panel_tc_timer_cb(lv_timer_t *timer)
 {
-    // can_send(panel_tc.panel_info);
     can_queue.push(panel_tc.panel_info);
 }
 
@@ -106,7 +104,6 @@ void panel_tc_timer_cb(lv_timer_t *timer)
  */
 void panel_tr_timer_cb(lv_timer_t *timer)
 {
-    // can_send(panel_tr.panel_info);
     can_queue.push(panel_tr.panel_info);
 }
 
@@ -116,7 +113,6 @@ void panel_tr_timer_cb(lv_timer_t *timer)
  */
 void panel_bl_timer_cb(lv_timer_t *timer)
 {
-    // can_send(panel_bl.panel_info);
     can_queue.push(panel_bl.panel_info);
 }
 
@@ -126,7 +122,6 @@ void panel_bl_timer_cb(lv_timer_t *timer)
  */
 void panel_br_timer_cb(lv_timer_t *timer)
 {
-    // can_send(panel_br.panel_info);
     can_queue.push(panel_br.panel_info);
 }
 

@@ -87,7 +87,7 @@ public:
     lv_style_t *style_btn;         // Style for the button
     lv_style_t *style_btn_pressed; // Style for the button when it is pressed
     lv_style_t *style_label;       // Style for the label
-    bool use_warning;              // Flag for warning or not
+    bool use_warning = false;      // Flag for warning or not
 
     /********************
      * Public Functions *
@@ -110,18 +110,6 @@ public:
      * @param info Pointer to an existing Information object
      */
     Panel(Information *info);
-
-    /**
-     * Main constructor for Panel objects. Creates an Information object
-     * using the passed-in pointer, and sets the Panel's panel_info variable to
-     * that Information object. Doesn't initialize any button or label styles.
-     *
-     * @param info Pointer to an existing Information object
-     * @param btn Pointer to lv_obj_t for a button
-     * @param data Pointer to lv_obj_t for button data
-     * @param label Pointer to lv_obj_t for a label
-     */
-    Panel(Information *info, lv_obj_t *btn, lv_obj_t *data, lv_obj_t *label);
 };
 
 /***************************
