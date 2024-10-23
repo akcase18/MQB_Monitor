@@ -12,7 +12,7 @@ using namespace std;
  *************/
 
 // static FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> MQB_CAN;
-static FlexCAN_T4<CAN3, RX_SIZE_256, TX_SIZE_16> MQB_CAN;
+static FlexCAN_T4<CAN3, RX_SIZE_16, TX_SIZE_16> MQB_CAN;
 
 /******************
  * Main Functions *
@@ -31,8 +31,10 @@ void can_init();
 void can_loop();
 
 /**
- * Sends a UDP request message on the CAN buf for the given Information
+ * Sends a UDS request message on the CAN buf for the given Information
  * object.
+ * 
+ * @param info a pointer to the Information object to request data for
  */
 void can_send(Information *info);
 

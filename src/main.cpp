@@ -143,6 +143,10 @@ void init_windows()
   config.init_configurator(); // Initialize the configurator window
 }
 
+/**
+ * Initializes all of the timers. These timers add CAN messages to the queue to be 
+ * sent off to the car.
+ */
 void init_timers()
 {
   lv_timer_t *panel_tl_timer = lv_timer_create(panel_tl_timer_cb, panel_tl.panel_info->get_refresh_rate(), NULL);
@@ -150,8 +154,13 @@ void init_timers()
   lv_timer_t *panel_tr_timer = lv_timer_create(panel_tr_timer_cb, panel_tr.panel_info->get_refresh_rate(), NULL);
   lv_timer_t *panel_bl_timer = lv_timer_create(panel_bl_timer_cb, panel_bl.panel_info->get_refresh_rate(), NULL);
   lv_timer_t *panel_br_timer = lv_timer_create(panel_br_timer_cb, panel_br.panel_info->get_refresh_rate(), NULL);
+
+  lv_timer_t *can_send_timer = lv_timer_create(can_send_timer_cb, 10, NULL);
 }
 
+/**
+ * Updates the data within all Panels based on the data in the Information objects.
+ */
 void update_display()
 {
   lv_label_set_text(panel_tl.data, panel_tl.panel_info->get_data_str().c_str());
@@ -214,16 +223,6 @@ void loop()
   }
 
   counter++;
-
-  // if (millis() > current_time + 500)
-  // {
-  //   Serial.println(panel_tl.panel_info->get_name_and_label() + ": " + panel_tl.panel_info->get_data_str());
-  //   Serial.println(panel_tc.panel_info->get_name_and_label() + ": " + panel_tc.panel_info->get_data_str());
-  //   Serial.println(panel_tr.panel_info->get_name_and_label() + ": " + panel_tr.panel_info->get_data_str());
-  //   Serial.println(panel_bl.panel_info->get_name_and_label() + ": " + panel_bl.panel_info->get_data_str());
-  //   Serial.println(panel_br.panel_info->get_name_and_label() + ": " + panel_br.panel_info->get_data_str());
-  //   current_time = millis();
-  // }
 
   lv_task_handler();
 

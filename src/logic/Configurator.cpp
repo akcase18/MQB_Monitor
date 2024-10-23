@@ -4,8 +4,7 @@
  * Configurator Font Definition *
  ********************************/
 
-const lv_font_t *done_label_font = &vw_24;
-const lv_font_t *drop_down_font = &vw_24;
+const lv_font_t *config_font = &vw_24;
 
 /**********************************
  * Configurator Object Definition *
@@ -80,7 +79,7 @@ void Configurator::style_init()
 
     /* Set the style of the label in the done button */
     lv_style_init(&style_label_done);
-    lv_style_set_text_font(&style_label_done, done_label_font);
+    lv_style_set_text_font(&style_label_done, config_font);
 
     /* Set the style of the radio buttons (for selecting unit region) */
     lv_style_init(&style_radio_unchecked);
