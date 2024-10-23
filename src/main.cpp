@@ -120,6 +120,11 @@ void touch_init()
   lv_indev_set_read_cb(touch, touch_read);
 }
 
+/**
+ * This will eventually pull this data from EEPROM so that 
+ * configs can be saved, but this allows you to choose whether
+ * to use imperial or metric units for the individual panels.
+ */
 void set_unit_region()
 {
   // Pull from EEPROM
@@ -137,6 +142,9 @@ void set_unit_region()
   // panel_br.panel_info.set_is_metric(true);
 }
 
+/**
+ * Initializes the main and configurator window.
+ */
 void init_windows()
 {
   layout.init_layout();       // Initialize the main window
