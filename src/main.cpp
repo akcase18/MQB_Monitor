@@ -5,6 +5,8 @@
 #include "TFT_Touch.h"
 #include "EEPROM.h"
 
+#define XPT 1
+
 /***********
  * Defines *
  ***********/
@@ -35,17 +37,19 @@ ILI948x_t4_mm lcd = ILI948x_t4_mm(LCD_DC, LCD_CS, LCD_RST);
 
 static lv_indev_t *touch;
 
-// /* CS1 */
-// #define CS_PIN 38
-// /* G11 */
-// #define TIRQ_PIN 27
-// XPT2046_Touchscreen ts = XPT2046_Touchscreen(CS_PIN);
-
+#if XPT
+/* CS1 */
+#define CS_PIN 38
+/* G11 */
+#define TIRQ_PIN 27
+XPT2046_Touchscreen ts = XPT2046_Touchscreen(CS_PIN);
+#else
 #define CS_PIN 38
 #define SDO 12
 #define SDI 11
 #define SCK 13
-TFT_Touch ts = TFT_Touch(CS_PIN, SCK, SDO, SDI);
+TFT_Touch ts = TFT_Touch(CS_PIN, SCK, SDI, SDO);
+#endif
 
 /*********
  * Queue *
@@ -207,23 +211,25 @@ void display_init()
 
 void touch_read(lv_indev_t *indev, lv_indev_data_t *data)
 {
-  // if (ts.tirqTouched())
-  // {
-  //   if (ts.touched())
-  //   {
-  //     TS_Point ts_point = ts.getPoint();
-  //     Serial.print(ts_point.z);
-  //     Serial.println("");
-  //     data->point.x = ts_point.x;
-  //     data->point.y = ts_point.y;
-  //     data->state = LV_INDEV_STATE_PRESSED;
-  //   }
-  //   else
-  //   {
-  //     data->state = LV_INDEV_STATE_RELEASED;
-  //   }
-  // }
-
+  #if XPT
+  if (ts.tirqTouched())
+  {
+    if (ts.touched())
+    {
+      TS_Point ts_point = ts.getPoint();
+      Serial.printf("X: %d\n", ts_point.x);
+      Serial.printf("Y: %d\n", ts_point.y);
+      Serial.printf("Z: %d\n", ts_point.z);
+      data->point.x = ts_point.x;
+      data->point.y = ts_point.y;
+      data->state = LV_INDEV_STATE_PRESSED;
+    }
+    else
+    {
+      data->state = LV_INDEV_STATE_RELEASED;
+    }
+  }
+  #else
   // Serial.printf("X: %d\n", ts.RawX());
   // Serial.printf("Y: %d\n", ts.RawY());
   if (ts.Pressed())
@@ -237,14 +243,18 @@ void touch_read(lv_indev_t *indev, lv_indev_data_t *data)
   {
     data->state = LV_INDEV_STATE_RELEASED;
   }
+  #endif
 }
 
 void touch_init()
 {
-  // ts.begin();
-  // ts.setRotation(1);
+  #if XPT
+  ts.begin();
+  ts.setRotation(1);
+  #else
   ts.setCal(0, 4095, 0, 4095, 480, 320, 0);
   ts.setRotation(2);
+  #endif
   touch = lv_indev_create();
   lv_indev_set_type(touch, LV_INDEV_TYPE_POINTER);
   lv_indev_set_read_cb(touch, touch_read);
