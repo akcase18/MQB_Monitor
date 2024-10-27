@@ -2,6 +2,7 @@
 #include "can_handler.hpp"
 #include "ILI948x_t4_mm.h"
 #include "XPT2046_Touchscreen.h"
+#include "TFT_Touch.h"
 #include "EEPROM.h"
 
 /***********
@@ -34,11 +35,17 @@ ILI948x_t4_mm lcd = ILI948x_t4_mm(LCD_DC, LCD_CS, LCD_RST);
 
 static lv_indev_t *touch;
 
-/* CS1 */
+// /* CS1 */
+// #define CS_PIN 38
+// /* G11 */
+// #define TIRQ_PIN 27
+// XPT2046_Touchscreen ts = XPT2046_Touchscreen(CS_PIN);
+
 #define CS_PIN 38
-/* G11 */
-#define TIRQ_PIN 27
-XPT2046_Touchscreen ts = XPT2046_Touchscreen(CS_PIN);
+#define SDO 12
+#define SDI 11
+#define SCK 13
+TFT_Touch ts = TFT_Touch(CS_PIN, SCK, SDO, SDI);
 
 /*********
  * Queue *
@@ -52,19 +59,19 @@ static queue<Information *> can_queue; // This queue holds the CAN messages that
 
 static lv_color_t darken(const lv_color_filter_dsc_t *dsc, lv_color_t color, lv_opa_t opa)
 {
-    LV_UNUSED(dsc);
-    return lv_color_darken(color, opa);
+  LV_UNUSED(dsc);
+  return lv_color_darken(color, opa);
 }
 
 static void style_init()
 {
-    /* Darken button when pressed */
-    static lv_color_filter_dsc_t color_filter_btn;
-    lv_color_filter_dsc_init(&color_filter_btn, darken);
-    lv_style_init(&style_btn_pressed);
-    lv_style_set_color_filter_dsc(&style_btn_pressed, &color_filter_btn);
-    lv_style_set_color_filter_opa(&style_btn_pressed, LV_OPA_20);
-    LV_UNUSED(style_btn_pressed);
+  /* Darken button when pressed */
+  static lv_color_filter_dsc_t color_filter_btn;
+  lv_color_filter_dsc_init(&color_filter_btn, darken);
+  lv_style_init(&style_btn_pressed);
+  lv_style_set_color_filter_dsc(&style_btn_pressed, &color_filter_btn);
+  lv_style_set_color_filter_opa(&style_btn_pressed, LV_OPA_20);
+  LV_UNUSED(style_btn_pressed);
 }
 
 /**********
@@ -77,7 +84,7 @@ static void style_init()
  */
 void panel_tl_timer_cb(lv_timer_t *timer)
 {
-    can_queue.push(panel_tl.panel_info);
+  can_queue.push(panel_tl.panel_info);
 }
 
 /**
@@ -86,7 +93,7 @@ void panel_tl_timer_cb(lv_timer_t *timer)
  */
 void panel_tc_timer_cb(lv_timer_t *timer)
 {
-    can_queue.push(panel_tc.panel_info);
+  can_queue.push(panel_tc.panel_info);
 }
 
 /**
@@ -95,7 +102,7 @@ void panel_tc_timer_cb(lv_timer_t *timer)
  */
 void panel_tr_timer_cb(lv_timer_t *timer)
 {
-    can_queue.push(panel_tr.panel_info);
+  can_queue.push(panel_tr.panel_info);
 }
 
 /**
@@ -104,7 +111,7 @@ void panel_tr_timer_cb(lv_timer_t *timer)
  */
 void panel_bl_timer_cb(lv_timer_t *timer)
 {
-    can_queue.push(panel_bl.panel_info);
+  can_queue.push(panel_bl.panel_info);
 }
 
 /**
@@ -113,7 +120,7 @@ void panel_bl_timer_cb(lv_timer_t *timer)
  */
 void panel_br_timer_cb(lv_timer_t *timer)
 {
-    can_queue.push(panel_br.panel_info);
+  can_queue.push(panel_br.panel_info);
 }
 
 /**
@@ -121,11 +128,11 @@ void panel_br_timer_cb(lv_timer_t *timer)
  */
 void can_send_timer_cb(lv_timer_t *timer)
 {
-    if (!can_queue.empty())
-    {
-        can_send(can_queue.front());
-        can_queue.pop();
-    }
+  if (!can_queue.empty())
+  {
+    can_send(can_queue.front());
+    can_queue.pop();
+  }
 }
 
 bool test = false;
@@ -200,11 +207,30 @@ void display_init()
 
 void touch_read(lv_indev_t *indev, lv_indev_data_t *data)
 {
-  if (ts.touched())
+  // if (ts.tirqTouched())
+  // {
+  //   if (ts.touched())
+  //   {
+  //     TS_Point ts_point = ts.getPoint();
+  //     Serial.print(ts_point.z);
+  //     Serial.println("");
+  //     data->point.x = ts_point.x;
+  //     data->point.y = ts_point.y;
+  //     data->state = LV_INDEV_STATE_PRESSED;
+  //   }
+  //   else
+  //   {
+  //     data->state = LV_INDEV_STATE_RELEASED;
+  //   }
+  // }
+
+  // Serial.printf("X: %d\n", ts.RawX());
+  // Serial.printf("Y: %d\n", ts.RawY());
+  if (ts.Pressed())
   {
-    TS_Point ts_point = ts.getPoint();
-    data->point.x = ts_point.x;
-    data->point.y = ts_point.y;
+    Serial.println("Touched");
+    data->point.x = ts.RawX();
+    data->point.y = ts.RawY();
     data->state = LV_INDEV_STATE_PRESSED;
   }
   else
@@ -215,15 +241,17 @@ void touch_read(lv_indev_t *indev, lv_indev_data_t *data)
 
 void touch_init()
 {
-  ts.begin();
-  ts.setRotation(1);
+  // ts.begin();
+  // ts.setRotation(1);
+  ts.setCal(0, 4095, 0, 4095, 480, 320, 0);
+  ts.setRotation(2);
   touch = lv_indev_create();
   lv_indev_set_type(touch, LV_INDEV_TYPE_POINTER);
   lv_indev_set_read_cb(touch, touch_read);
 }
 
 /**
- * This will eventually pull this data from EEPROM so that 
+ * This will eventually pull this data from EEPROM so that
  * configs can be saved, but this allows you to choose whether
  * to use imperial or metric units for the individual panels.
  */
@@ -254,7 +282,7 @@ void init_windows()
 }
 
 /**
- * Initializes all of the timers. These timers add CAN messages to the queue to be 
+ * Initializes all of the timers. These timers add CAN messages to the queue to be
  * sent off to the car.
  */
 void init_timers()
@@ -293,7 +321,7 @@ void setup()
   can_init();
 
   display_init();
-  // touch_init();
+  touch_init();
 
   init_windows();
 
@@ -338,6 +366,6 @@ void loop()
   lv_task_handler();
 
   update_display();
-  
+
   can_loop();
 }
