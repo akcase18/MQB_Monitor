@@ -2,6 +2,7 @@
 #include "can_handler.hpp"
 #include "ILI948x_t4_mm.h"
 #include "XPT2046_Touchscreen.h"
+#include "EEPROM.h"
 
 /***********
  * Defines *
