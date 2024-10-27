@@ -20,9 +20,12 @@ static lv_display_t *display;
 static lv_color_t buf_1[(LCD_HORZ * LCD_VERT) / 10];
 static lv_color_t buf_2[(LCD_HORZ * LCD_VERT) / 10];
 
-#define LCD_CS 4   // D0
-#define LCD_DC 5   // D1
-#define LCD_RST 26 // G8
+/* D0 */
+#define LCD_CS 4
+/* D1 */
+#define LCD_DC 5
+/* G8 */
+#define LCD_RST 26
 ILI948x_t4_mm lcd = ILI948x_t4_mm(LCD_DC, LCD_CS, LCD_RST);
 
 /*********************
@@ -31,7 +34,10 @@ ILI948x_t4_mm lcd = ILI948x_t4_mm(LCD_DC, LCD_CS, LCD_RST);
 
 static lv_indev_t *touch;
 
-#define CS_PIN 8
+/* CS1 */
+#define CS_PIN 38
+/* G11 */
+#define TIRQ_PIN 27
 XPT2046_Touchscreen ts = XPT2046_Touchscreen(CS_PIN);
 
 /*********
