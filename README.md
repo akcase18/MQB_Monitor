@@ -8,13 +8,16 @@ At this point, I have a working prototype that is crudely set up but functions w
 - [ ] Figure out wiring for all peripherals I'd like to use (touchscreen, MicroSD card slot, etc)
 - [ ] Create PCB to replace the ATP Carrier Board so I can more directly interface with the display. Use pin headers to connect directly to the display instead of with jumper wires. This PCB should also have power management on it, so I can pull power directly from the OBD-II port (12v -> 5/3.3v)
 - [ ] Create an enclosure for the display to mount in my car
+- [ ] Testing testing testing
 
 ## To Do List:
-- [ ] EEPROM configuration for storing layout configuration settings
 - [ ] Touch screen support
+- [ ] MicroSD card support
+- [ ] EEPROM configuration for storing layout configuration settings
 - [ ] Warning light configuration with the ability to set different thresholds
 - [ ] Analog and digital information display options
-- [ ] MicroSD card support
+- [ ] ISO-TP support for CAN
+- [ ] Combinational data (ex: absolute intake pressure - ambient pressure = net intake pressure)
 - [ ] Data logging (save into MicroSD card)
 - [ ] Different screen layouts with different amounts of information (1 - 6)
 - [ ] Multiple screen layouts with different configurations
