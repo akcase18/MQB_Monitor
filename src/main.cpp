@@ -1,11 +1,15 @@
 #include <queue>
 #include "can_handler.hpp"
 #include "ILI948x_t4_mm.h"
-#include "XPT2046_Touchscreen.h"
-#include "TFT_Touch.h"
 #include "EEPROM.h"
 
-#define XPT 1
+#define XPT 0
+
+#if XPT
+#include "XPT2046_Touchscreen.h"
+#else
+#include "touchscreen.hpp"
+#endif
 
 /***********
  * Defines *
@@ -39,16 +43,16 @@ static lv_indev_t *touch;
 
 #if XPT
 /* CS1 */
-#define CS_PIN 38
+#define CS_PIN 39
 /* G11 */
 #define TIRQ_PIN 27
-XPT2046_Touchscreen ts = XPT2046_Touchscreen(CS_PIN);
+XPT2046_Touchscreen ts = XPT2046_Touchscreen(CS_PIN, TIRQ_PIN);
 #else
-#define CS_PIN 38
-#define SDO 12
-#define SDI 11
-#define SCK 13
-TFT_Touch ts = TFT_Touch(CS_PIN, SCK, SDI, SDO);
+/* CS1 */
+#define CS_PIN 39
+/* G11 */
+#define TIRQ_PIN 27
+Touchscreen ts = Touchscreen(CS_PIN);
 #endif
 
 /*********
@@ -176,6 +180,13 @@ void set_brightness(uint8_t percent)
   analogWrite(PWM_PIN, brightness);
 }
 
+bool dma_transfer_complete = false;
+
+void dma_complete()
+{
+  dma_transfer_complete = true;
+}
+
 /**
  * Initialize the display driver object
  */
@@ -184,6 +195,7 @@ void lcd_init()
   lcd.begin(12);
   lcd.setBitDepth(16);
   lcd.setRotation(1);
+  lcd.onCompleteCB(dma_complete);
 }
 
 /**
@@ -194,6 +206,18 @@ void display_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *data)
 {
   lcd.pushPixels16bitDMA((uint16_t *)data, area->x1, area->y1, area->x2, area->y2);
   lv_display_flush_ready(disp);
+}
+
+bool display_flush_wait_cb(lv_display_t *display)
+{
+  if (dma_transfer_complete)
+  {
+
+  }
+  else
+  {
+    
+  }
 }
 
 /**
@@ -217,9 +241,9 @@ void touch_read(lv_indev_t *indev, lv_indev_data_t *data)
     if (ts.touched())
     {
       TS_Point ts_point = ts.getPoint();
-      Serial.printf("X: %d\n", ts_point.x);
-      Serial.printf("Y: %d\n", ts_point.y);
-      Serial.printf("Z: %d\n", ts_point.z);
+      // Serial.printf("X: %d\n", ts_point.x);
+      // Serial.printf("Y: %d\n", ts_point.y);
+      // Serial.printf("Z: %d\n", ts_point.z);
       data->point.x = ts_point.x;
       data->point.y = ts_point.y;
       data->state = LV_INDEV_STATE_PRESSED;
@@ -230,13 +254,11 @@ void touch_read(lv_indev_t *indev, lv_indev_data_t *data)
     }
   }
   #else
-  // Serial.printf("X: %d\n", ts.RawX());
-  // Serial.printf("Y: %d\n", ts.RawY());
-  if (ts.Pressed())
+  if (ts.touched())
   {
-    Serial.println("Touched");
-    data->point.x = ts.RawX();
-    data->point.y = ts.RawY();
+    ts.print_values();
+    data->point.x = ts.get_x();
+    data->point.y = ts.get_y();
     data->state = LV_INDEV_STATE_PRESSED;
   }
   else
@@ -252,12 +274,12 @@ void touch_init()
   ts.begin();
   ts.setRotation(1);
   #else
-  ts.setCal(0, 4095, 0, 4095, 480, 320, 0);
-  ts.setRotation(2);
+  ts.start();
   #endif
   touch = lv_indev_create();
   lv_indev_set_type(touch, LV_INDEV_TYPE_POINTER);
   lv_indev_set_read_cb(touch, touch_read);
+  lv_indev_set_mode(touch, LV_INDEV_MODE_EVENT);
 }
 
 /**
@@ -331,6 +353,7 @@ void setup()
   can_init();
 
   display_init();
+  delay(100);
   touch_init();
 
   init_windows();
@@ -378,4 +401,6 @@ void loop()
   update_display();
 
   can_loop();
+
+  lv_indev_read(touch);
 }
