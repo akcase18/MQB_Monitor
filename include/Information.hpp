@@ -295,8 +295,8 @@ extern Information intake_air_temp;
 extern Information charge_pressure;
 extern Information intake_pressure;
 extern Information ambient_pressure;
-extern Information lambda_actual;
-extern Information lambda_specified;
+extern Information lambda_actual; // Not working
+extern Information lambda_specified; // Not working
 extern Information turbo_speed;
 
 /***** Car Information *****/

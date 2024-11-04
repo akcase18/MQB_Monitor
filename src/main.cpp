@@ -4,6 +4,8 @@
 #include "EEPROM.h"
 #include "touchscreen.hpp"
 
+#define USE_TOUCH 0
+
 /***********
  * Defines *
  ***********/
@@ -184,7 +186,6 @@ void display_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *data)
 {
   lcd.pushPixels16bitDMA((uint16_t *)data, area->x1, area->y1, area->x2, area->y2);
   lv_display_flush_ready(disp);
-  
 }
 
 /**
@@ -203,10 +204,9 @@ void display_init()
 
 void touch_read(lv_indev_t *indev, lv_indev_data_t *data)
 {
-
   if (ts.touched())
   {
-    // ts.print_values();
+    ts.print_values();
     data->point.x = ts.get_x();
     data->point.y = ts.get_y();
     data->state = LV_INDEV_STATE_PRESSED;
@@ -297,8 +297,11 @@ void setup()
   can_init();
 
   display_init();
+
+  #if USE_TOUCH
   delay(100);
   touch_init();
+  #endif
 
   init_windows();
 
@@ -340,11 +343,13 @@ void loop()
 
   counter++;
 
+  #if USE_TOUCH
+  lv_indev_read(touch);
+  #endif
+
   lv_task_handler();
 
   update_display();
 
   can_loop();
-
-  lv_indev_read(touch);
 }
