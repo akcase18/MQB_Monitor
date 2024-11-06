@@ -107,6 +107,7 @@ public:
     lv_style_t style_btn_done;        // Style for done button
     lv_style_t style_label_done;      // Style for the labe for the done button
     lv_style_t style_layout;          // Style for flex layout used
+    String drop_down_string;
     Panel *panel_selected;            // Panel that the Configurator was opened by
 
     /********************

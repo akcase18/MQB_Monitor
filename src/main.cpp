@@ -4,7 +4,14 @@
 #include "EEPROM.h"
 #include "touchscreen.hpp"
 
-#define USE_TOUCH 0
+#define USE_TOUCH 1
+#define NIGHT 1
+
+#if NIGHT
+#define SCRN_BRIGHTNESS 30
+#else
+#define SCRN_BRIGHTNESS 100
+#endif
 
 /***********
  * Defines *
@@ -26,8 +33,8 @@ static lv_color_t buf_2[(LCD_HORZ * LCD_VERT) / 10];
 #define LCD_CS 4
 /* D1 */
 #define LCD_DC 5
-/* G8 */
-#define LCD_RST 26
+/* G9 */
+#define LCD_RST 32
 ILI948x_t4_mm lcd = ILI948x_t4_mm(LCD_DC, LCD_CS, LCD_RST);
 
 /*********************
@@ -37,9 +44,9 @@ ILI948x_t4_mm lcd = ILI948x_t4_mm(LCD_DC, LCD_CS, LCD_RST);
 static lv_indev_t *touch;
 
 /* CS1 */
-#define CS_PIN 39
-/* G11 */
-#define TIRQ_PIN 27
+#define CS_PIN 0
+/* G10 */
+#define TIRQ_PIN 33
 Touchscreen ts = Touchscreen(CS_PIN);
 
 /*********
@@ -133,6 +140,41 @@ void can_send_timer_cb(lv_timer_t *timer)
 bool test = false;
 int counter = 0;
 
+/*************
+ * Callbacks *
+ *************/
+
+void panel_select_cb(lv_event_t *e)
+{
+  if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+  {
+    config.open_window();
+  }
+}
+
+void config_done_cb(lv_event_t *e)
+{
+  if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+  {
+    layout.open_window();
+  }
+}
+
+void set_cbs()
+{
+  lv_obj_add_event_cb(layout.panel_tl->btn, panel_select_cb, LV_EVENT_CLICKED, NULL);
+  lv_obj_add_event_cb(layout.panel_tc->btn, panel_select_cb, LV_EVENT_CLICKED, NULL);
+  lv_obj_add_event_cb(layout.panel_tr->btn, panel_select_cb, LV_EVENT_CLICKED, NULL);
+  lv_obj_add_event_cb(layout.panel_bl->btn, panel_select_cb, LV_EVENT_CLICKED, NULL);
+  lv_obj_add_event_cb(layout.panel_br->btn, panel_select_cb, LV_EVENT_CLICKED, NULL);
+
+  lv_obj_add_event_cb(config.btn_done, config_done_cb, LV_EVENT_CLICKED, NULL);
+}
+
+/*********
+ * Setup *
+ *********/
+
 /**
  * LCD Wiring
  *
@@ -163,7 +205,7 @@ void set_brightness(uint8_t percent)
     percent = 100;
   }
   pinMode(PWM_PIN, OUTPUT);                  // Set up pin to control brightness
-  int brightness = percent * MAX_BRIGHTNESS; // Multiply the percent brightness level by the max brighness value
+  int brightness = (percent * MAX_BRIGHTNESS) / 100; // Multiply the percent brightness level by the max brighness value
   analogWrite(PWM_PIN, brightness);
 }
 
@@ -194,7 +236,7 @@ void display_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *data)
  */
 void display_init()
 {
-  set_brightness(100); // Can pull from EEPROM or something
+  set_brightness(SCRN_BRIGHTNESS); // Can pull from EEPROM or something
   lcd_init();
   display = lv_display_create(LCD_HORZ, LCD_VERT);
   lv_display_set_flush_cb(display, display_flush);
@@ -206,9 +248,8 @@ void touch_read(lv_indev_t *indev, lv_indev_data_t *data)
 {
   if (ts.touched())
   {
-    ts.print_values();
-    data->point.x = ts.get_x();
-    data->point.y = ts.get_y();
+    data->point.x = (ts.get_x() * LCD_HORZ) / 4095;
+    data->point.y = (ts.get_y() * LCD_VERT) / 4095;
     data->state = LV_INDEV_STATE_PRESSED;
   }
   else
@@ -223,7 +264,7 @@ void touch_init()
   touch = lv_indev_create();
   lv_indev_set_type(touch, LV_INDEV_TYPE_POINTER);
   lv_indev_set_read_cb(touch, touch_read);
-  lv_indev_set_mode(touch, LV_INDEV_MODE_EVENT);
+  // lv_indev_set_mode(touch, LV_INDEV_MODE_EVENT);
 }
 
 /**
@@ -307,12 +348,10 @@ void setup()
 
   layout.open_window();
 
-  // config.open_window();
-
-  // config.open_warning_config();
-
   init_timers();
   lv_tick_set_cb(millis);
+
+  set_cbs();
 }
 
 unsigned long current_time = 0;
@@ -323,19 +362,11 @@ void loop()
   {
     if (test)
     {
-      // layout.set_warning(&panel_tl, true);
-      // layout.set_warning(&panel_tc, true);
-      // layout.set_warning(&panel_tr, true);
-      // layout.set_warning(&panel_bl, true);
-      // layout.set_warning(&panel_br, true);
+      
     }
     else
     {
-      // layout.set_warning(&panel_tl, false);
-      // layout.set_warning(&panel_tc, false);
-      // layout.set_warning(&panel_tr, false);
-      // layout.set_warning(&panel_bl, false);
-      // layout.set_warning(&panel_br, false);
+      
     }
     test = !test;
     current_time = millis();
@@ -343,9 +374,9 @@ void loop()
 
   counter++;
 
-  #if USE_TOUCH
-  lv_indev_read(touch);
-  #endif
+  // #if USE_TOUCH
+  // lv_indev_read(touch);
+  // #endif
 
   lv_task_handler();
 

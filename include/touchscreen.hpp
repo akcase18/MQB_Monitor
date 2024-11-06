@@ -14,8 +14,8 @@ using namespace std;
 #define Y_CMD 0xD1
 #define Z1_CMD 0xB1
 #define Z2_CMD 0xC1
-#define Z_THRESHOLD 1450
-#define Z_THRESHOLD_IRQ 1450
+#define Z_THRESHOLD 1000
+#define Z_THRESHOLD_IRQ 1000
 #define MIN_CYCLE_TIME 3
 
 class Touchscreen
@@ -27,7 +27,7 @@ private:
 
     uint8_t _cs_pin;
     uint8_t _tirq_pin = 255;
-    uint8_t _rotation = 1;
+    uint8_t _rotation = 2;
     int16_t _x_val;
     int16_t _y_val;
     int16_t _z_val;
@@ -38,7 +38,9 @@ private:
      * Private Functions *
      *********************/
 
-    int16_t get_single_axis(uint16_t cmd, uint8_t num_samples = 1);
+    int16_t get_single_axis(uint16_t cmd);
+
+    int16_t get_best_avg(int16_t x, int16_t y, int16_t z);
 
 public:
     /********************
@@ -58,7 +60,7 @@ public:
      * Public Functions *
      ********************/
 
-    void start(SPIClass &spi = SPI);
+    void start(SPIClass &spi = SPI1);
 
     void get_data();
 

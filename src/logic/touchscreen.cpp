@@ -57,21 +57,34 @@ void Touchscreen::get_data()
     digitalWrite(_cs_pin, LOW);
 
     int16_t z1 = get_single_axis(Z1_CMD);
+    z1 = get_single_axis(Z1_CMD);
     int16_t z2 = get_single_axis(Z2_CMD);
+    z2 = get_single_axis(Z2_CMD);
 
     int16_t z = z1 + 4095 - z2;
-    int16_t x = 0;
-    int16_t y = 0;
+    int16_t x1 = 0;
+    int16_t x2 = 0;
+    int16_t x3 = 0;
+    int16_t y1 = 0;
+    int16_t y2 = 0;
+    int16_t y3 = 0;
 
     if (z > Z_THRESHOLD)
     {
         get_single_axis(X_CMD); // Initial query to reduce noise
-        x = get_single_axis(X_CMD, 3);
-        y = get_single_axis(Y_CMD, 3);
+        x1 = get_single_axis(X_CMD);
+        y1 = get_single_axis(Y_CMD);
+        x2 = get_single_axis(X_CMD);
+        y2 = get_single_axis(Y_CMD);
+        x3 = get_single_axis(X_CMD);
+        y3 = get_single_axis(Y_CMD);
     }
 
     digitalWrite(_cs_pin, HIGH);
     _spi->endTransaction();
+
+    int16_t x = get_best_avg(x1, x2, x3);
+    int16_t y = get_best_avg(y1, y2, y3);
 
     if (z < 0)
     {
@@ -156,14 +169,56 @@ void Touchscreen::print_values()
  * Private Helper Functions *
  ****************************/
 
-int16_t Touchscreen::get_single_axis(uint16_t cmd, uint8_t num_samples)
+int16_t Touchscreen::get_single_axis(uint16_t cmd)
 {
-    int sum = 0;
-    for (int i = 0; i < num_samples; i++)
+    return _spi->transfer16(cmd) >> 3;
+}
+
+int16_t Touchscreen::get_best_avg(int16_t x, int16_t y, int16_t z)
+{
+    int16_t diff_a;
+    int16_t diff_b;
+    int16_t diff_c;
+    int16_t result;
+    if (x > y)
     {
-        sum += _spi->transfer16(cmd) >> 3;
+        diff_a = x - y;
     }
-    return sum / num_samples;
+    else
+    {
+        diff_a = y - x;
+    }
+    if (x > z)
+    {
+        diff_b = x - z;
+    }
+    else
+    {
+        diff_b = z - x;
+    }
+    if (y > z)
+    {
+        diff_c = y - z;
+    }
+    else
+    {
+        diff_c = z - y;
+    }
+
+    if (diff_a <= diff_b && diff_a <= diff_c)
+    {
+        result = (x + y) >> 1;
+    }
+    else if (diff_b <= diff_a && diff_b <= diff_c)
+    {
+        result = (x + z) >> 1;
+    }
+    else
+    {
+        result = (y + z) >> 1;
+    }
+
+    return result;
 }
 
 /*************
