@@ -4,11 +4,11 @@
  * Panel Object Definition *
  ***************************/
 
-DMAMEM Panel panel_tl = Panel(&coolant_temp);
-DMAMEM Panel panel_tc = Panel(&engine_oil_temp);
+DMAMEM Panel panel_tl = Panel(&throttle_position);
+DMAMEM Panel panel_tc = Panel(&misfire_sum);
 DMAMEM Panel panel_tr = Panel(&intake_air_temp);
 DMAMEM Panel panel_bl = Panel(&intake_pressure);
-DMAMEM Panel panel_br = Panel(&throttle_position);
+DMAMEM Panel panel_br = Panel(&engine_oil_temp);
 
 /****************
  * Constructors *

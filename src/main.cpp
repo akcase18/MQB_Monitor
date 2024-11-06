@@ -1,8 +1,17 @@
 #include <queue>
 #include "can_handler.hpp"
 #include "ILI948x_t4_mm.h"
-#include "XPT2046_Touchscreen.h"
 #include "EEPROM.h"
+#include "touchscreen.hpp"
+
+#define USE_TOUCH 1
+#define NIGHT 1
+
+#if NIGHT
+#define SCRN_BRIGHTNESS 30
+#else
+#define SCRN_BRIGHTNESS 100
+#endif
 
 /***********
  * Defines *
@@ -20,9 +29,12 @@ static lv_display_t *display;
 static lv_color_t buf_1[(LCD_HORZ * LCD_VERT) / 10];
 static lv_color_t buf_2[(LCD_HORZ * LCD_VERT) / 10];
 
-#define LCD_CS 4   // D0
-#define LCD_DC 5   // D1
-#define LCD_RST 26 // G8
+/* D0 */
+#define LCD_CS 4
+/* D1 */
+#define LCD_DC 5
+/* G9 */
+#define LCD_RST 32
 ILI948x_t4_mm lcd = ILI948x_t4_mm(LCD_DC, LCD_CS, LCD_RST);
 
 /*********************
@@ -31,8 +43,11 @@ ILI948x_t4_mm lcd = ILI948x_t4_mm(LCD_DC, LCD_CS, LCD_RST);
 
 static lv_indev_t *touch;
 
-#define CS_PIN 8
-XPT2046_Touchscreen ts = XPT2046_Touchscreen(CS_PIN);
+/* CS1 */
+#define CS_PIN 0
+/* G10 */
+#define TIRQ_PIN 33
+Touchscreen ts = Touchscreen(CS_PIN);
 
 /*********
  * Queue *
@@ -46,19 +61,19 @@ static queue<Information *> can_queue; // This queue holds the CAN messages that
 
 static lv_color_t darken(const lv_color_filter_dsc_t *dsc, lv_color_t color, lv_opa_t opa)
 {
-    LV_UNUSED(dsc);
-    return lv_color_darken(color, opa);
+  LV_UNUSED(dsc);
+  return lv_color_darken(color, opa);
 }
 
 static void style_init()
 {
-    /* Darken button when pressed */
-    static lv_color_filter_dsc_t color_filter_btn;
-    lv_color_filter_dsc_init(&color_filter_btn, darken);
-    lv_style_init(&style_btn_pressed);
-    lv_style_set_color_filter_dsc(&style_btn_pressed, &color_filter_btn);
-    lv_style_set_color_filter_opa(&style_btn_pressed, LV_OPA_20);
-    LV_UNUSED(style_btn_pressed);
+  /* Darken button when pressed */
+  static lv_color_filter_dsc_t color_filter_btn;
+  lv_color_filter_dsc_init(&color_filter_btn, darken);
+  lv_style_init(&style_btn_pressed);
+  lv_style_set_color_filter_dsc(&style_btn_pressed, &color_filter_btn);
+  lv_style_set_color_filter_opa(&style_btn_pressed, LV_OPA_20);
+  LV_UNUSED(style_btn_pressed);
 }
 
 /**********
@@ -71,7 +86,7 @@ static void style_init()
  */
 void panel_tl_timer_cb(lv_timer_t *timer)
 {
-    can_queue.push(panel_tl.panel_info);
+  can_queue.push(panel_tl.panel_info);
 }
 
 /**
@@ -80,7 +95,7 @@ void panel_tl_timer_cb(lv_timer_t *timer)
  */
 void panel_tc_timer_cb(lv_timer_t *timer)
 {
-    can_queue.push(panel_tc.panel_info);
+  can_queue.push(panel_tc.panel_info);
 }
 
 /**
@@ -89,7 +104,7 @@ void panel_tc_timer_cb(lv_timer_t *timer)
  */
 void panel_tr_timer_cb(lv_timer_t *timer)
 {
-    can_queue.push(panel_tr.panel_info);
+  can_queue.push(panel_tr.panel_info);
 }
 
 /**
@@ -98,7 +113,7 @@ void panel_tr_timer_cb(lv_timer_t *timer)
  */
 void panel_bl_timer_cb(lv_timer_t *timer)
 {
-    can_queue.push(panel_bl.panel_info);
+  can_queue.push(panel_bl.panel_info);
 }
 
 /**
@@ -107,7 +122,7 @@ void panel_bl_timer_cb(lv_timer_t *timer)
  */
 void panel_br_timer_cb(lv_timer_t *timer)
 {
-    can_queue.push(panel_br.panel_info);
+  can_queue.push(panel_br.panel_info);
 }
 
 /**
@@ -115,15 +130,50 @@ void panel_br_timer_cb(lv_timer_t *timer)
  */
 void can_send_timer_cb(lv_timer_t *timer)
 {
-    if (!can_queue.empty())
-    {
-        can_send(can_queue.front());
-        can_queue.pop();
-    }
+  if (!can_queue.empty())
+  {
+    can_send(can_queue.front());
+    can_queue.pop();
+  }
 }
 
 bool test = false;
 int counter = 0;
+
+/*************
+ * Callbacks *
+ *************/
+
+void panel_select_cb(lv_event_t *e)
+{
+  if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+  {
+    config.open_window();
+  }
+}
+
+void config_done_cb(lv_event_t *e)
+{
+  if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+  {
+    layout.open_window();
+  }
+}
+
+void set_cbs()
+{
+  lv_obj_add_event_cb(layout.panel_tl->btn, panel_select_cb, LV_EVENT_CLICKED, NULL);
+  lv_obj_add_event_cb(layout.panel_tc->btn, panel_select_cb, LV_EVENT_CLICKED, NULL);
+  lv_obj_add_event_cb(layout.panel_tr->btn, panel_select_cb, LV_EVENT_CLICKED, NULL);
+  lv_obj_add_event_cb(layout.panel_bl->btn, panel_select_cb, LV_EVENT_CLICKED, NULL);
+  lv_obj_add_event_cb(layout.panel_br->btn, panel_select_cb, LV_EVENT_CLICKED, NULL);
+
+  lv_obj_add_event_cb(config.btn_done, config_done_cb, LV_EVENT_CLICKED, NULL);
+}
+
+/*********
+ * Setup *
+ *********/
 
 /**
  * LCD Wiring
@@ -155,7 +205,7 @@ void set_brightness(uint8_t percent)
     percent = 100;
   }
   pinMode(PWM_PIN, OUTPUT);                  // Set up pin to control brightness
-  int brightness = percent * MAX_BRIGHTNESS; // Multiply the percent brightness level by the max brighness value
+  int brightness = (percent * MAX_BRIGHTNESS) / 100; // Multiply the percent brightness level by the max brighness value
   analogWrite(PWM_PIN, brightness);
 }
 
@@ -167,6 +217,7 @@ void lcd_init()
   lcd.begin(12);
   lcd.setBitDepth(16);
   lcd.setRotation(1);
+  // lcd.onCompleteCB(dma_complete);
 }
 
 /**
@@ -185,10 +236,11 @@ void display_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *data)
  */
 void display_init()
 {
-  set_brightness(100); // Can pull from EEPROM or something
+  set_brightness(SCRN_BRIGHTNESS); // Can pull from EEPROM or something
   lcd_init();
   display = lv_display_create(LCD_HORZ, LCD_VERT);
   lv_display_set_flush_cb(display, display_flush);
+  // lv_display_set_flush_wait_cb(display, display_flush_wait_cb);
   lv_display_set_buffers(display, buf_1, buf_2, sizeof(buf_1), LV_DISPLAY_RENDER_MODE_PARTIAL);
 }
 
@@ -196,9 +248,8 @@ void touch_read(lv_indev_t *indev, lv_indev_data_t *data)
 {
   if (ts.touched())
   {
-    TS_Point ts_point = ts.getPoint();
-    data->point.x = ts_point.x;
-    data->point.y = ts_point.y;
+    data->point.x = (ts.get_x() * LCD_HORZ) / 4095;
+    data->point.y = (ts.get_y() * LCD_VERT) / 4095;
     data->state = LV_INDEV_STATE_PRESSED;
   }
   else
@@ -209,15 +260,15 @@ void touch_read(lv_indev_t *indev, lv_indev_data_t *data)
 
 void touch_init()
 {
-  ts.begin();
-  ts.setRotation(1);
+  ts.start();
   touch = lv_indev_create();
   lv_indev_set_type(touch, LV_INDEV_TYPE_POINTER);
   lv_indev_set_read_cb(touch, touch_read);
+  // lv_indev_set_mode(touch, LV_INDEV_MODE_EVENT);
 }
 
 /**
- * This will eventually pull this data from EEPROM so that 
+ * This will eventually pull this data from EEPROM so that
  * configs can be saved, but this allows you to choose whether
  * to use imperial or metric units for the individual panels.
  */
@@ -248,7 +299,7 @@ void init_windows()
 }
 
 /**
- * Initializes all of the timers. These timers add CAN messages to the queue to be 
+ * Initializes all of the timers. These timers add CAN messages to the queue to be
  * sent off to the car.
  */
 void init_timers()
@@ -287,18 +338,20 @@ void setup()
   can_init();
 
   display_init();
-  // touch_init();
+
+  #if USE_TOUCH
+  delay(100);
+  touch_init();
+  #endif
 
   init_windows();
 
   layout.open_window();
 
-  // config.open_window();
-
-  // config.open_warning_config();
-
   init_timers();
   lv_tick_set_cb(millis);
+
+  set_cbs();
 }
 
 unsigned long current_time = 0;
@@ -309,19 +362,11 @@ void loop()
   {
     if (test)
     {
-      // layout.set_warning(&panel_tl, true);
-      // layout.set_warning(&panel_tc, true);
-      // layout.set_warning(&panel_tr, true);
-      // layout.set_warning(&panel_bl, true);
-      // layout.set_warning(&panel_br, true);
+      
     }
     else
     {
-      // layout.set_warning(&panel_tl, false);
-      // layout.set_warning(&panel_tc, false);
-      // layout.set_warning(&panel_tr, false);
-      // layout.set_warning(&panel_bl, false);
-      // layout.set_warning(&panel_br, false);
+      
     }
     test = !test;
     current_time = millis();
@@ -329,9 +374,13 @@ void loop()
 
   counter++;
 
+  // #if USE_TOUCH
+  // lv_indev_read(touch);
+  // #endif
+
   lv_task_handler();
 
   update_display();
-  
+
   can_loop();
 }
