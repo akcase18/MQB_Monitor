@@ -4,7 +4,6 @@
 #include "EEPROM.h"
 #include "touchscreen.hpp"
 
-#define USE_TOUCH 1
 #define NIGHT 1
 
 #if NIGHT
@@ -263,7 +262,6 @@ void touch_init()
   touch = lv_indev_create();
   lv_indev_set_type(touch, LV_INDEV_TYPE_POINTER);
   lv_indev_set_read_cb(touch, touch_read);
-  // lv_indev_set_mode(touch, LV_INDEV_MODE_EVENT);
 }
 
 /**
@@ -280,12 +278,6 @@ void set_unit_region()
   panel_tr.panel_info->set_is_metric(false);
   panel_bl.panel_info->set_is_metric(false);
   panel_br.panel_info->set_is_metric(false);
-
-  // panel_tl.panel_info.set_is_metric(true);
-  // panel_tc.panel_info.set_is_metric(true);
-  // panel_tr.panel_info.set_is_metric(true);
-  // panel_bl.panel_info.set_is_metric(true);
-  // panel_br.panel_info.set_is_metric(true);
 }
 
 /**
@@ -338,10 +330,7 @@ void setup()
 
   display_init();
 
-  #if USE_TOUCH
-  delay(100);
   touch_init();
-  #endif
 
   init_windows();
 
@@ -372,10 +361,6 @@ void loop()
   }
 
   counter++;
-
-  // #if USE_TOUCH
-  // lv_indev_read(touch);
-  // #endif
 
   lv_task_handler();
 
