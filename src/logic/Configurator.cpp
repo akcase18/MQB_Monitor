@@ -36,9 +36,6 @@ void Configurator::init_configurator()
 void Configurator::open_window()
 {
     lv_screen_load(window);
-    int32_t option_id = lv_dropdown_get_option_index(drop_down, panel_selected->panel_info->get_name().c_str());
-    Serial.println(panel_selected->panel_info->get_name());
-    lv_dropdown_set_selected(drop_down, option_id);
 }
 
 void Configurator::close_window()

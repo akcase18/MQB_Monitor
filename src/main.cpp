@@ -217,7 +217,6 @@ void lcd_init()
   lcd.begin(12);
   lcd.setBitDepth(16);
   lcd.setRotation(1);
-  // lcd.onCompleteCB(dma_complete);
 }
 
 /**
