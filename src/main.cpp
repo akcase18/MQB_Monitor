@@ -20,6 +20,8 @@
 #define BRIGHTNESS 1
 #define MAX_BRIGHTNESS 256
 
+static uint32_t active_index = 0;
+
 /***********************
  * Display Constructor *
  ***********************/
@@ -143,31 +145,95 @@ int counter = 0;
  * Callbacks *
  *************/
 
+/**
+ * Callback for the Buttons in each Panel. This tells the Configurator 
+ * which Panel it was opened from, so it can then set the Configurator
+ * screen up correctly.
+ * 
+ * @note user_data is layout.panel_XX, where XX is the panel location
+ */
 void panel_select_cb(lv_event_t *e)
 {
   if (lv_event_get_code(e) == LV_EVENT_CLICKED)
   {
+    config.panel_selected = (Panel *)lv_event_get_user_data(e);
     config.open_window();
   }
 }
 
+/**
+ * Callback for the Done button in the Configurator screen. When this is
+ * pressed, it will check that a "Clicked" event was registered, get the
+ * index of the selected item of the dropdown, use that index to get the
+ * correct Information object from info_list (they are in the same order
+ * so the indicies will match), set the Panel's Information object to that
+ * Information object, set metric or imperial based on the radio buttons
+ * of the Configurator screen, update the text on the Layout screen, then
+ * open the Layout screen.
+ */
 void config_done_cb(lv_event_t *e)
 {
   if (lv_event_get_code(e) == LV_EVENT_CLICKED)
   {
+    int32_t option_id = lv_dropdown_get_selected(config.drop_down); // Get the index of the selected dropdown option
+    config.panel_selected->panel_info = info_list[option_id];       // Get the Information object at that index, set it to the Panel object
+    /* If the Imperial radio button is selected */
+    if (lv_obj_has_state(config.radio_imperial, LV_STATE_CHECKED))
+    {
+      config.panel_selected->panel_info->set_is_metric(false); // Use Imperial for Information object
+    }
+    /* If the Metric radio button is selected */
+    else
+    {
+      config.panel_selected->panel_info->set_is_metric(true); // Use Metric for Information object
+    }
+    lv_label_set_text(config.panel_selected->label, info_list[option_id]->get_name_and_label().c_str()); // Update the label text in Layout
+    active_index = 0;                                                                                    // Reset index not quite sure why this works but it does)
     layout.open_window();
   }
 }
 
+/**
+ * Callback for the Radio buttons in the Configurator screen. This is used
+ * to check which button was pressed and then update the two button's states
+ * accordingly.
+ */
+void radio_cb(lv_event_t *e)
+{
+  uint32_t *active_id = (uint32_t *)lv_event_get_user_data(e);
+  lv_obj_t *cont = (lv_obj_t *)lv_event_get_current_target(e);
+  lv_obj_t *act_cb = (lv_obj_t *)lv_event_get_target(e);
+  lv_obj_t *old_cb = lv_obj_get_child(cont, *active_id);
+
+  /* Do nothing if the container was clicked */
+  if (act_cb == cont)
+    return;
+
+  lv_obj_clear_state(old_cb, LV_STATE_CHECKED); /* Uncheck the previous radio button */
+  lv_obj_add_state(act_cb, LV_STATE_CHECKED);   /* Uncheck the current radio button */
+
+  *active_id = lv_obj_get_index(act_cb);
+}
+
+/**
+ * Set all the callbacks for the various elements, so that way all callbacks
+ * have access to all available functions.
+ */
 void set_cbs()
 {
-  lv_obj_add_event_cb(layout.panel_tl->btn, panel_select_cb, LV_EVENT_CLICKED, NULL);
-  lv_obj_add_event_cb(layout.panel_tc->btn, panel_select_cb, LV_EVENT_CLICKED, NULL);
-  lv_obj_add_event_cb(layout.panel_tr->btn, panel_select_cb, LV_EVENT_CLICKED, NULL);
-  lv_obj_add_event_cb(layout.panel_bl->btn, panel_select_cb, LV_EVENT_CLICKED, NULL);
-  lv_obj_add_event_cb(layout.panel_br->btn, panel_select_cb, LV_EVENT_CLICKED, NULL);
+  /***** Layout Callbacks *****/
+  /* Panel Callbacks */
+  lv_obj_add_event_cb(layout.panel_tl->btn, panel_select_cb, LV_EVENT_CLICKED, layout.panel_tl);
+  lv_obj_add_event_cb(layout.panel_tc->btn, panel_select_cb, LV_EVENT_CLICKED, layout.panel_tc);
+  lv_obj_add_event_cb(layout.panel_tr->btn, panel_select_cb, LV_EVENT_CLICKED, layout.panel_tr);
+  lv_obj_add_event_cb(layout.panel_bl->btn, panel_select_cb, LV_EVENT_CLICKED, layout.panel_bl);
+  lv_obj_add_event_cb(layout.panel_br->btn, panel_select_cb, LV_EVENT_CLICKED, layout.panel_br);
 
+  /***** Configurator Callbacks *****/
+  /* Done Button Callbacks */
   lv_obj_add_event_cb(config.btn_done, config_done_cb, LV_EVENT_CLICKED, NULL);
+  /* Radio BUtton Callbacks */
+  lv_obj_add_event_cb(config.flex_col_2, radio_cb, LV_EVENT_CLICKED, &active_index);
 }
 
 /*********
@@ -203,7 +269,7 @@ void set_brightness(uint8_t percent)
   {
     percent = 100;
   }
-  pinMode(PWM_PIN, OUTPUT);                  // Set up pin to control brightness
+  pinMode(PWM_PIN, OUTPUT);                          // Set up pin to control brightness
   int brightness = (percent * MAX_BRIGHTNESS) / 100; // Multiply the percent brightness level by the max brighness value
   analogWrite(PWM_PIN, brightness);
 }
@@ -350,11 +416,9 @@ void loop()
   {
     if (test)
     {
-      
     }
     else
     {
-      
     }
     test = !test;
     current_time = millis();

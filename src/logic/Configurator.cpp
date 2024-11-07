@@ -33,9 +33,27 @@ void Configurator::init_configurator()
     init_done_btn();
 }
 
+/**
+ * Opens the Configurator window and sets it up with the correct
+ * initial state based on which Panel it was opened from. This will
+ * show the currently selected Information object in the dropdown,
+ * and it will show whether the Panel is currently using Imperial or
+ * Metric values.
+ */
 void Configurator::open_window()
 {
     lv_screen_load(window);
+    int32_t option_id = lv_dropdown_get_option_index(drop_down, panel_selected->panel_info->get_name().c_str()); // Get the index of the Information object in the dropdown menu
+    lv_dropdown_set_selected(drop_down, option_id); // Set the correct dropdown option
+    /* Set the correct radio button to be selected when opened */
+    if (panel_selected->panel_info->get_is_metric())
+    {
+        select_metric_radio_btn();
+    }
+    else
+    {
+        select_imperial_radio_btn();
+    }
 }
 
 void Configurator::close_window()
@@ -180,6 +198,8 @@ void Configurator::init_radio_btns()
     lv_obj_add_style(radio_imperial, &style_radio_unchecked, LV_PART_INDICATOR);
     lv_obj_add_style(radio_imperial, &style_radio_checked, LV_PART_INDICATOR | LV_STATE_CHECKED);
     lv_obj_set_align(radio_imperial, LV_ALIGN_TOP_MID);
+    lv_obj_set_style_pad_bottom(radio_imperial, 15, 0);
+    lv_obj_set_style_pad_top(radio_imperial, 10, 0);
     /* Metric Radio Button */
     radio_metric = lv_checkbox_create(flex_col_2);
     lv_checkbox_set_text(radio_metric, "Metric");
@@ -187,8 +207,6 @@ void Configurator::init_radio_btns()
     lv_obj_add_style(radio_metric, &style_radio_unchecked, LV_PART_INDICATOR);
     lv_obj_add_style(radio_metric, &style_radio_checked, LV_PART_INDICATOR | LV_STATE_CHECKED);
     lv_obj_align(radio_metric, LV_ALIGN_TOP_MID, lv_pct(0), lv_pct(25));
-    /* Select metric by default */
-    lv_obj_add_state(radio_metric, LV_STATE_CHECKED);
 }
 
 Information *Configurator::get_info_from_drop_down()
