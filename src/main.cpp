@@ -4,7 +4,7 @@
 #include "EEPROM.h"
 #include "touchscreen.hpp"
 
-#define NIGHT 1
+#define NIGHT 0
 
 #if NIGHT
 #define SCRN_BRIGHTNESS 30
@@ -19,8 +19,6 @@
 #define PWM_PIN 3
 #define BRIGHTNESS 1
 #define MAX_BRIGHTNESS 256
-
-static uint32_t active_index = 0;
 
 /***********************
  * Display Constructor *
@@ -188,7 +186,6 @@ void config_done_cb(lv_event_t *e)
       config.panel_selected->panel_info->set_is_metric(true); // Use Metric for Information object
     }
     lv_label_set_text(config.panel_selected->label, info_list[option_id]->get_name_and_label().c_str()); // Update the label text in Layout
-    active_index = 0;                                                                                    // Reset index not quite sure why this works but it does)
     layout.open_window();
   }
 }
@@ -200,19 +197,22 @@ void config_done_cb(lv_event_t *e)
  */
 void radio_cb(lv_event_t *e)
 {
-  uint32_t *active_id = (uint32_t *)lv_event_get_user_data(e);
   lv_obj_t *cont = (lv_obj_t *)lv_event_get_current_target(e);
   lv_obj_t *act_cb = (lv_obj_t *)lv_event_get_target(e);
-  lv_obj_t *old_cb = lv_obj_get_child(cont, *active_id);
+  lv_obj_t *old_cb;
 
   /* Do nothing if the container was clicked */
   if (act_cb == cont)
     return;
 
-  lv_obj_clear_state(old_cb, LV_STATE_CHECKED); /* Uncheck the previous radio button */
-  lv_obj_add_state(act_cb, LV_STATE_CHECKED);   /* Uncheck the current radio button */
-
-  *active_id = lv_obj_get_index(act_cb);
+  if (act_cb == config.radio_imperial)
+  {
+    config.select_imperial_radio_btn();
+  }
+  else
+  {
+    config.select_metric_radio_btn();
+  }
 }
 
 /**
@@ -233,7 +233,7 @@ void set_cbs()
   /* Done Button Callbacks */
   lv_obj_add_event_cb(config.btn_done, config_done_cb, LV_EVENT_CLICKED, NULL);
   /* Radio BUtton Callbacks */
-  lv_obj_add_event_cb(config.flex_col_2, radio_cb, LV_EVENT_CLICKED, &active_index);
+  lv_obj_add_event_cb(config.flex_col_2, radio_cb, LV_EVENT_CLICKED, NULL);
 }
 
 /*********
