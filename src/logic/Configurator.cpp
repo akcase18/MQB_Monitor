@@ -84,13 +84,13 @@ void Configurator::style_init()
 {
     /* Set the style of the configurator window */
     lv_style_init(&style_window);
-    lv_style_set_bg_color(&style_window, lv_palette_darken(LV_PALETTE_GREY, 4));
+    lv_style_set_bg_color(&style_window, lv_color_black());
 
     /* Set the style of the done button */
     lv_style_init(&style_btn_done);
     lv_style_set_radius(&style_btn_done, 5);
-    lv_style_set_bg_color(&style_btn_done, lv_palette_lighten(LV_PALETTE_GREY, 4));
-    lv_style_set_text_color(&style_btn_done, lv_palette_darken(LV_PALETTE_GREY, 4));
+    lv_style_set_bg_color(&style_btn_done, lv_color_white());
+    lv_style_set_text_color(&style_btn_done, lv_color_black());
     // lv_style_set_text_font(&style_btn_done, done_label_font);
     lv_style_set_text_letter_space(&style_btn_done, 0);
     lv_style_set_shadow_width(&style_btn_done, 0);
@@ -102,7 +102,7 @@ void Configurator::style_init()
     /* Set the style of the radio buttons (for selecting unit region) */
     lv_style_init(&style_radio_unchecked);
     lv_style_set_radius(&style_radio_unchecked, LV_RADIUS_CIRCLE);
-    lv_style_set_text_color(&style_radio_unchecked, lv_palette_lighten(LV_PALETTE_GREY, 5));
+    lv_style_set_text_color(&style_radio_unchecked, lv_color_white());
 
     /* Set the style of the radio buttons when selected */
     lv_style_init(&style_radio_checked);
@@ -110,9 +110,9 @@ void Configurator::style_init()
 
     /* Set the style for the flex layout objects */
     lv_style_init(&style_layout);
-    lv_style_set_bg_color(&style_layout, lv_palette_darken(LV_PALETTE_GREY, 4));
+    lv_style_set_bg_color(&style_layout, lv_color_black());
     lv_style_set_border_width(&style_layout, 0);
-    lv_style_set_text_color(&style_layout, lv_palette_lighten(LV_PALETTE_GREY, 5));
+    lv_style_set_text_color(&style_layout, lv_color_white());
     lv_style_set_text_font(&style_layout, &vw_24);
 }
 
