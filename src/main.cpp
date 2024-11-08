@@ -174,9 +174,10 @@ void config_done_cb(lv_event_t *e)
   if (lv_event_get_code(e) == LV_EVENT_CLICKED)
   {
     int32_t option_id = lv_dropdown_get_selected(config.drop_down); // Get the index of the selected dropdown option
+    /* Make sure the option given is a valid index */
     if (option_id >= info_list.size())
     {
-      option_id = 0;
+      option_id = 0; // Set to 0 if not
     }
     config.panel_selected->panel_info = info_list[option_id];       // Get the Information object at that index, set it to the Panel object
     /* If the Imperial radio button is selected */
@@ -203,7 +204,6 @@ void radio_cb(lv_event_t *e)
 {
   lv_obj_t *cont = (lv_obj_t *)lv_event_get_current_target(e);
   lv_obj_t *act_cb = (lv_obj_t *)lv_event_get_target(e);
-  lv_obj_t *old_cb;
 
   /* Do nothing if the container was clicked */
   if (act_cb == cont)
