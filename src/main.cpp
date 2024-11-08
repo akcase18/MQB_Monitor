@@ -173,24 +173,7 @@ void config_done_cb(lv_event_t *e)
 {
   if (lv_event_get_code(e) == LV_EVENT_CLICKED)
   {
-    int32_t option_id = lv_dropdown_get_selected(config.drop_down); // Get the index of the selected dropdown option
-    /* Make sure the option given is a valid index */
-    if (option_id >= info_list.size())
-    {
-      option_id = 0; // Set to 0 if not
-    }
-    config.panel_selected->panel_info = info_list[option_id];       // Get the Information object at that index, set it to the Panel object
-    /* If the Imperial radio button is selected */
-    if (lv_obj_has_state(config.radio_imperial, LV_STATE_CHECKED))
-    {
-      config.panel_selected->panel_info->set_is_metric(false); // Use Imperial for Information object
-    }
-    /* If the Metric radio button is selected */
-    else
-    {
-      config.panel_selected->panel_info->set_is_metric(true); // Use Metric for Information object
-    }
-    lv_label_set_text(config.panel_selected->label, info_list[option_id]->get_name_and_label().c_str()); // Update the label text in Layout
+    config.close_window();
     layout.open_window();
   }
 }
@@ -223,8 +206,16 @@ void warning_button_cb(lv_event_t *e)
 {
     if (lv_event_get_code(e) == LV_EVENT_CLICKED)
     {
-        config.open_warning_config();
+        // config.open_warning_config(); // Currently disabled until warning is more set up
     }
+}
+
+void warning_done_cb(lv_event_t *e)
+{
+  if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+  {
+    config.open_window();
+  }
 }
 
 /**
