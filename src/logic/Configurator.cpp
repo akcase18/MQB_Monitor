@@ -151,6 +151,7 @@ void Configurator::init_drop_down()
     lv_dropdown_set_options_static(drop_down, drop_down_string.c_str());
     lv_obj_set_align(drop_down, LV_ALIGN_TOP_MID);
     lv_obj_set_size(drop_down, lv_pct(100), 50);
+    lv_dropdown_set_symbol(drop_down, NULL);
 }
 
 void Configurator::init_warning_btn()
