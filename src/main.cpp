@@ -219,6 +219,14 @@ void radio_cb(lv_event_t *e)
   }
 }
 
+void warning_button_cb(lv_event_t *e)
+{
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+    {
+        config.open_warning_config();
+    }
+}
+
 /**
  * Set all the callbacks for the various elements, so that way all callbacks
  * have access to all available functions.
@@ -234,10 +242,12 @@ void set_cbs()
   lv_obj_add_event_cb(layout.panel_br->btn, panel_select_cb, LV_EVENT_CLICKED, layout.panel_br);
 
   /***** Configurator Callbacks *****/
-  /* Done Button Callbacks */
+  /* Done Button Callback */
   lv_obj_add_event_cb(config.btn_done, config_done_cb, LV_EVENT_CLICKED, NULL);
-  /* Radio BUtton Callbacks */
+  /* Radio Button Callback */
   lv_obj_add_event_cb(config.flex_col_2, radio_cb, LV_EVENT_CLICKED, NULL);
+  /* Warning Button Callback */
+  lv_obj_add_event_cb(config.btn_warning, warning_button_cb, LV_EVENT_CLICKED, NULL);
 }
 
 /*********

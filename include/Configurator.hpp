@@ -156,18 +156,6 @@ public:
      */
     void select_metric_radio_btn();
 
-    /**
-     * Set the callback of a given object, triggered on the given state.
-     *
-     * @param object pointer to a lv_obj_t that the callback will be attached to
-     * @param function pointer to a callback function to be called
-     * @param state enum for the state trigger that the callback will be called on
-     * @param user_data custom data that will be available in the callback (can pass in NULL)
-     */
-    void set_callback(lv_obj_t *object, void (*function)(lv_event_t *e), lv_event_code_t state, void *user_data);
-
-    void warning_button_cb(lv_event_t *e);
-
     void open_warning_config();
 };
 

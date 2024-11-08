@@ -72,10 +72,6 @@ void Configurator::select_metric_radio_btn()
     lv_obj_add_state(radio_metric, LV_STATE_CHECKED);
 }
 
-void Configurator::set_callback(lv_obj_t *object, void (*function)(lv_event_t *e), lv_event_code_t state, void *user_data)
-{
-}
-
 /****************************
  * Private Helper Functions *
  ****************************/
@@ -212,14 +208,6 @@ void Configurator::init_radio_btns()
 
 Information *Configurator::get_info_from_drop_down()
 {
-}
-
-void Configurator::warning_button_cb(lv_event_t *e)
-{
-    if (lv_event_get_code(e) == LV_EVENT_CLICKED)
-    {
-        open_warning_config();
-    }
 }
 
 void Configurator::open_warning_config()
