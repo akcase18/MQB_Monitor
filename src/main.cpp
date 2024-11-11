@@ -20,6 +20,12 @@
 #define BRIGHTNESS 1
 #define MAX_BRIGHTNESS 256
 
+#define PANEL_TL_EEPROM 0x0
+#define PANEL_TC_EEPROM 0x1
+#define PANEL_TR_EEPROM 0x2
+#define PANEL_BL_EEPROM 0x3
+#define PANEL_BR_EEPROM 0x4
+
 /***********************
  * Display Constructor *
  ***********************/
@@ -53,6 +59,12 @@ Touchscreen ts = Touchscreen(CS_PIN);
  *********/
 
 static queue<Information *> can_queue; // This queue holds the CAN messages that are ready to be requested (sent)
+
+/**********
+ * Timers *
+ **********/
+
+lv_timer_t *can_send_timer;
 
 /**************************************
  * Initialization and Darken Function *
@@ -174,6 +186,7 @@ void config_done_cb(lv_event_t *e)
   if (lv_event_get_code(e) == LV_EVENT_CLICKED)
   {
     config.close_window();
+    lv_timer_set_period(config.panel_selected->timer, config.panel_selected->panel_info->get_refresh_rate());
     layout.open_window();
   }
 }
@@ -309,7 +322,6 @@ void display_init()
   lcd_init();
   display = lv_display_create(LCD_HORZ, LCD_VERT);
   lv_display_set_flush_cb(display, display_flush);
-  // lv_display_set_flush_wait_cb(display, display_flush_wait_cb);
   lv_display_set_buffers(display, buf_1, buf_2, sizeof(buf_1), LV_DISPLAY_RENDER_MODE_PARTIAL);
 }
 
@@ -366,13 +378,13 @@ void init_windows()
  */
 void init_timers()
 {
-  lv_timer_t *panel_tl_timer = lv_timer_create(panel_tl_timer_cb, panel_tl.panel_info->get_refresh_rate(), NULL);
-  lv_timer_t *panel_tc_timer = lv_timer_create(panel_tc_timer_cb, panel_tc.panel_info->get_refresh_rate(), NULL);
-  lv_timer_t *panel_tr_timer = lv_timer_create(panel_tr_timer_cb, panel_tr.panel_info->get_refresh_rate(), NULL);
-  lv_timer_t *panel_bl_timer = lv_timer_create(panel_bl_timer_cb, panel_bl.panel_info->get_refresh_rate(), NULL);
-  lv_timer_t *panel_br_timer = lv_timer_create(panel_br_timer_cb, panel_br.panel_info->get_refresh_rate(), NULL);
+  panel_tl.timer = lv_timer_create(panel_tl_timer_cb, panel_tl.panel_info->get_refresh_rate(), NULL);
+  panel_tc.timer = lv_timer_create(panel_tc_timer_cb, panel_tc.panel_info->get_refresh_rate(), NULL);
+  panel_tr.timer = lv_timer_create(panel_tr_timer_cb, panel_tr.panel_info->get_refresh_rate(), NULL);
+  panel_bl.timer = lv_timer_create(panel_bl_timer_cb, panel_bl.panel_info->get_refresh_rate(), NULL);
+  panel_br.timer = lv_timer_create(panel_br_timer_cb, panel_br.panel_info->get_refresh_rate(), NULL);
 
-  lv_timer_t *can_send_timer = lv_timer_create(can_send_timer_cb, 10, NULL);
+  can_send_timer = lv_timer_create(can_send_timer_cb, 10, NULL);
 }
 
 /**
@@ -417,20 +429,6 @@ unsigned long current_time = 0;
 
 void loop()
 {
-  if (millis() > current_time + 500)
-  {
-    if (test)
-    {
-    }
-    else
-    {
-    }
-    test = !test;
-    current_time = millis();
-  }
-
-  counter++;
-
   lv_task_handler();
 
   update_display();

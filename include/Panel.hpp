@@ -90,6 +90,7 @@ public:
     lv_style_t *style_btn;         // Style for the button
     lv_style_t *style_btn_pressed; // Style for the button when it is pressed
     lv_style_t *style_label;       // Style for the label
+    lv_timer_t *timer;             // Timer for requesting CAN data for panel
     bool use_warning = false;      // Flag for warning or not
 
     /********************
