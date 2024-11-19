@@ -4,7 +4,7 @@
 #include "EEPROM.h"
 #include "touchscreen.hpp"
 
-#define NIGHT 0
+#define NIGHT 1
 
 #if NIGHT
 #define SCRN_BRIGHTNESS 30
