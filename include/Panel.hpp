@@ -121,8 +121,8 @@ public:
  ***************************/
 
 /* Data */
-LV_FONT_DECLARE(digital_display_100);
-LV_FONT_DECLARE(digital_display_140);
+LV_FONT_DECLARE(digital_display_80_v2);
+LV_FONT_DECLARE(digital_display_115_v2);
 /* Labels */
 LV_FONT_DECLARE(vw_14);
 LV_FONT_DECLARE(vw_16);

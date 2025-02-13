@@ -4,8 +4,8 @@
  * Layout Font Definition *
  **************************/
 
-const lv_font_t *top_data_font = &digital_display_100;
-const lv_font_t *btm_data_font = &digital_display_140;
+const lv_font_t *top_data_font = &digital_display_80_v2;
+const lv_font_t *btm_data_font = &digital_display_115_v2;
 const lv_font_t *top_label_font = &vw_16;
 const lv_font_t *btm_label_font = &vw_18;
 
