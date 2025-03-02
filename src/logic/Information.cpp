@@ -5,34 +5,35 @@
  *********************************/
 
 /***** Performance Metrics *****/
-Information coolant_temp = Information("Coolant Temp", 0xF4, 0x05, -40, NO_SCALE, Information::TEMP, 0, 0, 2000);      // Works
-Information engine_oil_temp = Information("Engine Oil Temp", 0x20, 0x2F, -2731.4, 0.1, Information::TEMP, 0, 0, 1000); // Works
-Information intake_air_temp = Information("Intake Air Temp", 0xF4, 0x0F, -40, NO_SCALE, Information::TEMP, 0, 0, 100); // Works
-Information charge_pressure = Information("Charge Pressure", 0x20, 0x2A, NO_OFFSET, 0.001, Information::PRESSURE, 2, 1, 100);
-Information intake_pressure = Information("Intake Pressure", 0x3E, 0x70, NO_OFFSET, 0.001, Information::PRESSURE, 2, 1, MAX_REFRESH); // Works
-Information ambient_pressure = Information("Amb. Pressure", 0x13, 0xCA, NO_OFFSET, 0.0001, Information::PRESSURE, 2, 1, 1000);        // Works
-Information lambda_actual = Information("Lambda (actual)", 0x10, 0xC0, NO_OFFSET, (1 / 1024), Information::NONE, 1, 1, MAX_REFRESH);
-Information lambda_specified = Information("Lambda (specified)", 0x29, 0x50, NO_OFFSET, (1 / 1024), Information::NONE, 1, 1, MAX_REFRESH);
-Information turbo_speed = Information("Turbo Speed", 0x10, 0x40, NO_OFFSET, 6.11, Information::RPM, 0, 0, MIN_REFRESH);
+Information coolant_temp = Information("Coolant Temp",Information::TEMP, 0, 0, 2000);      // Works
+Information engine_oil_temp = Information("Engine Oil Temp", Information::TEMP, 0, 0, 1000); // Works
+Information intake_air_temp = Information("Intake Air Temp", Information::TEMP, 0, 0, 100); // Works
+Information charge_pressure = Information("Charge Pressure", Information::PRESSURE, 2, 1, 100);
+Information intake_pressure = Information("Intake Pressure", Information::PRESSURE, 2, 1, MAX_REFRESH); // Works
+Information ambient_pressure = Information("Amb. Pressure", Information::PRESSURE, 2, 1, 1000);        // Works
+Information actual_intake_pressure = Information("Act. Intake Pressure", Information::PRESSURE, 2, 1, MAX_REFRESH);
+Information lambda_actual = Information("Lambda (actual)", Information::NONE, 1, 1, MAX_REFRESH);
+Information lambda_specified = Information("Lambda (specified)", Information::NONE, 1, 1, MAX_REFRESH);
+Information turbo_speed = Information("Turbo Speed", Information::RPM, 0, 0, MIN_REFRESH);
 
 /***** Car Information *****/
-Information engine_rpm = Information("Engine Speed", 0x20, 0x6E, NO_OFFSET, NO_SCALE, Information::RPM, 0, 0, MAX_REFRESH);
-Information engine_torque = Information("Engine Torque", 0x43, 0x7C, NO_OFFSET, 0.1, Information::TORQUE, 0, 0, MAX_REFRESH);
-Information vehicle_speed = Information("Vehicle Speed", 0x20, 0x33, NO_OFFSET, 0.01, Information::SPEED, 0, 0, 100); // Works
-Information fuel_level = Information("Fuel", 0x22, 0x06, NO_OFFSET, NO_SCALE, Information::VOLUME, 1, 1, MIN_REFRESH);
-Information fuel_percent = Information("Fuel", 0xF4, 0x2F, NO_OFFSET, (1 / 2.55), Information::PERCENT, 0, 0, MIN_REFRESH);
-Information throttle_position = Information("Throttle Position", 0xF4, 0x11, NO_OFFSET, (1 / 2.55), Information::PERCENT, 0, 0, MAX_REFRESH); // Works
+Information engine_rpm = Information("Engine Speed", Information::RPM, 0, 0, MAX_REFRESH);
+Information engine_torque = Information("Engine Torque", Information::TORQUE, 0, 0, MAX_REFRESH);
+Information vehicle_speed = Information("Vehicle Speed", Information::SPEED, 0, 0, 100); // Works
+Information fuel_level = Information("Fuel", Information::VOLUME, 1, 1, MIN_REFRESH);
+Information fuel_percent = Information("Fuel", Information::PERCENT, 0, 0, MIN_REFRESH);
+Information throttle_position = Information("Throttle Position", Information::PERCENT, 0, 0, MAX_REFRESH); // Works
 
 /***** Diag/Monitoring *****/
-Information misfire_sum = Information("Misfire Count", 0x29, 0x04, NO_OFFSET, NO_SCALE, Information::NONE, 0, 0, 500);         // Works
-Information misfire_cyl_1 = Information("Misfire Count Cyl 1", 0x29, 0x66, NO_OFFSET, NO_SCALE, Information::NONE, 0, 0, 500); // Works
-Information misfire_cyl_2 = Information("Misfire Count Cyl 2", 0x29, 0x67, NO_OFFSET, NO_SCALE, Information::NONE, 0, 0, 500); // Works
-Information misfire_cyl_3 = Information("Misfire Count Cyl 3", 0x29, 0x68, NO_OFFSET, NO_SCALE, Information::NONE, 0, 0, 500); // Works
-Information misfire_cyl_4 = Information("Misfire Count Cyl 4", 0x29, 0x69, NO_OFFSET, NO_SCALE, Information::NONE, 0, 0, 500); // Works
-Information timing_corr_1 = Information("Timing Corr. Cyl 1", 0x20, 0x0A, NO_OFFSET, 0.01, Information::DEGREES, 0, 0, 100);
-Information timing_corr_2 = Information("Timing Corr. Cyl 2", 0x20, 0x0B, NO_OFFSET, 0.01, Information::DEGREES, 0, 0, 100);
-Information timing_corr_3 = Information("Timing Corr. Cyl 3", 0x20, 0x0C, NO_OFFSET, 0.01, Information::DEGREES, 0, 0, 100);
-Information timing_corr_4 = Information("Timing Corr. Cyl 4", 0x20, 0x0D, NO_OFFSET, 0.01, Information::DEGREES, 0, 0, 100);
+Information misfire_sum = Information("Misfire Count", Information::NONE, 0, 0, 500);         // Works
+Information misfire_cyl_1 = Information("Misfire Count Cyl 1", Information::NONE, 0, 0, 500); // Works
+Information misfire_cyl_2 = Information("Misfire Count Cyl 2", Information::NONE, 0, 0, 500); // Works
+Information misfire_cyl_3 = Information("Misfire Count Cyl 3", Information::NONE, 0, 0, 500); // Works
+Information misfire_cyl_4 = Information("Misfire Count Cyl 4", Information::NONE, 0, 0, 500); // Works
+Information timing_corr_1 = Information("Timing Corr. Cyl 1", Information::DEGREES, 0, 0, 100);
+Information timing_corr_2 = Information("Timing Corr. Cyl 2", Information::DEGREES, 0, 0, 100);
+Information timing_corr_3 = Information("Timing Corr. Cyl 3", Information::DEGREES, 0, 0, 100);
+Information timing_corr_4 = Information("Timing Corr. Cyl 4", Information::DEGREES, 0, 0, 100);
 
 /***** Information Object List/Vector *****/
 vector<Information *> info_list = {&coolant_temp, &engine_oil_temp, &intake_air_temp, &charge_pressure, &intake_pressure,
@@ -45,50 +46,27 @@ vector<Information *> info_list = {&coolant_temp, &engine_oil_temp, &intake_air_
  * Constructors *
  ****************/
 
-Information::Information()
-{
-    set_name("default");
-    set_data(0);
-    set_byte_1(0x00);
-    set_byte_2(0x00);
-    set_offset(NO_OFFSET);
-    set_scale(NO_SCALE);
-    set_unit_type(Information::NONE);
-    set_unit_label();
-    set_num_decimals_metric(0);
-    set_num_decimals_imperial(0);
-    set_refresh_rate(100);
-}
-
 Information::Information(Information *info)
 {
-    set_name(info->get_name());
+    _name = info->get_name();
     set_data(info->get_data_num());
-    set_byte_1(info->get_byte_1());
-    set_byte_2(info->get_byte_2());
-    set_offset(info->get_offset());
-    set_scale(info->get_scale());
     set_unit_type(info->get_unit_type());
     set_is_metric(info->get_is_metric());
     set_unit_label();
     set_num_decimals_metric(info->get_num_decimals_metric());
     set_num_decimals_imperial(info->get_num_decimals_imperial());
-    set_refresh_rate(info->get_refresh_rate());
+    _refresh_rate = info->get_refresh_rate();
 }
 
-Information::Information(String name, uint16_t byte_1, uint16_t byte_2, int16_t offset, float scale, Information::Unit_Type unit_type, uint8_t num_decimals_metric, uint8_t num_decimals_imperial, uint16_t refresh_rate)
+Information::Information(String name, Information::Unit_Type unit_type, uint8_t num_decimals_metric, uint8_t num_decimals_imperial, uint16_t refresh_rate)
 {
-    set_name(name);
+    _name = name;
     set_data(0);
-    set_byte_1(byte_1);
-    set_byte_2(byte_2);
-    set_offset(offset);
-    set_scale(scale);
     set_unit_type(unit_type);
     set_unit_label();
     set_num_decimals_metric(num_decimals_metric);
     set_num_decimals_imperial(num_decimals_imperial);
-    set_refresh_rate(refresh_rate);
+    _refresh_rate = refresh_rate;
 }
 
 /******************************
@@ -96,11 +74,6 @@ Information::Information(String name, uint16_t byte_1, uint16_t byte_2, int16_t 
  ******************************/
 
 /***** Name *****/
-
-void Information::set_name(String name)
-{
-    _name = name;
-}
 String Information::get_name()
 {
     return _name;
@@ -132,50 +105,6 @@ String Information::get_data_str()
         data_str = String(_data, get_num_decimals_imperial());
     }
     return data_str;
-}
-
-/**** Byte 1 *****/
-
-void Information::set_byte_1(uint16_t byte)
-{
-    _byte_1 = byte;
-}
-uint16_t Information::get_byte_1()
-{
-    return _byte_1;
-}
-
-/**** Byte 2 *****/
-
-void Information::set_byte_2(uint16_t byte)
-{
-    _byte_2 = byte;
-}
-uint16_t Information::get_byte_2()
-{
-    return _byte_2;
-}
-
-/**** Offset *****/
-
-void Information::set_offset(int16_t offset)
-{
-    _offset = offset;
-}
-int16_t Information::get_offset()
-{
-    return _offset;
-}
-
-/**** Scale *****/
-
-void Information::set_scale(float scale)
-{
-    _scale = scale;
-}
-float Information::get_scale()
-{
-    return _scale;
 }
 
 /**** Unit Type *****/
@@ -221,10 +150,6 @@ uint8_t Information::get_num_decimals_imperial()
 
 /**** Refresh Rate *****/
 
-void Information::set_refresh_rate(uint16_t refresh_rate)
-{
-    _refresh_rate = refresh_rate;
-}
 uint16_t Information::get_refresh_rate()
 {
     return _refresh_rate;
@@ -325,10 +250,6 @@ void Information::set_unit_label()
         _unit_label = "";
         break;
     }
-}
-String Information::get_unit_label()
-{
-    return _unit_label;
 }
 
 /****************************

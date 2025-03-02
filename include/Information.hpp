@@ -1,4 +1,4 @@
-#include "Arduino.h"
+#include "Request.hpp"
 #include <vector>
 
 using namespace std;
@@ -9,8 +9,6 @@ using namespace std;
 
 #define MAX_REFRESH 20
 #define MIN_REFRESH 5000
-#define NO_OFFSET 0
-#define NO_SCALE 1
 
 class Information
 {
@@ -44,14 +42,12 @@ private:
     /*********************
      * Private Variables *
      *********************/
+    Request **_requests;            // Request objects associated with the Information object
+    uint8_t _num_requests;          // Number of Request objectes
     uint8_t _num_decimals_metric;   // The number of decimal places to use for Metric data
     uint8_t _num_decimals_imperial; // The number of decimal places to use for Imperial data
-    uint16_t _byte_1;               // The first byte of the UDS request code
-    uint16_t _byte_2;               // The second byte of the UDS request code
-    int16_t _offset;                // The offset value used to decode raw data
     uint16_t _refresh_rate;         // The refresh rate of the data request
-    float _data;                    // The data received
-    float _scale;                   // The scaling factor used to decode raw data
+    float _data;                    // Data held by the Information object
     String _name;                   // The name of the Information object
     String _unit_label;             // The generated label for the units
     Unit_Type _unit_type;           // The unit type of the data
@@ -78,12 +74,6 @@ private:
      * @note Format: [label]
      */
     void set_unit_label();
-    /**
-     * Gets the unit label of the data.
-     *
-     * @note Format: [label]
-     */
-    String get_unit_label();
 
 public:
     /********************
@@ -93,11 +83,6 @@ public:
     /********************
      * Public Functions *
      ********************/
-
-    /**
-     * Default constructor for Information objects. Initializes everything to 0 or None.
-     */
-    Information();
 
     /**
      * Constructor to pass an existing Information object into a new one. This will copy
@@ -115,23 +100,13 @@ public:
      * to Metric and the data held within the Information object to 0.
      *
      * @param name An array of characters for the name of the Information object.
-     * @param byte_1 The first byte of the UDS request code in hex.
-     * @param byte_2 The second byte of the UDS request code in hex.
-     * @param offset The value by which the incoming raw data should be shifting by to decode it.
-     * @param scale The scaling factor for the incoming raw data.
      * @param unit_type The type of data that the Information object holds. Type of Unit_Type.
      * @param num_decimals_metric The number of decimal places for Metric data format.
      * @param num_decimals_imperial The number of decimal places for Imperial data format.
      * @param refresh_rate The cycle time of the Information object in ms. Smaller is faster.
      */
-    Information(String name, uint16_t byte_1, uint16_t byte_2, int16_t offset, float scale, Unit_Type unit_type, uint8_t num_decimals_metric, uint8_t num_decimals_imperial, uint16_t refresh_rate);
+    Information(String name, Unit_Type unit_type, uint8_t num_decimals_metric, uint8_t num_decimals_imperial, uint16_t refresh_rate);
 
-    /**
-     * Sets the name of the Information object.
-     *
-     * @param name A char array of the new name of the Information object.
-     */
-    void set_name(String name);
     /**
      * Gets the name of the Information object.
      *
@@ -165,58 +140,6 @@ public:
      * @return A String.
      */
     String get_data_str();
-
-    /**
-     * Sets the value of the first byte of the UDS request code.
-     *
-     * @param byte The first byte of the UDS request code in hex.
-     */
-    void set_byte_1(uint16_t byte);
-    /**
-     * Gets the value of the first byte of the UDS request code.
-     *
-     * @return The first byte of the UDS request code in hex.
-     */
-    uint16_t get_byte_1();
-
-    /**
-     * Sets the value of the second byte of the UDS request code.
-     *
-     * @param byte The second byte of the UDS request code in hex.
-     */
-    void set_byte_2(uint16_t byte);
-    /**
-     * Gets the value of the second byte of the UDS request code.
-     *
-     * @return THe second byte of the UDS request code in hex.
-     */
-    uint16_t get_byte_2();
-
-    /**
-     * Sets the offset value used to decode the raw data.
-     *
-     * @param offset The offset value as a 16-bit value.
-     */
-    void set_offset(int16_t offset);
-    /**
-     * Gets the offset value used to decode the raw data.
-     *
-     * @return The offset value as a 16-bit value.
-     */
-    int16_t get_offset();
-
-    /**
-     * Sets the scaling factor used to decode the raw data.
-     *
-     * @param scale The scaling factor as a float.
-     */
-    void set_scale(float scale);
-    /**
-     * Gets the scaling factor used to decode the raw data.
-     *
-     * @return The scaling factor as a float.
-     */
-    float get_scale();
 
     /**
      * Sets the Unit Type of the Information object.
@@ -258,12 +181,6 @@ public:
     uint8_t get_num_decimals_imperial();
 
     /**
-     * Sets the refresh rate of the data coming in (in ms).
-     *
-     * @param refresh_rate The new refresh rate in ms.
-     */
-    void set_refresh_rate(uint16_t refresh_rate);
-    /**
      * Gets the refresh rate of the data coming in (in ms).
      *
      * @return The refresh rate in ms.
@@ -295,7 +212,8 @@ extern Information intake_air_temp;
 extern Information charge_pressure;
 extern Information intake_pressure;
 extern Information ambient_pressure;
-extern Information lambda_actual; // Not working
+extern Information actual_intake_pressure;
+extern Information lambda_actual;    // Not working
 extern Information lambda_specified; // Not working
 extern Information turbo_speed;
 
