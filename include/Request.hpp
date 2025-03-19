@@ -1,50 +1,15 @@
 #include "Arduino.h"
 
-using namespace std;
-
-/***********
- * Defines *
- ***********/
-
 #define NO_OFFSET 0
-#define NO_SCALE 1
+#define NO_SCALE  1
 
-class Request
+struct Request
 {
-public:
-    /********************
-     * Public Variables *
-     ********************/
-
     uint16_t byte_1; // First byte of UDS request code (in hex)
     uint16_t byte_2; // Second byte of UDS request code (in hex)
     int16_t offset;  // Offset value to decode raw data
     float scale;     // Scaling factor to decode raw data
     float data;      // Received data (decoded)
-
-    /********************
-     * Public Functions *
-     ********************/
-    
-    /**
-     * Constructor to pass an existing Request object into a new one.
-     *
-     * This will copy all parameters and variables from the given Request
-     * object and assign them to the new Request object.
-     *
-     * @param request A pointer to an existing Request object.
-     */
-    Request(Request *request);
-
-    /**
-     * Constructor to fully define a new Request object.
-     *
-     * @param new_byte_1 The first byte of the UDS request code (in hex).
-     * @param new_byte_2 The second byte of the UDS request code (in hex).
-     * @param new_offset The value by which the incoming raw data should be shifted by to decode.
-     * @param new_scale The scaling factor for the incoming raw data.
-     */
-    Request(uint16_t new_byte_1, uint16_t new_byte_2, int16_t new_offset, float new_scale);
 };
 
 /***************************
