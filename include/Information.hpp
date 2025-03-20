@@ -7,7 +7,6 @@
 #define MAX_REFRESH 20
 #define MIN_REFRESH 5000
 
-template <uint8_t num_requests>
 class Information
 {
 private:
@@ -40,16 +39,16 @@ private:
     /*********************
      * Private Variables *
      *********************/
-    Request *_requests[num_requests];     // Request objects associated with the Information object
-    uint8_t _num_requests = num_requests; // Number of Request objectes
-    uint8_t _num_decimals_metric;         // The number of decimal places to use for Metric data
-    uint8_t _num_decimals_imperial;       // The number of decimal places to use for Imperial data
-    uint16_t _refresh_rate;               // The refresh rate of the data request
-    float _data;                          // Data held by the Information object
-    String _name;                         // The name of the Information object
-    String _unit_label;                   // The generated label for the units
-    Unit_Type _unit_type;                 // The unit type of the data
-    bool _is_metric = true;               // The unit region of the data
+    Request **_requests;            // Request objects associated with the Information object
+    uint8_t _num_requests;          // Number of Request objectes
+    uint8_t _num_decimals_metric;   // The number of decimal places to use for Metric data
+    uint8_t _num_decimals_imperial; // The number of decimal places to use for Imperial data
+    uint16_t _refresh_rate;         // The refresh rate of the data request
+    float _data;                    // Data held by the Information object
+    String _name;                   // The name of the Information object
+    String _unit_label;             // The generated label for the units
+    Unit_Type _unit_type;           // The unit type of the data
+    bool _is_metric = true;         // The unit region of the data
 
     /*********************
      * Private Functions *
@@ -159,20 +158,6 @@ public:
      ********************/
 
     /**
-     * Constructor to pass an existing Information object into a new one. This will copy
-     * all parameters and variables from the given Information object and assign them to the new
-     * Information object.
-     *
-     * @param info A pointer to an already-creted Information object
-     *
-     * @note This is used to assign Information objects to Information Panels in the GUI
-     */
-    Information(Information *info)
-    {
-
-    }
-
-    /**
      * Constructor to fully define a new Information object. This will default the Unit_Region
      * to Metric and the data held within the Information object to 0.
      *
@@ -182,7 +167,7 @@ public:
      * @param num_decimals_imperial The number of decimal places for Imperial data format.
      * @param refresh_rate The cycle time of the Information object in ms. Smaller is faster.
      */
-    Information(String name, Unit_Type unit_type, uint8_t num_decimals_metric, uint8_t num_decimals_imperial, uint16_t refresh_rate, Request *(&requests)[num_requests])
+    Information(Request **requests, uint8_t num_requests, String name, Unit_Type unit_type, uint8_t num_decimals_metric, uint8_t num_decimals_imperial, uint16_t refresh_rate)
         : _requests(requests),
           _num_requests(num_requests),
           _num_decimals_metric(num_decimals_metric),
@@ -338,36 +323,36 @@ public:
  * Information Object Declaration *
  **********************************/
 
-// /***** Performance Metrics *****/
-// extern Information coolant_temp;
-// extern Information engine_oil_temp;
-// extern Information intake_air_temp;
-// extern Information charge_pressure;
-// extern Information intake_pressure;
-// extern Information ambient_pressure;
-// extern Information actual_intake_pressure;
-// extern Information lambda_actual;    // Not working
-// extern Information lambda_specified; // Not working
-// extern Information turbo_speed;
+/***** Performance Metrics *****/
+extern Information coolant_temp;
+extern Information engine_oil_temp;
+extern Information intake_air_temp;
+extern Information charge_pressure;
+extern Information intake_pressure;
+extern Information ambient_pressure;
+extern Information actual_intake_pressure;
+extern Information lambda_actual;    // Not working
+extern Information lambda_specified; // Not working
+extern Information turbo_speed;
 
-// /***** Car Information *****/
-// extern Information engine_rpm;
-// extern Information engine_torque;
-// extern Information vehicle_speed;
-// extern Information fuel_level;
-// extern Information fuel_percent;
-// extern Information throttle_position;
+/***** Car Information *****/
+extern Information engine_rpm;
+extern Information engine_torque;
+extern Information vehicle_speed;
+extern Information fuel_level;
+extern Information fuel_percent;
+extern Information throttle_position;
 
-// /***** Diag/Monitoring *****/
-// extern Information misfire_sum;
-// extern Information misfire_cyl_1;
-// extern Information misfire_cyl_2;
-// extern Information misfire_cyl_3;
-// extern Information misfire_cyl_4;
-// extern Information timing_corr_1;
-// extern Information timing_corr_2;
-// extern Information timing_corr_3;
-// extern Information timing_corr_4;
+/***** Diag/Monitoring *****/
+extern Information misfire_sum;
+extern Information misfire_cyl_1;
+extern Information misfire_cyl_2;
+extern Information misfire_cyl_3;
+extern Information misfire_cyl_4;
+extern Information timing_corr_1;
+extern Information timing_corr_2;
+extern Information timing_corr_3;
+extern Information timing_corr_4;
 
-// /***** Information Object List/Vector *****/
-// extern vector<Information *> info_list;
+/***** Information Object List/Vector *****/
+extern vector<Information *> info_list;
