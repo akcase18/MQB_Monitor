@@ -26,10 +26,12 @@ public:
     {
         NONE = 0,
         DEGREES,
+        LAMBDA,
         PERCENT,
         PRESSURE,
         RPM,
         SPEED,
+        SUM,
         TEMP,
         TORQUE,
         VOLUME
@@ -167,19 +169,16 @@ public:
      * @param num_decimals_imperial The number of decimal places for Imperial data format.
      * @param refresh_rate The cycle time of the Information object in ms. Smaller is faster.
      */
-    Information(Request **requests, uint8_t num_requests, String name, Unit_Type unit_type, uint8_t num_decimals_metric, uint8_t num_decimals_imperial, uint16_t refresh_rate)
+    template <uint8_t num_requests>
+    Information(Request *(&requests)[num_requests], String name, Unit_Type unit_type, uint16_t refresh_rate)
         : _requests(requests),
           _num_requests(num_requests),
-          _num_decimals_metric(num_decimals_metric),
-          _num_decimals_imperial(num_decimals_imperial),
           _refresh_rate(refresh_rate),
           _data(0),
           _name(name),
           _unit_type(unit_type)
     {
-        set_num_decimals_metric(num_decimals_metric);
-        set_num_decimals_imperial(num_decimals_imperial);
-        set_unit_label();
+        set_unit_type(unit_type);
     }
 
     /**
@@ -239,6 +238,37 @@ public:
     void set_unit_type(Unit_Type type)
     {
         _unit_type = type;
+        set_unit_label();
+        switch (type)
+        {
+        case LAMBDA:
+            set_num_decimals_metric(1);
+            set_num_decimals_imperial(1);
+            break;
+
+        case PRESSURE:
+            set_num_decimals_metric(2);
+            set_num_decimals_imperial(1);
+            break;
+
+        case VOLUME:
+            set_num_decimals_metric(1);
+            set_num_decimals_imperial(1);
+            break;
+
+        case DEGREES:
+        case PERCENT:
+        case RPM:
+        case SPEED:
+        case SUM:
+        case TEMP:
+        case TORQUE:
+        case NONE:
+        default:
+            set_num_decimals_metric(0);
+            set_num_decimals_imperial(0);
+            break;
+        }
     }
     /**
      * Gets the Unit Type of the Information object.
@@ -324,35 +354,115 @@ public:
  **********************************/
 
 /***** Performance Metrics *****/
-extern Information coolant_temp;
-extern Information engine_oil_temp;
-extern Information intake_air_temp;
-extern Information charge_pressure;
-extern Information intake_pressure;
-extern Information ambient_pressure;
-extern Information actual_intake_pressure;
-extern Information lambda_actual;    // Not working
-extern Information lambda_specified; // Not working
-extern Information turbo_speed;
+
+/* Coolant Temperature */
+Request *coolant_temp_req[1] = {&cool_tmp_req};
+Information coolant_temp = Information(coolant_temp_req, "Coolant Temp", Information::TEMP, 2000); // Works;
+
+/* Engine Oil Temperature */
+Request *engine_oil_temp_req[1] = {&eng_oil_tmp_req};
+Information engine_oil_temp = Information(engine_oil_temp_req, "Engine Oil Temp", Information::TEMP, 1000);
+
+/* Intake Air Temperature */
+Request *intake_air_temp_req[1] = {&int_air_tmp_req};
+Information intake_air_temp = Information(intake_air_temp_req, "Intake Air Temp", Information::TEMP, 100);
+
+/* Charge Pipe Pressure */
+Request *charge_pressure_req[1] = {&chg_pres_req};
+Information charge_pressure = Information(charge_pressure_req, "Charge Pressure", Information::PRESSURE, 100);
+
+/* Intake Pressure */
+Request *intake_pressure_req[1] = {&int_pres_req};
+Information intake_pressure = Information(intake_pressure_req, "Intake Pressure", Information::PRESSURE, MAX_REFRESH);
+
+/* Ambient Pressure */
+Request *ambient_pressure_req[1] = {&amb_pres_req};
+Information ambient_pressure = Information(ambient_pressure_req, "Ambient Pressure", Information::PRESSURE, 1000);
+
+/* Actual Intake Pressure */
+Request *actual_intake_pressure[2] = {&int_pres_req, &amb_pres_req};
+Information actual_intake_pressure = Information(actual_intake_pressure, "Intake Pressure (Act)", Information::PRESSURE, MAX_REFRESH);
+
+/* Actual Lambda Value */
+Request *lambda_actual_req[1] = {&lmd_act_req};
+Information lambda_actual = Information(lambda_actual_req, "Lambda (Act.)", Information::LAMBDA, MAX_REFRESH); // Not working
+
+/* Specified Lambda Value */
+Request *lambda_specified_req[1] = {&lmd_spec_req};
+Information lambda_specified = Information(lambda_specified_req, "Lambda (Spec.)", Information::LAMBDA, MAX_REFRESH); // Not working
+
+/* Turbo Speed */
+Request *turbo_speed_req[1] = {&trbo_spd_req};
+Information turbo_speed = Information(turbo_speed_req, "Turbo Speed", Information::RPM, MAX_REFRESH);
 
 /***** Car Information *****/
-extern Information engine_rpm;
-extern Information engine_torque;
-extern Information vehicle_speed;
-extern Information fuel_level;
-extern Information fuel_percent;
-extern Information throttle_position;
+
+/* Engine RPM */
+Request *engine_rpm_req[1] = {&eng_rpm_req};
+Information engine_rpm = Information(engine_rpm_req, "Engine RPM", Information::RPM, MAX_REFRESH);
+
+/* Engine Torque */
+Request *engine_torque_req[1] = {&eng_trq_req};
+Information engine_torque = Information(engine_torque_req, "Engine Torque", Information::TORQUE, MAX_REFRESH);
+
+/* Vehicle Speed */
+Request *vehicle_speed_req[1] = {&car_spd_req};
+Information vehicle_speed = Information(vehicle_speed_req, "Vehicle Speed", Information::SPEED, 100);
+
+/* Fuel (Level) */
+Request *fuel_level_req[1] = {&fuel_lvl_req};
+Information fuel_level = Information(fuel_level_req, "Fuel", Information::VOLUME, MIN_REFRESH);
+
+/* Fuel (Percent) */
+Request *fuel_percent_req[1] = {&fuel_pcnt_req};
+Information fuel_percent = Information(fuel_percent_req, "Fuel", Information::PERCENT, MIN_REFRESH);
+
+/* Throttle Position */
+Request *throttle_position_req[1] = {&thrtl_pos_req};
+Information throttle_position = Information(throttle_position_req, "Throttle Position", Information::PERCENT, MAX_REFRESH);
 
 /***** Diag/Monitoring *****/
-extern Information misfire_sum;
-extern Information misfire_cyl_1;
-extern Information misfire_cyl_2;
-extern Information misfire_cyl_3;
-extern Information misfire_cyl_4;
-extern Information timing_corr_1;
-extern Information timing_corr_2;
-extern Information timing_corr_3;
-extern Information timing_corr_4;
 
-/***** Information Object List/Vector *****/
-extern vector<Information *> info_list;
+/* Total Number of Misfires */
+Request *misfire_sum_req[1] = {&msfr_sum_req};
+Information misfire_sum = Information(misfire_sum_req, "Misfire Count", Information::SUM, 500);
+
+/* Total Number of Misfires on Cylinder 1 */
+Request *misfire_cyl_1_req[1] = {&msfr_1_req};
+Information misfire_cyl_1 = Information(misfire_cyl_1_req, "Misfire Count Cyl 1", Information::SUM, 500);
+
+/* Total Number of Misfires on Cylinder 2 */
+Request *misfire_cyl_2_req[1] = {&msfr_2_req};
+Information misfire_cyl_2 = Information(misfire_cyl_2_req, "Misfire Count Cyl 2", Information::SUM, 500);
+
+/* Total Number of Misfires on Cylinder 3 */
+Request *misfire_cyl_3_req[1] = {&msfr_3_req};
+Information misfire_cyl_3 = Information(misfire_cyl_3_req, "Misfire Count Cyl 3", Information::SUM, 500);
+
+/* Total Number of Misfires on Cylinder 4 */
+Request *misfire_cyl_4_req[1] = {&msfr_4_req};
+Information misfire_cyl_4 = Information(misfire_cyl_4_req, "Misfire Count Cyl 4", Information::SUM, 500);
+
+/* Timing Correction on Cylinder 1 */
+Request *timing_corr_1_req[1] = {&tim_cor_1_req};
+Information timing_corr_1 = Information(timing_corr_1_req, "Timing Corr. Cyl 1", Information::DEGREES, 100);
+
+/* Timing Correction on Cylinder 2 */
+Request *timing_corr_2_req[1] = {&tim_cor_2_req};
+Information timing_corr_2 = Information(timing_corr_2_req, "Timing Corr. Cyl 2", Information::DEGREES, 100);
+
+/* Timing Correction on Cylinder 3 */
+Request *timing_corr_3_req[1] = {&tim_cor_3_req};
+Information timing_corr_3 = Information(timing_corr_3_req, "Timing Corr. Cyl 3", Information::DEGREES, 100);
+
+/* Timing Correction on Cylinder 4 */
+Request *timing_corr_4_req[1] = {&tim_cor_4_req};
+Information timing_corr_4 = Information(timing_corr_4_req, "Timing Corr. Cyl 4", Information::DEGREES, 100);
+
+/***** Information Object List *****/
+Information *info_list[25] = {&coolant_temp, &engine_oil_temp, &intake_air_temp, &charge_pressure,
+                              &intake_pressure, &ambient_pressure, &actual_intake_pressure, &lambda_actual,
+                              &lambda_specified, &turbo_speed, &engine_rpm, &engine_torque, &vehicle_speed,
+                              &fuel_level, &fuel_percent, &throttle_position, &misfire_sum, &misfire_cyl_1,
+                              &misfire_cyl_2, &misfire_cyl_3, &misfire_cyl_4, &timing_corr_1, &timing_corr_2,
+                              &timing_corr_3, &timing_corr_4};
