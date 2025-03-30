@@ -2,8 +2,7 @@
 #define CAN_HANDLER_H
 
 #include <FlexCAN_T4.h>
-#include "Layout.hpp"
-#include "Configurator.hpp"
+#include "Request.hpp"
 
 using namespace std;
 
@@ -33,16 +32,13 @@ void can_loop();
 /**
  * Sends a UDS request message on the CAN buf for the given Information
  * object.
- * 
- * @param info a pointer to the Information object to request data for
  */
-void can_send(Information *info);
+void can_send();
 
 /**
  * Callback function for receiving CAN messages. Automatically called by
- * the FlexCAN callback. Takes in the data, automatically determines which
- * Information object the CAN message was a response to, and sets the data
- * within the Information object.
+ * the FlexCAN callback. Takes in the data, determines which Request the
+ * message was a response to, and sets the data accordingly.
  * 
  * @param msg the address to a CAN Message object
  */
@@ -53,31 +49,14 @@ void can_recv(const CAN_message_t &msg);
  ********************/
 
 /**
- * Determines what Information object the data received is coming from 
- * based on the received PIDs.
- * 
- * @param byte_1 the first byte of the PID
- * @param byte_2 the second byte of the PID
- * 
- * @return the Information object that the data was received from
+ * Converts data from metric to imperial
  */
-Information *get_info_panel(uint8_t byte_1, uint8_t byte_2);
+void convert_units();
 
 /**
- * Conters the data in an Information object from metric to imperial units
- * using the type of data it is.
- * 
- * @param info the Information object that holds the data to convert
+ * Rounds data based on it's data type
  */
-void convert_units(Information *info, float data);
-
-/**
- * Automatically rounds the data in an Information object based on the type
- * of data it is.
- * 
- * @param info the Information object that holds the data to round
- */
-void round_data(Information *info);
+void round_data();
 
 /**
  * Rounding helper function to round a given value to a certain number

@@ -29,13 +29,13 @@ void can_loop()
     MQB_CAN.events();
 }
 
-void can_send(Information *info)
+void can_send()
 {
-    CAN_message_t msg;               // Initialize the CAN message to send to the car
-    msg.buf[0] = NUM_DATA_BYTES;     // Tell the car you are sending 3 more bytes in this request
-    msg.buf[1] = ENHANCE_DATA_REQ;   // Request enhanced service data from the car
-    msg.buf[2] = info->get_byte_1(); // UDS request byte 1
-    msg.buf[3] = info->get_byte_2(); // UDS request byte 2
+    CAN_message_t msg;             // Initialize the CAN message to send to the car
+    msg.buf[0] = NUM_DATA_BYTES;   // Tell the car you are sending 3 more bytes in this request
+    msg.buf[1] = ENHANCE_DATA_REQ; // Request enhanced service data from the car
+    msg.buf[2] = 0xFF;             // UDS request byte 1
+    msg.buf[3] = 0xFF;             // UDS request byte 2
     msg.buf[4] = 0;
     msg.buf[5] = 0;
     msg.buf[6] = 0;
@@ -52,12 +52,13 @@ void can_recv(const CAN_message_t &msg)
     uint8_t byte_1 = msg.buf[2]; // Get the first byte that the message is responding to
     uint8_t byte_2 = msg.buf[3]; // Get the second byte that the message is responding to
 
+    /* Check that CAN message is a valid response */
     if (msg.buf[1] != ENHANCE_DATA_RESP)
     {
         return;
     }
 
-    Information *info = get_info_panel(byte_1, byte_2);
+    // Figure out which Request the message was a response to
 
     float x = 0; // This is where data will go
 
@@ -69,89 +70,20 @@ void can_recv(const CAN_message_t &msg)
     {
         x = (msg.buf[4] << 8) | msg.buf[5]; // Concatenate data together
     }
-    x = (x + info->get_offset()) * info->get_scale(); // Apply offset and scale
-    if (info->get_is_metric())
-    {
-        info->set_data(x);
-    }
-    else
-    {
-        convert_units(info, x);
-    }
+    // Apply offset and scale
+    // Convert to imperial if necessary
 }
 
 /********************
  * Helper Functions *
  ********************/
 
-Information *get_info_panel(uint8_t byte_1, uint8_t byte_2)
+void convert_units()
 {
-    /* Loop through potential Information objects */
-    for (uint8_t i = 0; i < info_list.size(); i++)
-    {
-        Information *info = info_list[i];                                     // Get the current Information object
-        if ((byte_1 == info->get_byte_1()) && (byte_2 == info->get_byte_2())) // Check if both UDS request bytes match
-        {
-            return info; // Return the Information object if both matches are found
-        }
-    }
-    return nullptr; // Return null if no matches were found *extraneous data*
 }
 
-void convert_units(Information *info, float data)
+void round_data()
 {
-    /* Check what type of data the Information object has */
-    float value = 0;
-    switch (info->get_unit_type())
-    {
-    case Information::PRESSURE:
-        value = data * 14.5038;
-        info->set_data(value);
-        break;
-    case Information::SPEED:
-        value = data / 1.609;
-        info->set_data(value);
-        break;
-    case Information::TEMP:
-        value = data * 1.8 + 32;
-        info->set_data(value);
-        break;
-    case Information::TORQUE:
-        value = data * 0.7375621493;
-        info->set_data(value);
-        break;
-    case Information::VOLUME:
-        value = data / 3.785;
-        info->set_data(value);
-        break;
-    default:
-        info->set_data(data);
-        break;
-    }
-}
-
-void round_data(Information *info)
-{
-    /* Check what type of data the Information object has */
-    switch (info->get_unit_type())
-    {
-    case Information::VOLUME:
-        info->set_data(round(info->get_data_num(), 1)); // 1 decimal place for volume
-        break;
-    case Information::PRESSURE:
-        if (info->get_is_metric())
-        {
-            info->set_data(round(info->get_data_num(), 2)); // 2 decimal places for Metric
-        }
-        else
-        {
-            info->set_data(round(info->get_data_num(), 1)); // 1 decimal place for Imperial
-        }
-        break;
-    default:
-        info->set_data((int)info->get_data_num()); // No decimal places for any other Information type
-        break;
-    }
 }
 
 float round(float value, uint8_t decimal_places)
