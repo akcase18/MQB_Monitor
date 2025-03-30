@@ -1,4 +1,5 @@
 #include <queue>
+#include "lvgl.h"
 #include "can_handler.hpp"
 #include "ILI948x_t4_mm.h"
 #include "EEPROM.h"
