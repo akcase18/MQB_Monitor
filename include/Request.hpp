@@ -1,25 +1,38 @@
+#pragma once
+
 #include "Arduino.h"
+#include "etl/unordered_map.h"
+#include "styles.hpp"
 
-#define NO_OFFSET 0
-#define NO_SCALE 1
+constexpr uint8_t NO_OFFSET = 0;
+constexpr uint8_t NO_SCALE = 1;
 
-uint32_t req_uid = 0;
-
-struct Request
+struct UDS_Data
 {
-    static inline uint32_t gen_uid()
-    {
-        static uint32_t req_uid = 0;
-        return req_uid++;
-    }
-
-    uint32_t uid;
     uint16_t byte_1; // First byte of UDS request code (in hex)
     uint16_t byte_2; // Second byte of UDS request code (in hex)
-    float offset;    // Offset value to decode raw data
-    float scale;     // Scaling factor to decode raw data
-    float data = 0;  // Received data (decoded)
-
-    Request(uint32_t b1, uint32_t b2, float off, float sc)
-        : uid(gen_uid()), byte_1(b1), byte_2(b2), offset(off), scale(sc) {}
 };
+
+class Request
+{
+public:
+    /* Public Variables */
+    uint32_t uid;       // Unique ID for the Request
+    UDS_Data uds_bytes; // UDS bytes for the Request
+    float offset;       // Offset value to decode raw data
+    float scale;        // Scaling factor to decode raw data
+    float data = 0;     // Received data (decoded)
+
+    /**
+     * Constructor for Request objects.
+     * Creates a new Request that will be sent to the car
+     * in order to get data from it.
+     *
+     * @param uds_data UDS request bytes
+     * @param off the offset value for decoding raw data
+     * @param sc the scaling factor for decoding raw data
+     */
+    Request(uint16_t b1, uint16_t b2, float off, float sc);
+};
+
+// etl::unordered_map<UDS_Data, Request *, NUM_REQS> requests;

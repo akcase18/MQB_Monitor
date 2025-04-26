@@ -29,13 +29,13 @@ void can_loop()
     MQB_CAN.events();
 }
 
-void can_send()
+void can_send(Request *req)
 {
-    CAN_message_t msg;             // Initialize the CAN message to send to the car
-    msg.buf[0] = NUM_DATA_BYTES;   // Tell the car you are sending 3 more bytes in this request
-    msg.buf[1] = ENHANCE_DATA_REQ; // Request enhanced service data from the car
-    msg.buf[2] = 0xFF;             // UDS request byte 1
-    msg.buf[3] = 0xFF;             // UDS request byte 2
+    CAN_message_t msg;                  // Initialize the CAN message to send to the car
+    msg.buf[0] = NUM_DATA_BYTES;        // Tell the car you are sending 3 more bytes in this request
+    msg.buf[1] = ENHANCE_DATA_REQ;      // Request enhanced service data from the car
+    msg.buf[2] = req->uds_bytes.byte_1; // UDS request byte 1
+    msg.buf[3] = req->uds_bytes.byte_2; // UDS request byte 2
     msg.buf[4] = 0;
     msg.buf[5] = 0;
     msg.buf[6] = 0;
@@ -59,24 +59,47 @@ void can_recv(const CAN_message_t &msg)
     }
 
     // Figure out which Request the message was a response to
+    Request *req = get_request(byte_1, byte_2);
 
-    float x = 0; // This is where data will go
+    float new_data = 0; // This is where data will go
 
     if (msg.buf[0] == 0x04) // Data comes in 1 byte
     {
-        x = msg.buf[4];
+        new_data = msg.buf[4];
     }
     else // Data comes in 2 bytes
     {
-        x = (msg.buf[4] << 8) | msg.buf[5]; // Concatenate data together
+        new_data = (msg.buf[4] << 8) | msg.buf[5]; // Concatenate data bytes
     }
     // Apply offset and scale
+    new_data = (new_data * req->offset) * req->scale;
     // Convert to imperial if necessary
+    req->data = new_data;
 }
 
 /********************
  * Helper Functions *
  ********************/
+
+Request *get_request(uint16_t byte_1, uint16_t byte_2)
+{
+    UDS_Data bytes = {
+        .byte_1 = byte_1,
+        .byte_2 = byte_2};
+
+    // if (!requests.empty())
+    // {
+    //     etl::iunordered_map<UDS_Data, Request *>::iterator it = requests.find(bytes);
+    //     if (it != requests.end())
+    //     {
+    //         return it->second;
+    //     }
+    //     else
+    //     {
+    //         return nullptr;
+    //     }
+    // }
+}
 
 void convert_units()
 {
