@@ -2,6 +2,7 @@
 #define SETUP_HPP
 
 #include "etl/unordered_map.h"
+#include "styles.hpp"
 #include "transforms.hpp"
 #include "Request.hpp"
 #include "Info.hpp"
@@ -154,11 +155,11 @@ Info *info_list[NUM_INFO] = {&coolant_temp, &engine_oil_temp, &intake_air_temp, 
  * Panels *
  **********/
 
-Panel panel_1 = Panel(&coolant_temp);
-Panel panel_2 = Panel(&throttle_position);
-Panel panel_3 = Panel(&intake_air_temp);
-Panel panel_4 = Panel(&engine_oil_temp);
-Panel panel_5 = Panel(&actual_intake_pressure);
+Panel panel_1 = Panel(); // coolant temp
+Panel panel_2 = Panel(); // throttle position
+Panel panel_3 = Panel(); // intake air temp 
+Panel panel_4 = Panel(); // engine oil temp
+Panel panel_5 = Panel(); // actual intake pressure
 
 Panel *panel_list[NUM_PANELS] = {&panel_1, &panel_2, &panel_3, &panel_4, &panel_5};
 
@@ -166,7 +167,7 @@ Panel *panel_list[NUM_PANELS] = {&panel_1, &panel_2, &panel_3, &panel_4, &panel_
  * Screens *
  ***********/
 
-Info_Screen screen_1 = Info_Screen(panel_list, 5);
+Info_Screen screen_1 = Info_Screen();
 Configurator config = Configurator();
 
 void setup_info_transforms()

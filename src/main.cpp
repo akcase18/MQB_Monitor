@@ -6,7 +6,7 @@
 
 #include "setup.hpp"
 #include "Screen.hpp"
-#include "transforms.hpp"
+// #include "transforms.hpp"
 
 #define NIGHT 0
 
@@ -72,6 +72,9 @@ int counter = 0;
 /*********
  * Setup *
  *********/
+
+static lv_obj_t *test_screen;
+static lv_obj_t *test_label;
 
 /**
  * LCD Wiring
@@ -172,11 +175,19 @@ void setup()
 
   display_init();
 
+  test_screen = lv_obj_create(NULL);
+  lv_obj_add_style(test_screen, &style_screen, 0);
+  test_label = lv_label_create(test_screen);
+  lv_label_set_text(test_label, "testing testing 123");
+  lv_obj_set_style_text_color(test_label, lv_color_white(), 0);
+
+  lv_screen_load(test_screen);
+
   // touch_init();
 
-  setup_info_transforms();
+  // setup_info_transforms();
 
-  lv_screen_load(screen_1.screen);
+  // lv_screen_load(screen_1.screen);
 
   lv_tick_set_cb(millis);
 }

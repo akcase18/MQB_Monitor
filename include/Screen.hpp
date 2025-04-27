@@ -16,6 +16,8 @@ public:
     lv_obj_t *screen;
 
     Screen();
+
+    void init();
 };
 
 class Info_Screen : public Screen
@@ -24,7 +26,9 @@ public:
     Panel **panels;
     uint8_t num_panels;
 
-    Info_Screen(Panel **panel_list, uint8_t num_panels);
+    Info_Screen();
+
+    void init(Panel **panel_list, uint8_t num_panels);
 };
 
 class Configurator : public Screen

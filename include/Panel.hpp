@@ -19,12 +19,15 @@ class Panel
 {
 public:
     uint32_t uid; // Unique ID for the Panel
+    bool initialized = false;
     Info *info;
     lv_obj_t *btn;
     lv_obj_t *data;
     lv_obj_t *label;
 
-    Panel(Info *new_info);
+    Panel();
+
+    void init(Info *new_info);
 
     void set_info(Info *new_info);
 
@@ -42,5 +45,5 @@ class Graphic_Panel : public Panel
 public:
     lv_obj_t *graphic;
 
-    Graphic_Panel(Info *new_info);
+    Graphic_Panel();
 };
