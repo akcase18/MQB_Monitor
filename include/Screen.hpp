@@ -24,11 +24,12 @@ class Info_Screen : public Screen
 {
 public:
     Panel **panels;
-    uint8_t num_panels;
+    uint8_t total_num_panels; // Maximum number of Panels
+    uint8_t num_panels;       // Number of Panels displayed in this Screen
 
-    Info_Screen();
+    Info_Screen(Panel **panel_list, uint8_t total_num_panels);
 
-    void init(Panel **panel_list, uint8_t num_panels);
+    void init(uint8_t num_panels);
 };
 
 class Configurator : public Screen

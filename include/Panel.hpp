@@ -27,7 +27,7 @@ public:
 
     Panel();
 
-    void init(Info *new_info);
+    void init(lv_obj_t *parent);
 
     void set_info(Info *new_info);
 

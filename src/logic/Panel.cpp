@@ -15,12 +15,12 @@ Panel::Panel()
  * Public Functions *
  ********************/
 
-void Panel::init(Info *info)
+void Panel::init(lv_obj_t *parent)
 {
     this->info = info;
 
     // Create the button
-    this->btn = lv_btn_create(NULL);
+    this->btn = lv_btn_create(parent);
     lv_obj_add_style(this->btn, &style_panel_btn, 0);
     lv_obj_add_style(this->btn, &style_panel_btn_pressed, LV_STATE_PRESSED);
 
@@ -29,7 +29,7 @@ void Panel::init(Info *info)
     lv_obj_add_style(this->data, &style_panel_data, 0);
     lv_obj_add_style(this->data, &style_panel_data_sm, LV_STATE_USER_1); // Small Panel
     lv_obj_add_style(this->data, &style_panel_data_lg, LV_STATE_USER_2); // Large Panel
-    lv_label_set_text(this->data, info->get_data_str().c_str());
+    // lv_label_set_text(this->data, info->get_data_str().c_str());
     lv_obj_center(this->data);
 
     // Create the label for the name
@@ -37,7 +37,7 @@ void Panel::init(Info *info)
     lv_obj_add_style(this->label, &style_panel_label, 0);
     lv_obj_add_style(this->label, &style_panel_label_sm, LV_STATE_USER_1); // Small Panel
     lv_obj_add_style(this->label, &style_panel_label_lg, LV_STATE_USER_2); // Large Panel
-    lv_label_set_text(this->label, info->get_name_and_label().c_str());
+    // lv_label_set_text(this->label, info->get_name_and_label().c_str());
     lv_obj_set_align(this->label, LV_ALIGN_BOTTOM_MID);
 
     this->initialized = true;

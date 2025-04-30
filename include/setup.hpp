@@ -167,15 +167,41 @@ Panel *panel_list[NUM_PANELS] = {&panel_1, &panel_2, &panel_3, &panel_4, &panel_
  * Screens *
  ***********/
 
-Info_Screen screen_1 = Info_Screen();
+Info_Screen screen_1 = Info_Screen(panel_list, NUM_PANELS);
 Configurator config = Configurator();
 
-void setup_info_transforms()
+
+/******************
+ * Initialization *
+ ******************/
+
+void init_panels()
+{
+    panel_1.set_info(&coolant_temp);
+    panel_2.set_info(&throttle_position);
+    panel_3.set_info(&intake_air_temp);
+    panel_4.set_info(&engine_oil_temp);
+    panel_5.set_info(&actual_intake_pressure);
+}
+
+void init_screens()
+{
+    screen_1.init(5);
+}
+
+void init_transforms()
 {
     for (uint8_t i = 0; i < NUM_INFO; i++)
     {
         info_list[i]->set_transform(transform_default);
     }
+}
+
+void setup_init()
+{
+    init_screens();
+    init_panels();
+    init_transforms();
 }
 
 #endif

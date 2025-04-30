@@ -4,7 +4,9 @@
  * Constructors *
  ****************/
 
-Info_Screen::Info_Screen()
+Info_Screen::Info_Screen(Panel **panel_list, uint8_t total_num_panels)
+    : panels(panel_list),
+      total_num_panels(total_num_panels)
 {
 }
 
@@ -13,9 +15,8 @@ Info_Screen::Info_Screen()
  * Public Functions *
  ********************/
 
-void Info_Screen::init(Panel **panel_list, uint8_t num_panels)
+void Info_Screen::init(uint8_t num_panels)
 {
-    this->panels = panel_list;
     this->num_panels = num_panels;
 
     this->screen = lv_obj_create(NULL);
@@ -27,6 +28,7 @@ void Info_Screen::init(Panel **panel_list, uint8_t num_panels)
 
     for (uint8_t i = 0; i < num_panels; i++)
     {
+        panels[i]->init(this->screen);
         lv_obj_set_parent(panels[i]->btn, this->screen);
     }
 

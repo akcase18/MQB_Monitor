@@ -51,7 +51,7 @@ LV_STYLE_CONST_INIT(style_screen, style_screen_props);
  */
 static const lv_style_const_prop_t style_panel_btn_props[] = {
     LV_STYLE_CONST_RADIUS(2),
-    LV_STYLE_CONST_BG_COLOR(lv_color_black()),
+    LV_STYLE_CONST_BG_COLOR(lv_color_white()),
     LV_STYLE_CONST_TEXT_COLOR(lv_color_white()),
     LV_STYLE_CONST_PROPS_END,
 };
@@ -76,6 +76,8 @@ LV_STYLE_CONST_INIT(style_panel_btn_pressed, style_panel_btn_pressed_props);
  */
 static const lv_style_const_prop_t style_panel_data_props[] = {
     LV_STYLE_CONST_ALIGN(LV_ALIGN_CENTER),
+    LV_STYLE_CONST_BORDER_COLOR(lv_color_black()),
+    LV_STYLE_CONST_BORDER_WIDTH(3),
     LV_STYLE_CONST_PROPS_END,
 };
 LV_STYLE_CONST_INIT(style_panel_data, style_panel_data_props);
