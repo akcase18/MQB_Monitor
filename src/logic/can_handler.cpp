@@ -31,11 +31,11 @@ void can_loop()
 
 void can_send(Request *req)
 {
-    CAN_message_t msg;                  // Initialize the CAN message to send to the car
-    msg.buf[0] = NUM_DATA_BYTES;        // Tell the car you are sending 3 more bytes in this request
-    msg.buf[1] = ENHANCE_DATA_REQ;      // Request enhanced service data from the car
-    msg.buf[2] = req->uds_bytes.byte_1; // UDS request byte 1
-    msg.buf[3] = req->uds_bytes.byte_2; // UDS request byte 2
+    CAN_message_t msg;             // Initialize the CAN message to send to the car
+    msg.buf[0] = NUM_DATA_BYTES;   // Tell the car you are sending 3 more bytes in this request
+    msg.buf[1] = ENHANCE_DATA_REQ; // Request enhanced service data from the car
+    msg.buf[2] = req->byte_1;      // UDS request byte 1
+    msg.buf[3] = req->byte_2;      // UDS request byte 2
     msg.buf[4] = 0;
     msg.buf[5] = 0;
     msg.buf[6] = 0;
@@ -73,7 +73,6 @@ void can_recv(const CAN_message_t &msg)
     }
     // Apply offset and scale
     new_data = (new_data * req->offset) * req->scale;
-    // Convert to imperial if necessary
     req->data = new_data;
 }
 
@@ -83,37 +82,17 @@ void can_recv(const CAN_message_t &msg)
 
 Request *get_request(uint16_t byte_1, uint16_t byte_2)
 {
-    UDS_Data bytes = {
-        .byte_1 = byte_1,
-        .byte_2 = byte_2};
-
-    // if (!requests.empty())
-    // {
-    //     etl::iunordered_map<UDS_Data, Request *>::iterator it = requests.find(bytes);
-    //     if (it != requests.end())
-    //     {
-    //         return it->second;
-    //     }
-    //     else
-    //     {
-    //         return nullptr;
-    //     }
-    // }
-}
-
-void convert_units()
-{
-}
-
-void round_data()
-{
-}
-
-float round(float value, uint8_t decimal_places)
-{
-    /* I don't remember how this works, but it's online somewhere */
-    int round_value = pow(10, decimal_places);
-
-    float val = (int)(value * round_value + 0.5);
-    return (float)(val / round_value);
+    if (!request_list.empty())
+    {
+        auto it = request_list.find(etl::pair<uint16_t, uint16_t>(byte_1, byte_2));
+        if (it != request_list.end())
+        {
+            return it->second;
+        }
+        else
+        {
+            return nullptr;
+        }
+    }
+    return nullptr;
 }

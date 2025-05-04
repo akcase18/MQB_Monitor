@@ -22,6 +22,8 @@ void Panel::init(lv_obj_t *parent)
     // Create the button
     this->btn = lv_btn_create(parent);
     lv_obj_add_style(this->btn, &style_panel_btn, 0);
+    lv_obj_add_style(this->btn, &style_panel_btn_sm, LV_STATE_USER_1); // Small Panel
+    lv_obj_add_style(this->btn, &style_panel_btn_lg, LV_STATE_USER_2); // Large Panel
     lv_obj_add_style(this->btn, &style_panel_btn_pressed, LV_STATE_PRESSED);
 
     // Create the label for the data
@@ -54,4 +56,18 @@ void Panel::set_info(Info *new_info)
 void Panel::update()
 {
     lv_label_set_text(data, info->get_data_str().c_str());
+}
+
+void Panel::set_sm_panel()
+{
+    lv_obj_set_state(this->btn, LV_STATE_USER_1, true);
+    lv_obj_set_state(this->data, LV_STATE_USER_1, true);
+    lv_obj_set_state(this->label, LV_STATE_USER_1, true);
+}
+
+void Panel::set_lg_panel()
+{
+    lv_obj_set_state(this->btn, LV_STATE_USER_2, true);
+    lv_obj_set_state(this->data, LV_STATE_USER_2, true);
+    lv_obj_set_state(this->label, LV_STATE_USER_2, true);
 }

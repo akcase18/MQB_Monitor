@@ -6,6 +6,13 @@
  * Holds (and initalizes) all styles used
  */
 
+/*************
+ * Constants *
+ *************/
+
+constexpr uint16_t LCD_X = 480;
+constexpr uint16_t LCD_Y = 320;
+
 /*********
  * Fonts *
  *********/
@@ -50,12 +57,27 @@ LV_STYLE_CONST_INIT(style_screen, style_screen_props);
  * - 60-55% the height of the screen (192px-176px, old was 180px)
  */
 static const lv_style_const_prop_t style_panel_btn_props[] = {
-    LV_STYLE_CONST_RADIUS(2),
-    LV_STYLE_CONST_BG_COLOR(lv_color_white()),
+    LV_STYLE_CONST_FLEX_GROW(1),
+    LV_STYLE_CONST_BG_COLOR(lv_color_black()),
     LV_STYLE_CONST_TEXT_COLOR(lv_color_white()),
+    LV_STYLE_CONST_PAD_BOTTOM(2),
+    // LV_STYLE_CONST_BORDER_WIDTH(1),
+    LV_STYLE_CONST_RADIUS(0),
     LV_STYLE_CONST_PROPS_END,
 };
 LV_STYLE_CONST_INIT(style_panel_btn, style_panel_btn_props);
+
+static const lv_style_const_prop_t style_panel_btn_sm_props[] = {
+    LV_STYLE_CONST_HEIGHT((int32_t)(320 * 0.45)),\
+    LV_STYLE_CONST_PROPS_END,
+};
+LV_STYLE_CONST_INIT(style_panel_btn_sm, style_panel_btn_sm_props);
+
+static const lv_style_const_prop_t style_panel_btn_lg_props[] = {
+    LV_STYLE_CONST_HEIGHT((int32_t)(320 * 0.55)),
+    LV_STYLE_CONST_PROPS_END,
+};
+LV_STYLE_CONST_INIT(style_panel_btn_lg, style_panel_btn_lg_props);
 
 /**
  * Button - Pressed
@@ -76,8 +98,7 @@ LV_STYLE_CONST_INIT(style_panel_btn_pressed, style_panel_btn_pressed_props);
  */
 static const lv_style_const_prop_t style_panel_data_props[] = {
     LV_STYLE_CONST_ALIGN(LV_ALIGN_CENTER),
-    LV_STYLE_CONST_BORDER_COLOR(lv_color_black()),
-    LV_STYLE_CONST_BORDER_WIDTH(3),
+    LV_STYLE_CONST_TEXT_COLOR(lv_color_white()),
     LV_STYLE_CONST_PROPS_END,
 };
 LV_STYLE_CONST_INIT(style_panel_data, style_panel_data_props);
@@ -88,9 +109,8 @@ LV_STYLE_CONST_INIT(style_panel_data, style_panel_data_props);
  * Builds off of base data style. Uses smaller fonts.
  */
 static const lv_style_const_prop_t style_panel_data_sm_props[] = {
-    LV_STYLE_CONST_TRANSLATE_Y(-10),
     LV_STYLE_CONST_TEXT_FONT(&digital_display_80_v2),
-    LV_STYLE_CONST_FLEX_GROW(2),
+    LV_STYLE_CONST_TRANSLATE_Y(-10),
     LV_STYLE_CONST_PROPS_END,
 };
 LV_STYLE_CONST_INIT(style_panel_data_sm, style_panel_data_sm_props);
@@ -101,9 +121,8 @@ LV_STYLE_CONST_INIT(style_panel_data_sm, style_panel_data_sm_props);
  * Builds off of base data style. Uses larger fonts.
  */
 static const lv_style_const_prop_t style_panel_data_lg_props[] = {
-    LV_STYLE_CONST_TRANSLATE_Y(-20),
     LV_STYLE_CONST_TEXT_FONT(&digital_display_115_v2),
-    LV_STYLE_CONST_FLEX_GROW(3),
+    LV_STYLE_CONST_TRANSLATE_Y(-10),
     LV_STYLE_CONST_PROPS_END,
 };
 LV_STYLE_CONST_INIT(style_panel_data_lg, style_panel_data_lg_props);
@@ -115,8 +134,9 @@ LV_STYLE_CONST_INIT(style_panel_data_lg, style_panel_data_lg_props);
  */
 static const lv_style_const_prop_t style_panel_label_props[] = {
     LV_STYLE_CONST_ALIGN(LV_ALIGN_BOTTOM_MID),
-    LV_STYLE_CONST_HEIGHT(20),
     LV_STYLE_CONST_WIDTH(LV_SIZE_CONTENT),
+    // LV_STYLE_CONST_BORDER_COLOR(lv_color_white()),
+    // LV_STYLE_CONST_BORDER_WIDTH(1),
     LV_STYLE_CONST_PROPS_END,
 };
 LV_STYLE_CONST_INIT(style_panel_label, style_panel_label_props);
@@ -128,6 +148,7 @@ LV_STYLE_CONST_INIT(style_panel_label, style_panel_label_props);
  */
 static const lv_style_const_prop_t style_panel_label_sm_props[] = {
     LV_STYLE_CONST_TEXT_FONT(&vw_16),
+    LV_STYLE_CONST_HEIGHT(18),
     LV_STYLE_CONST_PROPS_END,
 };
 LV_STYLE_CONST_INIT(style_panel_label_sm, style_panel_label_sm_props);
@@ -139,6 +160,7 @@ LV_STYLE_CONST_INIT(style_panel_label_sm, style_panel_label_sm_props);
  */
 static const lv_style_const_prop_t style_panel_label_lg_props[] = {
     LV_STYLE_CONST_TEXT_FONT(&vw_18),
+    LV_STYLE_CONST_HEIGHT(20),
     LV_STYLE_CONST_PROPS_END,
 };
 LV_STYLE_CONST_INIT(style_panel_label_lg, style_panel_label_lg_props);

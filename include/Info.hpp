@@ -47,7 +47,6 @@ public:
      * @param transform
      */
     Info(String name, Unit_Type unit_type, uint16_t cycle_time, Request **requests, uint8_t num_requests);
-    // Info(String name, Unit_Type unit_type, uint16_t cycle_time, Request **requests, uint8_t num_requests, float (*transform)(Request **));
 
     String get_name();
 
@@ -64,14 +63,43 @@ public:
 
     String get_data_str();
 
+    Request **get_requests();
+    uint8_t get_num_requests();
+
     void set_transform(float (*transform)(Request **));
 
 private:
     /* Private Functions */
 
     /**
+     * Sets the unit label based on the type of data.
+     */
+    void set_unit_label();
+
+    /**
      * Sets the number of decimals to use for both metric and
      * imperial data, based on the type of data.
      */
     void set_decimals();
+
+    /**
+     * Converts the data metric to imperial units.
+     */
+    void convert_units();
+
+    /**
+     * Automatically rounds the data based on the data type.
+     */
+    void round_data();
+
+    /**
+     * Rounding helper function to round a given value to a certain number
+     * of decimal places.
+     *
+     * @param value the value to round
+     * @param decimal_places the number of decimal places to round the given value to
+     *
+     * @return the rounded value with the correct number of decimal places
+     */
+    float round(float value, uint8_t decimal_places);
 };

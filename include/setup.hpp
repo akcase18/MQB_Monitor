@@ -1,7 +1,5 @@
-#ifndef SETUP_HPP
-#define SETUP_HPP
+#pragma once
 
-#include "etl/unordered_map.h"
 #include "styles.hpp"
 #include "transforms.hpp"
 #include "Request.hpp"
@@ -13,7 +11,6 @@
  * Constants *
  *************/
 
-constexpr uint8_t NUM_REQS = 24;
 constexpr uint8_t NUM_INFO = 22;
 constexpr uint8_t NUM_PANELS = 5;
 
@@ -51,7 +48,7 @@ Request tim_cor_2_req = Request(0x20, 0x0B, NO_OFFSET, 0.01);    // Timing Corre
 Request tim_cor_3_req = Request(0x20, 0x0C, NO_OFFSET, 0.01);    // Timing Correction (Cylinder 3)
 Request tim_cor_4_req = Request(0x20, 0x0D, NO_OFFSET, 0.01);    // Timing Correction (Cylinder 4)
 
-// etl::unordered_map<UDS_Data, Request *, NUM_REQS> request_list;
+etl::unordered_map<etl::pair<uint16_t, uint16_t>, Request *, NUM_REQS> request_list = {};
 
 /********
  * Info *
@@ -157,7 +154,7 @@ Info *info_list[NUM_INFO] = {&coolant_temp, &engine_oil_temp, &intake_air_temp, 
 
 Panel panel_1 = Panel(); // coolant temp
 Panel panel_2 = Panel(); // throttle position
-Panel panel_3 = Panel(); // intake air temp 
+Panel panel_3 = Panel(); // intake air temp
 Panel panel_4 = Panel(); // engine oil temp
 Panel panel_5 = Panel(); // actual intake pressure
 
@@ -170,10 +167,37 @@ Panel *panel_list[NUM_PANELS] = {&panel_1, &panel_2, &panel_3, &panel_4, &panel_
 Info_Screen screen_1 = Info_Screen(panel_list, NUM_PANELS);
 Configurator config = Configurator();
 
-
 /******************
  * Initialization *
  ******************/
+
+void init_requests()
+{
+    request_list[etl::pair<uint16_t, uint16_t>(cool_tmp_req.byte_1, cool_tmp_req.byte_2)] = &cool_tmp_req;
+    request_list[etl::pair<uint16_t, uint16_t>(eng_oil_tmp_req.byte_1, eng_oil_tmp_req.byte_2)] = &eng_oil_tmp_req;
+    request_list[etl::pair<uint16_t, uint16_t>(int_air_tmp_req.byte_1, int_air_tmp_req.byte_2)] = &int_air_tmp_req;
+    request_list[etl::pair<uint16_t, uint16_t>(chg_pres_req.byte_1, chg_pres_req.byte_2)] = &chg_pres_req;
+    request_list[etl::pair<uint16_t, uint16_t>(int_pres_req.byte_1, int_pres_req.byte_2)] = &int_pres_req;
+    request_list[etl::pair<uint16_t, uint16_t>(amb_pres_req.byte_1, amb_pres_req.byte_2)] = &amb_pres_req;
+    request_list[etl::pair<uint16_t, uint16_t>(lmd_act_req.byte_1, lmd_act_req.byte_2)] = &lmd_act_req;
+    request_list[etl::pair<uint16_t, uint16_t>(lmd_spec_req.byte_1, lmd_spec_req.byte_2)] = &lmd_spec_req;
+    request_list[etl::pair<uint16_t, uint16_t>(trbo_spd_req.byte_1, trbo_spd_req.byte_2)] = &trbo_spd_req;
+    request_list[etl::pair<uint16_t, uint16_t>(eng_rpm_req.byte_1, eng_rpm_req.byte_2)] = &eng_rpm_req;
+    request_list[etl::pair<uint16_t, uint16_t>(eng_trq_req.byte_1, eng_trq_req.byte_2)] = &eng_trq_req;
+    request_list[etl::pair<uint16_t, uint16_t>(car_spd_req.byte_1, car_spd_req.byte_2)] = &car_spd_req;
+    request_list[etl::pair<uint16_t, uint16_t>(fuel_lvl_req.byte_1, fuel_lvl_req.byte_2)] = &fuel_lvl_req;
+    request_list[etl::pair<uint16_t, uint16_t>(fuel_pcnt_req.byte_1, fuel_pcnt_req.byte_2)] = &fuel_pcnt_req;
+    request_list[etl::pair<uint16_t, uint16_t>(thrtl_pos_req.byte_1, thrtl_pos_req.byte_2)] = &thrtl_pos_req;
+    request_list[etl::pair<uint16_t, uint16_t>(msfr_sum_req.byte_1, msfr_sum_req.byte_2)] = &msfr_sum_req;
+    request_list[etl::pair<uint16_t, uint16_t>(msfr_1_req.byte_1, msfr_1_req.byte_2)] = &msfr_1_req;
+    request_list[etl::pair<uint16_t, uint16_t>(msfr_2_req.byte_1, msfr_2_req.byte_2)] = &msfr_2_req;
+    request_list[etl::pair<uint16_t, uint16_t>(msfr_3_req.byte_1, msfr_3_req.byte_2)] = &msfr_3_req;
+    request_list[etl::pair<uint16_t, uint16_t>(msfr_4_req.byte_1, msfr_4_req.byte_2)] = &msfr_4_req;
+    request_list[etl::pair<uint16_t, uint16_t>(tim_cor_1_req.byte_1, tim_cor_1_req.byte_2)] = &tim_cor_1_req;
+    request_list[etl::pair<uint16_t, uint16_t>(tim_cor_2_req.byte_1, tim_cor_2_req.byte_2)] = &tim_cor_2_req;
+    request_list[etl::pair<uint16_t, uint16_t>(tim_cor_3_req.byte_1, tim_cor_3_req.byte_2)] = &tim_cor_3_req;
+    request_list[etl::pair<uint16_t, uint16_t>(tim_cor_4_req.byte_1, tim_cor_4_req.byte_2)] = &tim_cor_4_req;
+}
 
 void init_panels()
 {
@@ -202,6 +226,5 @@ void setup_init()
     init_screens();
     init_panels();
     init_transforms();
+    init_requests();
 }
-
-#endif

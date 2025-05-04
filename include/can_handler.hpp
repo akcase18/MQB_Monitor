@@ -52,25 +52,4 @@ void can_recv(const CAN_message_t &msg);
  */
 Request *get_request(uint16_t byte_1, uint16_t byte_2);
 
-/**
- * Converts data from metric to imperial
- */
-void convert_units();
-
-/**
- * Rounds data based on it's data type
- */
-void round_data();
-
-/**
- * Rounding helper function to round a given value to a certain number
- * of decimal places.
- *
- * @param value the value to round
- * @param decimal_places the number of decimal places to round the given value to
- *
- * @return the rounded value with the correct number of decimal places
- */
-float round(float value, uint8_t decimal_places);
-
 #endif

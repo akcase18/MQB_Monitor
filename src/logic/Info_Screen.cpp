@@ -29,13 +29,18 @@ void Info_Screen::init(uint8_t num_panels)
     for (uint8_t i = 0; i < num_panels; i++)
     {
         panels[i]->init(this->screen);
+        if (i == (int)((num_panels / 2) + 1))
+        {
+            lv_obj_add_flag(panels[i]->btn, LV_OBJ_FLAG_FLEX_IN_NEW_TRACK);
+        }
         lv_obj_set_parent(panels[i]->btn, this->screen);
+        lv_obj_set_height(panels[i]->btn, 100);
     }
 
     /* Temporary */
-    lv_obj_set_state(panels[0]->btn, LV_STATE_USER_1, true);
-    lv_obj_set_state(panels[1]->btn, LV_STATE_USER_1, true);
-    lv_obj_set_state(panels[2]->btn, LV_STATE_USER_1, true);
-    lv_obj_set_state(panels[3]->btn, LV_STATE_USER_2, true);
-    lv_obj_set_state(panels[4]->btn, LV_STATE_USER_2, true);
+    panels[0]->set_sm_panel();
+    panels[1]->set_sm_panel();
+    panels[2]->set_sm_panel();
+    panels[3]->set_lg_panel();
+    panels[4]->set_lg_panel();
 }

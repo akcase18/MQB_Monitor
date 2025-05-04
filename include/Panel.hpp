@@ -32,6 +32,9 @@ public:
     void set_info(Info *new_info);
 
     void update();
+
+    void set_sm_panel();
+    void set_lg_panel();
 };
 
 

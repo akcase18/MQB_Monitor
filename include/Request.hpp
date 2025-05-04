@@ -1,27 +1,23 @@
 #pragma once
 
 #include "Arduino.h"
-#include "etl/unordered_map.h"
+#include "etl_hash.hpp"
 #include "styles.hpp"
 
 constexpr uint8_t NO_OFFSET = 0;
 constexpr uint8_t NO_SCALE = 1;
-
-struct UDS_Data
-{
-    uint16_t byte_1; // First byte of UDS request code (in hex)
-    uint16_t byte_2; // Second byte of UDS request code (in hex)
-};
+constexpr uint8_t NUM_REQS = 24;
 
 class Request
 {
 public:
     /* Public Variables */
-    uint32_t uid;       // Unique ID for the Request
-    UDS_Data uds_bytes; // UDS bytes for the Request
-    float offset;       // Offset value to decode raw data
-    float scale;        // Scaling factor to decode raw data
-    float data = 0;     // Received data (decoded)
+    uint32_t uid;    // Unique ID for the Request
+    uint16_t byte_1; // First byte of UDS request code (in hex)
+    uint16_t byte_2; // Second byte of UDS request code (in hex)
+    float offset;    // Offset value to decode raw data
+    float scale;     // Scaling factor to decode raw data
+    float data = 0;  // Received data (decoded)
 
     /**
      * Constructor for Request objects.
@@ -35,4 +31,4 @@ public:
     Request(uint16_t b1, uint16_t b2, float off, float sc);
 };
 
-// etl::unordered_map<UDS_Data, Request *, NUM_REQS> requests;
+extern etl::unordered_map<etl::pair<uint16_t, uint16_t>, Request *, NUM_REQS> request_list;
