@@ -62,7 +62,8 @@ static const lv_style_const_prop_t style_panel_btn_props[] = {
     LV_STYLE_CONST_TEXT_COLOR(lv_color_white()),
     LV_STYLE_CONST_PAD_BOTTOM(2),
     // LV_STYLE_CONST_BORDER_WIDTH(1),
-    LV_STYLE_CONST_RADIUS(0),
+    LV_STYLE_CONST_RADIUS(10),
+    LV_STYLE_CONST_SHADOW_WIDTH(0),
     LV_STYLE_CONST_PROPS_END,
 };
 LV_STYLE_CONST_INIT(style_panel_btn, style_panel_btn_props);

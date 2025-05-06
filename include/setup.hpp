@@ -56,31 +56,31 @@ etl::unordered_map<etl::pair<uint16_t, uint16_t>, Request *, NUM_REQS> request_l
 
 /* Coolant Temp */
 Request *coolant_temp_req_list[] = {&cool_tmp_req};
-Info coolant_temp = Info("Coolant Temp", Unit_Type::Temp, 2000, coolant_temp_req_list, 1);
+Info coolant_temp = Info("Cool Temp", Unit_Type::Temp, 2000, coolant_temp_req_list, 1);
 
 /* Engine Oil Temp */
 Request *engine_oil_temp_req_list[] = {&eng_oil_tmp_req};
-Info engine_oil_temp = Info("Engine Oil Temp", Unit_Type::Temp, 1000, engine_oil_temp_req_list, 1);
+Info engine_oil_temp = Info("Eng Oil Temp", Unit_Type::Temp, 1000, engine_oil_temp_req_list, 1);
 
 /* Intake Air Temp */
 Request *intake_air_temp_req_list[] = {&int_air_tmp_req};
-Info intake_air_temp = Info("Intake Air Temp", Unit_Type::Temp, 100, intake_air_temp_req_list, 1);
+Info intake_air_temp = Info("Int Air Temp", Unit_Type::Temp, 100, intake_air_temp_req_list, 1);
 
 /* Charge Pressure */
 Request *charge_pressure_req_list[] = {&chg_pres_req};
-Info charge_pressure = Info("Charge Pressure", Unit_Type::Pressure, 100, charge_pressure_req_list, 1);
+Info charge_pressure = Info("Charge Pres", Unit_Type::Pressure, 100, charge_pressure_req_list, 1);
 
 /* Intake Pressure */
 Request *intake_pressure_req_list[] = {&int_pres_req};
-Info intake_pressure = Info("Intake Pressure", Unit_Type::Pressure, 20, intake_pressure_req_list, 1);
+Info intake_pressure = Info("Int Pres", Unit_Type::Pressure, 20, intake_pressure_req_list, 1);
 
 /* Ambient Pressure */
 Request *ambient_pressure_req_list[] = {&amb_pres_req};
-Info ambient_pressure = Info("Ambient Pressure", Unit_Type::Pressure, 1000, ambient_pressure_req_list, 1);
+Info ambient_pressure = Info("Amb Pres", Unit_Type::Pressure, 1000, ambient_pressure_req_list, 1);
 
 /* Actual Intake Pressure */
 Request *actual_intake_pressure_req_list[] = {&amb_pres_req, &int_pres_req};
-Info actual_intake_pressure = Info("Intake Pressure Act.", Unit_Type::Pressure, 20, actual_intake_pressure_req_list, 2);
+Info actual_intake_pressure = Info("Int Pres Act.", Unit_Type::Pressure, 20, actual_intake_pressure_req_list, 2);
 
 /* Engine RPM */
 Request *engine_rpm_req_list[] = {&eng_rpm_req};
@@ -92,7 +92,7 @@ Info engine_torque = Info("Engine Torque", Unit_Type::Torque, 20, engine_torque_
 
 /* Vehicle Speed */
 Request *vehicle_speed_req_list[] = {&car_spd_req};
-Info vehicle_speed = Info("Vehicle Speed", Unit_Type::Speed, 100, vehicle_speed_req_list, 1);
+Info vehicle_speed = Info("Speed", Unit_Type::Speed, 100, vehicle_speed_req_list, 1);
 
 /* Fuel Level */
 Request *fuel_level_req_list[] = {&fuel_lvl_req};
@@ -104,43 +104,43 @@ Info fuel_percent = Info("Fuel", Unit_Type::Percent, 5000, fuel_percent_req_list
 
 /* Throttle Position */
 Request *throttle_position_req_list[] = {&thrtl_pos_req};
-Info throttle_position = Info("Throttle Position", Unit_Type::Percent, 20, throttle_position_req_list, 1);
+Info throttle_position = Info("Throttle Pos", Unit_Type::Percent, 20, throttle_position_req_list, 1);
 
 /* Misfires */
 Request *misfire_sum_req_list[] = {&msfr_sum_req};
-Info misfire_sum = Info("Misfire Count", Unit_Type::None, 500, misfire_sum_req_list, 1);
+Info misfire_sum = Info("Misfire Cnt", Unit_Type::None, 500, misfire_sum_req_list, 1);
 
 /* Cyl 1 Misfires */
 Request *misfire_cyl_1_req_list[] = {&msfr_1_req};
-Info misfire_cyl_1 = Info("Misfire Count Cyl 1", Unit_Type::None, 500, misfire_cyl_1_req_list, 1);
+Info misfire_cyl_1 = Info("Misfire Cnt Cyl 1", Unit_Type::None, 500, misfire_cyl_1_req_list, 1);
 
 /* Cyl 2 Misfires */
 Request *misfire_cyl_2_req_list[] = {&msfr_2_req};
-Info misfire_cyl_2 = Info("Misfire Count Cyl 2", Unit_Type::None, 500, misfire_cyl_2_req_list, 1);
+Info misfire_cyl_2 = Info("Misfire Cnt Cyl 2", Unit_Type::None, 500, misfire_cyl_2_req_list, 1);
 
 /* Cyl 3 Misfires */
 Request *misfire_cyl_3_req_list[] = {&msfr_3_req};
-Info misfire_cyl_3 = Info("Misfire Count Cyl 3", Unit_Type::None, 500, misfire_cyl_3_req_list, 1);
+Info misfire_cyl_3 = Info("Misfire Cnt Cyl 3", Unit_Type::None, 500, misfire_cyl_3_req_list, 1);
 
 /* Cyl 4 Misfires */
 Request *misfire_cyl_4_req_list[] = {&msfr_4_req};
-Info misfire_cyl_4 = Info("Misfire Count Cyl 4", Unit_Type::None, 500, misfire_cyl_4_req_list, 1);
+Info misfire_cyl_4 = Info("Misfire Cnt Cyl 4", Unit_Type::None, 500, misfire_cyl_4_req_list, 1);
 
 /* Cyl 1 Timing Correction */
 Request *timing_corr_1_req_list[] = {&tim_cor_1_req};
-Info timing_corr_1 = Info("Timing Corr. Cyl 1", Unit_Type::Degrees, 100, timing_corr_1_req_list, 1);
+Info timing_corr_1 = Info("Time Corr. Cyl 1", Unit_Type::Degrees, 100, timing_corr_1_req_list, 1);
 
 /* Cyl 2 Timing Correction */
 Request *timing_corr_2_req_list[] = {&tim_cor_2_req};
-Info timing_corr_2 = Info("Timing Corr. Cyl 2", Unit_Type::Degrees, 100, timing_corr_2_req_list, 1);
+Info timing_corr_2 = Info("Time Corr. Cyl 2", Unit_Type::Degrees, 100, timing_corr_2_req_list, 1);
 
 /* Cyl 3 Timing Correction */
 Request *timing_corr_3_req_list[] = {&tim_cor_3_req};
-Info timing_corr_3 = Info("Timing Corr. Cyl 3", Unit_Type::Degrees, 100, timing_corr_3_req_list, 1);
+Info timing_corr_3 = Info("Time Corr. Cyl 3", Unit_Type::Degrees, 100, timing_corr_3_req_list, 1);
 
 /* Cyl 4 Timing Correction */
 Request *timing_corr_4_req_list[] = {&tim_cor_4_req};
-Info timing_corr_4 = Info("Timing Corr. Cyl 4", Unit_Type::Degrees, 100, timing_corr_4_req_list, 1);
+Info timing_corr_4 = Info("Time Corr. Cyl 4", Unit_Type::Degrees, 100, timing_corr_4_req_list, 1);
 
 Info *info_list[NUM_INFO] = {&coolant_temp, &engine_oil_temp, &intake_air_temp, &charge_pressure,
                              &intake_pressure, &ambient_pressure, &actual_intake_pressure, &engine_rpm,
@@ -157,6 +157,7 @@ Panel panel_2 = Panel(); // throttle position
 Panel panel_3 = Panel(); // intake air temp
 Panel panel_4 = Panel(); // engine oil temp
 Panel panel_5 = Panel(); // actual intake pressure
+Panel panel_6 = Panel(); //fuel (%)
 
 Panel *panel_list[NUM_PANELS] = {&panel_1, &panel_2, &panel_3, &panel_4, &panel_5};
 

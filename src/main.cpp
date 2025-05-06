@@ -176,9 +176,12 @@ void setup()
 
   lv_screen_load(screen_1.screen);
 
-  cool_tmp_req.data = 100;
-  amb_pres_req.data = 0;
-  int_pres_req.data = 30;
+  cool_tmp_req.data = 238;
+  thrtl_pos_req.data = 15;
+  int_air_tmp_req.data = 62;
+  eng_oil_tmp_req.data = 218;
+  amb_pres_req.data = 14.6;
+  int_pres_req.data = 24.3;
 
   lv_tick_set_cb(millis);
 }

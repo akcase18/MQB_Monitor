@@ -43,6 +43,12 @@ void Info_Screen::init(uint8_t num_panels)
     panels[2]->set_sm_panel();
     panels[3]->set_lg_panel();
     panels[4]->set_lg_panel();
+    // panels[0]->set_sm_panel();
+    // panels[1]->set_sm_panel();
+    // panels[2]->set_sm_panel();
+    // panels[3]->set_sm_panel();
+    // panels[4]->set_sm_panel();
+    // panels[5]->set_sm_panel();
 }
 
 void Info_Screen::update()
