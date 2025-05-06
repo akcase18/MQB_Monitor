@@ -44,6 +44,11 @@ String Info::get_data_str()
     return String(_data, (_is_metric) ? _decimals_m : _decimals_i);
 }
 
+uint16_t Info::get_cycle_time()
+{
+    return _cycle_time;
+}
+
 Request **Info::get_requests()
 {
     return _requests;
@@ -57,6 +62,11 @@ uint8_t Info::get_num_requests()
 void Info::set_transform(float (*transform)(Request **))
 {
     _transform = transform;
+}
+
+void Info::do_transform()
+{
+    _data = _transform(_requests);
 }
 
 /*********************

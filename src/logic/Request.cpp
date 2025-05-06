@@ -13,4 +13,23 @@ Request::Request(uint16_t b1, uint16_t b2, float off, float sc)
       scale(sc)
 {
     uid = request_unique_id++;
+    this->timer = lv_timer_create(NULL, 0, NULL);
+}
+
+void Request::start_timer(lv_timer_cb_t cb, uint32_t period)
+{
+    if (!timer_init)
+    {
+        this->timer = lv_timer_create(cb, period, this);
+        timer_init = true;
+    }
+    else
+    {
+        lv_timer_resume(this->timer);
+    }
+}
+
+void Request::stop_timer()
+{
+    lv_timer_pause(this->timer);
 }

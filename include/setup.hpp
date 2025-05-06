@@ -167,9 +167,47 @@ Panel *panel_list[NUM_PANELS] = {&panel_1, &panel_2, &panel_3, &panel_4, &panel_
 Info_Screen screen_1 = Info_Screen(panel_list, NUM_PANELS);
 Configurator config = Configurator();
 
+/*******
+ * CAN *
+ *******/
+
+std::queue<Request *> can_queue = {};
+lv_timer_t *can_timer;
+
 /******************
  * Initialization *
  ******************/
+
+void can_push_cb(lv_timer_t *timer)
+{
+    Request *request = (Request *)lv_timer_get_user_data(timer);
+    can_queue.push(request);
+}
+
+void can_send_cb(lv_timer_t *timer)
+{
+    if (!can_queue.empty())
+    {
+        can_send(can_queue.front());
+        can_queue.pop();
+    }
+}
+
+void init_timers()
+{
+    for (uint8_t i = 0; i < NUM_PANELS; i++)
+    {
+        for (uint8_t ii = 0; ii < panel_list[i]->info->get_num_requests(); ii++)
+        {
+            Panel *panel = panel_list[i];
+            uint32_t period = panel->info->get_cycle_time();
+            Request *request = panel->info->get_requests()[ii];
+            request->start_timer(can_push_cb, period);
+        }
+    }
+
+    can_timer = lv_timer_create(can_send_cb, 10, NULL);
+}
 
 void init_requests()
 {
@@ -219,6 +257,7 @@ void init_transforms()
     {
         info_list[i]->set_transform(transform_default);
     }
+    actual_intake_pressure.set_transform(transform_act_intake_pressure);
 }
 
 void setup_init()
@@ -227,4 +266,5 @@ void setup_init()
     init_panels();
     init_transforms();
     init_requests();
+    init_timers();
 }

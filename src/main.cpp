@@ -6,7 +6,6 @@
 
 #include "setup.hpp"
 #include "Screen.hpp"
-// #include "transforms.hpp"
 
 #define NIGHT 0
 
@@ -171,21 +170,24 @@ void setup()
   can_init();
 
   display_init();
-  setup_init();
-
   touch_init();
+  
+  setup_init();
 
   lv_screen_load(screen_1.screen);
 
+  cool_tmp_req.data = 100;
   amb_pres_req.data = 0;
-  int_pres_req.data = 10;
+  int_pres_req.data = 30;
 
   lv_tick_set_cb(millis);
 }
 
-unsigned long current_time = 0;
-
 void loop()
 {
   lv_task_handler();
+
+  screen_1.update();
+
+  can_loop();
 }

@@ -5,6 +5,7 @@
  * hold the Panels and a configuration screen as child classes.
  */
 
+#include <queue>
 #include "Panel.hpp"
 
 constexpr uint16_t LCD_HORZ = 480;
@@ -30,6 +31,8 @@ public:
     Info_Screen(Panel **panel_list, uint8_t total_num_panels);
 
     void init(uint8_t num_panels);
+
+    void update();
 };
 
 class Configurator : public Screen
@@ -43,3 +46,5 @@ public:
 
     Configurator();
 };
+
+extern std::queue<Request *> can_queue;

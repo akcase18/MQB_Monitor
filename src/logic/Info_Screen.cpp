@@ -44,3 +44,12 @@ void Info_Screen::init(uint8_t num_panels)
     panels[3]->set_lg_panel();
     panels[4]->set_lg_panel();
 }
+
+void Info_Screen::update()
+{
+    for (uint8_t i = 0; i < num_panels; i++)
+    {
+        panels[i]->info->do_transform();
+        lv_label_set_text(panels[i]->data, panels[i]->info->get_data_str().c_str());
+    }
+}

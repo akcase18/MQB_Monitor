@@ -63,10 +63,13 @@ public:
 
     String get_data_str();
 
+    uint16_t get_cycle_time();
+
     Request **get_requests();
     uint8_t get_num_requests();
 
     void set_transform(float (*transform)(Request **));
+    void do_transform();
 
 private:
     /* Private Functions */
