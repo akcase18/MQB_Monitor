@@ -49,6 +49,11 @@ uint16_t Info::get_cycle_time()
     return _cycle_time;
 }
 
+bool Info::get_metric()
+{
+    return _is_metric;
+}
+
 Request **Info::get_requests()
 {
     return _requests;
@@ -67,6 +72,11 @@ void Info::set_transform(float (*transform)(Request **))
 void Info::do_transform()
 {
     _data = _transform(_requests);
+    if (!_is_metric)
+    {
+        convert_units();    
+    }
+    round_data();
 }
 
 /*********************

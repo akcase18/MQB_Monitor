@@ -6,6 +6,7 @@
 #include "Info.hpp"
 #include "Panel.hpp"
 #include "Screen.hpp"
+#include "can_handler.hpp"
 
 /*************
  * Constants *
@@ -20,7 +21,7 @@ constexpr uint8_t NUM_PANELS = 5;
 
 /***** Performance Metrics *****/
 Request cool_tmp_req = Request(0xF4, 0x05, -40, NO_SCALE);         // Coolant Temperature
-Request eng_oil_tmp_req = Request(0x20, 0x2F, -2731.4, 0.1);       // Engine Oil Temperature
+Request eng_oil_tmp_req = Request(0x40, 0xD5, NO_OFFSET, 0.1);     // Engine Oil Temperature
 Request int_air_tmp_req = Request(0xF4, 0x0F, -40, NO_SCALE);      // Intake Air Temperature
 Request chg_pres_req = Request(0x20, 0x2a, NO_OFFSET, 0.001);      // Charge Pressure
 Request int_pres_req = Request(0x3E, 0x70, NO_OFFSET, 0.001);      // Intake Pressure
@@ -157,7 +158,7 @@ Panel panel_2 = Panel(); // throttle position
 Panel panel_3 = Panel(); // intake air temp
 Panel panel_4 = Panel(); // engine oil temp
 Panel panel_5 = Panel(); // actual intake pressure
-Panel panel_6 = Panel(); //fuel (%)
+Panel panel_6 = Panel(); // fuel (%)
 
 Panel *panel_list[NUM_PANELS] = {&panel_1, &panel_2, &panel_3, &panel_4, &panel_5};
 
@@ -172,7 +173,7 @@ Configurator config = Configurator();
  * CAN *
  *******/
 
-std::queue<Request *> can_queue = {};
+etl::queue<Request *, 64> can_queue = {};
 lv_timer_t *can_timer;
 
 /******************

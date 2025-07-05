@@ -1,4 +1,3 @@
-#include <queue>
 #include "can_handler.hpp"
 #include "ILI948x_t4_mm.h"
 #include "EEPROM.h"
@@ -176,12 +175,12 @@ void setup()
 
   lv_screen_load(screen_1.screen);
 
-  cool_tmp_req.data = 238;
+  cool_tmp_req.data = 112;
   thrtl_pos_req.data = 15;
-  int_air_tmp_req.data = 62;
-  eng_oil_tmp_req.data = 218;
-  amb_pres_req.data = 14.6;
-  int_pres_req.data = 24.3;
+  int_air_tmp_req.data = 14;
+  eng_oil_tmp_req.data = 100;
+  amb_pres_req.data = 1;
+  int_pres_req.data = 1.9;
 
   lv_tick_set_cb(millis);
 }

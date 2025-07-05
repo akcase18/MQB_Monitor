@@ -65,6 +65,8 @@ public:
 
     uint16_t get_cycle_time();
 
+    bool get_metric();
+
     Request **get_requests();
     uint8_t get_num_requests();
 

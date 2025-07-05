@@ -72,7 +72,7 @@ void can_recv(const CAN_message_t &msg)
         new_data = (msg.buf[4] << 8) | msg.buf[5]; // Concatenate data bytes
     }
     // Apply offset and scale
-    new_data = (new_data * req->offset) * req->scale;
+    new_data = (new_data + req->offset) * req->scale;
     req->data = new_data;
 }
 

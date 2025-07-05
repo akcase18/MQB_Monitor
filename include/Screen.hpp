@@ -5,7 +5,7 @@
  * hold the Panels and a configuration screen as child classes.
  */
 
-#include <queue>
+#include "etl/queue.h"
 #include "Panel.hpp"
 
 constexpr uint16_t LCD_HORZ = 480;
@@ -47,4 +47,4 @@ public:
     Configurator();
 };
 
-extern std::queue<Request *> can_queue;
+extern etl::queue<Request *, 64> can_queue;
