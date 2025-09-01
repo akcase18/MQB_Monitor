@@ -203,13 +203,6 @@ void setup()
 
   lv_screen_load(screen_1.screen);
 
-  cool_tmp_req.data = 112;
-  thrtl_pos_req.data = 15;
-  int_air_tmp_req.data = 14;
-  eng_oil_tmp_req.data = 100;
-  amb_pres_req.data = 1;
-  int_pres_req.data = 1.9;
-
   lv_obj_add_event_cb(panel_1.btn, open_config_cb, LV_EVENT_CLICKED, &panel_1);
   lv_obj_add_event_cb(panel_2.btn, open_config_cb, LV_EVENT_CLICKED, &panel_2);
   lv_obj_add_event_cb(panel_3.btn, open_config_cb, LV_EVENT_CLICKED, &panel_3);

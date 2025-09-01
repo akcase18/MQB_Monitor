@@ -30,6 +30,7 @@ private:
     uint8_t _num_requests;
     float (*_transform)(Request **);
     bool _is_metric = false;
+    bool _data_recv = false;
 
 public:
     /* Public Variables */

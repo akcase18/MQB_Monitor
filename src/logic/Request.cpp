@@ -7,12 +7,23 @@ static uint32_t request_unique_id = 0;
  ****************/
 
 Request::Request(uint16_t b1, uint16_t b2, float off, float sc)
-    : byte_1(b1), 
+    : byte_1(b1),
       byte_2(b2),
-      offset(off), 
+      offset(off),
       scale(sc)
 {
     uid = request_unique_id++;
+}
+
+void Request::set_data(float new_data)
+{
+    _data_recv = true;
+    data = new_data;
+}
+
+bool Request::get_recv()
+{
+    return _data_recv;
 }
 
 void Request::start_timer(lv_timer_cb_t cb, uint32_t period)

@@ -73,7 +73,7 @@ void can_recv(const CAN_message_t &msg)
     }
     // Apply offset and scale
     new_data = (new_data + req->offset) * req->scale;
-    req->data = new_data;
+    req->set_data(new_data);
 }
 
 /********************

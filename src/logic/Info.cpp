@@ -44,6 +44,13 @@ float Info::get_data()
 
 String Info::get_data_str()
 {
+    for (uint8_t i = 0; i < _num_requests; i++)
+    {
+        if (!_requests[i]->get_recv())
+        {
+            return "--";
+        }
+    }
     return String(_data, (_is_metric) ? _decimals_m : _decimals_i);
 }
 
