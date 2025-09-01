@@ -20,9 +20,3 @@ void Screen::init()
     lv_obj_center(this->screen);
     lv_obj_add_style(this->screen, &style_screen, 0);
 }
-
-
-Configurator::Configurator()
-{
-
-}

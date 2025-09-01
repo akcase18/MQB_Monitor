@@ -33,6 +33,7 @@ private:
 
 public:
     /* Public Variables */
+    uint32_t uid; // Unique ID fo the Info object
 
     /**
      * Constructor for Info objects.

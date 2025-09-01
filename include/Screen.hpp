@@ -38,13 +38,26 @@ public:
 class Configurator : public Screen
 {
 public:
+    Info **infos;
+    uint8_t total_num_info;
+
+    Panel *selected_panel;
+
     lv_obj_t *flex_col_1;
     lv_obj_t *flex_col_2;
-    lv_obj_t *info_sel; // Roller object
+    lv_obj_t *info_roller; // Roller object
     lv_obj_t *radio_i;
     lv_obj_t *radio_m;
+    lv_obj_t *done;
+    lv_obj_t *done_label;
 
-    Configurator();
+    Configurator(Info **info_list, uint8_t total_num_info);
+
+    void init();
+
+    void open(Panel *panel);
+
+    void close();
 };
 
 extern etl::queue<Request *, 64> can_queue;

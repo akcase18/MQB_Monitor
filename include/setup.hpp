@@ -167,7 +167,7 @@ Panel *panel_list[NUM_PANELS] = {&panel_1, &panel_2, &panel_3, &panel_4, &panel_
  ***********/
 
 Info_Screen screen_1 = Info_Screen(panel_list, NUM_PANELS);
-Configurator config = Configurator();
+Configurator config = Configurator(info_list, NUM_INFO);
 
 /*******
  * CAN *
@@ -251,6 +251,7 @@ void init_panels()
 void init_screens()
 {
     screen_1.init(5);
+    config.init();
 }
 
 void init_transforms()

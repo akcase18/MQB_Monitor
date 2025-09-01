@@ -1,5 +1,7 @@
 #include "Info.hpp"
 
+static uint32_t info_unique_id = 0;
+
 /****************
  * Constructors *
  ****************/
@@ -10,6 +12,7 @@ Info::Info(String name, Unit_Type unit_type, uint16_t cycle_time, Request **requ
       _requests(requests),
       _num_requests(num_requests)
 {
+    uid = info_unique_id++;
     set_unit_type(unit_type);
     set_unit_label();
 }

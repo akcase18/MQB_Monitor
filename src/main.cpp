@@ -138,6 +138,10 @@ void display_init()
   lv_display_set_buffers(display, buf_1, buf_2, sizeof(buf_1), LV_DISPLAY_RENDER_MODE_PARTIAL);
 }
 
+/**
+ * Callback function called by the touchscreen handler. If
+ * the display is touched, it will register a touch with LVGL.
+ */
 void touch_read(lv_indev_t *indev, lv_indev_data_t *data)
 {
   if (ts.touched())
@@ -152,12 +156,36 @@ void touch_read(lv_indev_t *indev, lv_indev_data_t *data)
   }
 }
 
+/**
+ * Initialize the touchscreen driver and register it with
+ * LVGL.
+ */
 void touch_init()
 {
   ts.start();
   touch = lv_indev_create();
   lv_indev_set_type(touch, LV_INDEV_TYPE_POINTER);
   lv_indev_set_read_cb(touch, touch_read);
+}
+
+/**
+ * Callback function to open the Configurator screen.
+ */
+void open_config_cb(lv_event_t *e)
+{
+  if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+  {
+    config.open((Panel *)lv_event_get_user_data(e));
+  }
+}
+
+void close_config_cb(lv_event_t *e)
+{
+  if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+  {
+    config.close();
+    lv_screen_load(screen_1.screen);
+  }
 }
 
 void setup()
@@ -181,6 +209,14 @@ void setup()
   eng_oil_tmp_req.data = 100;
   amb_pres_req.data = 1;
   int_pres_req.data = 1.9;
+
+  lv_obj_add_event_cb(panel_1.btn, open_config_cb, LV_EVENT_CLICKED, &panel_1);
+  lv_obj_add_event_cb(panel_2.btn, open_config_cb, LV_EVENT_CLICKED, &panel_2);
+  lv_obj_add_event_cb(panel_3.btn, open_config_cb, LV_EVENT_CLICKED, &panel_3);
+  lv_obj_add_event_cb(panel_4.btn, open_config_cb, LV_EVENT_CLICKED, &panel_4);
+  lv_obj_add_event_cb(panel_5.btn, open_config_cb, LV_EVENT_CLICKED, &panel_5);
+
+  lv_obj_add_event_cb(config.done, close_config_cb, LV_EVENT_CLICKED, NULL);
 
   lv_tick_set_cb(millis);
 }
