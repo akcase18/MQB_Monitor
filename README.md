@@ -14,7 +14,7 @@ I currently have a working PCB (v2). This version has the basics working, but th
 
 ## To Do List (In Order):
 - [ ] Touch screen support on PCB
-- [ ] Brighness adjustment
+- [ ] Brighness adjustment (ideally done automatically, may need to add a sensor to the PCB)
 - [ ] Additional data support
   - [ ] Transmission data (temp, clamping pressure, etc)
   - [ ] Haldex data
