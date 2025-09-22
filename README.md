@@ -13,7 +13,8 @@ I currently have a working PCB (v2). This version has the basics working, but th
 - [ ] Testing testing testing
 
 ## To Do List (In Order):
-- [ ] Touch screen support on PCB
+- [X] Touch screen support on PCB
+  - Figured out the issue. The SPI SDI and SCL lines were switched. This is fixed on the schematic and PCB, so will need to order a new version for full confirmation.
 - [ ] Brighness adjustment (ideally done automatically, may need to add a sensor to the PCB)
 - [ ] Additional data support
   - [ ] Transmission data (temp, clamping pressure, etc)
