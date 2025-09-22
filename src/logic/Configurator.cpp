@@ -1,283 +1,54 @@
-#include "Configurator.hpp"
-
-/********************************
- * Configurator Font Definition *
- ********************************/
-
-const lv_font_t *config_font = &vw_24;
-
-/**********************************
- * Configurator Object Definition *
- **********************************/
-
-DMAMEM Configurator config = Configurator();
+#include "Screen.hpp"
 
 /****************
  * Constructors *
  ****************/
 
-Configurator::Configurator() {}
-
-/***************************
- * Public Helper Functions *
- ***************************/
-
-void Configurator::init_configurator()
+Configurator::Configurator(Info **info_list, uint8_t total_num_info)
+    : infos(info_list), total_num_info(total_num_info)
 {
-    style_init();
-    init_window();
-    init_window_layout();
-    init_drop_down();
-    init_radio_btns();
-    init_warning_btn();
-    init_done_btn();
 }
 
-/**
- * Opens the Configurator window and sets it up with the correct
- * initial state based on which Panel it was opened from. This will
- * show the currently selected Information object in the dropdown,
- * and it will show whether the Panel is currently using Imperial or
- * Metric values.
- */
-void Configurator::open_window()
+/********************
+ * Public Functions *
+ ********************/
+
+void Configurator::init()
 {
-    lv_screen_load(window);
-    int32_t option_id = lv_dropdown_get_option_index(drop_down, panel_selected->panel_info->get_name().c_str()); // Get the index of the Information object in the dropdown menu
-    lv_dropdown_set_selected(drop_down, option_id); // Set the correct dropdown option
-    /* Set the correct radio button to be selected when opened */
-    if (panel_selected->panel_info->get_is_metric())
+    this->screen = lv_obj_create(NULL);
+    lv_obj_set_size(this->screen, LCD_HORZ, LCD_VERT);
+    lv_obj_center(this->screen);
+    lv_obj_add_style(this->screen, &style_screen, 0);
+
+    this->info_roller = lv_roller_create(this->screen);
+    lv_obj_add_style(this->info_roller, &style_config_roller, 0);
+    String roller_options;
+    for (uint i = 0; i < total_num_info; i++)
     {
-        select_metric_radio_btn();
+        roller_options += this->infos[i]->get_name_and_label();
+        if (i != (total_num_info - 1))
+        {
+            roller_options += "\n";
+        }
     }
-    else
-    {
-        select_imperial_radio_btn();
-    }
+    lv_roller_set_options(this->info_roller, roller_options.c_str(), LV_ROLLER_MODE_INFINITE);
+    lv_roller_set_visible_row_count(this->info_roller, 4);
+
+    this->done = lv_btn_create(this->screen);
+    lv_obj_add_style(this->done, &style_config_done, 0);
+    this->done_label = lv_label_create(this->done);
+    lv_obj_center(this->done_label);
+    lv_label_set_text(this->done_label, LV_SYMBOL_OK);
 }
 
-void Configurator::close_window()
+void Configurator::open(Panel *panel)
 {
-    int32_t option_id = lv_dropdown_get_selected(config.drop_down); // Get the index of the selected dropdown option
-    /* Make sure the option given is a valid index */
-    if (option_id >= info_list.size())
-    {
-      option_id = 0; // Set to 0 if not
-    }
-    config.panel_selected->panel_info = info_list[option_id];       // Get the Information object at that index, set it to the Panel object
-    /* If the Imperial radio button is selected */
-    if (lv_obj_has_state(config.radio_imperial, LV_STATE_CHECKED))
-    {
-      config.panel_selected->panel_info->set_is_metric(false); // Use Imperial for Information object
-    }
-    /* If the Metric radio button is selected */
-    else
-    {
-      config.panel_selected->panel_info->set_is_metric(true); // Use Metric for Information object
-    }
-    lv_label_set_text(config.panel_selected->label, info_list[option_id]->get_name_and_label().c_str()); // Update the label text in Layout
+    lv_screen_load(this->screen);
+    lv_roller_set_selected(this->info_roller, panel->info->uid, LV_ANIM_OFF);
+    this->selected_panel = panel;
 }
 
-void Configurator::select_imperial_radio_btn()
+void Configurator::close()
 {
-    lv_obj_add_state(radio_imperial, LV_STATE_CHECKED);
-    lv_obj_clear_state(radio_metric, LV_STATE_CHECKED);
-}
-
-void Configurator::select_metric_radio_btn()
-{
-    lv_obj_clear_state(radio_imperial, LV_STATE_CHECKED);
-    lv_obj_add_state(radio_metric, LV_STATE_CHECKED);
-}
-
-/****************************
- * Private Helper Functions *
- ****************************/
-
-void Configurator::style_init()
-{
-    /* Set the style of the configurator window */
-    lv_style_init(&style_window);
-    lv_style_set_bg_color(&style_window, lv_color_black());
-
-    /* Set the style of the done button */
-    lv_style_init(&style_btn_done);
-    lv_style_set_radius(&style_btn_done, 5);
-    lv_style_set_bg_color(&style_btn_done, lv_color_white());
-    lv_style_set_text_color(&style_btn_done, lv_color_black());
-    // lv_style_set_text_font(&style_btn_done, done_label_font);
-    lv_style_set_text_letter_space(&style_btn_done, 0);
-    lv_style_set_shadow_width(&style_btn_done, 0);
-
-    /* Set the style of the label in the done button */
-    lv_style_init(&style_label_done);
-    lv_style_set_text_font(&style_label_done, config_font);
-
-    /* Set the style of the radio buttons (for selecting unit region) */
-    lv_style_init(&style_radio_unchecked);
-    lv_style_set_radius(&style_radio_unchecked, LV_RADIUS_CIRCLE);
-    lv_style_set_text_color(&style_radio_unchecked, lv_color_white());
-
-    /* Set the style of the radio buttons when selected */
-    lv_style_init(&style_radio_checked);
-    lv_style_set_bg_img_src(&style_radio_checked, NULL);
-
-    /* Set the style for the flex layout objects */
-    lv_style_init(&style_layout);
-    lv_style_set_bg_color(&style_layout, lv_color_black());
-    lv_style_set_border_width(&style_layout, 0);
-    lv_style_set_text_color(&style_layout, lv_color_white());
-    lv_style_set_text_font(&style_layout, &vw_24);
-}
-
-void Configurator::init_window()
-{
-    window = lv_obj_create(NULL);
-    lv_obj_set_size(window, LCD_HORZ, LCD_VERT);
-    lv_obj_center(window);
-    lv_obj_add_style(window, &style_window, 0);
-    /* Turn off scrolling */
-    lv_obj_set_scrollbar_mode(window, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_clear_flag(window, LV_OBJ_FLAG_SCROLLABLE);
-}
-
-void Configurator::init_window_layout()
-{
-    /* Add formatting to window */
-    flex_col_1 = lv_obj_create(window);                    // Adds flex column to the Configurator window
-    lv_obj_set_flex_flow(flex_col_1, LV_FLEX_FLOW_COLUMN); // Sets column to use flex flow layout
-    lv_obj_set_size(flex_col_1, lv_pct(65), lv_pct(100));  // Set column to take up 65% of window width
-    lv_obj_add_style(flex_col_1, &style_layout, 0);        // Add flex layout style to column
-    flex_col_2 = lv_obj_create(window);                    // Adds flex clumn to the Configurator window
-    lv_obj_set_flex_flow(flex_col_2, LV_FLEX_FLOW_COLUMN); // Sets column to use flex flow layout
-    lv_obj_set_size(flex_col_2, lv_pct(35), lv_pct(100));  // Set column to take up 35% of window width
-    lv_obj_set_x(flex_col_2, lv_pct(65));                  // Set column to take up 60% of window height
-    lv_obj_add_style(flex_col_2, &style_layout, 0);        // Add flex layout style to column
-}
-
-void Configurator::init_drop_down()
-{
-    for (uint i = 0; i < info_list.size(); i++)
-    {
-        drop_down_string += info_list[i]->get_name() + "\n";
-    }
-    drop_down = lv_dropdown_create(flex_col_1);
-    lv_dropdown_set_options_static(drop_down, drop_down_string.c_str());
-    lv_obj_set_align(drop_down, LV_ALIGN_TOP_MID);
-    lv_obj_set_size(drop_down, lv_pct(100), 50);
-    lv_dropdown_set_symbol(drop_down, NULL);
-}
-
-void Configurator::init_warning_btn()
-{
-    int32_t btn_w = 215;
-    int32_t btn_h = 50;
-    btn_warning = lv_btn_create(window);
-    lv_obj_set_size(btn_warning, btn_w, btn_h);
-    lv_obj_set_pos(btn_warning, 20, LCD_VERT - btn_h - 20);
-    lv_obj_add_style(btn_warning, &style_btn_done, 0);
-    /* Turn off scrolling */
-    lv_obj_set_scrollbar_mode(btn_warning, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_clear_flag(btn_warning, LV_OBJ_FLAG_SCROLLABLE);
-    /* Add "Done" text */
-    label_warning = lv_label_create(btn_warning);
-    lv_obj_add_style(label_warning, &style_label_done, 0);
-    lv_label_set_text(label_warning, "Warning Setup");
-    lv_obj_set_align(label_warning, LV_ALIGN_CENTER);
-}
-
-void Configurator::init_done_btn()
-{
-    int32_t btn_w = 120;
-    int32_t btn_h = 50;
-    btn_done = lv_btn_create(window);
-    lv_obj_set_size(btn_done, btn_w, btn_h);
-    lv_obj_set_pos(btn_done, LCD_HORZ - btn_w - 20, LCD_VERT - btn_h - 20);
-    lv_obj_add_style(btn_done, &style_btn_done, 0);
-    /* Turn off scrolling */
-    lv_obj_set_scrollbar_mode(btn_done, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_clear_flag(btn_done, LV_OBJ_FLAG_SCROLLABLE);
-    /* Add "Done" text */
-    label_done = lv_label_create(btn_done);
-    lv_obj_add_style(label_done, &style_label_done, 0);
-    lv_label_set_text(label_done, "Done");
-    lv_obj_set_align(label_done, LV_ALIGN_CENTER);
-}
-
-void Configurator::init_radio_btns()
-{
-    /* Imperial Radio Button */
-    radio_imperial = lv_checkbox_create(flex_col_2);
-    lv_checkbox_set_text(radio_imperial, "Imperial");
-    lv_obj_add_flag(radio_imperial, LV_OBJ_FLAG_EVENT_BUBBLE);
-    lv_obj_add_style(radio_imperial, &style_radio_unchecked, LV_PART_INDICATOR);
-    lv_obj_add_style(radio_imperial, &style_radio_checked, LV_PART_INDICATOR | LV_STATE_CHECKED);
-    lv_obj_set_align(radio_imperial, LV_ALIGN_TOP_MID);
-    lv_obj_set_style_pad_bottom(radio_imperial, 15, 0);
-    lv_obj_set_style_pad_top(radio_imperial, 10, 0);
-    /* Metric Radio Button */
-    radio_metric = lv_checkbox_create(flex_col_2);
-    lv_checkbox_set_text(radio_metric, "Metric");
-    lv_obj_add_flag(radio_metric, LV_OBJ_FLAG_EVENT_BUBBLE);
-    lv_obj_add_style(radio_metric, &style_radio_unchecked, LV_PART_INDICATOR);
-    lv_obj_add_style(radio_metric, &style_radio_checked, LV_PART_INDICATOR | LV_STATE_CHECKED);
-    lv_obj_align(radio_metric, LV_ALIGN_TOP_MID, lv_pct(0), lv_pct(25));
-}
-
-Information *Configurator::get_info_from_drop_down()
-{
-}
-
-void Configurator::open_warning_config()
-{
-    /***** Setup window *****/
-    lv_obj_t *warning_window = lv_obj_create(NULL);
-    lv_obj_set_size(warning_window, LCD_HORZ, LCD_VERT);
-    lv_obj_center(warning_window);
-    lv_obj_add_style(warning_window, &style_window, 0);
-    /* Turn off scrolling */
-    lv_obj_set_scrollbar_mode(warning_window, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_clear_flag(warning_window, LV_OBJ_FLAG_SCROLLABLE);
-    /***** Setup window layout *****/
-    lv_obj_t *warn_flex_col_1 = lv_obj_create(warning_window); // Adds flex column to the Configurator window
-    lv_obj_set_flex_flow(warn_flex_col_1, LV_FLEX_FLOW_COLUMN);     // Sets column to use flex flow layout
-    lv_obj_set_size(warn_flex_col_1, lv_pct(50), lv_pct(100));      // Set column to take up 65% of window width
-    lv_obj_add_style(warn_flex_col_1, &style_layout, 0);            // Add flex layout style to column
-    lv_obj_t *warn_flex_col_2 = lv_obj_create(warning_window); // Adds flex clumn to the Configurator window
-    lv_obj_set_flex_flow(warn_flex_col_2, LV_FLEX_FLOW_COLUMN);     // Sets column to use flex flow layout
-    lv_obj_set_size(warn_flex_col_2, lv_pct(50), lv_pct(100));      // Set column to take up 35% of window width
-    lv_obj_set_x(warn_flex_col_2, lv_pct(50));                      // Set column to take up 60% of window height
-    lv_obj_add_style(warn_flex_col_2, &style_layout, 0);            // Add flex layout style to column
-    /***** Setup radio buttons *****/
-    lv_obj_t *radio_warn_on = lv_checkbox_create(warn_flex_col_1);
-    lv_checkbox_set_text(radio_warn_on, "Warning On");
-    lv_obj_add_flag(radio_warn_on, LV_OBJ_FLAG_EVENT_BUBBLE);
-    lv_obj_add_style(radio_warn_on, &style_radio_unchecked, LV_PART_INDICATOR);
-    lv_obj_add_style(radio_warn_on, &style_radio_checked, LV_PART_INDICATOR | LV_STATE_CHECKED);
-    lv_obj_set_align(radio_warn_on, LV_ALIGN_TOP_LEFT);
-    lv_obj_t *radio_warn_off = lv_checkbox_create(warn_flex_col_1);
-    lv_checkbox_set_text(radio_warn_off, "Warning Off");
-    lv_obj_add_flag(radio_warn_off, LV_OBJ_FLAG_EVENT_BUBBLE);
-    lv_obj_add_style(radio_warn_off, &style_radio_unchecked, LV_PART_INDICATOR);
-    lv_obj_add_style(radio_warn_off, &style_radio_checked, LV_PART_INDICATOR | LV_STATE_CHECKED);
-    lv_obj_align(radio_warn_off, LV_ALIGN_TOP_LEFT, lv_pct(0), lv_pct(25));
-    /* Select Warning Off by default */
-    lv_obj_add_state(radio_warn_on, LV_STATE_CHECKED);
-    /***** Setup Done button *****/
-    int32_t btn_w = 120;
-    int32_t btn_h = 50;
-    lv_obj_t *done_btn = lv_btn_create(warning_window);
-    lv_obj_set_size(done_btn, btn_w, btn_h);
-    lv_obj_set_pos(done_btn, LCD_HORZ - btn_w - 20, LCD_VERT - btn_h - 20);
-    lv_obj_add_style(done_btn, &style_btn_done, 0);
-    /* Turn off scrolling */
-    lv_obj_set_scrollbar_mode(done_btn, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_clear_flag(done_btn, LV_OBJ_FLAG_SCROLLABLE);
-    /* Add "Done" text */
-    lv_obj_t *done_label = lv_label_create(done_btn);
-    lv_obj_add_style(done_label, &style_label_done, 0);
-    lv_label_set_text(done_label, "Done");
-    lv_obj_set_align(done_label, LV_ALIGN_CENTER);
-    /***** Open warning window *****/
-    lv_screen_load(warning_window);
+    this->selected_panel->set_info(this->infos[lv_roller_get_selected(this->info_roller)]);
 }

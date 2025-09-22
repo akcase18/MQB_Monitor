@@ -1,10 +1,12 @@
-#include <queue>
 #include "can_handler.hpp"
 #include "ILI948x_t4_mm.h"
 #include "EEPROM.h"
 #include "touchscreen.hpp"
 
-#define NIGHT 1
+#include "setup.hpp"
+#include "Screen.hpp"
+
+#define NIGHT 0
 
 #if NIGHT
 #define SCRN_BRIGHTNESS 30
@@ -19,12 +21,6 @@
 #define PWM_PIN 3
 #define BRIGHTNESS 1
 #define MAX_BRIGHTNESS 256
-
-#define PANEL_TL_EEPROM 0x0
-#define PANEL_TC_EEPROM 0x1
-#define PANEL_TR_EEPROM 0x2
-#define PANEL_BL_EEPROM 0x3
-#define PANEL_BR_EEPROM 0x4
 
 /***********************
  * Display Constructor *
@@ -58,95 +54,11 @@ Touchscreen ts = Touchscreen(CS_PIN);
  * Queue *
  *********/
 
-static queue<Information *> can_queue; // This queue holds the CAN messages that are ready to be requested (sent)
-
 /**********
  * Timers *
  **********/
 
 lv_timer_t *can_send_timer;
-
-/**************************************
- * Initialization and Darken Function *
- **************************************/
-
-static lv_color_t darken(const lv_color_filter_dsc_t *dsc, lv_color_t color, lv_opa_t opa)
-{
-  LV_UNUSED(dsc);
-  return lv_color_darken(color, opa);
-}
-
-static void style_init()
-{
-  /* Darken button when pressed */
-  static lv_color_filter_dsc_t color_filter_btn;
-  lv_color_filter_dsc_init(&color_filter_btn, darken);
-  lv_style_init(&style_btn_pressed);
-  lv_style_set_color_filter_dsc(&style_btn_pressed, &color_filter_btn);
-  lv_style_set_color_filter_opa(&style_btn_pressed, LV_OPA_20);
-  LV_UNUSED(style_btn_pressed);
-}
-
-/**********
- * Timers *
- **********/
-
-/**
- * Adds the Information object held in the top left panel
- * to the CAN queue to be sent off.
- */
-void panel_tl_timer_cb(lv_timer_t *timer)
-{
-  can_queue.push(panel_tl.panel_info);
-}
-
-/**
- * Adds the Information object held in the top center panel
- * to the CAN queue to be sent off.
- */
-void panel_tc_timer_cb(lv_timer_t *timer)
-{
-  can_queue.push(panel_tc.panel_info);
-}
-
-/**
- * Adds the Information object held in the top right panel
- * to the CAN queue to be sent off.
- */
-void panel_tr_timer_cb(lv_timer_t *timer)
-{
-  can_queue.push(panel_tr.panel_info);
-}
-
-/**
- * Adds the Information object held in the bottom left panel
- * to the CAN queue to be sent off.
- */
-void panel_bl_timer_cb(lv_timer_t *timer)
-{
-  can_queue.push(panel_bl.panel_info);
-}
-
-/**
- * Adds the Information object held in the bottom right panel
- * to the CAN queue to be sent off.
- */
-void panel_br_timer_cb(lv_timer_t *timer)
-{
-  can_queue.push(panel_br.panel_info);
-}
-
-/**
- * Calls can_send() to send the first CAN message in the queue.
- */
-void can_send_timer_cb(lv_timer_t *timer)
-{
-  if (!can_queue.empty())
-  {
-    can_send(can_queue.front());
-    can_queue.pop();
-  }
-}
 
 bool test = false;
 int counter = 0;
@@ -154,105 +66,6 @@ int counter = 0;
 /*************
  * Callbacks *
  *************/
-
-/**
- * Callback for the Buttons in each Panel. This tells the Configurator 
- * which Panel it was opened from, so it can then set the Configurator
- * screen up correctly.
- * 
- * @note user_data is layout.panel_XX, where XX is the panel location
- */
-void panel_select_cb(lv_event_t *e)
-{
-  if (lv_event_get_code(e) == LV_EVENT_CLICKED)
-  {
-    config.panel_selected = (Panel *)lv_event_get_user_data(e);
-    config.open_window();
-  }
-}
-
-/**
- * Callback for the Done button in the Configurator screen. When this is
- * pressed, it will check that a "Clicked" event was registered, get the
- * index of the selected item of the dropdown, use that index to get the
- * correct Information object from info_list (they are in the same order
- * so the indicies will match), set the Panel's Information object to that
- * Information object, set metric or imperial based on the radio buttons
- * of the Configurator screen, update the text on the Layout screen, then
- * open the Layout screen.
- */
-void config_done_cb(lv_event_t *e)
-{
-  if (lv_event_get_code(e) == LV_EVENT_CLICKED)
-  {
-    config.close_window();
-    lv_timer_set_period(config.panel_selected->timer, config.panel_selected->panel_info->get_refresh_rate());
-    layout.open_window();
-  }
-}
-
-/**
- * Callback for the Radio buttons in the Configurator screen. This is used
- * to check which button was pressed and then update the two button's states
- * accordingly.
- */
-void radio_cb(lv_event_t *e)
-{
-  lv_obj_t *cont = (lv_obj_t *)lv_event_get_current_target(e);
-  lv_obj_t *act_cb = (lv_obj_t *)lv_event_get_target(e);
-
-  /* Do nothing if the container was clicked */
-  if (act_cb == cont)
-    return;
-
-  if (act_cb == config.radio_imperial)
-  {
-    config.select_imperial_radio_btn();
-  }
-  else
-  {
-    config.select_metric_radio_btn();
-  }
-}
-
-void warning_button_cb(lv_event_t *e)
-{
-    if (lv_event_get_code(e) == LV_EVENT_CLICKED)
-    {
-        // config.open_warning_config(); // Currently disabled until warning is more set up
-    }
-}
-
-void warning_done_cb(lv_event_t *e)
-{
-  if (lv_event_get_code(e) == LV_EVENT_CLICKED)
-  {
-    config.open_window();
-  }
-}
-
-/**
- * Set all the callbacks for the various elements, so that way all callbacks
- * have access to all available functions.
- */
-void set_cbs()
-{
-  /***** Layout Callbacks *****/
-  /* Panel Callbacks */
-  lv_obj_add_event_cb(layout.panel_tl->btn, panel_select_cb, LV_EVENT_CLICKED, layout.panel_tl);
-  lv_obj_add_event_cb(layout.panel_tc->btn, panel_select_cb, LV_EVENT_CLICKED, layout.panel_tc);
-  lv_obj_add_event_cb(layout.panel_tr->btn, panel_select_cb, LV_EVENT_CLICKED, layout.panel_tr);
-  lv_obj_add_event_cb(layout.panel_bl->btn, panel_select_cb, LV_EVENT_CLICKED, layout.panel_bl);
-  lv_obj_add_event_cb(layout.panel_br->btn, panel_select_cb, LV_EVENT_CLICKED, layout.panel_br);
-
-  /***** Configurator Callbacks *****/
-  /* Done Button Callback */
-  lv_obj_add_event_cb(config.btn_done, config_done_cb, LV_EVENT_CLICKED, NULL);
-  /* Radio Button Callback */
-  lv_obj_add_event_cb(config.flex_col_2, radio_cb, LV_EVENT_CLICKED, NULL);
-  /* Warning Button Callback */
-  lv_obj_add_event_cb(config.btn_warning, warning_button_cb, LV_EVENT_CLICKED, NULL);
-}
 
 /*********
  * Setup *
@@ -325,6 +138,10 @@ void display_init()
   lv_display_set_buffers(display, buf_1, buf_2, sizeof(buf_1), LV_DISPLAY_RENDER_MODE_PARTIAL);
 }
 
+/**
+ * Callback function called by the touchscreen handler. If
+ * the display is touched, it will register a touch with LVGL.
+ */
 void touch_read(lv_indev_t *indev, lv_indev_data_t *data)
 {
   if (ts.touched())
@@ -339,6 +156,10 @@ void touch_read(lv_indev_t *indev, lv_indev_data_t *data)
   }
 }
 
+/**
+ * Initialize the touchscreen driver and register it with
+ * LVGL.
+ */
 void touch_init()
 {
   ts.start();
@@ -348,55 +169,23 @@ void touch_init()
 }
 
 /**
- * This will eventually pull this data from EEPROM so that
- * configs can be saved, but this allows you to choose whether
- * to use imperial or metric units for the individual panels.
+ * Callback function to open the Configurator screen.
  */
-void set_unit_region()
+void open_config_cb(lv_event_t *e)
 {
-  // Pull from EEPROM
-
-  panel_tl.panel_info->set_is_metric(false);
-  panel_tc.panel_info->set_is_metric(false);
-  panel_tr.panel_info->set_is_metric(false);
-  panel_bl.panel_info->set_is_metric(false);
-  panel_br.panel_info->set_is_metric(false);
+  if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+  {
+    config.open((Panel *)lv_event_get_user_data(e));
+  }
 }
 
-/**
- * Initializes the main and configurator window.
- */
-void init_windows()
+void close_config_cb(lv_event_t *e)
 {
-  layout.init_layout();       // Initialize the main window
-  config.init_configurator(); // Initialize the configurator window
-}
-
-/**
- * Initializes all of the timers. These timers add CAN messages to the queue to be
- * sent off to the car.
- */
-void init_timers()
-{
-  panel_tl.timer = lv_timer_create(panel_tl_timer_cb, panel_tl.panel_info->get_refresh_rate(), NULL);
-  panel_tc.timer = lv_timer_create(panel_tc_timer_cb, panel_tc.panel_info->get_refresh_rate(), NULL);
-  panel_tr.timer = lv_timer_create(panel_tr_timer_cb, panel_tr.panel_info->get_refresh_rate(), NULL);
-  panel_bl.timer = lv_timer_create(panel_bl_timer_cb, panel_bl.panel_info->get_refresh_rate(), NULL);
-  panel_br.timer = lv_timer_create(panel_br_timer_cb, panel_br.panel_info->get_refresh_rate(), NULL);
-
-  can_send_timer = lv_timer_create(can_send_timer_cb, 10, NULL);
-}
-
-/**
- * Updates the data within all Panels based on the data in the Information objects.
- */
-void update_display()
-{
-  lv_label_set_text(panel_tl.data, panel_tl.panel_info->get_data_str().c_str());
-  lv_label_set_text(panel_tc.data, panel_tc.panel_info->get_data_str().c_str());
-  lv_label_set_text(panel_tr.data, panel_tr.panel_info->get_data_str().c_str());
-  lv_label_set_text(panel_bl.data, panel_bl.panel_info->get_data_str().c_str());
-  lv_label_set_text(panel_br.data, panel_br.panel_info->get_data_str().c_str());
+  if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+  {
+    config.close();
+    lv_screen_load(screen_1.screen);
+  }
 }
 
 void setup()
@@ -405,33 +194,31 @@ void setup()
 
   lv_init();
 
-  set_unit_region();
-
-  style_init();
-
   can_init();
 
   display_init();
-
   touch_init();
+  
+  setup_init();
 
-  init_windows();
+  lv_screen_load(screen_1.screen);
 
-  layout.open_window();
+  lv_obj_add_event_cb(panel_1.btn, open_config_cb, LV_EVENT_CLICKED, &panel_1);
+  lv_obj_add_event_cb(panel_2.btn, open_config_cb, LV_EVENT_CLICKED, &panel_2);
+  lv_obj_add_event_cb(panel_3.btn, open_config_cb, LV_EVENT_CLICKED, &panel_3);
+  lv_obj_add_event_cb(panel_4.btn, open_config_cb, LV_EVENT_CLICKED, &panel_4);
+  lv_obj_add_event_cb(panel_5.btn, open_config_cb, LV_EVENT_CLICKED, &panel_5);
 
-  init_timers();
+  lv_obj_add_event_cb(config.done, close_config_cb, LV_EVENT_CLICKED, NULL);
+
   lv_tick_set_cb(millis);
-
-  set_cbs();
 }
-
-unsigned long current_time = 0;
 
 void loop()
 {
   lv_task_handler();
 
-  update_display();
+  screen_1.update();
 
   can_loop();
 }

@@ -14,8 +14,8 @@ using namespace std;
 #define Y_CMD 0xD1
 #define Z1_CMD 0xB1
 #define Z2_CMD 0xC1
-#define Z_THRESHOLD 1000
-#define Z_THRESHOLD_IRQ 1000
+#define Z_THRESHOLD 800
+#define Z_THRESHOLD_IRQ 800
 #define MIN_CYCLE_TIME 3
 
 class Touchscreen
