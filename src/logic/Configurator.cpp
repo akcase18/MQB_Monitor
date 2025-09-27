@@ -51,4 +51,5 @@ void Configurator::open(Panel *panel)
 void Configurator::close()
 {
     this->selected_panel->set_info(this->infos[lv_roller_get_selected(this->info_roller)]);
+    eeprom.save_panel(this->selected_panel->panel_num, {(uint8_t)this->selected_panel->info->uid, this->selected_panel->info->get_metric() ? METRIC : IMPERIAL});
 }

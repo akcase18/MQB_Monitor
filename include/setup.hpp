@@ -239,13 +239,19 @@ void init_requests()
     request_list[etl::pair<uint16_t, uint16_t>(tim_cor_4_req.byte_1, tim_cor_4_req.byte_2)] = &tim_cor_4_req;
 }
 
-void init_panels()
+void init_panels(EEPROM_Handler &cfg)
 {
-    panel_1.set_info(&coolant_temp);
-    panel_2.set_info(&throttle_position);
-    panel_3.set_info(&intake_air_temp);
-    panel_4.set_info(&engine_oil_temp);
-    panel_5.set_info(&actual_intake_pressure);
+    panel_1.set_info(info_list[cfg.config.panels[0].panel_info]);
+    panel_2.set_info(info_list[cfg.config.panels[1].panel_info]);
+    panel_3.set_info(info_list[cfg.config.panels[2].panel_info]);
+    panel_4.set_info(info_list[cfg.config.panels[3].panel_info]);
+    panel_5.set_info(info_list[cfg.config.panels[4].panel_info]);
+
+    // panel_1.set_info(&coolant_temp);
+    // panel_2.set_info(&throttle_position);
+    // panel_3.set_info(&intake_air_temp);
+    // panel_4.set_info(&engine_oil_temp);
+    // panel_5.set_info(&actual_intake_pressure);
 }
 
 void init_screens()
@@ -263,10 +269,10 @@ void init_transforms()
     actual_intake_pressure.set_transform(transform_act_intake_pressure);
 }
 
-void setup_init()
+void setup_init(EEPROM_Handler &cfg)
 {
     init_screens();
-    init_panels();
+    init_panels(cfg);
     init_transforms();
     init_requests();
     init_timers();

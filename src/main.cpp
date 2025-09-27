@@ -191,6 +191,7 @@ void close_config_cb(lv_event_t *e)
 void setup()
 {
   Serial.begin(115200);
+  eeprom.load_config();
 
   lv_init();
 
@@ -199,7 +200,7 @@ void setup()
   display_init();
   touch_init();
   
-  setup_init();
+  setup_init(eeprom);
 
   lv_screen_load(screen_1.screen);
 
@@ -208,6 +209,8 @@ void setup()
   lv_obj_add_event_cb(panel_3.btn, open_config_cb, LV_EVENT_CLICKED, &panel_3);
   lv_obj_add_event_cb(panel_4.btn, open_config_cb, LV_EVENT_CLICKED, &panel_4);
   lv_obj_add_event_cb(panel_5.btn, open_config_cb, LV_EVENT_CLICKED, &panel_5);
+
+
 
   lv_obj_add_event_cb(config.done, close_config_cb, LV_EVENT_CLICKED, NULL);
 

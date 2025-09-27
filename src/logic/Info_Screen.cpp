@@ -29,6 +29,7 @@ void Info_Screen::init(uint8_t num_panels)
     for (uint8_t i = 0; i < num_panels; i++)
     {
         panels[i]->init(this->screen);
+        panels[i]->panel_num = i;
         if (i == (int)((num_panels / 2) + 1))
         {
             lv_obj_add_flag(panels[i]->btn, LV_OBJ_FLAG_FLEX_IN_NEW_TRACK);
