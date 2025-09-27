@@ -10,6 +10,7 @@
 
 #include "Info.hpp"
 #include "styles.hpp"
+#include "EEPROM_Handler.hpp"
 
 /**
  * The regular Panel class will handle numeric display
@@ -24,6 +25,7 @@ public:
     lv_obj_t *btn;
     lv_obj_t *data;
     lv_obj_t *label;
+    uint8_t panel_num = NULL; // The panel number (0-indexed)
 
     Panel();
 
