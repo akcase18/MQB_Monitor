@@ -25,7 +25,7 @@ public:
     lv_obj_t *btn;
     lv_obj_t *data;
     lv_obj_t *label;
-    uint8_t panel_num = NULL; // The panel number (0-indexed)
+    uint8_t panel_num = 255; // The panel number (0-indexed)
 
     Panel();
 
@@ -38,7 +38,6 @@ public:
     void set_sm_panel();
     void set_lg_panel();
 };
-
 
 /**
  * The Graphic Panel class will add in an image of some

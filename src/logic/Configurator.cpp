@@ -26,7 +26,7 @@ void Configurator::init()
     for (uint i = 0; i < total_num_info; i++)
     {
         roller_options += this->infos[i]->get_name_and_label();
-        if (i != (total_num_info - 1))
+        if (i != (uint)(total_num_info - 1))
         {
             roller_options += "\n";
         }
