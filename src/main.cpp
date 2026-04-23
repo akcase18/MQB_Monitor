@@ -6,22 +6,6 @@
 #include "setup.hpp"
 #include "Screen.hpp"
 
-#define NIGHT 0
-
-#if NIGHT
-#define SCRN_BRIGHTNESS 30
-#else
-#define SCRN_BRIGHTNESS 100
-#endif
-
-/***********
- * Defines *
- ***********/
-
-#define PWM_PIN 3
-#define BRIGHTNESS 1
-#define MAX_BRIGHTNESS 256
-
 /***********************
  * Display Constructor *
  ***********************/
@@ -87,25 +71,6 @@ int counter = 0;
  */
 
 /**
- * Sets the brightness of the display from 0-100% by setting
- * the duty cycle of a PWM pin connected to the backlight
- * control pin on the display
- *
- * @param percent brightness of the display (0-100%)
- */
-void set_brightness(uint8_t percent)
-{
-  /* Clamp brightness if over 100% */
-  if (percent > 100)
-  {
-    percent = 100;
-  }
-  pinMode(PWM_PIN, OUTPUT);                          // Set up pin to control brightness
-  int brightness = (percent * MAX_BRIGHTNESS) / 100; // Multiply the percent brightness level by the max brighness value
-  analogWrite(PWM_PIN, brightness);
-}
-
-/**
  * Initialize the display driver object
  */
 void lcd_init()
@@ -131,7 +96,6 @@ void display_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *data)
  */
 void display_init()
 {
-  set_brightness(SCRN_BRIGHTNESS); // Can pull from EEPROM or something
   lcd_init();
   display = lv_display_create(LCD_HORZ, LCD_VERT);
   lv_display_set_flush_cb(display, display_flush);
@@ -199,7 +163,7 @@ void setup()
 
   display_init();
   touch_init();
-  
+
   setup_init(eeprom);
 
   lv_screen_load(screen_1.screen);
@@ -209,8 +173,6 @@ void setup()
   lv_obj_add_event_cb(panel_3.btn, open_config_cb, LV_EVENT_CLICKED, &panel_3);
   lv_obj_add_event_cb(panel_4.btn, open_config_cb, LV_EVENT_CLICKED, &panel_4);
   lv_obj_add_event_cb(panel_5.btn, open_config_cb, LV_EVENT_CLICKED, &panel_5);
-
-
 
   lv_obj_add_event_cb(config.done, close_config_cb, LV_EVENT_CLICKED, NULL);
 

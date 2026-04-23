@@ -166,6 +166,7 @@ Panel *panel_list[NUM_PANELS] = {&panel_1, &panel_2, &panel_3, &panel_4, &panel_
  * Screens *
  ***********/
 
+Settings_Screen settings = Settings_Screen();
 Info_Screen screen_1 = Info_Screen(panel_list, NUM_PANELS);
 Configurator config = Configurator(info_list, NUM_INFO);
 

@@ -10,7 +10,6 @@ Info_Screen::Info_Screen(Panel **panel_list, uint8_t total_num_panels)
 {
 }
 
-
 /********************
  * Public Functions *
  ********************/
@@ -52,5 +51,5 @@ void Info_Screen::update()
     {
         panels[i]->info->do_transform();
         lv_label_set_text(panels[i]->data, panels[i]->info->get_data_str().c_str());
-    } 
+    }
 }
