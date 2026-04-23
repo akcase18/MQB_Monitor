@@ -3,6 +3,4 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
-lib/FlexCAN_T4
-lib/ILI948x_t4_mm
-lib/lvgl
+.DS_Store
