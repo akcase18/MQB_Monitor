@@ -5,8 +5,8 @@
  ****************/
 
 Info_Screen::Info_Screen(Panel **panel_list, uint8_t total_num_panels)
-    : panels(panel_list),
-      total_num_panels(total_num_panels)
+    : panels(panel_list)
+    , total_num_panels(total_num_panels)
 {
 }
 
@@ -50,6 +50,7 @@ void Info_Screen::update()
     for (uint8_t i = 0; i < num_panels; i++)
     {
         panels[i]->info->do_transform();
-        lv_label_set_text(panels[i]->data, panels[i]->info->get_data_str().c_str());
+        lv_label_set_text(panels[i]->data,
+                          panels[i]->info->get_data_str().c_str());
     }
 }

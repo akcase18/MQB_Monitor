@@ -69,7 +69,7 @@ static const lv_style_const_prop_t style_panel_btn_props[] = {
 LV_STYLE_CONST_INIT(style_panel_btn, style_panel_btn_props);
 
 static const lv_style_const_prop_t style_panel_btn_sm_props[] = {
-    LV_STYLE_CONST_HEIGHT((int32_t)(320 * 0.45)),\
+    LV_STYLE_CONST_HEIGHT((int32_t)(320 * 0.45)),
     LV_STYLE_CONST_PROPS_END,
 };
 LV_STYLE_CONST_INIT(style_panel_btn_sm, style_panel_btn_sm_props);
@@ -169,7 +169,7 @@ LV_STYLE_CONST_INIT(style_panel_label_lg, style_panel_label_lg_props);
 
 /**
  * Information Roller
- * 
+ *
  * Used to select Information objects in the configuration screen.
  */
 static const lv_style_const_prop_t style_config_roller_props[] = {
@@ -184,7 +184,7 @@ LV_STYLE_CONST_INIT(style_config_roller, style_config_roller_props);
 
 /**
  * Done button for the Configuration Screen
- * 
+ *
  * Used to go back (and save your changes) after opening the
  * Configuration screen.
  */

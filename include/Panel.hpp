@@ -18,25 +18,25 @@
  */
 class Panel
 {
-public:
-    uint32_t uid; // Unique ID for the Panel
-    bool initialized = false;
-    Info *info;
-    lv_obj_t *btn;
-    lv_obj_t *data;
-    lv_obj_t *label;
-    uint8_t panel_num = 255; // The panel number (0-indexed)
+    public:
+        uint32_t  uid; // Unique ID for the Panel
+        bool      initialized = false;
+        Info     *info;
+        lv_obj_t *btn;
+        lv_obj_t *data;
+        lv_obj_t *label;
+        uint8_t   panel_num = 255; // The panel number (0-indexed)
 
-    Panel();
+        Panel();
 
-    void init(lv_obj_t *parent);
+        void init(lv_obj_t *parent);
 
-    void set_info(Info *new_info);
+        void set_info(Info *new_info);
 
-    void update();
+        void update();
 
-    void set_sm_panel();
-    void set_lg_panel();
+        void set_sm_panel();
+        void set_lg_panel();
 };
 
 /**
@@ -46,8 +46,8 @@ public:
  */
 class Graphic_Panel : public Panel
 {
-public:
-    lv_obj_t *graphic;
+    public:
+        lv_obj_t *graphic;
 
-    Graphic_Panel();
+        Graphic_Panel();
 };

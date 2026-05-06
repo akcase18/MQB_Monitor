@@ -4,8 +4,7 @@
  * Constructors *
  ****************/
 
-Screen::Screen() {
-};
+Screen::Screen() {};
 
 /********************
  * Public Functions *

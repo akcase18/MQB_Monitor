@@ -6,5 +6,4 @@
 
 Graphic_Panel::Graphic_Panel()
 {
-    
 }

@@ -11,8 +11,8 @@
  ***********************/
 
 static lv_display_t *display;
-static lv_color_t buf_1[(LCD_HORZ * LCD_VERT) / 10];
-static lv_color_t buf_2[(LCD_HORZ * LCD_VERT) / 10];
+static lv_color_t    buf_1[(LCD_HORZ * LCD_VERT) / 10];
+static lv_color_t    buf_2[(LCD_HORZ * LCD_VERT) / 10];
 
 /* D0 */
 #define LCD_CS 4
@@ -44,8 +44,8 @@ Touchscreen ts = Touchscreen(CS_PIN);
 
 lv_timer_t *can_send_timer;
 
-bool test = false;
-int counter = 0;
+bool test    = false;
+int  counter = 0;
 
 /*************
  * Callbacks *
@@ -75,9 +75,9 @@ int counter = 0;
  */
 void lcd_init()
 {
-  lcd.begin(12);
-  lcd.setBitDepth(16);
-  lcd.setRotation(1);
+    lcd.begin(12);
+    lcd.setBitDepth(16);
+    lcd.setRotation(1);
 }
 
 /**
@@ -86,8 +86,9 @@ void lcd_init()
  */
 void display_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *data)
 {
-  lcd.pushPixels16bitDMA((uint16_t *)data, area->x1, area->y1, area->x2, area->y2);
-  lv_display_flush_ready(disp);
+    lcd.pushPixels16bitDMA(
+        (uint16_t *)data, area->x1, area->y1, area->x2, area->y2);
+    lv_display_flush_ready(disp);
 }
 
 /**
@@ -96,10 +97,11 @@ void display_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *data)
  */
 void display_init()
 {
-  lcd_init();
-  display = lv_display_create(LCD_HORZ, LCD_VERT);
-  lv_display_set_flush_cb(display, display_flush);
-  lv_display_set_buffers(display, buf_1, buf_2, sizeof(buf_1), LV_DISPLAY_RENDER_MODE_PARTIAL);
+    lcd_init();
+    display = lv_display_create(LCD_HORZ, LCD_VERT);
+    lv_display_set_flush_cb(display, display_flush);
+    lv_display_set_buffers(
+        display, buf_1, buf_2, sizeof(buf_1), LV_DISPLAY_RENDER_MODE_PARTIAL);
 }
 
 /**
@@ -108,16 +110,16 @@ void display_init()
  */
 void touch_read(lv_indev_t *indev, lv_indev_data_t *data)
 {
-  if (ts.touched())
-  {
-    data->point.x = (ts.get_x() * LCD_HORZ) / 4095;
-    data->point.y = (ts.get_y() * LCD_VERT) / 4095;
-    data->state = LV_INDEV_STATE_PRESSED;
-  }
-  else
-  {
-    data->state = LV_INDEV_STATE_RELEASED;
-  }
+    if (ts.touched())
+    {
+        data->point.x = (ts.get_x() * LCD_HORZ) / 4095;
+        data->point.y = (ts.get_y() * LCD_VERT) / 4095;
+        data->state   = LV_INDEV_STATE_PRESSED;
+    }
+    else
+    {
+        data->state = LV_INDEV_STATE_RELEASED;
+    }
 }
 
 /**
@@ -126,10 +128,10 @@ void touch_read(lv_indev_t *indev, lv_indev_data_t *data)
  */
 void touch_init()
 {
-  ts.start();
-  touch = lv_indev_create();
-  lv_indev_set_type(touch, LV_INDEV_TYPE_POINTER);
-  lv_indev_set_read_cb(touch, touch_read);
+    ts.start();
+    touch = lv_indev_create();
+    lv_indev_set_type(touch, LV_INDEV_TYPE_POINTER);
+    lv_indev_set_read_cb(touch, touch_read);
 }
 
 /**
@@ -137,53 +139,58 @@ void touch_init()
  */
 void open_config_cb(lv_event_t *e)
 {
-  if (lv_event_get_code(e) == LV_EVENT_CLICKED)
-  {
-    config.open((Panel *)lv_event_get_user_data(e));
-  }
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+    {
+        config.open((Panel *)lv_event_get_user_data(e));
+    }
 }
 
 void close_config_cb(lv_event_t *e)
 {
-  if (lv_event_get_code(e) == LV_EVENT_CLICKED)
-  {
-    config.close();
-    lv_screen_load(screen_1.screen);
-  }
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+    {
+        config.close();
+        lv_screen_load(screen_1.screen);
+    }
 }
 
 void setup()
 {
-  Serial.begin(115200);
-  eeprom.load_config();
+    Serial.begin(115200);
+    eeprom.load_config();
 
-  lv_init();
+    lv_init();
 
-  can_init();
+    can_init();
 
-  display_init();
-  touch_init();
+    display_init();
+    touch_init();
 
-  setup_init(eeprom);
+    setup_init(eeprom);
 
-  lv_screen_load(screen_1.screen);
+    lv_screen_load(screen_1.screen);
 
-  lv_obj_add_event_cb(panel_1.btn, open_config_cb, LV_EVENT_CLICKED, &panel_1);
-  lv_obj_add_event_cb(panel_2.btn, open_config_cb, LV_EVENT_CLICKED, &panel_2);
-  lv_obj_add_event_cb(panel_3.btn, open_config_cb, LV_EVENT_CLICKED, &panel_3);
-  lv_obj_add_event_cb(panel_4.btn, open_config_cb, LV_EVENT_CLICKED, &panel_4);
-  lv_obj_add_event_cb(panel_5.btn, open_config_cb, LV_EVENT_CLICKED, &panel_5);
+    lv_obj_add_event_cb(
+        panel_1.btn, open_config_cb, LV_EVENT_CLICKED, &panel_1);
+    lv_obj_add_event_cb(
+        panel_2.btn, open_config_cb, LV_EVENT_CLICKED, &panel_2);
+    lv_obj_add_event_cb(
+        panel_3.btn, open_config_cb, LV_EVENT_CLICKED, &panel_3);
+    lv_obj_add_event_cb(
+        panel_4.btn, open_config_cb, LV_EVENT_CLICKED, &panel_4);
+    lv_obj_add_event_cb(
+        panel_5.btn, open_config_cb, LV_EVENT_CLICKED, &panel_5);
 
-  lv_obj_add_event_cb(config.done, close_config_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(config.done, close_config_cb, LV_EVENT_CLICKED, NULL);
 
-  lv_tick_set_cb(millis);
+    lv_tick_set_cb(millis);
 }
 
 void loop()
 {
-  lv_task_handler();
+    lv_task_handler();
 
-  screen_1.update();
+    screen_1.update();
 
-  can_loop();
+    can_loop();
 }

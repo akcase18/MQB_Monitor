@@ -7,10 +7,10 @@ static uint32_t request_unique_id = 0;
  ****************/
 
 Request::Request(uint16_t b1, uint16_t b2, float off, float sc)
-    : byte_1(b1),
-      byte_2(b2),
-      offset(off),
-      scale(sc)
+    : byte_1(b1)
+    , byte_2(b2)
+    , offset(off)
+    , scale(sc)
 {
     uid = request_unique_id++;
 }
@@ -18,7 +18,7 @@ Request::Request(uint16_t b1, uint16_t b2, float off, float sc)
 void Request::set_data(float new_data)
 {
     _data_recv = true;
-    data = new_data;
+    data       = new_data;
 }
 
 bool Request::get_recv()
@@ -31,15 +31,19 @@ void Request::start_timer(lv_timer_cb_t cb, uint32_t period)
     if (!timer_init)
     {
         this->timer = lv_timer_create(cb, period, this);
-        timer_init = true;
+        timer_init  = true;
     }
     else
     {
+        lv_timer_set_period(this->timer, period);
         lv_timer_resume(this->timer);
     }
 }
 
 void Request::stop_timer()
 {
-    lv_timer_pause(this->timer);
+    if (timer_init)
+    {
+        lv_timer_pause(this->timer);
+    }
 }

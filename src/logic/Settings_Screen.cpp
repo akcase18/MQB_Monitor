@@ -23,7 +23,7 @@ void Settings_Screen::init()
     lv_obj_center(this->screen);
     lv_obj_add_style(this->screen, &style_screen, 0);
 
-    this->day_icon = lv_label_create(this->screen);
+    this->day_icon   = lv_label_create(this->screen);
     this->night_icon = lv_label_create(this->screen);
 }
 
@@ -33,14 +33,14 @@ void Settings_Screen::set_brightness(BrightMode mode)
 
     switch (mode)
     {
-    case BRIGHT_NIGHT:
-        analogWrite(PWM_PIN, this->brightness.night);
-        break;
+        case BRIGHT_NIGHT:
+            analogWrite(PWM_PIN, this->brightness.night);
+            break;
 
-    case BRIGHT_DAY:
-    default:
-        analogWrite(PWM_PIN, this->brightness.day);
-        break;
+        case BRIGHT_DAY:
+        default:
+            analogWrite(PWM_PIN, this->brightness.day);
+            break;
     }
 }
 
@@ -53,13 +53,13 @@ void Settings_Screen::set_brightness(BrightMode mode, uint8_t percent)
 
     switch (mode)
     {
-    case BRIGHT_NIGHT:
-        this->brightness.night = (percent * MAX_BRIGHTNESS) / 100;
-        break;
+        case BRIGHT_NIGHT:
+            this->brightness.night = (percent * MAX_BRIGHTNESS) / 100;
+            break;
 
-    case BRIGHT_DAY:
-    default:
-        this->brightness.day = (percent * MAX_BRIGHTNESS) / 100;
-        break;
+        case BRIGHT_DAY:
+        default:
+            this->brightness.day = (percent * MAX_BRIGHTNESS) / 100;
+            break;
     }
 }

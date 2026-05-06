@@ -1,7 +1,7 @@
 #include "touchscreen.hpp"
 
 static Touchscreen *ts_pointer;
-void touch_interrupt();
+void                touch_interrupt();
 
 /****************
  * Constructors *
@@ -15,8 +15,8 @@ Touchscreen::Touchscreen(uint8_t cs_pin)
 }
 
 Touchscreen::Touchscreen(uint8_t cs_pin, uint8_t tirq_pin)
-    : _cs_pin(cs_pin),
-      _tirq_pin(tirq_pin)
+    : _cs_pin(cs_pin)
+    , _tirq_pin(tirq_pin)
 {
     pinMode(cs_pin, OUTPUT);
     digitalWrite(cs_pin, HIGH);
@@ -57,11 +57,11 @@ void Touchscreen::get_data()
     digitalWrite(_cs_pin, LOW);
 
     int16_t z1 = get_single_axis(Z1_CMD);
-    z1 = get_single_axis(Z1_CMD);
+    z1         = get_single_axis(Z1_CMD);
     int16_t z2 = get_single_axis(Z2_CMD);
-    z2 = get_single_axis(Z2_CMD);
+    z2         = get_single_axis(Z2_CMD);
 
-    int16_t z = z1 + 4095 - z2;
+    int16_t z  = z1 + 4095 - z2;
     int16_t x1 = 0;
     int16_t x2 = 0;
     int16_t x3 = 0;
@@ -107,31 +107,31 @@ void Touchscreen::get_data()
         _y_val = 0;
         return;
     }
-    
+
     _z_val = z;
 
     switch (_rotation)
     {
-    case 0:
-        _x_val = 4095 - y;
-        _y_val = x;
-        break;
+        case 0:
+            _x_val = 4095 - y;
+            _y_val = x;
+            break;
 
-    case 1:
-        _x_val = x;
-        _y_val = y;
-        break;
+        case 1:
+            _x_val = x;
+            _y_val = y;
+            break;
 
-    case 2:
-        _x_val = y;
-        _y_val = 4095 - x;
-        break;
+        case 2:
+            _x_val = y;
+            _y_val = 4095 - x;
+            break;
 
-    case 3:
-    default:
-        _x_val = 4095 - x;
-        _y_val = 4095 - y;
-        break;
+        case 3:
+        default:
+            _x_val = 4095 - x;
+            _y_val = 4095 - y;
+            break;
     }
 
     _last_req_tick = curr_tick;
@@ -228,5 +228,5 @@ int16_t Touchscreen::get_best_avg(int16_t x, int16_t y, int16_t z)
 void touch_interrupt(void)
 {
     Touchscreen *ts = ts_pointer;
-    ts->touch_wake = true;
+    ts->touch_wake  = true;
 }

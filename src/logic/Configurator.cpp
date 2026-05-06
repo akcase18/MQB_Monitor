@@ -5,7 +5,8 @@
  ****************/
 
 Configurator::Configurator(Info **info_list, uint8_t total_num_info)
-    : infos(info_list), total_num_info(total_num_info)
+    : infos(info_list)
+    , total_num_info(total_num_info)
 {
 }
 
@@ -31,7 +32,8 @@ void Configurator::init()
             roller_options += "\n";
         }
     }
-    lv_roller_set_options(this->info_roller, roller_options.c_str(), LV_ROLLER_MODE_INFINITE);
+    lv_roller_set_options(
+        this->info_roller, roller_options.c_str(), LV_ROLLER_MODE_INFINITE);
     lv_roller_set_visible_row_count(this->info_roller, 4);
 
     this->done = lv_btn_create(this->screen);
@@ -50,6 +52,11 @@ void Configurator::open(Panel *panel)
 
 void Configurator::close()
 {
-    this->selected_panel->set_info(this->infos[lv_roller_get_selected(this->info_roller)]);
-    eeprom.save_panel(this->selected_panel->panel_num, {(uint8_t)this->selected_panel->info->uid, this->selected_panel->info->get_metric() ? METRIC : IMPERIAL});
+    this->selected_panel->set_info(
+        this->infos[lv_roller_get_selected(this->info_roller)]);
+    refresh_request_timers();
+    eeprom.save_panel(
+        this->selected_panel->panel_num,
+        { (uint8_t)this->selected_panel->info->uid,
+          this->selected_panel->info->get_metric() ? METRIC : IMPERIAL });
 }
