@@ -1,8 +1,8 @@
 #include "setup.hpp"
 
-/************
- * Requests *
- ************/
+/*==============================================================================
+ Requests
+ =============================================================================*/
 
 /***** Performance Metrics *****/
 Request cool_tmp_req
@@ -54,9 +54,9 @@ Request tim_cor_4_req
 
 Request *request_list[NUM_REQS] = {};
 
-/********
- * Info *
- ********/
+/*==============================================================================
+ Info
+ =============================================================================*/
 
 /* Coolant Temp */
 Request *coolant_temp_req_list[] = { &cool_tmp_req };
@@ -180,9 +180,9 @@ Info *info_list[NUM_INFO]
         &timing_corr_1,          &timing_corr_2,   &timing_corr_3,
         &timing_corr_4 };
 
-/**********
- * Panels *
- **********/
+/*==============================================================================
+ Panels
+ =============================================================================*/
 
 Panel panel_1 = Panel(); // coolant temp
 Panel panel_2 = Panel(); // throttle position
@@ -194,24 +194,24 @@ Panel panel_6 = Panel(); // fuel (%)
 Panel *panel_list[NUM_PANELS]
     = { &panel_1, &panel_2, &panel_3, &panel_4, &panel_5 };
 
-/***********
- * Screens *
- ***********/
+/*==============================================================================
+ Screens
+ =============================================================================*/
 
 Settings_Screen settings = Settings_Screen();
 Info_Screen     screen_1 = Info_Screen(panel_list, NUM_PANELS);
 Configurator    config   = Configurator(info_list, NUM_INFO);
 
-/*******
- * CAN *
- *******/
+/*==============================================================================
+ CAN
+ =============================================================================*/
 
-RingBuffer<Request *> can_queue(64);
-lv_timer_t           *can_timer;
+RingBuffer<Request *, 64> can_queue;
+lv_timer_t               *can_timer;
 
-/******************
- * Initialization *
- ******************/
+/*==============================================================================
+ Initialization
+ =============================================================================*/
 
 void can_push_cb(lv_timer_t *timer)
 {

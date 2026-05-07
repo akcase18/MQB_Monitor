@@ -2,9 +2,9 @@
 
 static uint32_t request_unique_id = 0;
 
-/****************
- * Constructors *
- ****************/
+/*==============================================================================
+ Constructors
+ =============================================================================*/
 
 Request::Request(uint16_t b1, uint16_t b2, float off, float sc)
     : byte_1(b1)
@@ -14,6 +14,10 @@ Request::Request(uint16_t b1, uint16_t b2, float off, float sc)
 {
     uid = request_unique_id++;
 }
+
+/*==============================================================================
+ Public Functions
+ =============================================================================*/
 
 void Request::set_data(float new_data)
 {

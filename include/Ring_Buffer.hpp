@@ -1,16 +1,12 @@
 #pragma once
 
-#include <memory>
+#include <stdint.h>
 
-template<class T>
+template<class T, uint8_t buf_size>
 class RingBuffer
 {
     public:
-        explicit RingBuffer(size_t size)
-            : _buf(std::unique_ptr<T[]>(new T[size]))
-            , _max_size(size)
-        {
-        }
+        RingBuffer() = default;
 
         /**
          * Add a new item to the ring buffer.
@@ -94,7 +90,7 @@ class RingBuffer
          *
          * @return The maximum size of the ring buffer.
          */
-        size_t capacity() const
+        uint8_t capacity() const
         {
             return _max_size;
         }
@@ -105,10 +101,10 @@ class RingBuffer
          *
          * @return The number of items in the ring buffer.
          */
-        size_t size() const
+        uint8_t size() const
         {
             // Start with max size
-            size_t size = _max_size;
+            uint8_t size = _max_size;
 
             // Make sure buffer is not full
             if (!_full)
@@ -127,9 +123,9 @@ class RingBuffer
         }
 
     private:
-        std::unique_ptr<T[]> _buf;      // Ring buffer
-        size_t               _head = 0; // Index of "newest" item in buffer
-        size_t               _tail = 0; // Index of "oldest" item in buffer
-        const size_t         _max_size; // Maximum size of buffer
-        bool                 _full = 0;
+        T       _buf[buf_size]; // Ring buffer
+        uint8_t _head = 0;      // Index of "newest" item in buffer
+        uint8_t _tail = 0;      // Index of "oldest" item in buffer
+        uint8_t _max_size;      // Maximum size of buffer
+        bool    _full = 0;
 };

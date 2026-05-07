@@ -6,9 +6,9 @@
 
 using namespace std;
 
-/***********
- * Defines *
- ***********/
+/*==============================================================================
+ Defines
+ =============================================================================*/
 
 #define X_CMD           0x91
 #define Y_CMD           0xD1
@@ -21,9 +21,7 @@ using namespace std;
 class Touchscreen
 {
     private:
-        /*********************
-         * Private Variables *
-         *********************/
+        /*==== Private Variables ====*/
 
         uint8_t   _cs_pin;
         uint8_t   _tirq_pin = 255;
@@ -34,31 +32,23 @@ class Touchscreen
         uint32_t  _last_req_tick;
         SPIClass *_spi = nullptr;
 
-        /*********************
-         * Private Functions *
-         *********************/
+        /*==== Private Functions ====*/
 
         int16_t get_single_axis(uint16_t cmd);
 
         int16_t get_best_avg(int16_t x, int16_t y, int16_t z);
 
     public:
-        /********************
-         * Public Variables *
-         ********************/
+        /*==== Public Variables ====*/
 
         volatile bool touch_wake = true;
 
-        /****************
-         * Constructors *
-         ****************/
+        /*==== Constructors ====*/
 
         Touchscreen(uint8_t cs_pin);
         Touchscreen(uint8_t cs_pin, uint8_t tirq_pin);
 
-        /********************
-         * Public Functions *
-         ********************/
+        /*==== Public Functions ====*/
 
         void start(SPIClass &spi = SPI1);
 

@@ -95,5 +95,5 @@ class Configurator : public Screen
         void close();
 };
 
-extern RingBuffer<Request *> can_queue;
-void                         refresh_request_timers();
+extern RingBuffer<Request *, 64> can_queue;
+void                             refresh_request_timers();

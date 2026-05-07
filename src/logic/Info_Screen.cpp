@@ -1,8 +1,8 @@
 #include "Screen.hpp"
 
-/****************
- * Constructors *
- ****************/
+/*==============================================================================
+ Constructors
+ =============================================================================*/
 
 Info_Screen::Info_Screen(Panel **panel_list, uint8_t total_num_panels)
     : panels(panel_list)
@@ -10,9 +10,9 @@ Info_Screen::Info_Screen(Panel **panel_list, uint8_t total_num_panels)
 {
 }
 
-/********************
- * Public Functions *
- ********************/
+/*==============================================================================
+ Public Functions
+ =============================================================================*/
 
 void Info_Screen::init(uint8_t num_panels)
 {

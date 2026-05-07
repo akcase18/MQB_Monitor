@@ -3,9 +3,9 @@
 static Touchscreen *ts_pointer;
 void                touch_interrupt();
 
-/****************
- * Constructors *
- ****************/
+/*==============================================================================
+ Constructors
+ =============================================================================*/
 
 Touchscreen::Touchscreen(uint8_t cs_pin)
     : _cs_pin(cs_pin)
@@ -24,9 +24,9 @@ Touchscreen::Touchscreen(uint8_t cs_pin, uint8_t tirq_pin)
     attachInterrupt(digitalPinToInterrupt(tirq_pin), touch_interrupt, FALLING);
 }
 
-/***************************
- * Public Helper Functions *
- ***************************/
+/*==============================================================================
+ Public Helper Functions
+ =============================================================================*/
 
 void Touchscreen::start(SPIClass &spi)
 {
@@ -165,9 +165,9 @@ void Touchscreen::print_values()
     Serial.printf("Z: %d\n", _z_val);
 }
 
-/****************************
- * Private Helper Functions *
- ****************************/
+/*==============================================================================
+ Private Helper Functions
+ =============================================================================*/
 
 int16_t Touchscreen::get_single_axis(uint16_t cmd)
 {
@@ -221,9 +221,9 @@ int16_t Touchscreen::get_best_avg(int16_t x, int16_t y, int16_t z)
     return result;
 }
 
-/*************
- * Callbacks *
- *************/
+/*==============================================================================
+ Callbacks
+ =============================================================================*/
 
 void touch_interrupt(void)
 {

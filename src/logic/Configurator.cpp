@@ -1,8 +1,8 @@
 #include "Screen.hpp"
 
-/****************
- * Constructors *
- ****************/
+/*==============================================================================
+ Constructors
+ =============================================================================*/
 
 Configurator::Configurator(Info **info_list, uint8_t total_num_info)
     : infos(info_list)
@@ -10,9 +10,9 @@ Configurator::Configurator(Info **info_list, uint8_t total_num_info)
 {
 }
 
-/********************
- * Public Functions *
- ********************/
+/*==============================================================================
+ Public Functions
+ =============================================================================*/
 
 void Configurator::init()
 {
