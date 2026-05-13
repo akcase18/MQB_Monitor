@@ -5,6 +5,11 @@
 # here, such as MicroPython and PC simulator packages.
 #
 # Note: This script is run by the CI workflows.
+SCRIPT_PATH=$(readlink -f $0)
+SCRIPT_DIR=$(dirname $SCRIPT_PATH)
+
+sudo dpkg --add-architecture i386
 sudo apt update
-sudo apt install gcc python3 ninja-build libpng-dev ruby-full gcovr cmake libjpeg-turbo8-dev libfreetype6-dev pngquant libinput-dev libxkbcommon-dev libdrm-dev pkg-config
-pip3 install pypng lz4
+
+cat $SCRIPT_DIR/prerequisites-apt.txt | xargs sudo apt install -y
+pip3 install --user -r $SCRIPT_DIR/prerequisites-pip.txt

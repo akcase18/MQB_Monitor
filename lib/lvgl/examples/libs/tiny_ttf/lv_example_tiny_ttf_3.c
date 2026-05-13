@@ -6,7 +6,15 @@ static void font_size_observer_cb(lv_observer_t * observer, lv_subject_t * subje
 static lv_subject_t subject_font;
 
 /**
- * Change font size with Tiny_TTF
+ * @title Resize Tiny TTF font with a slider
+ * @brief Rescale a Tiny TTF font live as a slider drives a bound subject.
+ *
+ * `lv_tiny_ttf_create_data` builds a 25 px font from the embedded
+ * `ubuntu_font` array and applies it to a style used by a centered
+ * `Hello world!` label. A slider spanning 5 to 50 is bound through
+ * `lv_subject_t` to a label showing the current value, and an observer
+ * calls `lv_tiny_ttf_set_size` followed by `lv_obj_report_style_change`
+ * whenever the subject updates so the label redraws at the new size.
  */
 void lv_example_tiny_ttf_3(void)
 {
@@ -44,7 +52,7 @@ void lv_example_tiny_ttf_3(void)
 
 static void font_size_observer_cb(lv_observer_t * observer, lv_subject_t * subject)
 {
-    lv_style_t * style = observer->user_data;
+    lv_style_t * style = (lv_style_t *) lv_observer_get_user_data(observer);
     lv_style_value_t v;
     lv_style_get_prop(style, LV_STYLE_TEXT_FONT, &v);
     lv_font_t * font = (lv_font_t *) v.ptr;

@@ -6,11 +6,9 @@
 /*********************
  *      INCLUDES
  *********************/
-#include <stddef.h>
 
 #include "lv_utils.h"
-#include "lv_fs.h"
-#include "cache/lv_image_cache.h"
+#include "cache/lv_cache.h"
 
 /*********************
  *      DEFINES
@@ -36,8 +34,8 @@
  *   GLOBAL FUNCTIONS
  **********************/
 
-void * _lv_utils_bsearch(const void * key, const void * base, uint32_t n, uint32_t size,
-                         int32_t (*cmp)(const void * pRef, const void * pElement))
+void * lv_utils_bsearch(const void * key, const void * base, size_t n, size_t size,
+                        int (*cmp)(const void * pRef, const void * pElement))
 {
     const char * middle;
     int32_t c;

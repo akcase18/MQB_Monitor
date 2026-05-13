@@ -69,16 +69,17 @@ void can_recv(const CAN_message_t &msg)
     // Figure out which Request the message was a response to
     Request *req = get_request(byte_1, byte_2);
 
-    float new_data = 0; // This is where data will go
+    int16_t raw_data = 0; // This is where data will go
 
     if (msg.buf[0] == 0x04) // Data comes in 1 byte
     {
-        new_data = msg.buf[4];
+        raw_data = msg.buf[4];
     }
     else // Data comes in 2 bytes
     {
-        new_data = (msg.buf[4] << 8) | msg.buf[5]; // Concatenate data bytes
+        raw_data = (msg.buf[4] << 8) | msg.buf[5]; // Concatenate data bytes
     }
+    float new_data = raw_data;
     // Apply offset and scale
     new_data = (new_data + req->offset) * req->scale;
     req->set_data(new_data);

@@ -1,6 +1,6 @@
 #if LV_BUILD_TEST
 #include "../lvgl.h"
-#include "lv_test_indev.h"
+#include "../../lvgl_private.h"
 #include "unity/unity.h"
 
 static lv_obj_t * active_screen = NULL;
@@ -24,7 +24,7 @@ void tearDown(void)
 
 void test_button_matrix_creation(void)
 {
-    const char ** map;
+    const char * const * map;
 
     /* Verify the default map. */
     map = lv_buttonmatrix_get_map(btnm);
@@ -38,7 +38,7 @@ void test_button_matrix_creation(void)
 
 void test_button_matrix_set_map_works(void)
 {
-    const char ** ret_map;
+    const char * const * ret_map;
     static const char * exp_map[] = {"A", "B", "\n", "C", "D", ""};
 
     lv_buttonmatrix_set_map(btnm, exp_map);
@@ -392,7 +392,7 @@ void test_button_matrix_pressing_event_works(void)
      * This is done to increase code coverage. */
     btnmObj->btn_id_sel = 3;
     /* Send a dummy lv_indev_t object as param to avoid crashing during build. */
-    lv_obj_send_event(btnm, LV_EVENT_PRESSING, lv_test_mouse_indev);
+    lv_obj_send_event(btnm, LV_EVENT_PRESSING, lv_test_indev_get_indev(LV_INDEV_TYPE_POINTER));
     TEST_ASSERT_TRUE(event_triggered);
 }
 
@@ -454,6 +454,35 @@ void test_button_matrix_focused_event_works(void)
     exp_evt_code = LV_EVENT_FOCUSED;
     lv_obj_send_event(btnm, LV_EVENT_FOCUSED, NULL);
     TEST_ASSERT_TRUE(event_triggered);
+}
+
+void test_buttonmatrix_properties(void)
+{
+#if LV_USE_OBJ_PROPERTY
+    lv_obj_t * obj = lv_buttonmatrix_create(lv_screen_active());
+
+    lv_property_t prop = { };
+
+    /* Test SELECTED_BUTTON property */
+    prop.id = LV_PROPERTY_BUTTONMATRIX_SELECTED_BUTTON;
+    prop.num = 2;
+    TEST_ASSERT_TRUE(lv_obj_set_property(obj, &prop) == LV_RESULT_OK);
+    TEST_ASSERT_EQUAL_INT(2, lv_obj_get_property(obj, LV_PROPERTY_BUTTONMATRIX_SELECTED_BUTTON).num);
+
+    /* Test ONE_CHECKED property */
+    lv_buttonmatrix_set_button_ctrl_all(obj, LV_BUTTONMATRIX_CTRL_CHECKABLE);
+
+    prop.id = LV_PROPERTY_BUTTONMATRIX_ONE_CHECKED;
+    prop.num = 1;
+    TEST_ASSERT_TRUE(lv_obj_set_property(obj, &prop) == LV_RESULT_OK);
+    TEST_ASSERT_EQUAL_INT(1, lv_obj_get_property(obj, LV_PROPERTY_BUTTONMATRIX_ONE_CHECKED).num);
+
+    prop.num = 0;
+    TEST_ASSERT_TRUE(lv_obj_set_property(obj, &prop) == LV_RESULT_OK);
+    TEST_ASSERT_EQUAL_INT(0, lv_obj_get_property(obj, LV_PROPERTY_BUTTONMATRIX_ONE_CHECKED).num);
+
+    lv_obj_delete(obj);
+#endif
 }
 
 #endif

@@ -3,11 +3,19 @@
 
 static void ofs_y_anim(void * img, int32_t v)
 {
-    lv_image_set_offset_y(img, v);
+    lv_image_set_offset_y((lv_obj_t *)img, v);
 }
 
 /**
- * Image styling and offset
+ * @title Image styling and vertical offset
+ * @brief Scroll the pixels of a recolored, yellow-backed strip image vertically.
+ *
+ * An `lv_style_t` with a yellow background and a black recolor at
+ * `LV_OPA_COVER` is applied to an image that uses the
+ * `img_skew_strip` source and is clipped to 150x100. An infinite
+ * `lv_anim_t` drives `lv_image_set_offset_y` from 0 to 100 over
+ * 3000 ms with a 500 ms reverse phase, so the visible pixels scroll
+ * up and back down inside the fixed frame.
  */
 void lv_example_image_4(void)
 {
@@ -32,7 +40,7 @@ void lv_example_image_4(void)
     lv_anim_set_exec_cb(&a, ofs_y_anim);
     lv_anim_set_values(&a, 0, 100);
     lv_anim_set_duration(&a, 3000);
-    lv_anim_set_playback_duration(&a, 500);
+    lv_anim_set_reverse_duration(&a, 500);
     lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
     lv_anim_start(&a);
 

@@ -4,7 +4,7 @@
 static void event_handler(lv_event_t * e)
 {
     lv_event_code_t code = lv_event_get_code(e);
-    lv_obj_t * obj = lv_event_get_current_target(e);
+    lv_obj_t * obj = (lv_obj_t *)lv_event_get_current_target(e);
 
     if(code == LV_EVENT_VALUE_CHANGED) {
         lv_calendar_date_t date;
@@ -14,6 +14,19 @@ static void event_handler(lv_event_t * e)
     }
 }
 
+/**
+ * @title Calendar with highlighted days
+ * @brief Show February 2021 with three highlighted dates and log the tapped day.
+ *
+ * A 185x230 `lv_calendar` is placed below screen center with today set
+ * to 2021-02-23 via `lv_calendar_set_today_date` and the shown month
+ * fixed by `lv_calendar_set_month_shown`. A static array of three
+ * `lv_calendar_date_t` entries is registered through
+ * `lv_calendar_set_highlighted_dates`. The `LV_EVENT_VALUE_CHANGED`
+ * callback reads `lv_calendar_get_pressed_date` and logs the tapped
+ * day. If `LV_USE_CALENDAR_HEADER_DROPDOWN` or `_ARROW` is available
+ * the matching header is attached.
+ */
 void lv_example_calendar_1(void)
 {
     lv_obj_t  * calendar = lv_calendar_create(lv_screen_active());
@@ -22,7 +35,7 @@ void lv_example_calendar_1(void)
     lv_obj_add_event_cb(calendar, event_handler, LV_EVENT_ALL, NULL);
 
     lv_calendar_set_today_date(calendar, 2021, 02, 23);
-    lv_calendar_set_showed_date(calendar, 2021, 02);
+    lv_calendar_set_month_shown(calendar, 2021, 02);
 
     /*Highlight a few days*/
     static lv_calendar_date_t highlighted_days[3];       /*Only its pointer will be saved so should be static*/
@@ -41,9 +54,9 @@ void lv_example_calendar_1(void)
     lv_calendar_set_highlighted_dates(calendar, highlighted_days, 3);
 
 #if LV_USE_CALENDAR_HEADER_DROPDOWN
-    lv_calendar_header_dropdown_create(calendar);
+    lv_calendar_add_header_dropdown(calendar);
 #elif LV_USE_CALENDAR_HEADER_ARROW
-    lv_calendar_header_arrow_create(calendar);
+    lv_calendar_add_header_arrow(calendar);
 #endif
 }
 

@@ -1,6 +1,16 @@
 #include "../../lv_examples.h"
 #if LV_USE_KEYBOARD && LV_BUILD_EXAMPLES
 
+/**
+ * @title AZERTY layout as USER_1 mode
+ * @brief Register a custom AZERTY button map on the keyboard.
+ *
+ * A `kb_map` and matching `lv_buttonmatrix_ctrl_t` control array describe an
+ * AZERTY layout with `LV_SYMBOL_BACKSPACE`, `LV_SYMBOL_NEW_LINE`,
+ * `LV_SYMBOL_CLOSE`, and `LV_SYMBOL_OK`. `lv_keyboard_set_map` installs the
+ * layout under `LV_KEYBOARD_MODE_USER_1` and `lv_keyboard_set_mode` activates
+ * it. A focused textarea above the keyboard receives the typed characters.
+ */
 void lv_example_keyboard_2(void)
 {
     /*Create an AZERTY keyboard map*/
@@ -11,10 +21,10 @@ void lv_example_keyboard_2(void)
                                    };
 
     /*Set the relative width of the buttons and other controls*/
-    static const lv_buttonmatrix_ctrl_t kb_ctrl[] = {4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 6,
-                                                     4, 4, 4, 4, 4, 4, 4, 4, 4, 6,
-                                                     4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-                                                     2, LV_BUTTONMATRIX_CTRL_HIDDEN | 2, 6, LV_BUTTONMATRIX_CTRL_HIDDEN | 2, 2
+    static const lv_buttonmatrix_ctrl_t kb_ctrl[] = {LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_6,
+                                                     LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_6,
+                                                     LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_4, LV_BUTTONMATRIX_CTRL_WIDTH_4,
+                                                     LV_BUTTONMATRIX_CTRL_WIDTH_2, (lv_buttonmatrix_ctrl_t)(LV_BUTTONMATRIX_CTRL_HIDDEN | LV_BUTTONMATRIX_CTRL_WIDTH_2), LV_BUTTONMATRIX_CTRL_WIDTH_6, (lv_buttonmatrix_ctrl_t)(LV_BUTTONMATRIX_CTRL_HIDDEN | LV_BUTTONMATRIX_CTRL_WIDTH_2), LV_BUTTONMATRIX_CTRL_WIDTH_2
                                                     };
 
     /*Create a keyboard and add the new map as USER_1 mode*/

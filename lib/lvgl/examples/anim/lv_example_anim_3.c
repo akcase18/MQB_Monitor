@@ -1,13 +1,6 @@
 #include "../lv_examples.h"
 #if LV_BUILD_EXAMPLES && LV_USE_SLIDER && LV_USE_CHART && LV_USE_BUTTON && LV_USE_GRID
 
-/**
- * the example show the use of cubic-bezier3 in animation.
- * the control point P1,P2 of cubic-bezier3 can be adjusted by slider.
- * and the chart shows the cubic-bezier3 in real time. you can click
- * run button see animation in current point of cubic-bezier3.
- */
-
 #define CHART_POINTS_NUM 256
 
 struct {
@@ -19,8 +12,8 @@ struct {
     lv_obj_t * p2_slider;
     lv_obj_t * p2_label;
     lv_obj_t * run_btn;
-    uint16_t p1;
-    uint16_t p2;
+    int32_t p1;
+    int32_t p2;
     lv_anim_t a;
 } ginfo;
 
@@ -32,7 +25,17 @@ static void page_obj_init(lv_obj_t * par);
 static void anim_x_cb(void * var, int32_t v);
 
 /**
- * create an animation
+ * @title Cubic-bezier animation editor
+ * @brief Edit a cubic-bezier path with two sliders while a chart plots it live.
+ *
+ * A 320x240 grid container holds an animated red square, two sliders that
+ * set the p1 and p2 control points of `lv_bezier3` (both ranged 0 to 1024),
+ * value labels, a play button with `LV_SYMBOL_PLAY`, and a scatter
+ * `lv_chart_t` that plots the current curve across 256 points. Slider
+ * `LV_EVENT_VALUE_CHANGED` callbacks update the stored control points and
+ * refresh the chart; clicking the play button calls `lv_anim_start` to run
+ * the square across the container using the custom bezier path callback
+ * over 2000 ms.
  */
 void lv_example_anim_3(void)
 {
@@ -64,7 +67,7 @@ void lv_example_anim_3(void)
 
 static int32_t anim_path_bezier3_cb(const lv_anim_t * a)
 {
-    uint32_t t = lv_map(a->act_time, 0, a->duration, 0, 1024);
+    int32_t t = lv_map(a->act_time, 0, a->duration, 0, 1024);
     int32_t step = lv_bezier3(t, 0, ginfo.p1, ginfo.p2, 1024);
     int32_t new_value;
     new_value = step * (a->end_value - a->start_value);
@@ -76,16 +79,16 @@ static int32_t anim_path_bezier3_cb(const lv_anim_t * a)
 static void refer_chart_cubic_bezier(void)
 {
     for(uint16_t i = 0; i <= CHART_POINTS_NUM; i ++) {
-        uint32_t t = i * (1024 / CHART_POINTS_NUM);
+        int32_t t = i * (1024 / CHART_POINTS_NUM);
         int32_t step = lv_bezier3(t, 0, ginfo.p1, ginfo.p2, 1024);
-        lv_chart_set_value_by_id2(ginfo.chart, ginfo.ser1, i, t, step);
+        lv_chart_set_series_value_by_id2(ginfo.chart, ginfo.ser1, i, t, step);
     }
     lv_chart_refresh(ginfo.chart);
 }
 
 static void anim_x_cb(void * var, int32_t v)
 {
-    lv_obj_set_style_translate_x(var, v, LV_PART_MAIN);
+    lv_obj_set_style_translate_x((lv_obj_t *)var, v, LV_PART_MAIN);
 }
 
 static void run_button_event_handler(lv_event_t * e)
@@ -100,7 +103,7 @@ static void slider_event_cb(lv_event_t * e)
 {
     char buf[16];
     lv_obj_t * label;
-    lv_obj_t * slider = lv_event_get_target(e);
+    lv_obj_t * slider = lv_event_get_target_obj(e);
 
     if(slider == ginfo.p1_slider) {
         label = ginfo.p1_label;
@@ -156,8 +159,8 @@ static void page_obj_init(lv_obj_t * par)
     lv_obj_set_style_size(ginfo.chart, 0, 0, LV_PART_INDICATOR);
     lv_chart_set_type(ginfo.chart, LV_CHART_TYPE_SCATTER);
     ginfo.ser1 = lv_chart_add_series(ginfo.chart, lv_palette_main(LV_PALETTE_RED), LV_CHART_AXIS_PRIMARY_Y);
-    lv_chart_set_range(ginfo.chart, LV_CHART_AXIS_PRIMARY_Y, 0, 1024);
-    lv_chart_set_range(ginfo.chart, LV_CHART_AXIS_PRIMARY_X, 0, 1024);
+    lv_chart_set_axis_range(ginfo.chart, LV_CHART_AXIS_PRIMARY_Y, 0, 1024);
+    lv_chart_set_axis_range(ginfo.chart, LV_CHART_AXIS_PRIMARY_X, 0, 1024);
     lv_chart_set_point_count(ginfo.chart, CHART_POINTS_NUM);
     lv_obj_set_grid_cell(ginfo.chart, LV_GRID_ALIGN_STRETCH, 0, 3, LV_GRID_ALIGN_STRETCH, 3, 1);
 }

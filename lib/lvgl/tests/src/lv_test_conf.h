@@ -22,6 +22,8 @@ extern "C" {
 #define LV_USE_STDLIB_SPRINTF       LV_STDLIB_CLIB
 #define LV_USE_OS                   LV_OS_PTHREAD
 #define LV_OBJ_STYLE_CACHE          0
+#define LV_BIN_DECODER_RAM_LOAD     1   /* Run test with bin image loaded to RAM */
+#define LV_DRAW_BUF_STRIDE_ALIGN    64  /* Use a large value to be sure any issues will cause crash */
 #endif
 
 #ifdef LVGL_CI_USING_DEF_HEAP
@@ -29,6 +31,7 @@ extern "C" {
 #define LV_USE_STDLIB_STRING    LV_STDLIB_BUILTIN
 #define LV_USE_STDLIB_SPRINTF   LV_STDLIB_BUILTIN
 #define LV_OBJ_STYLE_CACHE      1
+#define LV_BIN_DECODER_RAM_LOAD 0
 #endif
 
 #ifdef MICROPYTHON
@@ -69,22 +72,21 @@ typedef void * lv_user_data_t;
 #define  LV_COLOR_DEPTH     32
 #define  LV_DPI_DEF         160
 
-#define LV_USE_THORVG_INTERNAL      1
-/* Use VG-Lite GPU. */
-#define LV_USE_DRAW_VG_LITE         1
+#define  LV_DRAW_BUF_ALIGN  64
+#ifdef _MSC_VER
+#define  LV_ATTRIBUTE_MEM_ALIGN __declspec(align(LV_DRAW_BUF_ALIGN))
+#else
+#define  LV_ATTRIBUTE_MEM_ALIGN __attribute__((aligned(LV_DRAW_BUF_ALIGN)))
+#endif
 
-/* Enable VG-Lite custom external 'gpu_init()' function */
-#define LV_VG_LITE_USE_GPU_INIT     1
-
-/* Enable VG-Lite assert. */
-#define LV_VG_LITE_USE_ASSERT       1
-
-/* Simulate VG-Lite hardware using ThorVG */
-#define LV_USE_VG_LITE_THORVG       1
-
-/* Enable performance monitor log mode for build test */
-#define LV_USE_PERF_MONITOR_LOG_MODE 1
-
+#include "lv_test_conf_vg_lite.h"
+#include "lv_test_conf_full.h"
+#elif LV_TEST_OPTION == 7
+#define  LV_COLOR_DEPTH     32
+#define  LV_DPI_DEF         160
+#define  LV_USE_DRAW_SDL    1
+#define  LV_USE_SDL         1
+#define  LV_USE_NUTTX       1
 #include "lv_test_conf_full.h"
 #elif LV_TEST_OPTION == 4
 #define  LV_COLOR_DEPTH     24
@@ -107,21 +109,14 @@ typedef void * lv_user_data_t;
 #if defined(LVGL_CI_USING_SYS_HEAP) || defined(LVGL_CI_USING_DEF_HEAP)
 #undef LV_LOG_PRINTF
 
-/*Use a large value be sure any issues will cause crash*/
-#define LV_DRAW_BUF_STRIDE_ALIGN                64
-
+#ifndef LV_DRAW_BUF_ALIGN
 /*Use non power of 2 to avoid the case when `malloc` returns aligned pointer by default, and use a large value be sure any issues will cause crash*/
 #define LV_DRAW_BUF_ALIGN                       852
-
-/*For screenshots*/
-#undef LV_USE_PERF_MONITOR
-#undef LV_USE_MEM_MONITOR
-#undef LV_DPI_DEF
-#define  LV_DPI_DEF         130
 #endif
 
-#if defined(LVGL_CI_USING_SYS_HEAP)
-#undef LV_USE_FLOAT
+/*For screenshots*/
+#undef LV_DPI_DEF
+#define  LV_DPI_DEF         130
 #endif
 
 #ifdef __cplusplus

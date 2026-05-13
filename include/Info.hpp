@@ -5,7 +5,7 @@
 #define MAX_NAME_LEN           20
 #define MAX_LABEL_LEN          10
 #define MAX_NAME_AND_LABEL_LEN MAX_NAME_LEN + MAX_LABEL_LEN
-#define MAX_DATA_LEN 8
+#define MAX_DATA_LEN           8
 
 enum class Unit_Type
 {
@@ -77,6 +77,7 @@ class Info
         uint16_t get_cycle_time();
 
         bool get_metric();
+        void set_metric(bool is_metric);
 
         Request **get_requests();
         uint8_t   get_num_requests();

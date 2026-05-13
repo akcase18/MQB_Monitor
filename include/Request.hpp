@@ -31,9 +31,9 @@ class Request
          * Creates a new Request that will be sent to the car
          * in order to get data from it.
          *
-         * @param uds_data UDS request bytes
-         * @param off the offset value for decoding raw data
-         * @param sc the scaling factor for decoding raw data
+         * @param uds_data  UDS request bytes
+         * @param off       the offset value for decoding raw data
+         * @param sc        the scaling factor for decoding raw data
          */
         Request(uint16_t b1, uint16_t b2, float off, float sc);
 

@@ -2,7 +2,15 @@
 #if LV_USE_CHART && LV_BUILD_EXAMPLES
 
 /**
- * Use lv_scale to add ticks to a scrollable chart
+ * @title Scrollable bar chart with month scale
+ * @brief Bar chart inside a scrollable wrapper paired with a horizontal month scale.
+ *
+ * A 200x150 container holds a transparent flex-column wrapper sized to
+ * 300% width so the chart scrolls horizontally. The wrapper contains a
+ * `LV_CHART_TYPE_BAR` chart with 12 points and two green series, plus a
+ * `lv_scale` in `LV_SCALE_MODE_HORIZONTAL_BOTTOM` labeled with month
+ * abbreviations. The scale's horizontal padding is aligned to the first
+ * bar using `lv_chart_get_first_point_center_offset`.
  */
 void lv_example_chart_2(void)
 {
@@ -24,8 +32,8 @@ void lv_example_chart_2(void)
     lv_obj_set_width(chart, lv_pct(100));
     lv_obj_set_flex_grow(chart, 1);
     lv_chart_set_type(chart, LV_CHART_TYPE_BAR);
-    lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_Y, 0, 100);
-    lv_chart_set_range(chart, LV_CHART_AXIS_SECONDARY_Y, 0, 400);
+    lv_chart_set_axis_range(chart, LV_CHART_AXIS_PRIMARY_Y, 0, 100);
+    lv_chart_set_axis_range(chart, LV_CHART_AXIS_SECONDARY_Y, 0, 400);
     lv_chart_set_point_count(chart, 12);
     lv_obj_set_style_radius(chart, 0, 0);
 
@@ -47,8 +55,8 @@ void lv_example_chart_2(void)
     /*Set the next points on 'ser1'*/
     uint32_t i;
     for(i = 0; i < 12; i++) {
-        lv_chart_set_next_value(chart, ser1, lv_rand(10, 60));
-        lv_chart_set_next_value(chart, ser2, lv_rand(50, 90));
+        lv_chart_set_next_value(chart, ser1, (int32_t)lv_rand(10, 60));
+        lv_chart_set_next_value(chart, ser2, (int32_t)lv_rand(50, 90));
     }
     lv_chart_refresh(chart); /*Required after direct set*/
 }

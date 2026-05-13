@@ -5,6 +5,16 @@ static void ta_event_cb(lv_event_t * e);
 
 static lv_obj_t * kb;
 
+/**
+ * @title Password and text fields with keyboard
+ * @brief Two one-line textareas share a keyboard, one masked for password entry.
+ *
+ * A left textarea has `lv_textarea_set_password_mode` enabled so input is
+ * masked, a right textarea keeps plain text, and each is labelled `Password:`
+ * or `Text:` above it. An `lv_keyboard` occupies the bottom half. A shared
+ * `LV_EVENT_ALL` handler retargets the keyboard on `LV_EVENT_CLICKED` or
+ * `LV_EVENT_FOCUSED`, and logs the text on `LV_EVENT_READY`.
+ */
 void lv_example_textarea_2(void)
 {
     /*Create the password box*/
@@ -52,7 +62,7 @@ void lv_example_textarea_2(void)
 static void ta_event_cb(lv_event_t * e)
 {
     lv_event_code_t code = lv_event_get_code(e);
-    lv_obj_t * ta = lv_event_get_target(e);
+    lv_obj_t * ta = lv_event_get_target_obj(e);
     if(code == LV_EVENT_CLICKED || code == LV_EVENT_FOCUSED) {
         /*Focus on the clicked text area*/
         if(kb != NULL) lv_keyboard_set_textarea(kb, ta);

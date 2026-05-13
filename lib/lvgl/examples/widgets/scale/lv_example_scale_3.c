@@ -3,21 +3,30 @@
 
 LV_IMAGE_DECLARE(img_hand);
 
-lv_obj_t * needle_line;
-lv_obj_t * needle_img;
+static lv_obj_t * needle_line;
+static lv_obj_t * needle_img;
 
 static void set_needle_line_value(void * obj, int32_t v)
 {
-    lv_scale_set_line_needle_value(obj, needle_line, 60, v);
+    lv_scale_set_line_needle_value((lv_obj_t *)obj, needle_line, 60, v);
 }
 
 static void set_needle_img_value(void * obj, int32_t v)
 {
-    lv_scale_set_image_needle_value(obj, needle_img, v);
+    lv_scale_set_image_needle_value((lv_obj_t *)obj, needle_img, v);
 }
 
 /**
- * A simple round scale
+ * @title Round scales with animated needles
+ * @brief Two round inner scales driven by looping line and image needles.
+ *
+ * Two 150 by 150 scales use `LV_SCALE_MODE_ROUND_INNER` with a 270
+ * degree range rotated to 135 degrees, 31 ticks, and the range 10 to
+ * 40. The left scale attaches an `lv_line` needle driven by
+ * `lv_scale_set_line_needle_value`; the right one attaches an
+ * `lv_image` needle (`img_hand`) driven by
+ * `lv_scale_set_image_needle_value`. Both needles animate between 10
+ * and 40 on an infinite 1000 ms forward and 1000 ms reverse loop.
  */
 void lv_example_scale_3(void)
 {
@@ -54,7 +63,7 @@ void lv_example_scale_3(void)
     lv_anim_set_exec_cb(&anim_scale_line, set_needle_line_value);
     lv_anim_set_duration(&anim_scale_line, 1000);
     lv_anim_set_repeat_count(&anim_scale_line, LV_ANIM_REPEAT_INFINITE);
-    lv_anim_set_playback_duration(&anim_scale_line, 1000);
+    lv_anim_set_reverse_duration(&anim_scale_line, 1000);
     lv_anim_set_values(&anim_scale_line, 10, 40);
     lv_anim_start(&anim_scale_line);
 
@@ -81,7 +90,7 @@ void lv_example_scale_3(void)
     lv_scale_set_rotation(scale_img, 135);
 
     /* image must point to the right. E.g. -O------>*/
-    needle_img = lv_img_create(scale_img);
+    needle_img = lv_image_create(scale_img);
     lv_image_set_src(needle_img, &img_hand);
     lv_obj_align(needle_img, LV_ALIGN_CENTER, 47, -2);
     lv_image_set_pivot(needle_img, 3, 4);
@@ -92,7 +101,7 @@ void lv_example_scale_3(void)
     lv_anim_set_exec_cb(&anim_scale_img, set_needle_img_value);
     lv_anim_set_duration(&anim_scale_img, 1000);
     lv_anim_set_repeat_count(&anim_scale_img, LV_ANIM_REPEAT_INFINITE);
-    lv_anim_set_playback_duration(&anim_scale_img, 1000);
+    lv_anim_set_reverse_duration(&anim_scale_img, 1000);
     lv_anim_set_values(&anim_scale_img, 10, 40);
     lv_anim_start(&anim_scale_img);
 }

@@ -8,7 +8,9 @@
 #include "lvgl.h"
 #else
 #include "../lvgl/lvgl.h"
+#include "pgmspace.h"
 #endif
+
 
 #ifndef DIGITAL_DISPLAY_80_V2
 #define DIGITAL_DISPLAY_80_V2 1

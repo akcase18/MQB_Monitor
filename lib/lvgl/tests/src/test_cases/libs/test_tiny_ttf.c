@@ -1,5 +1,6 @@
 #if LV_BUILD_TEST
 #include "../lvgl.h"
+#include "../../lvgl_private.h"
 
 #include "unity/unity.h"
 
@@ -37,9 +38,11 @@ void test_tiny_ttf_rendering_test(void)
                       "Accents: ÁÉÍÓÖŐÜŰ áéíóöőüű");
     lv_obj_center(label);
 
+#ifndef NON_AMD64_BUILD
     TEST_ASSERT_EQUAL_SCREENSHOT("libs/tiny_ttf_1.png");
+#endif
 
-    lv_obj_del(label);
+    lv_obj_delete(label);
     lv_tiny_ttf_destroy(font);
 #else
     TEST_PASS();
@@ -71,11 +74,43 @@ void test_tiny_ttf_kerning(void)
 
     TEST_ASSERT_EQUAL_SCREENSHOT("libs/tiny_ttf_2.png");
 
-    lv_obj_del(cont);
+    lv_obj_delete(cont);
     lv_tiny_ttf_destroy(font_normal);
     lv_tiny_ttf_destroy(font_none);
 #else
     TEST_PASS();
+#endif
+}
+
+void test_tiny_ttf_gpos(void)
+{
+#if LV_USE_TINY_TTF && LV_TINY_TTF_FILE_SUPPORT
+    lv_font_t * font_normal = lv_tiny_ttf_create_file("A:src/test_assets/test_gpos_one.ttf", 60);
+    lv_font_t * font_none = lv_tiny_ttf_create_file("A:src/test_assets/test_gpos_one.ttf", 60);
+    lv_font_set_kerning(font_none, LV_FONT_KERNING_NONE);
+
+    lv_obj_t * label_normal = lv_label_create(lv_screen_active());
+    lv_label_set_long_mode(label_normal, LV_LABEL_LONG_MODE_WRAP);
+    lv_label_set_text(label_normal, "ĄJ Ąg Ąģ Ąj Ąȷ Qȷ ąj ąȷ gȷ ģȷ ıȷ ųȷ vȷ Va Vá Vą Vf Vﬂ V.");
+    lv_obj_set_style_text_font(label_normal, font_normal, LV_PART_MAIN);
+    lv_obj_set_width(label_normal, 700);
+    lv_obj_set_style_text_align(label_normal, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(label_normal, LV_ALIGN_CENTER, 0, -100);
+
+    lv_obj_t * label_none = lv_label_create(lv_screen_active());
+    lv_label_set_long_mode(label_normal, LV_LABEL_LONG_MODE_WRAP);
+    lv_label_set_text(label_none, "ĄJ Ąg Ąģ Ąj Ąȷ Qȷ ąj ąȷ gȷ ģȷ ıȷ ųȷ vȷ Va Vá Vą Vf Vﬂ V.");
+    lv_obj_set_style_text_font(label_none, font_none, LV_PART_MAIN);
+    lv_obj_set_width(label_none, 700);
+    lv_obj_set_style_text_align(label_none, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(label_none, LV_ALIGN_CENTER, 0, 100);
+
+    TEST_ASSERT_EQUAL_SCREENSHOT("libs/tiny_ttf_3.png");
+
+    lv_tiny_ttf_destroy(font_normal);
+    lv_tiny_ttf_destroy(font_none);
+#else
+    TEST_IGNORE_MESSAGE("Ignoring test_tiny_ttf_gpos as it requires LV_USE_TINY_TTF && LV_TINY_TTF_FILE_SUPPORT");
 #endif
 }
 

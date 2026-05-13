@@ -6,12 +6,13 @@
 /*********************
  *      INCLUDES
  *********************/
-#include "lv_freetype.h"
+#include "lv_freetype_private.h"
 
 #if LV_USE_FREETYPE
 
-#include "lv_freetype_private.h"
+#include "../../misc/lv_fs_private.h"
 #include "../../core/lv_global.h"
+#include "../../misc/cache/lv_cache_entry.h"
 
 /*********************
  *      DEFINES
@@ -19,6 +20,20 @@
 
 #define ft_ctx LV_GLOBAL_DEFAULT()->ft_context
 #define LV_FREETYPE_OUTLINE_REF_SIZE_DEF 128
+
+/* Temporary stack buffer size for variable-font axes.
+ * Most fonts have only a few axes; use heap only when needed. */
+#define LV_FREETYPE_MAX_STACK_AXES 8
+
+/* Clamp for requested variable font weight before converting to 16.16.
+ * Fonts commonly use CSS-like 100..900, but some support extended ranges.
+ * Keeping this bounded avoids unreasonable inputs and keeps conversion safe. */
+#define LV_FREETYPE_VAR_WEIGHT_MIN 1
+#define LV_FREETYPE_VAR_WEIGHT_MAX 2000
+
+#define LV_FREETYPE_VAR_WEIGHT_DEFAULT 0   /**< 0 = resolved from style: NORMAL(400) or BOLD(700) */
+#define LV_FREETYPE_VAR_WEIGHT_NORMAL  400
+#define LV_FREETYPE_VAR_WEIGHT_BOLD    700
 
 /**< This value is from the FreeType's function `FT_GlyphSlot_Oblique` in `ftsynth.c` */
 #define LV_FREETYPE_OBLIQUE_SLANT_DEF 0x0366A
@@ -40,23 +55,33 @@ typedef struct {
 /**********************
  *  STATIC PROTOTYPES
  **********************/
-static FT_Error lv_freetype_face_requester(FTC_FaceID face_id,
-                                           FT_Library library,
-                                           FT_Pointer req_data,
-                                           FT_Face * aface);
 static void lv_freetype_cleanup(lv_freetype_context_t * ctx);
 static FTC_FaceID lv_freetype_req_face_id(lv_freetype_context_t * ctx, const char * pathname);
 static void lv_freetype_drop_face_id(lv_freetype_context_t * ctx, FTC_FaceID face_id);
-static bool freetype_on_font_create(lv_freetype_font_dsc_t * dsc);
+static bool freetype_on_font_create(lv_freetype_font_dsc_t * dsc, uint32_t max_glyph_cnt);
 static void freetype_on_font_set_cbs(lv_freetype_font_dsc_t * dsc);
 
 static bool cache_node_cache_create_cb(lv_freetype_cache_node_t * node, void * user_data);
 static void cache_node_cache_free_cb(lv_freetype_cache_node_t * node, void * user_data);
 static lv_cache_compare_res_t cache_node_cache_compare_cb(const lv_freetype_cache_node_t * lhs,
                                                           const lv_freetype_cache_node_t * rhs);
+static bool lv_freetype_set_weight_if_variable(FT_Face face, int weight);
+
+static lv_font_t * freetype_font_create_cb(const lv_font_info_t * info, const void * src);
+static void freetype_font_delete_cb(lv_font_t * font);
+static void * freetype_font_dup_src_cb(const void * src);
+static void freetype_font_free_src_cb(void * src);
+
 /**********************
  *  STATIC VARIABLES
  **********************/
+
+const lv_font_class_t lv_freetype_font_class = {
+    .create_cb = freetype_font_create_cb,
+    .delete_cb = freetype_font_delete_cb,
+    .dup_src_cb = freetype_font_dup_src_cb,
+    .free_src_cb = freetype_font_free_src_cb,
+};
 
 /**********************
  *      MACROS
@@ -66,7 +91,7 @@ static lv_cache_compare_res_t cache_node_cache_compare_cb(const lv_freetype_cach
  *   GLOBAL FUNCTIONS
  **********************/
 
-lv_result_t lv_freetype_init(uint32_t max_faces, uint32_t max_sizes, uint32_t max_kilobytes)
+lv_result_t lv_freetype_init(uint32_t max_glyph_cnt)
 {
     if(ft_ctx) {
         LV_LOG_WARN("freetype already initialized");
@@ -81,6 +106,9 @@ lv_result_t lv_freetype_init(uint32_t max_faces, uint32_t max_sizes, uint32_t ma
     }
 
     lv_freetype_context_t * ctx = lv_freetype_get_context();
+
+    ctx->max_glyph_cnt = max_glyph_cnt;
+
     FT_Error error;
 
     error = FT_Init_FreeType(&ctx->library);
@@ -89,27 +117,7 @@ lv_result_t lv_freetype_init(uint32_t max_faces, uint32_t max_sizes, uint32_t ma
         return LV_RESULT_INVALID;
     }
 
-    error = FTC_Manager_New(ctx->library,
-                            max_faces,
-                            max_sizes,
-                            max_kilobytes * 1024,
-                            lv_freetype_face_requester,
-                            NULL,
-                            &ctx->cache_manager);
-    if(error) {
-        FT_ERROR_MSG("FTC_Manager_New", error);
-        lv_freetype_cleanup(ctx);
-        return LV_RESULT_INVALID;
-    }
-
-    error = FTC_CMapCache_New(ctx->cache_manager, &ctx->cmap_cache);
-    if(error) {
-        FT_ERROR_MSG("FTC_CMapCache_New", error);
-        lv_freetype_cleanup(ctx);
-        return LV_RESULT_INVALID;
-    }
-
-    _lv_ll_init(&ctx->face_id_ll, sizeof(face_id_node_t));
+    lv_ll_init(&ctx->face_id_ll, sizeof(face_id_node_t));
 
     lv_cache_ops_t ops = {
         .compare_cb = (lv_cache_compare_cb_t)cache_node_cache_compare_cb,
@@ -117,6 +125,7 @@ lv_result_t lv_freetype_init(uint32_t max_faces, uint32_t max_sizes, uint32_t ma
         .free_cb = (lv_cache_free_cb_t)cache_node_cache_free_cb,
     };
     ctx->cache_node_cache = lv_cache_create(&lv_cache_class_lru_rb_count, sizeof(lv_freetype_cache_node_t), INT32_MAX, ops);
+    lv_cache_set_name(ctx->cache_node_cache, "FREETYPE_CACHE_NODE");
 
     return LV_RESULT_OK;
 }
@@ -124,27 +133,52 @@ lv_result_t lv_freetype_init(uint32_t max_faces, uint32_t max_sizes, uint32_t ma
 void lv_freetype_uninit(void)
 {
     lv_freetype_context_t * ctx = lv_freetype_get_context();
+    if(!ctx) {
+        return;
+    }
+
     lv_freetype_cleanup(ctx);
 
     lv_free(ft_ctx);
     ft_ctx = NULL;
 }
 
-lv_font_t * lv_freetype_font_create(const char * pathname, lv_freetype_font_render_mode_t render_mode, uint32_t size,
-                                    lv_freetype_font_style_t style)
+void lv_freetype_init_font_info(lv_font_info_t * font_info)
 {
-    LV_ASSERT_NULL(pathname);
-    LV_ASSERT(size > 0);
+    LV_ASSERT_NULL(font_info);
+    lv_memzero(font_info, sizeof(lv_font_info_t));
+    font_info->class_p = &lv_freetype_font_class;
+    font_info->render_mode = LV_FREETYPE_FONT_RENDER_MODE_BITMAP;
+    font_info->style = LV_FREETYPE_FONT_STYLE_NORMAL;
+    font_info->weight = LV_FREETYPE_VAR_WEIGHT_DEFAULT;
+    font_info->kerning = LV_FONT_KERNING_NONE;
+}
 
-    size_t pathname_len = lv_strlen(pathname);
-    LV_ASSERT(pathname_len > 0);
+lv_font_t * lv_freetype_font_create_with_info(const lv_font_info_t * font_info)
+{
+    LV_ASSERT_NULL(font_info);
+    if(font_info->size == 0) {
+        LV_LOG_ERROR("font size can't be zero");
+        return NULL;
+    }
+
+    const char * pathname = font_info->name;
+
+    size_t pathname_len = pathname ? lv_strlen(pathname) : 0;
+    if(pathname_len == 0) {
+        LV_LOG_ERROR("font pathname can't be empty");
+        return NULL;
+    }
 
     lv_freetype_context_t * ctx = lv_freetype_get_context();
 
     lv_freetype_cache_node_t search_key = {
         .pathname = lv_freetype_req_face_id(ctx, pathname),
-        .style = style,
-        .render_mode = render_mode,
+        .style = font_info->style,
+        .render_mode = font_info->render_mode,
+        /* Normalize weight: DEFAULT(0) resolves to BOLD(700) or NORMAL(400) to avoid duplicate cache nodes */
+        .weight = font_info->weight > LV_FREETYPE_VAR_WEIGHT_DEFAULT ? font_info->weight
+        : ((font_info->style & LV_FREETYPE_FONT_STYLE_BOLD) ? LV_FREETYPE_VAR_WEIGHT_BOLD : LV_FREETYPE_VAR_WEIGHT_NORMAL),
     };
 
     bool cache_hitting = true;
@@ -163,15 +197,16 @@ lv_font_t * lv_freetype_font_create(const char * pathname, lv_freetype_font_rend
     LV_ASSERT_MALLOC(dsc);
 
     dsc->face_id = (FTC_FaceID)search_key.pathname;
-    dsc->render_mode = render_mode;
+    dsc->render_mode = font_info->render_mode;
     dsc->context = ctx;
-    dsc->size = size;
-    dsc->style = style;
+    dsc->size = font_info->size;
+    dsc->style = font_info->style;
+    dsc->kerning = font_info->kerning;
     dsc->magic_num = LV_FREETYPE_FONT_DSC_MAGIC_NUM;
     dsc->cache_node = lv_cache_entry_get_data(cache_node_entry);
     dsc->cache_node_entry = cache_node_entry;
 
-    if(cache_hitting == false && freetype_on_font_create(dsc) == false) {
+    if(cache_hitting == false && freetype_on_font_create(dsc, ctx->max_glyph_cnt) == false) {
         lv_cache_release(ctx->cache_node_cache, dsc->cache_node_entry, NULL);
         lv_freetype_drop_face_id(ctx, dsc->face_id);
         lv_free(dsc);
@@ -180,7 +215,22 @@ lv_font_t * lv_freetype_font_create(const char * pathname, lv_freetype_font_rend
     freetype_on_font_set_cbs(dsc);
 
     FT_Face face = dsc->cache_node->face;
-    FT_Set_Pixel_Sizes(face, 0, size);
+    FT_Error error;
+    if(FT_IS_SCALABLE(face)) {
+        error = FT_Set_Pixel_Sizes(face, 0, font_info->size);
+    }
+    else {
+        LV_LOG_WARN("font is not scalable, selecting available size");
+        error = FT_Select_Size(face, 0);
+    }
+    if(error) {
+        FT_ERROR_MSG("FT_Set_Pixel_Sizes", error);
+        return NULL;
+    }
+
+    if(dsc->kerning != LV_FONT_KERNING_NONE && !dsc->cache_node->face_has_kerning) {
+        LV_LOG_WARN("font: '%s' doesn't have kerning info", pathname);
+    }
 
     lv_font_t * font = &dsc->font;
     font->dsc = dsc;
@@ -196,12 +246,27 @@ lv_font_t * lv_freetype_font_create(const char * pathname, lv_freetype_font_rend
     return font;
 }
 
+lv_font_t * lv_freetype_font_create(const char * pathname, lv_freetype_font_render_mode_t render_mode, uint32_t size,
+                                    lv_freetype_font_style_t style)
+{
+    lv_font_info_t font_info;
+    lv_freetype_init_font_info(&font_info);
+    font_info.name = pathname;
+    font_info.size = size;
+    font_info.render_mode = render_mode;
+    font_info.style = style;
+    return lv_freetype_font_create_with_info(&font_info);
+}
+
 void lv_freetype_font_delete(lv_font_t * font)
 {
     LV_ASSERT_NULL(font);
     lv_freetype_context_t * ctx = lv_freetype_get_context();
+    if(!ctx) {
+        /* Freetype already torn down (e.g. static destruction order). Nothing to release. */
+        return;
+    }
     lv_freetype_font_dsc_t * dsc = (lv_freetype_font_dsc_t *)(font->dsc);
-    LV_ASSERT_NULL(dsc);
     LV_ASSERT_FREETYPE_FONT_DSC(dsc);
 
     lv_cache_release(ctx->cache_node_cache, dsc->cache_node_entry, NULL);
@@ -221,27 +286,6 @@ lv_freetype_context_t * lv_freetype_get_context(void)
     return LV_GLOBAL_DEFAULT()->ft_context;
 }
 
-FT_Size lv_freetype_lookup_size(const lv_freetype_font_dsc_t * dsc)
-{
-    FT_Error error;
-    lv_freetype_context_t * ctx = dsc->context;
-
-    FT_Size ft_size;
-    struct FTC_ScalerRec_ scaler;
-    scaler.face_id = dsc->face_id;
-    scaler.width = dsc->size;
-    scaler.height = dsc->size;
-    scaler.pixel = 1;
-    error = FTC_Manager_LookupSize(ctx->cache_manager, &scaler, &ft_size);
-
-    if(error) {
-        FT_ERROR_MSG("FTC_Manager_LookupSize", error);
-        return NULL;
-    }
-
-    return ft_size;
-}
-
 void lv_freetype_italic_transform(FT_Face face)
 {
     LV_ASSERT_NULL(face);
@@ -258,19 +302,17 @@ int32_t lv_freetype_italic_transform_on_pos(lv_point_t point)
     return point.x + FT_F16DOT16_TO_INT(point.y * LV_FREETYPE_OBLIQUE_SLANT_DEF);
 }
 
-const char * lv_freetype_get_pathname(FTC_FaceID face_id)
-{
-    LV_ASSERT_NULL(face_id);
-    return (const char *)face_id;
-}
-
 /**********************
  *   STATIC FUNCTIONS
  **********************/
 
-static bool freetype_on_font_create(lv_freetype_font_dsc_t * dsc)
+static bool freetype_on_font_create(lv_freetype_font_dsc_t * dsc, uint32_t max_glyph_cnt)
 {
-    lv_cache_t * glyph_cache = lv_freetype_create_glyph_cache();
+    /*
+     * Glyph info uses a small amount of memory, and uses glyph info more frequently,
+     * so it plans to use twice the maximum number of caches here to
+     * get a better info acquisition performance.*/
+    lv_cache_t * glyph_cache = lv_freetype_create_glyph_cache(max_glyph_cnt * 2);
     if(glyph_cache == NULL) {
         LV_LOG_ERROR("glyph cache creating failed");
         return false;
@@ -279,10 +321,10 @@ static bool freetype_on_font_create(lv_freetype_font_dsc_t * dsc)
 
     lv_cache_t * draw_data_cache = NULL;
     if(dsc->render_mode == LV_FREETYPE_FONT_RENDER_MODE_BITMAP) {
-        draw_data_cache = lv_freetype_create_draw_data_image();
+        draw_data_cache = lv_freetype_create_draw_data_image(max_glyph_cnt);
     }
     else if(dsc->render_mode == LV_FREETYPE_FONT_RENDER_MODE_OUTLINE) {
-        draw_data_cache = lv_freetype_create_draw_data_outline();
+        draw_data_cache = lv_freetype_create_draw_data_outline(max_glyph_cnt);
     }
     else {
         LV_LOG_ERROR("unknown render mode");
@@ -310,35 +352,12 @@ static void freetype_on_font_set_cbs(lv_freetype_font_dsc_t * dsc)
     }
 }
 
-static FT_Error lv_freetype_face_requester(FTC_FaceID face_id,
-                                           FT_Library library,
-                                           FT_Pointer req_data,
-                                           FT_Face * aface)
-{
-    LV_UNUSED(library);
-    LV_UNUSED(req_data);
-
-    const char * pathname = lv_freetype_get_pathname(face_id);
-
-    FT_Error error = FT_New_Face(library, pathname, 0, aface);
-    if(error) {
-        FT_ERROR_MSG("FT_New_Face", error);
-        LV_LOG_ERROR("error pathname = %s", pathname);
-    }
-    return error;
-}
-
 static void lv_freetype_cleanup(lv_freetype_context_t * ctx)
 {
     LV_ASSERT_NULL(ctx);
     if(ctx->cache_node_cache) {
         lv_cache_destroy(ctx->cache_node_cache, NULL);
         ctx->cache_node_cache = NULL;
-    }
-
-    if(ctx->cache_manager) {
-        FTC_Manager_Done(ctx->cache_manager);
-        ctx->cache_manager = NULL;
     }
 
     if(ctx->library) {
@@ -356,7 +375,7 @@ static FTC_FaceID lv_freetype_req_face_id(lv_freetype_context_t * ctx, const cha
     face_id_node_t * node;
 
     /* search cache */
-    _LV_LL_READ(ll_p, node) {
+    LV_LL_READ(ll_p, node) {
         if(strcmp(node->pathname, pathname) == 0) {
             node->ref_cnt++;
             LV_LOG_INFO("reuse face_id: %s, ref_cnt = %d", node->pathname, node->ref_cnt);
@@ -365,7 +384,7 @@ static FTC_FaceID lv_freetype_req_face_id(lv_freetype_context_t * ctx, const cha
     }
 
     /* insert new cache */
-    node = _lv_ll_ins_tail(ll_p);
+    node = lv_ll_ins_tail(ll_p);
     LV_ASSERT_MALLOC(node);
 
 #if LV_USE_FS_MEMFS
@@ -394,14 +413,13 @@ static void lv_freetype_drop_face_id(lv_freetype_context_t * ctx, FTC_FaceID fac
 {
     lv_ll_t * ll_p = &ctx->face_id_ll;
     face_id_node_t * node;
-    _LV_LL_READ(ll_p, node) {
+    LV_LL_READ(ll_p, node) {
         if(face_id == node->pathname) {
             LV_LOG_INFO("found face_id: %s, ref_cnt = %d", node->pathname, node->ref_cnt);
             node->ref_cnt--;
             if(node->ref_cnt == 0) {
                 LV_LOG_INFO("drop face_id: %s", node->pathname);
-                _lv_ll_remove(ll_p, node);
-                FTC_Manager_RemoveFaceID(ctx->cache_manager, face_id);
+                lv_ll_remove(ll_p, node);
                 lv_free(node->pathname);
                 lv_free(node);
             }
@@ -436,12 +454,128 @@ static bool cache_node_cache_create_cb(lv_freetype_cache_node_t * node, void * u
     }
 
     node->face = face;
+    node->face_has_kerning = FT_HAS_KERNING(face);
+    lv_mutex_init(&node->face_lock);
+
+#if LV_FREETYPE_CACHE_FT_GLYPH_L1
+    lv_freetype_glyph_l1_init(node);
+#endif
+
+    /* Apply variable font weight */
+    if(!lv_freetype_set_weight_if_variable(face, node->weight)) {
+        /* Only log when an explicit weight was requested, to avoid spamming logs
+         * for default weights on non-variable fonts. */
+        if(node->weight != LV_FREETYPE_VAR_WEIGHT_NORMAL && node->weight != LV_FREETYPE_VAR_WEIGHT_BOLD) {
+            LV_LOG_INFO("font '%s' does not support variable weight, requested weight %d ignored", node->pathname, node->weight);
+        }
+    }
 
     return true;
 }
+
+static void lv_freetype_done_mm_var(FT_MM_Var * mm_var)
+{
+    lv_freetype_context_t * ctx = lv_freetype_get_context();
+    LV_ASSERT_NULL(ctx);
+    LV_ASSERT_NULL(ctx->library);
+    FT_Error err = FT_Done_MM_Var(ctx->library, mm_var);
+    if(err != 0) {
+        FT_ERROR_MSG("FT_Done_MM_Var", err);
+    }
+}
+
+/* If the font is variable, set the 'wght' axis to the requested value. Returns true if applied. */
+static bool lv_freetype_set_weight_if_variable(FT_Face face, int weight)
+{
+    if(!face)
+        return false;
+    if(!FT_HAS_MULTIPLE_MASTERS(face))
+        return false;
+
+    FT_MM_Var * mm_var = NULL;
+    FT_Error mm_err = FT_Get_MM_Var(face, &mm_var);
+    if(mm_err != 0 || !mm_var || mm_var->num_axis == 0) {
+        if(mm_err != 0) {
+            FT_ERROR_MSG("FT_Get_MM_Var", mm_err);
+        }
+        else if(mm_var) {
+            /* FT_Get_MM_Var succeeded but no usable axes; free to avoid leak */
+            lv_freetype_done_mm_var(mm_var);
+        }
+
+        return false;
+    }
+
+    FT_UInt axis_count = mm_var->num_axis;
+    FT_Fixed coords_stack[LV_FREETYPE_MAX_STACK_AXES];
+    FT_Fixed * coords = coords_stack;
+    const bool use_heap = axis_count > LV_FREETYPE_MAX_STACK_AXES;
+    bool applied = false;
+    FT_ULong wght_tag;
+    int wght_index;
+    FT_UInt i;
+
+    if(use_heap) {
+        coords = (FT_Fixed *)lv_malloc(axis_count * sizeof(FT_Fixed));
+        LV_ASSERT_MALLOC(coords);
+        if(!coords) {
+            LV_LOG_ERROR("failed to allocate memory for %u font axes", axis_count);
+            lv_freetype_done_mm_var(mm_var);
+            return false;
+        }
+    }
+
+    FT_Error coord_err = FT_Get_Var_Design_Coordinates(face, axis_count, coords);
+    if(coord_err != 0) {
+        FT_ERROR_MSG("FT_Get_Var_Design_Coordinates", coord_err);
+        goto cleanup;
+    }
+
+    wght_tag = FT_MAKE_TAG('w', 'g', 'h', 't');
+    wght_index = -1;
+    for(i = 0; i < axis_count; i++) {
+        if(mm_var->axis[i].tag == wght_tag) {
+            wght_index = (int)i;
+            break;
+        }
+    }
+
+    if(wght_index >= 0) {
+        FT_Fixed min_v = mm_var->axis[wght_index].minimum;
+        FT_Fixed max_v = mm_var->axis[wght_index].maximum;
+        FT_Fixed target;
+        FT_Error set_err;
+
+        weight = LV_CLAMP(LV_FREETYPE_VAR_WEIGHT_MIN, weight, LV_FREETYPE_VAR_WEIGHT_MAX);
+        target = LV_CLAMP(min_v, FT_INT_TO_F16DOT16(weight), max_v);
+        coords[wght_index] = target;
+
+        set_err = FT_Set_Var_Design_Coordinates(face, axis_count, coords);
+        if(set_err != 0) {
+            FT_ERROR_MSG("FT_Set_Var_Design_Coordinates", set_err);
+        }
+        else {
+            applied = true;
+        }
+    }
+
+cleanup:
+    if(use_heap) {
+        lv_free(coords);
+    }
+
+    lv_freetype_done_mm_var(mm_var);
+    return applied;
+}
+
 static void cache_node_cache_free_cb(lv_freetype_cache_node_t * node, void * user_data)
 {
+#if LV_FREETYPE_CACHE_FT_GLYPH_L1
+    lv_freetype_glyph_l1_deinit(node);
+#endif
+
     FT_Done_Face(node->face);
+    lv_mutex_delete(&node->face_lock);
 
     if(node->glyph_cache) {
         lv_cache_destroy(node->glyph_cache, user_data);
@@ -461,6 +595,9 @@ static lv_cache_compare_res_t cache_node_cache_compare_cb(const lv_freetype_cach
     if(lhs->style != rhs->style) {
         return lhs->style > rhs->style ? 1 : -1;
     }
+    if(lhs->weight != rhs->weight) {
+        return lhs->weight > rhs->weight ? 1 : -1;
+    }
 
     int32_t cmp_res = lv_strcmp(lhs->pathname, rhs->pathname);
     if(cmp_res != 0) {
@@ -468,6 +605,29 @@ static lv_cache_compare_res_t cache_node_cache_compare_cb(const lv_freetype_cach
     }
 
     return 0;
+}
+
+static lv_font_t * freetype_font_create_cb(const lv_font_info_t * info, const void * src)
+{
+    LV_ASSERT_NULL(info);
+    lv_font_info_t font_info = *info;
+    font_info.name = src;
+    return lv_freetype_font_create_with_info(&font_info);
+}
+
+static void freetype_font_delete_cb(lv_font_t * font)
+{
+    lv_freetype_font_delete(font);
+}
+
+static void * freetype_font_dup_src_cb(const void * src)
+{
+    return lv_strdup(src);
+}
+
+static void freetype_font_free_src_cb(void * src)
+{
+    lv_free(src);
 }
 
 #endif /*LV_USE_FREETYPE*/

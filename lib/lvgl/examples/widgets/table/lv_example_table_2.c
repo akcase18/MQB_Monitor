@@ -5,12 +5,12 @@
 
 static void draw_event_cb(lv_event_t * e)
 {
-    lv_obj_t * obj = lv_event_get_target(e);
+    lv_obj_t * obj = lv_event_get_target_obj(e);
 
     lv_draw_task_t * draw_task = lv_event_get_draw_task(e);
-    lv_draw_dsc_base_t * base_dsc = draw_task->draw_dsc;
+    lv_draw_dsc_base_t * base_dsc = (lv_draw_dsc_base_t *)lv_draw_task_get_draw_dsc(draw_task);
     /*If the cells are drawn...*/
-    if(base_dsc->part == LV_PART_ITEMS && draw_task->type == LV_DRAW_TASK_TYPE_FILL) {
+    if(base_dsc->part == LV_PART_ITEMS && lv_draw_task_get_type(draw_task) == LV_DRAW_TASK_TYPE_FILL) {
         /*Draw the background*/
         bool chk = lv_table_has_cell_ctrl(obj, base_dsc->id1, 0, LV_TABLE_CELL_CTRL_CUSTOM_1);
         lv_draw_rect_dsc_t rect_dsc;
@@ -23,7 +23,9 @@ static void draw_event_cb(lv_event_t * e)
         sw_area.x2 = 40;
         sw_area.y1 = 0;
         sw_area.y2 = 24;
-        lv_area_align(&draw_task->area, &sw_area, LV_ALIGN_RIGHT_MID, -15, 0);
+        lv_area_t draw_task_area;
+        lv_draw_task_get_area(draw_task, &draw_task_area);
+        lv_area_align(&draw_task_area, &sw_area, LV_ALIGN_RIGHT_MID, -15, 0);
         lv_draw_rect(base_dsc->layer, &rect_dsc, &sw_area);
 
         /*Draw the knob*/
@@ -45,17 +47,27 @@ static void draw_event_cb(lv_event_t * e)
 
 static void change_event_cb(lv_event_t * e)
 {
-    lv_obj_t * obj = lv_event_get_target(e);
+    lv_obj_t * obj = lv_event_get_target_obj(e);
     uint32_t col;
     uint32_t row;
     lv_table_get_selected_cell(obj, &row, &col);
     bool chk = lv_table_has_cell_ctrl(obj, row, 0, LV_TABLE_CELL_CTRL_CUSTOM_1);
     if(chk) lv_table_clear_cell_ctrl(obj, row, 0, LV_TABLE_CELL_CTRL_CUSTOM_1);
-    else lv_table_add_cell_ctrl(obj, row, 0, LV_TABLE_CELL_CTRL_CUSTOM_1);
+    else lv_table_set_cell_ctrl(obj, row, 0, LV_TABLE_CELL_CTRL_CUSTOM_1);
 }
 
 /**
- * A very light-weighted list created from table
+ * @title 200-row list with custom switch cell
+ * @brief Scrollable 200-item table that draws a toggle switch per row and reports build cost.
+ *
+ * `lv_mem_monitor` and `lv_tick_get` bracket the creation of a one-column,
+ * 200-row table to measure memory and time usage. Each row is filled
+ * with `lv_table_set_cell_value_fmt`. An `LV_EVENT_DRAW_TASK_ADDED`
+ * handler intercepts each `LV_PART_ITEMS` fill task and paints a pill
+ * track and knob whose position and color reflect the row's
+ * `LV_TABLE_CELL_CTRL_CUSTOM_1` flag. An `LV_EVENT_VALUE_CHANGED`
+ * handler toggles that flag on the selected row. A bottom label reports
+ * the row count along with elapsed time and bytes used.
  */
 void lv_example_table_2(void)
 {
@@ -79,7 +91,7 @@ void lv_example_table_2(void)
 
     uint32_t i;
     for(i = 0; i < ITEM_CNT; i++) {
-        lv_table_set_cell_value_fmt(table, i, 0, "Item %"LV_PRIu32, i + 1);
+        lv_table_set_cell_value_fmt(table, i, 0, "Item %" LV_PRIu32, i + 1);
     }
 
     lv_obj_align(table, LV_ALIGN_CENTER, 0, -20);
@@ -97,7 +109,7 @@ void lv_example_table_2(void)
     uint32_t elaps = lv_tick_elaps(t);
 
     lv_obj_t * label = lv_label_create(lv_screen_active());
-    lv_label_set_text_fmt(label, "%"LV_PRIu32" items were created in %"LV_PRIu32" ms\n"
+    lv_label_set_text_fmt(label, "%" LV_PRIu32" items were created in %" LV_PRIu32" ms\n"
                           "using %zu bytes of memory",
                           (uint32_t)ITEM_CNT, elaps, mem_used);
 

@@ -1,15 +1,16 @@
 /**
- * @file lv_obj_id.c
+ * @file lv_obj_id_builtin.c
  *
  */
 
 /*********************
  *      INCLUDES
  *********************/
-#include "lv_obj.h"
+#include "lv_obj_class_private.h"
+#include "lv_obj_private.h"
 #include "lv_global.h"
-#include "../osal/lv_os.h"
-#include "../stdlib/lv_sprintf.h"
+#include "../lvgl_public.h"
+#include "../osal/lv_os_private.h"
 
 /*********************
  *      DEFINES
@@ -40,19 +41,19 @@ typedef struct _class_info_t {
  *   GLOBAL FUNCTIONS
  **********************/
 
-#if LV_USE_OBJ_ID_BUILTIN
+#if LV_USE_OBJ_ID && LV_USE_OBJ_ID_BUILTIN
 
 void lv_obj_assign_id(const lv_obj_class_t * class_p, lv_obj_t * obj)
 {
-    LV_ASSERT(obj && class_p);
+    LV_CHECK_ARG(obj != NULL, return);
+    LV_CHECK_ARG(class_p != NULL, return);
 
     uint32_t i;
     uint32_t id = 0;
     lv_global_t * global = LV_GLOBAL_DEFAULT();
     class_info_t * info = NULL;
 
-    if(obj == NULL || class_p == NULL) return;
-    if(global == NULL) return;
+    LV_ASSERT_NULL(global);
 
     obj->id = NULL;
 
@@ -78,21 +79,29 @@ void lv_obj_assign_id(const lv_obj_class_t * class_p, lv_obj_t * obj)
     obj->id = (void *)(lv_uintptr_t)id;
 }
 
+void lv_obj_set_id(lv_obj_t * obj, void * id)
+{
+    LV_CHECK_ARG(obj != NULL, return);
+    if(obj->id) lv_obj_free_id(obj);
+    obj->id = id;
+}
+
 void lv_obj_free_id(lv_obj_t * obj)
 {
-    LV_UNUSED(obj);
+    LV_CHECK_ARG(obj != NULL, return);
+    obj->id = NULL;
 }
 
 const char * lv_obj_stringify_id(lv_obj_t * obj, char * buf, uint32_t len)
 {
-    const char * name;
-    if(obj == NULL || obj->class_p == NULL) return NULL;
-    if(buf == NULL) return NULL;
+    LV_CHECK_ARG(obj != NULL, return NULL);
+    LV_CHECK_ARG(obj->class_p != NULL, return NULL);
+    LV_CHECK_ARG(buf != NULL, return NULL);
 
-    name = obj->class_p->name;
+    const char * name = obj->class_p->name;
     if(name == NULL) name = "nameless";
 
-    lv_snprintf(buf, len, "%s%" LV_PRId32 "", name, (uint32_t)(lv_uintptr_t)obj->id);
+    lv_snprintf(buf, len, "%s%" LV_PRIu32 "", name, (uint32_t)(lv_uintptr_t)obj->id);
     return buf;
 }
 
@@ -103,6 +112,11 @@ void lv_objid_builtin_destroy(void)
 
     lv_free(global->objid_array);
     global->objid_count = 0;
+}
+
+int lv_obj_id_compare(const void * id1, const void * id2)
+{
+    return id1 == id2 ? 0 : 1;
 }
 
 #endif /*LV_USE_OBJ_ID_BUILTIN*/

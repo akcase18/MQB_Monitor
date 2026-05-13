@@ -1,10 +1,8 @@
 #if LV_BUILD_TEST
 #include "../lvgl.h"
+#include "../../lvgl_private.h"
 
 #include "unity/unity.h"
-
-#include "lv_test_helpers.h"
-#include "lv_test_indev.h"
 
 #define SWITCHES_CNT    10
 
@@ -62,6 +60,7 @@ void test_switch_should_not_leak_memory_after_deletion(void)
         lv_obj_delete(switches[idx]);
     }
 
+    LV_UNUSED(initial_available_memory);
     LV_HEAP_CHECK(TEST_ASSERT_MEM_LEAK_LESS_THAN(initial_available_memory, 24));
 }
 
@@ -73,14 +72,14 @@ void test_switch_animation(void)
     /* Trigger animation */
     mouse_click_on_switch();
     /* Wait some time  */
-    lv_test_indev_wait(50);
+    lv_test_wait(50);
 
     int32_t checked_anim_state = anim_sw->anim_state;
     TEST_ASSERT_GREATER_THAN(initial_anim_state, checked_anim_state);
     TEST_ASSERT(lv_obj_has_state(sw, LV_STATE_CHECKED));
 
     mouse_click_on_switch();
-    lv_test_indev_wait(50);
+    lv_test_wait(50);
 
     TEST_ASSERT_LESS_THAN(checked_anim_state, anim_sw->anim_state);
     TEST_ASSERT_FALSE(lv_obj_has_state(sw, LV_STATE_CHECKED));
@@ -88,7 +87,7 @@ void test_switch_animation(void)
 
 void test_switch_should_not_have_extra_draw_size_at_creation(void)
 {
-    int32_t extra_size = _lv_obj_get_ext_draw_size(sw);
+    int32_t extra_size = lv_obj_get_ext_draw_size(sw);
 
     TEST_ASSERT_EQUAL(0, extra_size);
 }
@@ -97,7 +96,7 @@ void test_switch_should_update_extra_draw_size_after_editing_padding(void)
 {
     int32_t pad = 6;
     int32_t actual = 0;
-    int32_t expected = pad + _LV_SWITCH_KNOB_EXT_AREA_CORRECTION;
+    int32_t expected = pad + LV_SWITCH_KNOB_EXT_AREA_CORRECTION;
 
     static lv_style_t style_knob;
     lv_style_init(&style_knob);
@@ -108,7 +107,7 @@ void test_switch_should_update_extra_draw_size_after_editing_padding(void)
     lv_obj_center(sw);
 
     /* Get extra draw size */
-    actual = _lv_obj_get_ext_draw_size(sw);
+    actual = lv_obj_get_ext_draw_size(sw);
 
     TEST_ASSERT_EQUAL(expected, actual);
 }
@@ -129,6 +128,59 @@ void test_switch_should_state_change_when_event_bubbling_is_enabled(void)
     mouse_click_on_switch();
 
     TEST_ASSERT(lv_obj_has_state(sw, LV_STATE_CHECKED));
+}
+
+
+void test_screeshots(void)
+{
+    lv_obj_set_flex_flow(lv_screen_active(), LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(lv_screen_active(), LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_clean(scr);
+
+    sw = lv_switch_create(lv_screen_active());
+
+    sw = lv_switch_create(lv_screen_active());
+    lv_obj_add_state(sw, LV_STATE_CHECKED);
+
+    sw = lv_switch_create(lv_screen_active());
+
+    sw = lv_switch_create(lv_screen_active());
+    lv_obj_add_state(sw, (lv_state_t)(LV_STATE_CHECKED | LV_STATE_DISABLED));
+
+    sw = lv_switch_create(lv_screen_active());
+    lv_switch_set_orientation(sw, LV_SWITCH_ORIENTATION_VERTICAL);
+    lv_obj_set_size(sw, 50, 100);
+
+    sw = lv_switch_create(lv_screen_active());
+    lv_switch_set_orientation(sw, LV_SWITCH_ORIENTATION_VERTICAL);
+    lv_obj_add_state(sw, LV_STATE_CHECKED);
+    lv_obj_set_size(sw, 50, 100);
+
+    lv_test_wait(1000); /*Wait for the transitions*/
+
+    TEST_ASSERT_EQUAL_SCREENSHOT("widgets/switch_1.png");
+}
+
+void test_switch_properties(void)
+{
+#if LV_USE_OBJ_PROPERTY
+    lv_obj_t * obj = lv_switch_create(lv_screen_active());
+    lv_property_t prop = { };
+
+    /* Test ORIENTATION property */
+    prop.id = LV_PROPERTY_SWITCH_ORIENTATION;
+    prop.num = LV_SWITCH_ORIENTATION_VERTICAL;
+    TEST_ASSERT_TRUE(lv_obj_set_property(obj, &prop) == LV_RESULT_OK);
+    TEST_ASSERT_EQUAL_INT(LV_SWITCH_ORIENTATION_VERTICAL, lv_obj_get_property(obj, LV_PROPERTY_SWITCH_ORIENTATION).num);
+    TEST_ASSERT_EQUAL_INT(LV_SWITCH_ORIENTATION_VERTICAL, lv_switch_get_orientation(obj));
+
+    prop.num = LV_SWITCH_ORIENTATION_HORIZONTAL;
+    TEST_ASSERT_TRUE(lv_obj_set_property(obj, &prop) == LV_RESULT_OK);
+    TEST_ASSERT_EQUAL_INT(LV_SWITCH_ORIENTATION_HORIZONTAL, lv_obj_get_property(obj, LV_PROPERTY_SWITCH_ORIENTATION).num);
+    TEST_ASSERT_EQUAL_INT(LV_SWITCH_ORIENTATION_HORIZONTAL, lv_switch_get_orientation(obj));
+
+    lv_obj_delete(obj);
+#endif
 }
 
 #endif

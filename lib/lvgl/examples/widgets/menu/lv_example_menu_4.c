@@ -18,16 +18,29 @@ static void float_button_event_cb(lv_event_t * e)
 
     cont = lv_menu_cont_create(sub_page);
     label = lv_label_create(cont);
-    lv_label_set_text_fmt(label, "Hello, I am hiding inside %"LV_PRIu32"", btn_cnt);
+    lv_label_set_text_fmt(label, "Hello, I am hiding inside %" LV_PRIu32"", btn_cnt);
 
     cont = lv_menu_cont_create(main_page);
     label = lv_label_create(cont);
-    lv_label_set_text_fmt(label, "Item %"LV_PRIu32"", btn_cnt);
+    lv_label_set_text_fmt(label, "Item %" LV_PRIu32"", btn_cnt);
     lv_menu_set_load_page_event(menu, cont, sub_page);
 
     lv_obj_scroll_to_view_recursive(cont, LV_ANIM_ON);
 }
 
+/**
+ * @title Menu with floating add button
+ * @brief A circular floating button appends new items and matching sub pages.
+ *
+ * The menu starts with a single main-page item wired to a greeting
+ * sub page. A circular `lv_button` flagged with
+ * `LV_OBJ_FLAG_FLOATING` is anchored to the bottom-right corner with
+ * a plus symbol background and a large theme font. Its
+ * `LV_EVENT_CLICKED` handler increments a counter, creates a new sub
+ * page and a new main-page row labeled `Item N`, links them with
+ * `lv_menu_set_load_page_event`, and calls
+ * `lv_obj_scroll_to_view_recursive` so the fresh row stays visible.
+ */
 void lv_example_menu_4(void)
 {
     /*Create a menu object*/

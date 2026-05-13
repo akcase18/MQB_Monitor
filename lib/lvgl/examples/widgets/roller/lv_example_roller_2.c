@@ -4,7 +4,7 @@
 static void event_handler(lv_event_t * e)
 {
     lv_event_code_t code = lv_event_get_code(e);
-    lv_obj_t * obj = lv_event_get_target(e);
+    lv_obj_t * obj = lv_event_get_target_obj(e);
     if(code == LV_EVENT_VALUE_CHANGED) {
         char buf[32];
         lv_roller_get_selected_str(obj, buf, sizeof(buf));
@@ -13,7 +13,16 @@ static void event_handler(lv_event_t * e)
 }
 
 /**
- * Roller with various alignments and larger text in the selected area
+ * @title Rollers sharing a selected-row style
+ * @brief One `LV_PART_SELECTED` style is reused across three number rollers of different widths.
+ *
+ * A shared style for `LV_PART_SELECTED` swaps in `lv_font_montserrat_22` with a
+ * pink fill and red border. Three `LV_ROLLER_MODE_NORMAL` rollers list numbers
+ * `1..10`: a 100 px left-aligned roller with a green vertical gradient
+ * background and two visible rows, a default-width center roller with three
+ * visible rows, and an 80 px right-aligned roller with four visible rows. Each
+ * roller starts on a different selection (2, 5, 8) with `LV_ANIM_OFF` and logs
+ * on `LV_EVENT_VALUE_CHANGED`.
  */
 void lv_example_roller_2(void)
 {

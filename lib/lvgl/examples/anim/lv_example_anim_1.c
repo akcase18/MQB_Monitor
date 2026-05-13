@@ -3,13 +3,13 @@
 
 static void anim_x_cb(void * var, int32_t v)
 {
-    lv_obj_set_x(var, v);
+    lv_obj_set_x((lv_obj_t *) var, v);
 }
 
 static void sw_event_cb(lv_event_t * e)
 {
-    lv_obj_t * sw = lv_event_get_target(e);
-    lv_obj_t * label = lv_event_get_user_data(e);
+    lv_obj_t * sw = lv_event_get_target_obj(e);
+    lv_obj_t * label = (lv_obj_t *) lv_event_get_user_data(e);
 
     if(lv_obj_has_state(sw, LV_STATE_CHECKED)) {
         lv_anim_t a;
@@ -35,7 +35,14 @@ static void sw_event_cb(lv_event_t * e)
 }
 
 /**
- * Start animation on an event
+ * @title Start animation on an event
+ * @brief Animate a label's x position when a switch's state changes.
+ *
+ * A label and a switch (initially checked) are placed on the active screen.
+ * The switch's `LV_EVENT_VALUE_CHANGED` callback configures and starts an
+ * `lv_anim_t`: when checked, the label animates to x=100 with
+ * `lv_anim_path_overshoot`; when unchecked, it animates to `-width` with
+ * `lv_anim_path_ease_in`. Both animations run for 500 ms.
  */
 void lv_example_anim_1(void)
 {

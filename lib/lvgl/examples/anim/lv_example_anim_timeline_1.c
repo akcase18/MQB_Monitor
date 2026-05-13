@@ -6,23 +6,23 @@ static const int32_t obj_height = 70;
 
 static void set_width(lv_anim_t * var, int32_t v)
 {
-    lv_obj_set_width(var->var, v);
+    lv_obj_set_width((lv_obj_t *) var->var, v);
 }
 
 static void set_height(lv_anim_t * var, int32_t v)
 {
-    lv_obj_set_height(var->var, v);
+    lv_obj_set_height((lv_obj_t *) var->var, v);
 }
 
 static void set_slider_value(lv_anim_t * var, int32_t v)
 {
-    lv_slider_set_value(var->var, v, LV_ANIM_OFF);
+    lv_slider_set_value((lv_obj_t *) var->var, v, LV_ANIM_OFF);
 }
 
 static void btn_start_event_handler(lv_event_t * e)
 {
     lv_obj_t * btn = lv_event_get_current_target_obj(e);
-    lv_anim_timeline_t * anim_timeline = lv_event_get_user_data(e);
+    lv_anim_timeline_t * anim_timeline = (lv_anim_timeline_t *) lv_event_get_user_data(e);
 
     bool reverse = lv_obj_has_state(btn, LV_STATE_CHECKED);
     lv_anim_timeline_set_reverse(anim_timeline, reverse);
@@ -31,20 +31,31 @@ static void btn_start_event_handler(lv_event_t * e)
 
 static void btn_pause_event_handler(lv_event_t * e)
 {
-    lv_anim_timeline_t * anim_timeline = lv_event_get_user_data(e);
+    lv_anim_timeline_t * anim_timeline = (lv_anim_timeline_t *) lv_event_get_user_data(e);
     lv_anim_timeline_pause(anim_timeline);
 }
 
 static void slider_prg_event_handler(lv_event_t * e)
 {
     lv_obj_t * slider = lv_event_get_current_target_obj(e);
-    lv_anim_timeline_t * anim_timeline = lv_event_get_user_data(e);
+    lv_anim_timeline_t * anim_timeline = (lv_anim_timeline_t *) lv_event_get_user_data(e);
     int32_t progress = lv_slider_get_value(slider);
-    lv_anim_timeline_set_progress(anim_timeline, progress);
+    lv_anim_timeline_set_progress(anim_timeline, (uint16_t) progress);
 }
 
 /**
- * Create an animation timeline
+ * @title Animation timeline with transport controls
+ * @brief Drive staggered grow animations through a timeline the user can pause or scrub.
+ *
+ * Three 90x70 objects are laid out in a flex row with a checkable Start
+ * button, a Pause button, and a progress slider ranged to
+ * `LV_ANIM_TIMELINE_PROGRESS_MAX`. An `lv_anim_timeline_t` schedules width
+ * and height animations for each object (`lv_anim_path_overshoot` for width
+ * and `lv_anim_path_ease_out` for height, each 300 ms) starting at offsets
+ * 0, 200, and 400 ms, plus a linear 700 ms animation that sweeps the
+ * slider. The Start button toggles forward and reverse playback via
+ * `lv_anim_timeline_set_reverse`, Pause calls `lv_anim_timeline_pause`, and
+ * dragging the slider calls `lv_anim_timeline_set_progress`.
  */
 void lv_example_anim_timeline_1(void)
 {

@@ -3,16 +3,23 @@
 
 static void row_gap_anim(void * obj, int32_t v)
 {
-    lv_obj_set_style_pad_row(obj, v, 0);
+    lv_obj_set_style_pad_row((lv_obj_t *) obj, v, 0);
 }
 
 static void column_gap_anim(void * obj, int32_t v)
 {
-    lv_obj_set_style_pad_column(obj, v, 0);
+    lv_obj_set_style_pad_column((lv_obj_t *) obj, v, 0);
 }
 
 /**
- * Demonstrate column and row gap
+ * @title Animated grid row and column gaps
+ * @brief Animate `pad_row` and `pad_column` of a 3x3 grid on two timescales.
+ *
+ * A 300x220 container uses three 60 px columns and three 45 px rows, with
+ * nine stretched children labeled by cell coordinates. Two `lv_anim_t`
+ * instances loop `pad_row` and `pad_column` between 0 and 10 with
+ * `LV_ANIM_REPEAT_INFINITE`: row gap takes 500 ms per direction while column
+ * gap takes 3000 ms, so the grid breathes on two independent cycles.
  */
 void lv_example_grid_5(void)
 {
@@ -29,7 +36,7 @@ void lv_example_grid_5(void)
 
     lv_obj_t * label;
     lv_obj_t * obj;
-    uint32_t i;
+    uint8_t i;
     for(i = 0; i < 9; i++) {
         uint8_t col = i % 3;
         uint8_t row = i / 3;
@@ -50,12 +57,12 @@ void lv_example_grid_5(void)
 
     lv_anim_set_exec_cb(&a, row_gap_anim);
     lv_anim_set_duration(&a, 500);
-    lv_anim_set_playback_duration(&a, 500);
+    lv_anim_set_reverse_duration(&a, 500);
     lv_anim_start(&a);
 
     lv_anim_set_exec_cb(&a, column_gap_anim);
     lv_anim_set_duration(&a, 3000);
-    lv_anim_set_playback_duration(&a, 3000);
+    lv_anim_set_reverse_duration(&a, 3000);
     lv_anim_start(&a);
 }
 

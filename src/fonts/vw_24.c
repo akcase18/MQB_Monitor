@@ -8,7 +8,9 @@
 #include "lvgl.h"
 #else
 #include "../lvgl/lvgl.h"
+#include "pgmspace.h"
 #endif
+
 
 #ifndef VW_24
 #define VW_24 1

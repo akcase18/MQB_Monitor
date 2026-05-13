@@ -177,10 +177,34 @@ static const lv_style_const_prop_t style_config_roller_props[] = {
     LV_STYLE_CONST_TEXT_COLOR(lv_color_black()),
     LV_STYLE_CONST_ALIGN(LV_ALIGN_TOP_LEFT),
     LV_STYLE_CONST_TEXT_FONT(&vw_18),
-    LV_STYLE_CONST_WIDTH(480),
+    LV_STYLE_CONST_WIDTH(320),
     LV_STYLE_CONST_PROPS_END,
 };
 LV_STYLE_CONST_INIT(style_config_roller, style_config_roller_props);
+
+/**
+ * Radio Button (Unselected)
+ */
+static const lv_style_const_prop_t style_config_radio_btn_props[] = {
+    LV_STYLE_CONST_BG_COLOR(lv_color_black()),
+    LV_STYLE_CONST_TEXT_COLOR(lv_color_white()),
+    LV_STYLE_CONST_TEXT_FONT(&vw_18),
+    LV_STYLE_CONST_PAD_LEFT(20),
+    LV_STYLE_CONST_PAD_RIGHT(20),
+    LV_STYLE_CONST_WIDTH(160),
+    LV_STYLE_CONST_PROPS_END,
+};
+LV_STYLE_CONST_INIT(style_config_radio_btn, style_config_radio_btn_props);
+
+/**
+ * Radio Button (Selected)
+ */
+static const lv_style_const_prop_t style_config_radio_btn_sel_props[] = {
+    LV_STYLE_CONST_BG_IMAGE_SRC(NULL),
+    LV_STYLE_CONST_PROPS_END,
+};
+LV_STYLE_CONST_INIT(style_config_radio_btn_sel,
+                    style_config_radio_btn_sel_props);
 
 /**
  * Done button

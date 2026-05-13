@@ -1,10 +1,11 @@
+
 #include "../../lv_examples.h"
 #if LV_USE_SNAPSHOT && LV_BUILD_EXAMPLES
 
 static void event_cb(lv_event_t * e)
 {
-    lv_obj_t * snapshot_obj = lv_event_get_user_data(e);
-    lv_obj_t * img = lv_event_get_target(e);
+    lv_obj_t * snapshot_obj = (lv_obj_t *) lv_event_get_user_data(e);
+    lv_obj_t * img = lv_event_get_target_obj(e);
 
     if(snapshot_obj) {
         lv_draw_buf_t * snapshot = (lv_draw_buf_t *)lv_image_get_src(snapshot_obj);
@@ -13,13 +14,25 @@ static void event_cb(lv_event_t * e)
         }
 
         /*Update the snapshot, we know parent of object is the container.*/
-        snapshot = lv_snapshot_take(img->parent, LV_COLOR_FORMAT_ARGB8888);
+        snapshot = lv_snapshot_take(lv_obj_get_parent(img), LV_COLOR_FORMAT_ARGB8888);
         if(snapshot == NULL)
             return;
         lv_image_set_src(snapshot_obj, snapshot);
     }
 }
 
+/**
+ * @title Snapshot a container into an image
+ * @brief Capture a widget tree on press and release with `lv_snapshot_take`.
+ *
+ * A 180x180 container is filled with four star images in an
+ * `LV_FLEX_FLOW_ROW_WRAP` layout. A separate `lv_image` on the screen is scaled
+ * to 128 and rotated 300. Every star is clickable, and both `LV_EVENT_PRESSED`
+ * and `LV_EVENT_RELEASED` run a callback that destroys the previous snapshot
+ * buffer with `lv_draw_buf_destroy`, takes a fresh one via
+ * `lv_snapshot_take(parent, LV_COLOR_FORMAT_ARGB8888)`, and assigns it as the
+ * image's source.
+ */
 void lv_example_snapshot_1(void)
 {
     LV_IMAGE_DECLARE(img_star);

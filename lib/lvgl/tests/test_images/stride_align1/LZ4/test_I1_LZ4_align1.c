@@ -1,23 +1,24 @@
 
 #if defined(LV_LVGL_H_INCLUDE_SIMPLE)
 #include "lvgl.h"
+#elif defined(LV_LVGL_H_INCLUDE_SYSTEM)
+#include <lvgl.h>
 #elif defined(LV_BUILD_TEST)
 #include "../lvgl.h"
 #else
 #include "lvgl/lvgl.h"
 #endif
 
-
 #ifndef LV_ATTRIBUTE_MEM_ALIGN
 #define LV_ATTRIBUTE_MEM_ALIGN
 #endif
 
-#ifndef LV_ATTRIBUTE_IMG_DUST
-#define LV_ATTRIBUTE_IMG_DUST
+#ifndef LV_ATTRIBUTE_TEST_I1_LZ4_ALIGN1
+#define LV_ATTRIBUTE_TEST_I1_LZ4_ALIGN1
 #endif
 
 static const
-LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_DUST
+LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_TEST_I1_LZ4_ALIGN1
 uint8_t test_I1_LZ4_align1_map[] = {
 
     0x02,0x00,0x00,0x00,0x93,0x01,0x00,0x00,0xc8,0x03,0x00,0x00,0x9b,0x56,0x82,0x0a,
@@ -49,14 +50,18 @@ uint8_t test_I1_LZ4_align1_map[] = {
 
 };
 
-const lv_img_dsc_t test_I1_LZ4_align1 = {
-  .header.magic = LV_IMAGE_HEADER_MAGIC,
-  .header.cf = LV_COLOR_FORMAT_I1,
-  .header.flags = 0 | LV_IMAGE_FLAGS_COMPRESSED,
-  .header.w = 71,
-  .header.h = 60,
-  .header.stride = 16,
-  .data_size = 415,
+const lv_image_dsc_t test_I1_LZ4_align1 = {
+  .header = {
+    .magic = LV_IMAGE_HEADER_MAGIC,
+    .cf = LV_COLOR_FORMAT_I1,
+    .flags = 0 | LV_IMAGE_FLAGS_COMPRESSED,
+    .w = 71,
+    .h = 60,
+    .stride = 16,
+    .reserved_2 = 0,
+  },
+  .data_size = sizeof(test_I1_LZ4_align1_map),
   .data = test_I1_LZ4_align1_map,
+  .reserved = NULL,
 };
 

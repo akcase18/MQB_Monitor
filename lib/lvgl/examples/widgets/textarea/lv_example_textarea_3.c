@@ -6,8 +6,15 @@ static void ta_event_cb(lv_event_t * e);
 static lv_obj_t * kb;
 
 /**
- * Automatically format text like a clock. E.g. "12:34"
- * Add the ':' automatically.
+ * @title Auto-format HH:MM clock input
+ * @brief Insert the `:` automatically after the first two digits.
+ *
+ * A one-line textarea restricts input to `0123456789:` via
+ * `lv_textarea_set_accepted_chars` and caps the length at 5. A
+ * `LV_EVENT_VALUE_CHANGED` callback checks the first two characters and, once
+ * both are digits with no colon in position 2, moves the cursor and calls
+ * `lv_textarea_add_char(':')`. A numeric `lv_keyboard` in
+ * `LV_KEYBOARD_MODE_NUMBER` feeds the textarea.
  */
 void lv_example_textarea_3(void)
 {
@@ -28,7 +35,7 @@ void lv_example_textarea_3(void)
 
 static void ta_event_cb(lv_event_t * e)
 {
-    lv_obj_t * ta = lv_event_get_target(e);
+    lv_obj_t * ta = lv_event_get_target_obj(e);
     const char * txt = lv_textarea_get_text(ta);
     if(txt[0] >= '0' && txt[0] <= '9' &&
        txt[1] >= '0' && txt[1] <= '9' &&

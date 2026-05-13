@@ -2,7 +2,15 @@
 #if LV_USE_SCALE && LV_BUILD_EXAMPLES
 
 /**
- * A round scale with section and custom styling
+ * @title Round outer scale with red upper band
+ * @brief Celsius-labelled round outer scale turning red above 75.
+ *
+ * A 150 by 150 scale uses `LV_SCALE_MODE_ROUND_OUTER` with 21 ticks
+ * (major every fifth), the range 0 to 100, and a custom label array
+ * (`0 °C` through `100 °C`). Blue styles are applied to
+ * `LV_PART_MAIN` (as an arc), `LV_PART_INDICATOR`, and `LV_PART_ITEMS`;
+ * a section from 75 to 100 overrides those with red arc and tick
+ * styles via `lv_scale_add_section`.
  */
 void lv_example_scale_4(void)
 {
@@ -74,10 +82,11 @@ void lv_example_scale_4(void)
 
     /* Configure section styles */
     lv_scale_section_t * section = lv_scale_add_section(scale);
-    lv_scale_section_set_range(section, 75, 100);
-    lv_scale_section_set_style(section, LV_PART_INDICATOR, &section_label_style);
-    lv_scale_section_set_style(section, LV_PART_ITEMS, &section_minor_tick_style);
-    lv_scale_section_set_style(section, LV_PART_MAIN, &section_main_line_style);
+    lv_scale_set_section_range(scale, section, 75, 100);
+    lv_scale_set_section_style_indicator(scale, section, &section_label_style);
+    lv_scale_set_section_style_items(scale, section, &section_minor_tick_style);
+    lv_scale_set_section_style_main(scale, section, &section_main_line_style);
+
 }
 
 #endif

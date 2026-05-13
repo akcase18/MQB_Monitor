@@ -5,15 +5,21 @@ static lv_obj_t * label;
 
 static void slider_event_cb(lv_event_t * e)
 {
-    lv_obj_t * slider = lv_event_get_target(e);
+    lv_obj_t * slider = lv_event_get_target_obj(e);
 
     /*Refresh the text*/
-    lv_label_set_text_fmt(label, "%"LV_PRId32, lv_slider_get_value(slider));
+    lv_label_set_text_fmt(label, "%" LV_PRId32, lv_slider_get_value(slider));
     lv_obj_align_to(label, slider, LV_ALIGN_OUT_TOP_MID, 0, -15);    /*Align top of the slider*/
 }
 
 /**
- * Create a slider and write its value on a label.
+ * @title Slider with live value label
+ * @brief Mirror a slider's value into a label anchored above it.
+ *
+ * A 200 px wide slider is centered on the active screen with a label placed
+ * 15 px above it via `lv_obj_align_to` and `LV_ALIGN_OUT_TOP_MID`. An
+ * `LV_EVENT_VALUE_CHANGED` callback reads `lv_slider_get_value` and rewrites
+ * the label text, re-aligning it after each update.
  */
 void lv_example_get_started_4(void)
 {

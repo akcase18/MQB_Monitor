@@ -13,8 +13,8 @@ extern "C" {
 /*********************
  *      INCLUDES
  *********************/
-#include "../lvgl.h"
-#include "lv_conf_internal.h"
+
+#include "lvgl_public.h"
 
 /*********************
  *      DEFINES
@@ -36,4 +36,4 @@ extern "C" {
 } /*extern "C"*/
 #endif
 
-#endif /*LVGL_SRC_H*/
+#endif /* LVGL_SRC_H */

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
 import argparse
-import errno
 import shutil
 import subprocess
 import sys
 import os
+import platform
 from itertools import chain
 from pathlib import Path
 
@@ -13,20 +13,28 @@ lvgl_test_dir = os.path.dirname(os.path.realpath(__file__))
 lvgl_script_path = os.path.join(lvgl_test_dir, "../scripts")
 sys.path.append(lvgl_script_path)
 
+wayland_dir = os.path.join(lvgl_test_dir, "wayland_protocols")
+wayland_protocols_dir = os.path.realpath("/usr/share/wayland-protocols")
+
+from perf import perf_test_options
 from LVGLImage import LVGLImage, ColorFormat, CompressMethod
 
 # Key values must match variable names in CMakeLists.txt.
 build_only_options = {
-#    'OPTIONS_NORMAL_8BIT': 'Normal config, 8 bit color depth',
+    'OPTIONS_NORMAL_8BIT': 'Normal config, 8 bit color depth',
     'OPTIONS_16BIT': 'Minimal config, 16 bit color depth',
     'OPTIONS_24BIT': 'Normal config, 24 bit color depth',
     'OPTIONS_FULL_32BIT': 'Full config, 32 bit color depth',
-    'OPTIONS_VG_LITE': 'VG-Lite simulator with full config, 32 bit color depth',
 }
+
+if platform.system() != 'Windows':
+    build_only_options['OPTIONS_SDL'] = 'SDL simulator with full config, 32 bit color depth'
 
 test_options = {
     'OPTIONS_TEST_SYSHEAP': 'Test config, system heap, 32 bit color depth',
     'OPTIONS_TEST_DEFHEAP': 'Test config, LVGL heap, 32 bit color depth',
+    'OPTIONS_TEST_VG_LITE': 'VG-Lite simulator with full config, 32 bit color depth',
+    'OPTIONS_TEST_RISCV_V': 'RISC-V Vector emulation with full config, 32 bit color depth',
 }
 
 
@@ -65,6 +73,37 @@ def get_build_dir(options_name):
     global lvgl_test_dir
     return os.path.join(lvgl_test_dir, get_base_build_dir(options_name))
 
+def gen_wayland_protocols(clean):
+    '''Generates the xdg shell interface from wayland protocol definitions'''
+
+    if clean:
+        delete_dir_ignore_missing(wayland_dir)
+
+    if not os.path.isdir(wayland_dir):
+        os.mkdir(wayland_dir)
+        subprocess.check_call(['wayland-scanner',
+            'client-header',
+            os.path.join(wayland_protocols_dir, "stable/xdg-shell/xdg-shell.xml"),
+            os.path.join(wayland_dir, "wayland_xdg_shell.h.original"),
+        ])
+
+        subprocess.check_call(['wayland-scanner',
+            'private-code',
+            os.path.join(wayland_protocols_dir, "stable/xdg-shell/xdg-shell.xml"),
+            os.path.join(wayland_dir, "wayland_xdg_shell.c.original"),
+        ])
+
+        # Insert guards
+        with open(os.path.join(wayland_dir, "wayland_xdg_shell.h"), "w") as outfile:
+            subprocess.check_call(['sed','-e', "1i #if LV_BUILD_TEST", '-e', '$a #endif',
+                os.path.join(wayland_dir, "wayland_xdg_shell.h.original")], stdout=outfile)
+
+        with open(os.path.join(wayland_dir, "wayland_xdg_shell.c"), "w") as outfile:
+            subprocess.check_call(['sed','-e', "1i #if LV_BUILD_TEST", '-e', '$a #endif',
+                os.path.join(wayland_dir, "wayland_xdg_shell.c.original")], stdout=outfile)
+
+        subprocess.check_call(['rm', os.path.join(wayland_dir, "wayland_xdg_shell.c.original")])
+        subprocess.check_call(['rm', os.path.join(wayland_dir, "wayland_xdg_shell.h.original")])
 
 def build_tests(options_name, build_type, clean):
     '''Build all tests for the specified options name.'''
@@ -84,6 +123,10 @@ def build_tests(options_name, build_type, clean):
         delete_dir_ignore_missing(build_dir)
 
     os.chdir(lvgl_test_dir)
+
+    if platform.system() != 'Windows':
+        gen_wayland_protocols(clean)
+
     created_build_dir = False
     if not os.path.isdir(build_dir):
         os.mkdir(build_dir)
@@ -133,19 +176,20 @@ def generate_code_coverage_report():
     os.chdir(lvgl_test_dir)
     delete_dir_ignore_missing('report')
     os.mkdir('report')
-    root_dir = os.pardir
+    root_dir = os.path.dirname(lvgl_test_dir)  # Get parent directory of tests (lvgl directory)
     html_report_file = 'report/index.html'
-    cmd = ['gcovr', '--root', root_dir, '--html-details', '--output',
+    cmd = ['gcovr', '--gcov-ignore-parse-errors', 
+           '--root', root_dir, '--html-details', '--output',
            html_report_file, '--xml', 'report/coverage.xml',
-           '-j', str(os.cpu_count()), '--print-summary',
-           '--html-title', 'LVGL Test Coverage', '--filter', '../src/.*/lv_.*\.c']
+           '-j', str(os.cpu_count()), '--print-summary', '--merge-mode-functions=merge-use-line-min',
+           '--html-title', 'LVGL Test Coverage']
 
     subprocess.check_call(cmd)
     print("Done: See %s" % html_report_file, flush=True)
 
 
 def generate_test_images():
-    invalids = (ColorFormat.UNKNOWN,)
+    invalids = (ColorFormat.UNKNOWN,ColorFormat.RAW,ColorFormat.RAW_ALPHA)
     formats = [i for i in ColorFormat if i not in invalids]
     png_path = os.path.join(lvgl_test_dir, "test_images/pngs")
     pngs = list(Path(png_path).rglob("*.[pP][nN][gG]"))
@@ -169,6 +213,19 @@ def generate_test_images():
                     print(f"converting {os.path.basename(png)}, format: {fmt.name}, compress: {compress_name}")
 
 
+def clean_build_dirs_with_filter(build_dir, clean_filters):
+    for entry in os.listdir(build_dir):
+        entry_path = os.path.join(build_dir, entry)
+
+        if any(entry.endswith(filter) for filter in clean_filters):
+            continue
+
+        if os.path.isfile(entry_path):
+            os.remove(entry_path)
+        elif os.path.isdir(entry_path):
+            shutil.rmtree(entry_path)
+
+
 if __name__ == "__main__":
     epilog = '''This program builds and optionally runs the LVGL test programs.
     There are two types of LVGL tests: "build", and "test". The build-only
@@ -179,7 +236,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Build and/or run LVGL tests.', epilog=epilog)
     parser.add_argument('--build-options', nargs=1,
-                        choices=list(chain(build_only_options, test_options)),
+                        choices=list(chain(build_only_options, test_options, perf_test_options)),
                         help='''the build option name to build or run. When
                         omitted all build configurations are used.
                         ''')
@@ -193,6 +250,10 @@ if __name__ == "__main__":
                         help='select test suite to run')
     parser.add_argument('--update-image', action='store_true', default=False,
                         help='Update test image using LVGLImage.py script')
+    parser.add_argument('--auto-clean', action='store_true', default=False,
+                        help='Automatically clean build directories')
+    parser.add_argument('--keep-report', action='store_true', default=False,
+                        help='Skip cleaning gcov report files when --auto-clean and --report are enabled')
 
     args = parser.parse_args()
 
@@ -210,8 +271,18 @@ if __name__ == "__main__":
         else:
             options_to_build = test_options
 
+    clean_build_dirs = []
     for options_name in options_to_build:
         is_test = options_name in test_options
+        is_perf_test = options_name in perf_test_options
+        if is_perf_test:
+            perf_test_script = os.path.join(lvgl_test_dir, "perf.py")
+            try:
+                subprocess.check_call([perf_test_script, *(sys.argv[1:])])
+            except subprocess.CalledProcessError as e:
+                sys.exit(e.returncode)
+            continue
+
         build_type = 'Debug'
         build_tests(options_name, build_type, args.clean)
         if is_test:
@@ -220,5 +291,30 @@ if __name__ == "__main__":
             except subprocess.CalledProcessError as e:
                 sys.exit(e.returncode)
 
+        if args.auto_clean:
+            build_dir = get_build_dir(options_name)
+
+            if args.report:
+                # Keep the files that gcovr analysis depends on and delete
+                # the rest to solve the storage capacity limit of GitHub CI
+                clean_filters = ['CMakeFiles', '.c']
+                clean_build_dirs_with_filter(build_dir, clean_filters)
+
+                if args.keep_report:
+                    # Retain the gcov report files for subsequent automated coverage analysis.
+                    print(f"Keeping {build_dir} for report")
+                else:
+                    print(f"Append {build_dir} to clean list")
+                    clean_build_dirs.append(build_dir)
+            else:
+                # Remove all build directories directly
+                print(f"Removing {build_dir}")
+                shutil.rmtree(build_dir)
+
     if args.report:
         generate_code_coverage_report()
+
+    # Clean all build directories after report
+    for build_dir in clean_build_dirs:
+        print(f"Removing {build_dir}")
+        shutil.rmtree(build_dir)

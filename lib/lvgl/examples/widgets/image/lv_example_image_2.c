@@ -8,7 +8,15 @@ static lv_obj_t * red_slider, * green_slider, * blue_slider, * intense_slider;
 static lv_obj_t * img1;
 
 /**
- * Demonstrate runtime image re-coloring
+ * @title Image recolor with RGB sliders
+ * @brief Four sliders drive the recolor tint and intensity of a cogwheel image.
+ *
+ * Red, green, blue, and intensity sliders (range 0 to 255) sit along
+ * the left half of the screen while the `img_cogwheel_argb` image sits
+ * on the right. A shared `LV_EVENT_VALUE_CHANGED` callback reads each
+ * slider and applies `lv_obj_set_style_image_recolor` and
+ * `lv_obj_set_style_image_recolor_opa` so the image retints live as
+ * the sliders move.
  */
 void lv_example_image_2(void)
 {
@@ -42,9 +50,10 @@ static void slider_event_cb(lv_event_t * e)
     LV_UNUSED(e);
 
     /*Recolor the image based on the sliders' values*/
-    lv_color_t color  = lv_color_make(lv_slider_get_value(red_slider), lv_slider_get_value(green_slider),
-                                      lv_slider_get_value(blue_slider));
-    lv_opa_t intense = lv_slider_get_value(intense_slider);
+    lv_color_t color  = lv_color_make((uint8_t)lv_slider_get_value(red_slider),
+                                      (uint8_t)lv_slider_get_value(green_slider),
+                                      (uint8_t)lv_slider_get_value(blue_slider));
+    lv_opa_t intense = (lv_opa_t)lv_slider_get_value(intense_slider);
     lv_obj_set_style_image_recolor_opa(img1, intense, 0);
     lv_obj_set_style_image_recolor(img1, color, 0);
 }

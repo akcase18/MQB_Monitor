@@ -3,14 +3,14 @@
 
 static void add_data(lv_timer_t * t)
 {
-    lv_obj_t * chart = t->user_data;
+    lv_obj_t * chart = (lv_obj_t *)lv_timer_get_user_data(t);
     lv_chart_series_t * ser = lv_chart_get_series_next(chart, NULL);
 
-    lv_chart_set_next_value(chart, ser, lv_rand(10, 90));
+    lv_chart_set_next_value(chart, ser, (int32_t)lv_rand(10, 90));
 
-    uint16_t p = lv_chart_get_point_count(chart);
-    uint16_t s = lv_chart_get_x_start_point(chart, ser);
-    int32_t * a = lv_chart_get_y_array(chart, ser);
+    uint32_t p = lv_chart_get_point_count(chart);
+    uint32_t s = lv_chart_get_x_start_point(chart, ser);
+    int32_t * a = lv_chart_get_series_y_array(chart, ser);
 
     a[(s + 1) % p] = LV_CHART_POINT_NONE;
     a[(s + 2) % p] = LV_CHART_POINT_NONE;
@@ -20,7 +20,14 @@ static void add_data(lv_timer_t * t)
 }
 
 /**
- * Circular line chart with gap
+ * @title Circular update mode with gap
+ * @brief Line chart that scrolls with `LV_CHART_UPDATE_MODE_CIRCULAR` and leaves a moving gap.
+ *
+ * A 280x150 line chart with 80 points and one red series is prefilled
+ * with random values, then a 300 ms `lv_timer` appends a new value via
+ * `lv_chart_set_next_value` and writes `LV_CHART_POINT_NONE` into the
+ * two slots ahead of the write cursor. The point indicator size is set
+ * to zero, producing a circular plot with a visible moving gap.
  */
 void lv_example_chart_8(void)
 {
@@ -36,7 +43,7 @@ void lv_example_chart_8(void)
     /*Prefill with data*/
     uint32_t i;
     for(i = 0; i < 80; i++) {
-        lv_chart_set_next_value(chart, ser, lv_rand(10, 90));
+        lv_chart_set_next_value(chart, ser, (int32_t)lv_rand(10, 90));
     }
 
     lv_timer_create(add_data, 300, chart);

@@ -1,5 +1,6 @@
 #if LV_BUILD_TEST
 #include "../lvgl.h"
+#include "../../lvgl_private.h"
 
 #include "unity/unity.h"
 #include <stdio.h>
@@ -22,8 +23,10 @@ static const char * color_formats[] = {
 
 static const char * compressions[] = {
     "UNCOMPRESSED",
+#if LV_BIN_DECODER_RAM_LOAD == 1
     "RLE",
     "LZ4"
+#endif
 };
 
 static const char * modes[] = {
@@ -282,6 +285,9 @@ void test_image_formats(void)
         for(unsigned mode = 0; mode <= 3; mode++) {
             bool rotate = mode & 0x02;
             bool recolor = mode & 0x01;
+#if LV_BIN_DECODER_RAM_LOAD == 0
+            if(rotate) continue;  /* Transform relies on LV_BIN_DECODER_RAM_LOAD to be enabled */
+#endif
             /*Loop compressions array and do test.*/
             for(unsigned i = 0; i < sizeof(compressions) / sizeof(compressions[0]); i++) {
                 char reference[256];

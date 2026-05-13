@@ -2,7 +2,16 @@
 #if LV_USE_SCALE && LV_BUILD_EXAMPLES
 
 /**
- * An scale with section and custom styling
+ * @title Custom labels and hex-coloured styles
+ * @brief Default-mode scale with two named ticks and a magenta/red/blue palette.
+ *
+ * A scale sized to half the display resolution carries 10 total ticks
+ * (major every fifth) across the range 25 to 35, with two custom
+ * labels `One` and `Two`. Styles set via `lv_color_hex` colour the main
+ * line blue, the minor ticks red, and the major tick labels magenta
+ * with green tick lines. A section from 25 to 30 overrides the
+ * indicator and items styles with spaced red text and blue minor
+ * ticks.
  */
 void lv_example_scale_5(void)
 {
@@ -70,9 +79,9 @@ void lv_example_scale_5(void)
 
     /* Configure section styles */
     lv_scale_section_t * section = lv_scale_add_section(scale);
-    lv_scale_section_set_range(section, 25, 30);
-    lv_scale_section_set_style(section, LV_PART_INDICATOR, &section_label_style);
-    lv_scale_section_set_style(section, LV_PART_ITEMS, &section_minor_tick_style);
+    lv_scale_set_section_range(scale, section, 25, 30);
+    lv_scale_set_section_style_indicator(scale, section, &section_label_style);
+    lv_scale_set_section_style_items(scale, section, &section_minor_tick_style);
 }
 
 #endif

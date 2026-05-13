@@ -4,7 +4,7 @@
 static void btn_event_cb(lv_event_t * e)
 {
     lv_event_code_t code = lv_event_get_code(e);
-    lv_obj_t * btn = lv_event_get_target(e);
+    lv_obj_t * btn = lv_event_get_target_obj(e);
     if(code == LV_EVENT_CLICKED) {
         static uint8_t cnt = 0;
         cnt++;
@@ -16,7 +16,13 @@ static void btn_event_cb(lv_event_t * e)
 }
 
 /**
- * Create a button with a label and react on click event.
+ * @title Button with click counter
+ * @brief Increment a label on a button each time it is clicked.
+ *
+ * A button sized 120x50 is placed at position (10, 10) on the active screen
+ * with a centered label reading `Button`. The button subscribes to
+ * `LV_EVENT_ALL` and on `LV_EVENT_CLICKED` the callback updates its child
+ * label with `lv_label_set_text_fmt` to show an incrementing counter.
  */
 void lv_example_get_started_2(void)
 {

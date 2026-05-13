@@ -6,15 +6,10 @@
 /*********************
  *      INCLUDES
  *********************/
-#include "lv_log.h"
+#include "../lvgl_public.h"
+
 #if LV_USE_LOG
 
-#include <stdarg.h>
-#include <string.h>
-#include "../stdlib/lv_sprintf.h"
-#include "../stdlib/lv_mem.h"
-#include "../stdlib/lv_string.h"
-#include "../tick/lv_tick.h"
 #include "../core/lv_global.h"
 
 #if LV_LOG_PRINTF
@@ -70,9 +65,9 @@ void lv_log_register_print_cb(lv_log_print_g_cb_t print_cb)
     custom_print_cb = print_cb;
 }
 
-void _lv_log_add(lv_log_level_t level, const char * file, int line, const char * func, const char * format, ...)
+void lv_log_add(lv_log_level_t level, const char * file, int line, const char * func, const char * format, ...)
 {
-    if(level >= _LV_LOG_LEVEL_NUM) return; /*Invalid level*/
+    if(level >= LV_LOG_LEVEL_NUM) return; /*Invalid level*/
 
     if(level >= LV_LOG_LEVEL) {
         va_list args;
@@ -97,12 +92,6 @@ void _lv_log_add(lv_log_level_t level, const char * file, int line, const char *
 #endif
         static const char * lvl_prefix[] = {"Trace", "Info", "Warn", "Error", "User"};
 
-#if LV_LOG_PRINTF
-        printf("[%s]" LOG_TIMESTAMP_FMT " %s: ",
-               lvl_prefix[level], LOG_TIMESTAMP_EXPR func);
-        vprintf(format, args);
-        printf(LOG_FILE_LINE_FMT "\n" LOG_FILE_LINE_EXPR);
-#else
         if(custom_print_cb) {
             char buf[512];
             char msg[256];
@@ -110,6 +99,14 @@ void _lv_log_add(lv_log_level_t level, const char * file, int line, const char *
             lv_snprintf(buf, sizeof(buf), "[%s]" LOG_TIMESTAMP_FMT " %s: %s" LOG_FILE_LINE_FMT "\n",
                         lvl_prefix[level], LOG_TIMESTAMP_EXPR func, msg LOG_FILE_LINE_EXPR);
             custom_print_cb(level, buf);
+        }
+#if LV_LOG_PRINTF
+        else {
+            printf("[%s]" LOG_TIMESTAMP_FMT " %s: ",
+                   lvl_prefix[level], LOG_TIMESTAMP_EXPR func);
+            vprintf(format, args);
+            printf(LOG_FILE_LINE_FMT "\n" LOG_FILE_LINE_EXPR);
+            fflush(stdout);
         }
 #endif
 
@@ -127,13 +124,14 @@ void lv_log(const char * format, ...)
     va_list args;
     va_start(args, format);
 
-#if LV_LOG_PRINTF
-    vprintf(format, args);
-#else
     if(custom_print_cb) {
         char buf[512];
         lv_vsnprintf(buf, sizeof(buf), format, args);
         custom_print_cb(LV_LOG_LEVEL_USER, buf);
+    }
+#if LV_LOG_PRINTF
+    else {
+        vprintf(format, args);
     }
 #endif
 

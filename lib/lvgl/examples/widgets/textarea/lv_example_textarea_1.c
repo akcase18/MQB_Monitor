@@ -3,23 +3,34 @@
 
 static void textarea_event_handler(lv_event_t * e)
 {
-    lv_obj_t * ta = lv_event_get_target(e);
+    lv_obj_t * ta = lv_event_get_target_obj(e);
     LV_UNUSED(ta);
     LV_LOG_USER("Enter was pressed. The current text is: %s", lv_textarea_get_text(ta));
 }
 
 static void btnm_event_handler(lv_event_t * e)
 {
-    lv_obj_t * obj = lv_event_get_target(e);
-    lv_obj_t * ta = lv_event_get_user_data(e);
+    lv_obj_t * obj = lv_event_get_target_obj(e);
+    lv_obj_t * ta = (lv_obj_t *)lv_event_get_user_data(e);
     const char * txt = lv_buttonmatrix_get_button_text(obj, lv_buttonmatrix_get_selected_button(obj));
 
-    if(strcmp(txt, LV_SYMBOL_BACKSPACE) == 0) lv_textarea_delete_char(ta);
-    else if(strcmp(txt, LV_SYMBOL_NEW_LINE) == 0) lv_obj_send_event(ta, LV_EVENT_READY, NULL);
+    if(lv_strcmp(txt, LV_SYMBOL_BACKSPACE) == 0) lv_textarea_delete_char(ta);
+    else if(lv_strcmp(txt, LV_SYMBOL_NEW_LINE) == 0) lv_obj_send_event(ta, LV_EVENT_READY, NULL);
     else lv_textarea_add_text(ta, txt);
 
 }
 
+/**
+ * @title Single-line textarea with button matrix
+ * @brief Feed a one-line textarea from a numeric button matrix.
+ *
+ * A textarea is placed at the top in one-line mode and forced into
+ * `LV_STATE_FOCUSED` so the cursor stays visible. A four-row button matrix
+ * holds digits `0..9` plus `LV_SYMBOL_BACKSPACE` and `LV_SYMBOL_NEW_LINE`. Its
+ * `LV_EVENT_VALUE_CHANGED` handler appends the pressed character, deletes on
+ * backspace, or sends `LV_EVENT_READY` to the textarea on new line. The matrix
+ * drops `LV_OBJ_FLAG_CLICK_FOCUSABLE` so focus stays with the textarea.
+ */
 void lv_example_textarea_1(void)
 {
     lv_obj_t * ta = lv_textarea_create(lv_screen_active());

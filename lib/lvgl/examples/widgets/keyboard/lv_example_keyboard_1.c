@@ -4,8 +4,8 @@
 static void ta_event_cb(lv_event_t * e)
 {
     lv_event_code_t code = lv_event_get_code(e);
-    lv_obj_t * ta = lv_event_get_target(e);
-    lv_obj_t * kb = lv_event_get_user_data(e);
+    lv_obj_t * ta = lv_event_get_target_obj(e);
+    lv_obj_t * kb = (lv_obj_t *)lv_event_get_user_data(e);
     if(code == LV_EVENT_FOCUSED) {
         lv_keyboard_set_textarea(kb, ta);
         lv_obj_remove_flag(kb, LV_OBJ_FLAG_HIDDEN);
@@ -17,6 +17,16 @@ static void ta_event_cb(lv_event_t * e)
     }
 }
 
+/**
+ * @title Keyboard shown on textarea focus
+ * @brief Hide the keyboard unless one of two textareas is focused.
+ *
+ * Two textareas are placed at the top-left and top-right, one with placeholder
+ * text `Hello`. A shared callback watches `LV_EVENT_FOCUSED` and
+ * `LV_EVENT_DEFOCUSED`: on focus it retargets the keyboard with
+ * `lv_keyboard_set_textarea` and clears `LV_OBJ_FLAG_HIDDEN`, and on defocus it
+ * clears the target and hides the keyboard again.
+ */
 void lv_example_keyboard_1(void)
 {
     /*Create a keyboard to use it with an of the text areas*/

@@ -4,7 +4,7 @@
 typedef enum {
     THEME_MODE_LIGHT,
     THEME_MODE_DARK,
-} theme_mode_t;
+} lv_theme_mode_t;
 
 static lv_obj_t * my_panel_create(lv_obj_t * parent);
 static lv_obj_t * my_button_create(lv_obj_t * parent, const char * text, lv_event_cb_t event_cb);
@@ -13,7 +13,16 @@ static void switch_theme_event_cb(lv_event_t * e);
 static lv_subject_t theme_subject;
 
 /**
- * Change between light and dark mode
+ * @title Theme styles with `lv_subject_add_observer_with_target`
+ * @brief Recolour two style sets when a theme subject flips between light and dark.
+ *
+ * `theme_subject` starts at `THEME_MODE_DARK`. A panel with ten child buttons is
+ * built with encapsulated factory helpers; each helper registers its own
+ * `lv_panel_styles_t` or `lv_button_styles_t` through
+ * `lv_subject_add_observer_with_target` so the observer gets the style bundle as
+ * its target. The observers rewrite background, shadow, text, and gradient
+ * colours per mode and call `lv_obj_report_style_change`. Any button click
+ * toggles the subject.
  */
 void lv_example_observer_6(void)
 {
@@ -54,15 +63,14 @@ static void switch_theme_event_cb(lv_event_t * e)
 typedef struct {
     lv_style_t style_main;
     lv_style_t style_scrollbar;
-} my_panel_styles_t;
+} lv_panel_styles_t;
 
 static void my_panel_style_observer_cb(lv_observer_t * observer, lv_subject_t * subject)
 {
     LV_UNUSED(subject);
-    LV_UNUSED(observer);
 
-    theme_mode_t m = lv_subject_get_int(&theme_subject);
-    my_panel_styles_t * styles = lv_observer_get_target(observer);
+    lv_theme_mode_t m = (lv_theme_mode_t) lv_subject_get_int(&theme_subject);
+    lv_panel_styles_t * styles = (lv_panel_styles_t *) lv_observer_get_target(observer);
     if(m == THEME_MODE_LIGHT) {
         lv_style_set_bg_color(&styles->style_main, lv_color_hex3(0xfff));
         lv_style_set_shadow_color(&styles->style_main, lv_color_hex3(0x888));
@@ -83,7 +91,7 @@ static void my_panel_style_observer_cb(lv_observer_t * observer, lv_subject_t * 
 static lv_obj_t * my_panel_create(lv_obj_t * parent)
 {
     static bool inited = false;
-    static my_panel_styles_t styles;
+    static lv_panel_styles_t styles;
     if(!inited) {
         inited = true;
 
@@ -124,15 +132,14 @@ static lv_obj_t * my_panel_create(lv_obj_t * parent)
 typedef struct {
     lv_style_t style_main;
     lv_style_t style_pressed;
-} my_button_styles_t;
+} lv_button_styles_t;
 
 static void my_button_style_observer_cb(lv_observer_t * observer, lv_subject_t * subject)
 {
     LV_UNUSED(subject);
-    LV_UNUSED(observer);
 
-    theme_mode_t m = lv_subject_get_int(&theme_subject);
-    my_button_styles_t * styles = lv_observer_get_target(observer);
+    lv_theme_mode_t m = (lv_theme_mode_t) lv_subject_get_int(&theme_subject);
+    lv_button_styles_t * styles = (lv_button_styles_t *) lv_observer_get_target(observer);
     if(m == THEME_MODE_LIGHT) {
         lv_style_set_bg_color(&styles->style_main, lv_color_hex(0x3379de));
         lv_style_set_bg_grad_color(&styles->style_main, lv_color_hex(0xd249a5));
@@ -157,7 +164,7 @@ static void my_button_style_observer_cb(lv_observer_t * observer, lv_subject_t *
 static lv_obj_t * my_button_create(lv_obj_t * parent, const char * text, lv_event_cb_t event_cb)
 {
     static bool inited = false;
-    static my_button_styles_t styles;
+    static lv_button_styles_t styles;
     if(!inited) {
         inited = true;
 
@@ -175,7 +182,7 @@ static lv_obj_t * my_button_create(lv_obj_t * parent, const char * text, lv_even
         lv_subject_add_observer_with_target(&theme_subject, my_button_style_observer_cb, &styles, NULL);
     }
 
-    lv_obj_t * btn = lv_btn_create(parent);
+    lv_obj_t * btn = lv_button_create(parent);
     lv_obj_remove_style_all(btn);
     lv_obj_add_style(btn, &styles.style_main, 0);
     lv_obj_add_style(btn, &styles.style_pressed, LV_STATE_PRESSED);

@@ -8,9 +8,13 @@
 extern "C" {
 #endif
 
+#include "../../lvgl_public.h"
 #include "tjpgdcnf.h"
+
+#if LV_USE_TJPGD
+
 #include <string.h>
-#include <stdint.h>
+#include LV_STDINT_INCLUDE
 
 #if JD_FASTDECODE >= 1
 typedef int16_t jd_yuv_t;
@@ -95,6 +99,7 @@ JRESULT jd_mcu_output(JDEC * jd, int (*outfunc)(JDEC *, void *, JRECT *), unsign
 
 JRESULT jd_restart(JDEC * jd, uint16_t rstn);
 
+#endif
 
 #ifdef __cplusplus
 }

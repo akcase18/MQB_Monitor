@@ -2,7 +2,15 @@
 #if LV_BUILD_EXAMPLES && LV_USE_LIST
 
 /**
- * Styling the scrollbars
+ * @title Styled scrollbar with state transition
+ * @brief Restyle the `LV_PART_SCROLLBAR` of a text panel and fade it in while scrolling.
+ *
+ * A 200x100 container holds a long Lorem Ipsum label. The default scrollbar
+ * style is removed, then a custom `lv_style_t` sets width 4, length 20,
+ * padding, radius 2, `LV_OPA_70` blue fill, a darker blue border, and a
+ * shadow. A second style tied to `LV_STATE_SCROLLED` widens the scrollbar
+ * to 8 and sets `LV_OPA_COVER`, and a 200 ms `lv_style_transition_dsc_t`
+ * over `LV_STYLE_BG_OPA` and `LV_STYLE_WIDTH` animates between the two states.
  */
 void lv_example_scroll_4(void)
 {
@@ -39,6 +47,7 @@ void lv_example_scroll_4(void)
     static lv_style_t style;
     lv_style_init(&style);
     lv_style_set_width(&style, 4);      /*Width of the scrollbar*/
+    lv_style_set_length(&style, 20);    /*Length of the scrollbar*/
     lv_style_set_pad_right(&style, 5);  /*Space from the parallel side*/
     lv_style_set_pad_top(&style, 5);    /*Space from the perpendicular side*/
 

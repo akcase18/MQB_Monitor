@@ -1,5 +1,5 @@
 /**
- * @file lv_draw_vg_lite_rect.c
+ * @file lv_draw_vg_lite_mask_rect.c
  *
  */
 
@@ -13,6 +13,8 @@
 
 #include "lv_vg_lite_utils.h"
 #include "lv_draw_vg_lite_type.h"
+#include "lv_vg_lite_path.h"
+#include "../../misc/lv_area_private.h"
 
 /*********************
  *      DEFINES
@@ -37,58 +39,50 @@
 /**********************
  *   GLOBAL FUNCTIONS
  **********************/
-
-void lv_draw_vg_lite_mask_rect(lv_draw_unit_t * draw_unit, const lv_draw_mask_rect_dsc_t * dsc,
+void lv_draw_vg_lite_mask_rect(lv_draw_task_t * t, const lv_draw_mask_rect_dsc_t * dsc,
                                const lv_area_t * coords)
 {
     LV_UNUSED(coords);
-
     lv_area_t draw_area;
-    if(!_lv_area_intersect(&draw_area, &dsc->area, draw_unit->clip_area)) {
+
+    if(!lv_area_intersect(&draw_area, &dsc->area, &t->clip_area)) {
         return;
     }
 
-    LV_PROFILER_BEGIN;
+    LV_PROFILER_DRAW_BEGIN;
 
-    lv_draw_sw_mask_radius_param_t param;
-    lv_draw_sw_mask_radius_init(&param, &dsc->area, dsc->radius, false);
+    lv_draw_vg_lite_unit_t * u = (lv_draw_vg_lite_unit_t *)t->draw_unit;
 
-    void * masks[2] = {0};
-    masks[0] = &param;
+    lv_vg_lite_path_t * path = lv_vg_lite_path_get(u, VG_LITE_FP32);
+    lv_vg_lite_path_set_bounding_box_area(path, &t->clip_area);
 
-    uint32_t area_w = lv_area_get_width(&draw_area);
-    lv_opa_t * mask_buf = lv_malloc(area_w);
+    /* Nesting cropping regions using rounded rectangles and normal rectangles */
+    lv_vg_lite_path_append_rect(
+        path,
+        dsc->area.x1, dsc->area.y1,
+        lv_area_get_width(&dsc->area), lv_area_get_height(&dsc->area),
+        dsc->radius);
+    lv_vg_lite_path_append_rect(
+        path,
+        t->clip_area.x1, t->clip_area.y1,
+        lv_area_get_width(&t->clip_area), lv_area_get_height(&t->clip_area),
+        0);
+    lv_vg_lite_path_end(path);
 
-    int32_t y;
-    for(y = draw_area.y1; y <= draw_area.y2; y++) {
-        lv_memset(mask_buf, 0xff, area_w);
-        lv_draw_sw_mask_res_t res = lv_draw_sw_mask_apply(masks, mask_buf, draw_area.x1, y, area_w);
-        if(res == LV_DRAW_SW_MASK_RES_FULL_COVER) continue;
+    vg_lite_matrix_t matrix = u->global_matrix;
 
-        lv_layer_t * target_layer = draw_unit->target_layer;
-        lv_color32_t * c32_buf = lv_draw_layer_go_to_xy(target_layer, draw_area.x1 - target_layer->buf_area.x1,
-                                                        y - target_layer->buf_area.y1);
+    /* Use VG_LITE_BLEND_DST_IN (Sa * D) blending mode to make the corners transparent */
+    lv_vg_lite_draw(
+        &u->target_buffer,
+        lv_vg_lite_path_get_path(path),
+        VG_LITE_FILL_EVEN_ODD,
+        &matrix,
+        VG_LITE_BLEND_DST_IN,
+        0);
 
-        if(res == LV_DRAW_SW_MASK_RES_TRANSP) {
-            lv_memzero(c32_buf, area_w * sizeof(lv_color32_t));
-        }
-        else {
-            uint32_t i;
-            for(i = 0; i < area_w; i++) {
-                if(mask_buf[i] != LV_OPA_COVER) {
-                    c32_buf[i].alpha = LV_OPA_MIX2(c32_buf[i].alpha, mask_buf[i]);
-                }
+    lv_vg_lite_path_drop(u, path);
 
-                /*Pre-multiply the alpha*/
-                lv_color_premultiply(&c32_buf[i]);
-            }
-        }
-    }
-
-    lv_free(mask_buf);
-    lv_draw_sw_mask_free_param(&param);
-
-    LV_PROFILER_END;
+    LV_PROFILER_DRAW_END;
 }
 
 /**********************

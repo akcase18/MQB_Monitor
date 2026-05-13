@@ -4,7 +4,7 @@
 static void event_handler(lv_event_t * e)
 {
     lv_event_code_t code = lv_event_get_code(e);
-    lv_obj_t * obj = lv_event_get_target(e);
+    lv_obj_t * obj = lv_event_get_target_obj(e);
     if(code == LV_EVENT_VALUE_CHANGED) {
         uint32_t id = lv_buttonmatrix_get_selected_button(obj);
         const char * txt = lv_buttonmatrix_get_button_text(obj, id);
@@ -18,6 +18,19 @@ static const char * btnm_map[] = {"1", "2", "3", "4", "5", "\n",
                                   "Action1", "Action2", ""
                                  };
 
+/**
+ * @title Numeric keypad with action row
+ * @brief A 3-row button matrix with a checkable Action1 button and a checked Action2 button.
+ *
+ * `lv_buttonmatrix_set_map` lays out digits `1` through `0` on two rows and
+ * `Action1`/`Action2` on a third, where the newline strings split the rows.
+ * `Action1` is made twice as wide as `Action2` via
+ * `lv_buttonmatrix_set_button_width` and marked
+ * `LV_BUTTONMATRIX_CTRL_CHECKABLE`; `Action2` starts in the
+ * `LV_BUTTONMATRIX_CTRL_CHECKED` state. The callback subscribes to
+ * `LV_EVENT_ALL` and logs the text of the button that fired
+ * `LV_EVENT_VALUE_CHANGED`.
+ */
 void lv_example_buttonmatrix_1(void)
 {
     lv_obj_t * btnm1 = lv_buttonmatrix_create(lv_screen_active());

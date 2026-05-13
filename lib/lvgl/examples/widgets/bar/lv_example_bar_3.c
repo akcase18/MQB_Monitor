@@ -3,11 +3,18 @@
 
 static void set_temp(void * bar, int32_t temp)
 {
-    lv_bar_set_value(bar, temp, LV_ANIM_ON);
+    lv_bar_set_value((lv_obj_t *)bar, temp, LV_ANIM_ON);
 }
 
 /**
- * A temperature meter example
+ * @title Vertical gradient temperature meter
+ * @brief A tall bar ranged from -20 to 40 that animates endlessly between the extremes.
+ *
+ * A 20 x 200 vertical bar is centered on the active screen and given an
+ * `LV_PART_INDICATOR` style with a red-to-blue `LV_GRAD_DIR_VER` gradient.
+ * `lv_bar_set_range` maps the values to -20 through 40, and an `lv_anim_t`
+ * sweeps `lv_bar_set_value` from -20 to 40 over 3000 ms with a matching
+ * reverse duration, repeating with `LV_ANIM_REPEAT_INFINITE`.
  */
 void lv_example_bar_3(void)
 {
@@ -29,7 +36,7 @@ void lv_example_bar_3(void)
     lv_anim_init(&a);
     lv_anim_set_exec_cb(&a, set_temp);
     lv_anim_set_duration(&a, 3000);
-    lv_anim_set_playback_duration(&a, 3000);
+    lv_anim_set_reverse_duration(&a, 3000);
     lv_anim_set_var(&a, bar);
     lv_anim_set_values(&a, -20, 40);
     lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);

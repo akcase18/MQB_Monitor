@@ -1,7 +1,9 @@
 #if LV_BUILD_TEST
 #include "../lvgl.h"
+#include "../../lvgl_private.h"
 
 #include "unity/unity.h"
+#include <string.h>
 
 const char * read_exp =
     "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam sed maximus orci. Morbi massa nisi, varius eu convallis ac, venenatis at metus. In in nibh id urna pretium feugiat vitae eu libero. Ut eget fringilla eros. Nunc ullamcorper lectus mauris, vel rhoncus velit volutpat et. Phasellus sed molestie massa. Maecenas quis dui sollicitudin, vulputate nunc ut, dictum quam. Nam a congue lorem. Nulla non facilisis sapien. Ut luctus nulla nibh, sed finibus urna porta non. Duis aliquet augue id urna euismod auctor. Integer pellentesque vulputate enim non mattis. Donec finibus mattis dolor, et feugiat nisi pharetra porta. Mauris ullamcorper cursus magna. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus.";
@@ -13,6 +15,9 @@ static void read_random_drv(char drv_letter, uint32_t cache_size);
 void setUp(void)
 {
     /* Function run before every test */
+    lv_test_fs_clear_open_cb(false);
+    lv_test_fs_clear_close_cb(false);
+    lv_test_fs_set_ready(true);
 }
 
 void tearDown(void)
@@ -28,54 +33,59 @@ void test_read(void)
     lv_fs_res_t res;
 
     char cur[512];
-    getcwd(cur, 512);
-    errno = 0;
-    void * a = fopen("src/test_files/readtest.txt", "r");
-    printf("%s, %d, %p\n", cur, errno, a);
-    fclose(a);
+    if(getcwd(cur, 512) != NULL) {
+        errno = 0;
+        void * a = fopen("src/test_files/readtest.txt", "r");
+        printf("%s, %d, %p\n", cur, errno, a);
+        fclose(a);
 
-    /*'A' has cache*/
-    lv_fs_file_t fa;
-    res = lv_fs_open(&fa, "A:src/test_files/readtest.txt", LV_FS_MODE_RD);
-    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
-
-    /*'B' has no cache*/
-    lv_fs_file_t fb;
-    res = lv_fs_open(&fb, "B:src/test_files/readtest.txt", LV_FS_MODE_RD);
-    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
-
-    /*Use an odd size to make sure it's not aligned with the drivier's'cache size*/
-    uint8_t buf[79];
-    uint32_t cnt = 0;
-    uint32_t br = 1;
-    while(br) {
-        res = lv_fs_read(&fa, buf, sizeof(buf), &br);
+        /*'A' has cache*/
+        lv_fs_file_t fa;
+        res = lv_fs_open(&fa, "A:src/test_files/readtest.txt", LV_FS_MODE_RD);
         TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
-        TEST_ASSERT_TRUE(memcmp(buf, read_exp + cnt, br) == 0);
 
-        res = lv_fs_read(&fb, buf, sizeof(buf), &br);
+        /*'B' has no cache*/
+        lv_fs_file_t fb;
+        res = lv_fs_open(&fb, "B:src/test_files/readtest.txt", LV_FS_MODE_RD);
         TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
-        TEST_ASSERT_TRUE(memcmp(buf, read_exp + cnt, br) == 0);
-        cnt += br;
+
+        /*Use an odd size to make sure it's not aligned with the driver's cache size*/
+        uint8_t buf[79];
+        uint32_t cnt = 0;
+        uint32_t br = 1;
+        while(br) {
+            res = lv_fs_read(&fa, buf, sizeof(buf), &br);
+            TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+            TEST_ASSERT_TRUE(memcmp(buf, read_exp + cnt, br) == 0);
+
+            res = lv_fs_read(&fb, buf, sizeof(buf), &br);
+            TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+            TEST_ASSERT_TRUE(memcmp(buf, read_exp + cnt, br) == 0);
+            cnt += br;
+        }
+
+        lv_fs_close(&fa);
+        lv_fs_close(&fb);
     }
-
-    lv_fs_close(&fa);
-    lv_fs_close(&fb);
 }
 
 void test_read_random(void)
 {
     read_random_drv('A', 8);
     read_random_drv('B', 8);
+    read_random_drv('T', 8);
 
     read_random_drv('A', 32);
     read_random_drv('B', 32);
+    read_random_drv('T', 32);
 
     read_random_drv('A', 128);
     read_random_drv('B', 128);
+    read_random_drv('T', 128);
 
     read_random_drv('A', 1024);
     read_random_drv('B', 1024);
+    read_random_drv('T', 1024);
 }
 
 /**
@@ -175,6 +185,497 @@ static void read_random_drv(char drv_letter, uint32_t cache_size)
     TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
 
     drv->cache_size = original_cache_size;
+}
+
+void test_write_read_random(void)
+{
+    lv_fs_drv_t * drv = lv_fs_get_drv('A');
+    uint32_t original_cache_size = drv->cache_size;
+    drv->cache_size = 7;
+
+    /* create the file and reopen for read+write. stdio "rb+" mode requires the file to exist */
+    lv_fs_res_t res;
+    lv_fs_file_t f;
+    res = lv_fs_open(&f, "A:fs_write_read_random.bin", LV_FS_MODE_WR);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+    res = lv_fs_close(&f);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+    res = lv_fs_open(&f, "A:fs_write_read_random.bin", LV_FS_MODE_WR | LV_FS_MODE_RD);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+
+    uint8_t buf1000[1000];
+    for(uint32_t i = 0; i < 1000; i++) buf1000[i] = i;
+    res = lv_fs_write(&f, buf1000, 1000, NULL);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+
+    /**
+     * {{{action, amount}, ... x20 actions per combo}, ... x100 combos}
+     * actions are read (0), write (1), seek (2)
+     * read and write amount ranges from 1 to 20. seek amount ranges from -20 to 20.
+     * seeks occur as frequently as reads+writes combined.
+     */
+    // *INDENT-OFF*
+    static const int8_t actions[100][20][2] = {
+        {{2, -20}, {2, 17}, {0, 20}, {2, 19}, {1, 18}, {1, 4}, {1, 13}, {2, -7}, {1, 6}, {1, 19}, {2, 3}, {1, 12}, {2, 12}, {2, -2}, {2, -20}, {2, -17}, {1, 15}, {2, -17}, {0, 18}, {2, 14}}, {{2, 19}, {2, 17}, {2, -12}, {2, -5}, {2, -1}, {2, -17}, {1, 4}, {2, 19}, {2, 3}, {2, 1}, {2, 10}, {2, 18}, {0, 10}, {2, 8}, {2, 17}, {2, 20}, {0, 5}, {0, 14}, {0, 6}, {1, 8}}, {{0, 1}, {2, -20}, {2, -12}, {1, 9}, {0, 9}, {2, 19}, {1, 8}, {0, 13}, {0, 5}, {2, -7}, {2, -14}, {0, 8}, {2, 13}, {1, 5}, {0, 3}, {0, 16}, {2, 19}, {0, 4}, {1, 6}, {2, -4}}, {{0, 1}, {2, 12}, {1, 7}, {1, 17}, {1, 19}, {0, 8}, {1, 1}, {2, 9}, {2, -14}, {2, 14}, {2, -17}, {2, 11}, {1, 4}, {2, 19}, {2, -18}, {1, 12}, {2, -14}, {0, 9}, {1, 7}, {2, 17}}, {{2, -6}, {0, 13}, {1, 15}, {1, 8}, {2, -1}, {2, 15}, {2, 3}, {2, -16}, {2, -11}, {2, 14}, {2, -19}, {2, 6}, {1, 10}, {1, 6}, {1, 12}, {2, 12}, {0, 10}, {2, 10}, {2, -4}, {2, 5}}, {{2, -6}, {1, 2}, {1, 11}, {1, 19}, {2, 2}, {2, 20}, {2, -19}, {2, -7}, {0, 13}, {2, 4}, {1, 6}, {0, 9}, {0, 6}, {2, -1}, {2, -5}, {2, 14}, {2, 15}, {0, 4}, {0, 6}, {0, 10}}, {{1, 17}, {1, 17}, {0, 15}, {0, 3}, {1, 8}, {2, -9}, {1, 13}, {0, 20}, {0, 3}, {1, 17}, {2, -8}, {2, -1}, {1, 13}, {0, 13}, {0, 8}, {1, 1}, {2, -4}, {2, 13}, {2, 17}, {2, -14}}, {{1, 17}, {1, 13}, {1, 17}, {1, 5}, {1, 3}, {0, 20}, {2, 12}, {0, 13}, {2, 5}, {2, -10}, {2, 10}, {0, 6}, {2, 18}, {0, 17}, {2, 2}, {1, 5}, {2, 16}, {2, -10}, {0, 2}, {2, -9}}, {{2, 7}, {2, -2}, {1, 14}, {0, 15}, {1, 2}, {2, 6}, {2, 11}, {1, 2}, {0, 12}, {2, 9}, {0, 17}, {0, 15}, {2, -19}, {0, 11}, {2, 3}, {2, 15}, {2, 19}, {2, -16}, {1, 6}, {1, 15}}, {{2, 12}, {1, 2}, {2, -4}, {2, -20}, {0, 18}, {2, -16}, {1, 15}, {2, -9}, {2, -7}, {1, 1}, {0, 7}, {0, 18}, {1, 18}, {0, 2}, {2, 17}, {1, 2}, {1, 8}, {1, 18}, {2, -7}, {0, 2}},
+        {{2, 19}, {2, 17}, {2, -7}, {0, 17}, {0, 18}, {1, 4}, {1, 1}, {0, 3}, {2, 4}, {2, -4}, {1, 20}, {0, 1}, {2, 20}, {0, 6}, {2, 10}, {0, 19}, {2, -1}, {0, 7}, {0, 16}, {1, 13}}, {{2, 10}, {2, 13}, {2, 15}, {2, 3}, {2, 12}, {0, 14}, {2, 6}, {2, 14}, {2, -13}, {2, 18}, {0, 19}, {2, -8}, {2, -9}, {0, 12}, {2, -20}, {2, -6}, {2, 15}, {2, 18}, {1, 18}, {1, 10}}, {{0, 15}, {2, -6}, {2, 17}, {1, 7}, {0, 9}, {0, 11}, {0, 12}, {0, 20}, {2, -1}, {2, -8}, {0, 13}, {2, 19}, {1, 3}, {0, 18}, {1, 13}, {2, 12}, {2, 13}, {1, 5}, {2, -14}, {2, 18}}, {{0, 6}, {1, 4}, {1, 6}, {0, 2}, {2, 8}, {1, 9}, {2, 20}, {0, 9}, {2, -1}, {2, 5}, {0, 18}, {2, 8}, {2, 12}, {2, -14}, {0, 18}, {1, 1}, {2, -15}, {2, 14}, {2, -11}, {2, -2}}, {{1, 4}, {2, 6}, {2, 18}, {1, 19}, {0, 18}, {0, 19}, {0, 14}, {0, 12}, {2, 3}, {0, 19}, {2, -20}, {0, 8}, {2, -15}, {2, -15}, {0, 8}, {1, 17}, {2, 2}, {1, 14}, {0, 11}, {0, 13}}, {{2, -10}, {2, -8}, {1, 18}, {1, 11}, {1, 5}, {0, 2}, {2, -19}, {2, -9}, {1, 5}, {2, -1}, {2, 2}, {1, 5}, {0, 9}, {0, 17}, {2, 2}, {0, 10}, {1, 12}, {1, 10}, {0, 8}, {2, -13}}, {{0, 13}, {1, 5}, {2, -1}, {2, -16}, {2, 2}, {0, 6}, {2, -11}, {0, 5}, {2, 5}, {2, -6}, {2, -6}, {1, 19}, {0, 8}, {2, -16}, {2, 14}, {0, 11}, {0, 14}, {0, 18}, {0, 14}, {2, 1}}, {{2, 3}, {2, -2}, {0, 10}, {1, 1}, {0, 10}, {2, -15}, {2, 19}, {2, 2}, {1, 15}, {1, 10}, {2, -18}, {0, 20}, {0, 10}, {2, 3}, {1, 13}, {0, 8}, {0, 16}, {0, 14}, {2, 13}, {2, -7}}, {{0, 4}, {1, 7}, {0, 2}, {0, 15}, {0, 20}, {1, 9}, {0, 14}, {2, 18}, {0, 1}, {0, 4}, {2, -17}, {1, 10}, {1, 15}, {0, 2}, {2, -6}, {2, 4}, {2, 4}, {2, 17}, {2, -13}, {1, 20}}, {{1, 8}, {0, 20}, {2, 4}, {1, 6}, {2, -19}, {1, 4}, {0, 5}, {1, 8}, {1, 17}, {2, -4}, {2, 14}, {1, 10}, {2, 7}, {1, 18}, {2, 17}, {1, 6}, {0, 20}, {2, 1}, {2, -12}, {2, 18}},
+        {{2, -7}, {1, 12}, {2, 4}, {2, 14}, {0, 13}, {1, 17}, {2, -2}, {2, -9}, {2, -13}, {1, 4}, {2, 4}, {1, 5}, {0, 15}, {2, -11}, {2, 3}, {2, 1}, {2, -11}, {2, 11}, {2, -11}, {0, 4}}, {{1, 7}, {2, 20}, {0, 6}, {0, 9}, {1, 2}, {0, 11}, {2, 4}, {2, -19}, {0, 17}, {2, -7}, {0, 20}, {0, 10}, {1, 11}, {1, 20}, {1, 6}, {2, 14}, {0, 11}, {0, 19}, {2, 4}, {1, 8}}, {{0, 9}, {2, -3}, {1, 17}, {2, 14}, {2, 3}, {1, 19}, {2, 17}, {0, 18}, {2, 16}, {0, 9}, {2, -15}, {1, 14}, {2, 11}, {2, -7}, {0, 17}, {2, 12}, {2, 6}, {2, 9}, {0, 7}, {1, 3}}, {{0, 1}, {2, 13}, {1, 19}, {0, 19}, {2, 6}, {2, -14}, {2, 8}, {2, -18}, {2, 4}, {2, -7}, {0, 12}, {2, 15}, {1, 3}, {2, -19}, {2, 15}, {2, -2}, {1, 19}, {1, 18}, {1, 19}, {0, 16}}, {{2, 7}, {2, 14}, {2, 14}, {2, -19}, {0, 1}, {2, -5}, {0, 17}, {2, 2}, {2, 15}, {1, 13}, {0, 20}, {0, 12}, {2, 20}, {0, 9}, {2, -8}, {0, 14}, {1, 19}, {2, -15}, {2, 17}, {2, -12}}, {{0, 16}, {2, -7}, {2, -4}, {1, 11}, {1, 17}, {2, -14}, {0, 16}, {2, 6}, {1, 19}, {2, 17}, {2, 10}, {2, -12}, {2, -17}, {1, 4}, {2, -14}, {2, -7}, {2, -17}, {2, -1}, {2, -16}, {1, 8}}, {{0, 5}, {0, 15}, {2, 4}, {2, 20}, {2, 7}, {2, 3}, {2, 17}, {0, 8}, {0, 18}, {2, -18}, {1, 1}, {0, 15}, {2, -4}, {0, 13}, {1, 11}, {0, 4}, {2, 11}, {1, 11}, {1, 10}, {2, -9}}, {{2, -5}, {2, -16}, {1, 2}, {1, 17}, {2, 9}, {2, -2}, {0, 7}, {0, 14}, {2, -10}, {0, 6}, {1, 14}, {1, 15}, {2, 12}, {2, 11}, {2, -9}, {2, -10}, {2, -14}, {2, 9}, {0, 13}, {2, 5}}, {{2, 8}, {2, -16}, {2, 20}, {1, 8}, {1, 2}, {2, -5}, {2, -20}, {1, 2}, {1, 4}, {1, 9}, {0, 19}, {2, -18}, {0, 6}, {0, 13}, {1, 5}, {2, 2}, {0, 4}, {1, 19}, {2, 15}, {1, 12}}, {{2, -8}, {0, 16}, {1, 10}, {2, 5}, {2, -16}, {0, 3}, {2, 5}, {0, 6}, {1, 17}, {2, 1}, {2, 13}, {0, 3}, {0, 6}, {0, 6}, {0, 19}, {1, 13}, {2, 19}, {2, 5}, {1, 16}, {2, 5}},
+        {{2, -19}, {2, -1}, {0, 19}, {2, -3}, {2, 13}, {2, -12}, {0, 2}, {2, -20}, {2, 15}, {2, -9}, {2, -2}, {2, 13}, {2, -6}, {0, 2}, {1, 6}, {2, -1}, {0, 12}, {0, 20}, {2, -14}, {1, 2}}, {{1, 9}, {2, -14}, {2, -2}, {2, -13}, {0, 3}, {1, 6}, {2, 20}, {2, 11}, {2, 17}, {2, 5}, {0, 5}, {1, 1}, {2, -9}, {1, 8}, {2, -2}, {0, 18}, {2, -8}, {1, 11}, {2, 6}, {1, 7}}, {{2, 17}, {2, 14}, {2, 16}, {1, 20}, {2, -1}, {2, -7}, {1, 3}, {1, 14}, {0, 1}, {0, 18}, {2, -14}, {0, 10}, {0, 18}, {2, 19}, {1, 13}, {2, -16}, {1, 17}, {1, 1}, {2, -13}, {0, 13}}, {{2, -2}, {0, 14}, {0, 12}, {2, -8}, {1, 16}, {0, 18}, {2, 5}, {2, 13}, {1, 14}, {2, -4}, {2, 16}, {2, -16}, {2, 16}, {1, 18}, {2, 15}, {2, 4}, {2, -5}, {1, 7}, {2, -20}, {2, -9}}, {{2, 18}, {2, 2}, {2, 5}, {0, 4}, {2, 17}, {2, -15}, {2, 8}, {2, -11}, {1, 8}, {2, -6}, {2, -13}, {0, 5}, {0, 18}, {0, 15}, {2, -8}, {2, -15}, {1, 1}, {2, 4}, {2, -9}, {2, 14}}, {{2, -1}, {2, 1}, {1, 12}, {0, 9}, {2, -11}, {1, 4}, {1, 11}, {1, 5}, {0, 12}, {2, -7}, {1, 1}, {0, 6}, {0, 15}, {2, -10}, {2, -18}, {2, -12}, {0, 3}, {2, 2}, {2, -17}, {2, 1}}, {{2, -5}, {2, 18}, {1, 2}, {2, 14}, {2, 20}, {0, 13}, {0, 11}, {0, 6}, {2, -7}, {2, 13}, {1, 13}, {2, -1}, {1, 12}, {2, -9}, {2, 3}, {1, 6}, {2, -16}, {0, 6}, {0, 9}, {2, -14}}, {{1, 6}, {2, 7}, {2, -13}, {0, 5}, {1, 4}, {0, 15}, {2, 18}, {2, -4}, {2, 16}, {1, 1}, {2, 17}, {0, 2}, {1, 12}, {0, 17}, {1, 18}, {1, 5}, {1, 8}, {1, 4}, {2, -9}, {1, 9}}, {{0, 20}, {1, 10}, {2, 20}, {2, 13}, {0, 18}, {0, 10}, {1, 3}, {0, 8}, {2, -16}, {2, -16}, {2, -2}, {0, 20}, {2, -19}, {2, -11}, {1, 17}, {1, 18}, {1, 5}, {0, 6}, {2, -9}, {1, 8}}, {{0, 18}, {0, 19}, {2, 16}, {2, -14}, {1, 7}, {1, 9}, {0, 16}, {0, 16}, {1, 17}, {0, 14}, {2, -16}, {1, 6}, {1, 11}, {2, 7}, {1, 19}, {1, 11}, {2, -14}, {0, 7}, {1, 12}, {0, 2}},
+        {{2, 3}, {2, -15}, {0, 13}, {2, -3}, {0, 16}, {1, 18}, {0, 11}, {0, 16}, {1, 13}, {2, -18}, {1, 14}, {2, 11}, {0, 11}, {2, -14}, {2, -19}, {0, 2}, {2, -7}, {0, 5}, {0, 20}, {2, -7}}, {{2, 9}, {2, 5}, {2, 7}, {0, 15}, {2, 4}, {0, 5}, {2, -17}, {2, 16}, {2, 8}, {0, 11}, {0, 1}, {1, 8}, {2, -5}, {1, 1}, {2, 4}, {2, -4}, {2, -17}, {0, 5}, {1, 10}, {0, 5}}, {{0, 11}, {1, 16}, {1, 18}, {0, 5}, {2, -13}, {0, 5}, {1, 13}, {1, 10}, {1, 11}, {0, 5}, {1, 9}, {1, 4}, {1, 19}, {2, 1}, {1, 19}, {1, 18}, {1, 8}, {2, 2}, {2, -5}, {1, 4}}, {{0, 12}, {1, 16}, {2, -1}, {1, 10}, {1, 10}, {2, -19}, {2, -20}, {1, 17}, {1, 19}, {1, 4}, {2, 12}, {0, 1}, {2, -15}, {2, -1}, {2, -10}, {2, -19}, {0, 18}, {0, 6}, {2, 18}, {0, 18}}, {{1, 10}, {0, 13}, {2, 3}, {0, 20}, {0, 19}, {0, 5}, {0, 9}, {0, 5}, {0, 20}, {0, 9}, {2, 16}, {1, 11}, {0, 12}, {2, -17}, {0, 20}, {0, 14}, {1, 17}, {2, 15}, {1, 7}, {2, -1}}, {{2, -10}, {2, 1}, {0, 2}, {2, -11}, {2, -17}, {2, -10}, {1, 9}, {2, -6}, {2, -19}, {1, 14}, {0, 4}, {1, 6}, {2, -9}, {2, 3}, {1, 2}, {2, 19}, {1, 15}, {0, 7}, {0, 4}, {2, 2}}, {{1, 12}, {2, -8}, {2, 13}, {2, -19}, {0, 17}, {0, 20}, {1, 3}, {1, 15}, {1, 20}, {2, 17}, {0, 12}, {2, -2}, {1, 8}, {2, -12}, {0, 11}, {2, 17}, {1, 14}, {1, 13}, {2, 2}, {2, 3}}, {{0, 13}, {1, 13}, {2, -4}, {1, 17}, {1, 1}, {1, 5}, {0, 10}, {1, 12}, {0, 9}, {2, -16}, {0, 13}, {2, 19}, {2, 9}, {1, 18}, {2, -1}, {2, -14}, {0, 5}, {1, 2}, {0, 20}, {2, -19}}, {{1, 7}, {2, 19}, {2, 11}, {2, -16}, {1, 19}, {2, -14}, {0, 7}, {1, 10}, {2, 8}, {0, 12}, {1, 12}, {2, -11}, {2, 6}, {2, -16}, {2, 15}, {1, 20}, {2, -12}, {1, 7}, {2, -16}, {2, 7}}, {{0, 8}, {2, 19}, {1, 12}, {2, -12}, {2, 4}, {1, 10}, {1, 13}, {2, 2}, {2, -14}, {2, -10}, {2, 18}, {1, 16}, {0, 10}, {2, 19}, {2, -1}, {1, 17}, {2, -1}, {0, 14}, {1, 11}, {0, 18}},
+        {{2, 2}, {2, -2}, {2, 12}, {0, 7}, {0, 14}, {2, -15}, {2, 13}, {2, -3}, {0, 1}, {2, -2}, {1, 2}, {2, 4}, {2, 4}, {2, 16}, {1, 4}, {2, 1}, {1, 9}, {1, 6}, {1, 12}, {1, 11}}, {{2, -10}, {1, 16}, {1, 12}, {0, 18}, {2, -13}, {0, 19}, {2, 15}, {0, 11}, {0, 2}, {0, 4}, {0, 7}, {0, 10}, {2, -10}, {2, 11}, {0, 13}, {0, 10}, {2, -14}, {2, -18}, {0, 7}, {2, 16}}, {{2, -19}, {2, -5}, {1, 9}, {0, 15}, {2, 4}, {2, -14}, {1, 13}, {2, 10}, {2, -7}, {2, 14}, {2, 8}, {2, 9}, {0, 14}, {2, -4}, {1, 2}, {1, 19}, {0, 18}, {2, 18}, {1, 6}, {2, -6}}, {{2, -15}, {2, 1}, {0, 8}, {1, 5}, {2, -11}, {2, -3}, {0, 19}, {0, 4}, {1, 19}, {1, 2}, {1, 2}, {0, 3}, {0, 16}, {2, -3}, {2, 18}, {1, 20}, {2, -16}, {2, -2}, {2, -17}, {1, 15}}, {{1, 19}, {2, -11}, {1, 13}, {0, 14}, {1, 18}, {2, 11}, {2, 13}, {2, -14}, {1, 5}, {2, -6}, {0, 4}, {2, 19}, {0, 12}, {1, 4}, {2, -6}, {2, 8}, {2, 9}, {2, -10}, {2, -3}, {2, -19}}, {{2, 7}, {2, -9}, {2, 5}, {2, 12}, {2, -20}, {2, -3}, {2, -12}, {2, 5}, {0, 6}, {2, 15}, {1, 8}, {1, 9}, {2, 18}, {2, -14}, {2, 10}, {1, 5}, {1, 2}, {0, 14}, {2, 14}, {0, 19}}, {{2, 12}, {0, 9}, {0, 14}, {1, 4}, {2, 4}, {2, -8}, {2, 4}, {0, 13}, {1, 10}, {2, 18}, {2, 13}, {2, 15}, {1, 18}, {2, 7}, {2, -18}, {2, 18}, {1, 9}, {2, -9}, {0, 16}, {2, -14}}, {{0, 16}, {2, 9}, {2, 7}, {1, 6}, {0, 14}, {2, -18}, {1, 14}, {1, 2}, {0, 10}, {1, 6}, {0, 10}, {2, 2}, {1, 1}, {0, 19}, {1, 6}, {2, -3}, {2, 3}, {2, 12}, {2, 5}, {1, 18}}, {{2, -17}, {0, 17}, {0, 5}, {2, 18}, {2, 8}, {0, 14}, {0, 10}, {1, 20}, {2, 7}, {1, 10}, {1, 14}, {1, 10}, {0, 11}, {1, 15}, {0, 16}, {1, 14}, {0, 3}, {2, 16}, {2, -5}, {2, -4}}, {{1, 15}, {2, -9}, {0, 11}, {0, 16}, {2, 1}, {0, 12}, {0, 7}, {0, 16}, {2, 14}, {0, 3}, {1, 11}, {2, 4}, {1, 6}, {2, -1}, {1, 20}, {1, 13}, {0, 2}, {2, -12}, {0, 9}, {2, 8}},
+        {{0, 1}, {2, -4}, {0, 19}, {2, -15}, {2, -16}, {2, -10}, {2, 7}, {0, 10}, {2, -6}, {2, -8}, {2, -3}, {2, 18}, {1, 20}, {2, 10}, {1, 18}, {2, -3}, {0, 7}, {2, 3}, {2, 14}, {2, 15}}, {{1, 17}, {0, 7}, {1, 17}, {2, -8}, {2, -12}, {2, -9}, {2, 15}, {0, 10}, {1, 10}, {2, -6}, {2, -20}, {1, 17}, {2, -9}, {1, 15}, {1, 3}, {1, 8}, {0, 1}, {1, 13}, {2, -5}, {0, 14}}, {{2, 8}, {0, 11}, {0, 12}, {2, 5}, {2, -4}, {2, -5}, {2, -2}, {0, 20}, {2, -4}, {1, 1}, {1, 2}, {0, 4}, {2, 14}, {1, 17}, {2, -13}, {1, 13}, {2, 12}, {2, 20}, {2, 14}, {2, -9}}, {{2, -20}, {2, 13}, {1, 20}, {2, 20}, {2, 9}, {0, 16}, {2, 1}, {0, 13}, {2, 17}, {2, 8}, {2, 13}, {2, -3}, {2, -1}, {2, -19}, {2, 1}, {1, 16}, {2, -16}, {0, 6}, {2, 2}, {1, 8}}, {{1, 4}, {1, 9}, {1, 8}, {2, -12}, {0, 4}, {1, 8}, {0, 9}, {2, -2}, {2, -19}, {2, 2}, {2, -1}, {0, 14}, {2, 4}, {2, -17}, {0, 1}, {2, 4}, {2, -20}, {2, 3}, {0, 7}, {1, 4}}, {{0, 6}, {2, -5}, {1, 13}, {2, 15}, {2, 11}, {0, 7}, {1, 17}, {2, 9}, {1, 14}, {2, -7}, {2, 12}, {2, -18}, {0, 19}, {2, -1}, {2, 14}, {2, 5}, {2, -16}, {1, 2}, {2, -2}, {0, 17}}, {{1, 11}, {2, 4}, {2, 7}, {1, 16}, {2, 14}, {0, 14}, {2, 16}, {1, 11}, {1, 10}, {2, -3}, {2, -10}, {1, 7}, {2, 9}, {0, 19}, {2, 1}, {0, 7}, {1, 11}, {0, 9}, {2, -16}, {1, 8}}, {{0, 10}, {0, 4}, {2, -8}, {2, 20}, {2, 16}, {2, 5}, {0, 16}, {1, 6}, {2, 2}, {2, 14}, {2, 11}, {1, 15}, {2, -10}, {2, -5}, {0, 4}, {0, 4}, {2, -13}, {2, 11}, {0, 13}, {0, 11}}, {{0, 6}, {1, 4}, {2, 15}, {2, 17}, {1, 1}, {2, -20}, {1, 18}, {0, 19}, {2, -12}, {2, 1}, {2, -15}, {2, -11}, {1, 19}, {0, 13}, {1, 2}, {0, 17}, {2, 14}, {0, 14}, {2, 12}, {0, 19}}, {{2, -16}, {1, 20}, {2, -14}, {1, 7}, {2, -13}, {2, 19}, {2, 20}, {2, -14}, {1, 17}, {2, 20}, {1, 2}, {2, -19}, {2, -17}, {2, 18}, {2, 6}, {1, 17}, {2, 7}, {0, 8}, {1, 20}, {2, 9}},
+        {{2, 20}, {2, 17}, {2, 15}, {1, 13}, {0, 7}, {2, -6}, {0, 8}, {2, -17}, {1, 15}, {2, -20}, {0, 17}, {2, -17}, {0, 12}, {1, 14}, {2, -8}, {2, -17}, {0, 12}, {2, -3}, {2, -13}, {0, 7}}, {{0, 3}, {2, 12}, {2, 4}, {0, 13}, {0, 15}, {1, 4}, {2, 7}, {2, -20}, {0, 4}, {0, 6}, {0, 12}, {2, 10}, {2, -13}, {0, 20}, {2, -11}, {0, 16}, {2, -13}, {2, -5}, {1, 14}, {0, 7}}, {{2, 16}, {1, 11}, {2, -1}, {0, 9}, {0, 19}, {2, 9}, {2, 6}, {1, 15}, {2, 2}, {2, 8}, {1, 3}, {2, 20}, {2, -18}, {2, -15}, {2, -20}, {0, 10}, {1, 9}, {2, 5}, {2, -17}, {2, 14}}, {{2, -15}, {2, -10}, {2, -18}, {1, 20}, {1, 4}, {0, 18}, {1, 10}, {2, 19}, {2, -9}, {2, 20}, {0, 1}, {0, 11}, {2, -18}, {2, 5}, {1, 15}, {0, 10}, {2, -14}, {2, 6}, {0, 17}, {0, 3}}, {{1, 18}, {1, 5}, {0, 11}, {2, 11}, {0, 13}, {1, 5}, {0, 19}, {2, 20}, {1, 10}, {2, 19}, {0, 13}, {0, 7}, {2, 1}, {2, 14}, {1, 19}, {0, 9}, {1, 17}, {2, 18}, {0, 11}, {1, 9}}, {{2, -17}, {2, 10}, {2, -19}, {2, -18}, {2, 6}, {0, 9}, {0, 20}, {1, 7}, {2, -14}, {2, -11}, {0, 14}, {1, 1}, {0, 13}, {0, 2}, {2, 3}, {0, 2}, {2, 11}, {2, 10}, {2, 12}, {2, -4}}, {{2, 13}, {1, 14}, {2, 7}, {1, 12}, {2, -9}, {2, -4}, {2, -8}, {2, 13}, {0, 3}, {1, 20}, {2, 2}, {2, 5}, {0, 19}, {0, 10}, {2, 14}, {2, -15}, {1, 5}, {2, 18}, {2, -8}, {2, 6}}, {{1, 5}, {1, 9}, {1, 19}, {2, 19}, {0, 13}, {2, 2}, {2, 12}, {2, 17}, {2, -16}, {0, 12}, {0, 9}, {1, 17}, {0, 13}, {2, 7}, {1, 7}, {2, 14}, {0, 12}, {0, 7}, {2, -16}, {1, 7}}, {{2, 15}, {0, 9}, {1, 3}, {0, 4}, {2, -3}, {0, 12}, {2, 9}, {0, 6}, {1, 16}, {0, 10}, {2, -6}, {1, 20}, {2, 11}, {2, -3}, {2, -6}, {0, 15}, {0, 14}, {0, 11}, {2, -19}, {2, -14}}, {{0, 12}, {2, 8}, {1, 20}, {2, 18}, {2, 3}, {2, 2}, {2, 4}, {2, 7}, {2, -19}, {2, -9}, {2, 2}, {0, 19}, {0, 11}, {2, -9}, {0, 9}, {2, -14}, {1, 13}, {0, 2}, {0, 1}, {2, -19}},
+        {{2, -4}, {1, 6}, {0, 18}, {2, 4}, {1, 12}, {0, 17}, {2, 10}, {2, 13}, {2, 10}, {1, 10}, {2, -1}, {2, -11}, {2, -15}, {2, -5}, {2, -16}, {2, -12}, {0, 2}, {2, -10}, {2, 15}, {1, 2}}, {{2, -9}, {2, -14}, {1, 4}, {0, 5}, {2, -9}, {0, 7}, {0, 9}, {1, 16}, {1, 10}, {2, -14}, {0, 7}, {2, -18}, {0, 19}, {1, 3}, {1, 7}, {2, -19}, {2, 14}, {0, 9}, {1, 7}, {2, -5}}, {{2, 16}, {0, 13}, {2, 20}, {2, -9}, {0, 20}, {2, 20}, {0, 5}, {0, 6}, {1, 4}, {2, -11}, {0, 14}, {0, 9}, {2, 18}, {0, 14}, {0, 12}, {2, 16}, {2, 8}, {2, -13}, {1, 9}, {1, 3}}, {{2, 1}, {2, 13}, {2, -8}, {0, 9}, {2, -16}, {0, 12}, {0, 12}, {2, 19}, {2, -10}, {2, 1}, {2, -20}, {1, 10}, {0, 18}, {2, -15}, {2, -15}, {1, 15}, {0, 15}, {0, 1}, {2, -5}, {0, 19}}, {{2, 6}, {2, 15}, {2, -20}, {1, 20}, {2, 3}, {2, 7}, {1, 1}, {0, 5}, {0, 4}, {2, 8}, {1, 19}, {2, -3}, {2, 18}, {1, 10}, {0, 11}, {2, -19}, {0, 3}, {2, 5}, {1, 4}, {0, 6}}, {{0, 5}, {2, -17}, {1, 1}, {0, 1}, {2, -9}, {0, 8}, {2, -10}, {2, -4}, {0, 13}, {2, 19}, {0, 6}, {2, 9}, {2, 14}, {2, 11}, {0, 16}, {2, 13}, {1, 1}, {2, 9}, {2, 14}, {0, 18}}, {{0, 10}, {1, 12}, {1, 4}, {2, -12}, {2, 7}, {0, 5}, {1, 15}, {2, 7}, {2, 17}, {1, 18}, {2, 3}, {0, 12}, {1, 8}, {1, 13}, {2, -17}, {1, 20}, {0, 18}, {1, 12}, {1, 16}, {0, 16}}, {{2, -10}, {2, -1}, {2, 10}, {1, 4}, {2, -12}, {1, 19}, {2, 18}, {2, -15}, {2, -5}, {1, 11}, {2, -7}, {0, 20}, {2, -12}, {2, -12}, {1, 11}, {2, 8}, {2, 2}, {2, -2}, {2, -4}, {2, 19}}, {{2, 5}, {1, 15}, {1, 18}, {2, 20}, {1, 4}, {0, 7}, {2, -8}, {2, 1}, {2, -6}, {2, 8}, {1, 1}, {2, 12}, {1, 15}, {0, 16}, {1, 13}, {0, 1}, {0, 19}, {0, 20}, {2, -3}, {0, 12}}, {{1, 18}, {2, -4}, {1, 8}, {2, 19}, {1, 11}, {0, 12}, {0, 20}, {2, 4}, {1, 12}, {0, 17}, {2, 8}, {1, 5}, {2, -13}, {1, 3}, {1, 14}, {1, 4}, {0, 20}, {1, 18}, {0, 7}, {0, 17}},
+        {{2, 14}, {2, 10}, {2, -12}, {2, -15}, {1, 3}, {2, -17}, {1, 12}, {2, 9}, {2, -9}, {0, 11}, {2, 12}, {0, 16}, {0, 13}, {2, -17}, {2, 13}, {2, 11}, {1, 13}, {2, 16}, {0, 14}, {2, -8}}, {{0, 16}, {2, -10}, {1, 12}, {1, 12}, {2, 19}, {1, 5}, {2, 1}, {2, 19}, {0, 17}, {2, -19}, {2, 20}, {0, 7}, {1, 11}, {2, -3}, {2, -19}, {2, -20}, {2, 15}, {2, -18}, {2, 11}, {2, -19}}, {{2, -11}, {2, 10}, {0, 10}, {1, 15}, {1, 1}, {2, 7}, {2, -9}, {2, -3}, {0, 2}, {0, 20}, {0, 1}, {2, 14}, {2, -16}, {1, 14}, {0, 19}, {0, 11}, {2, 4}, {2, -9}, {2, -4}, {2, -10}}, {{2, 2}, {2, 17}, {1, 7}, {0, 18}, {0, 12}, {2, -15}, {2, 18}, {1, 7}, {1, 3}, {2, 14}, {1, 19}, {1, 6}, {2, -19}, {2, 9}, {0, 11}, {1, 13}, {2, -13}, {0, 19}, {1, 15}, {0, 14}}, {{2, 14}, {1, 3}, {2, 4}, {0, 14}, {1, 8}, {2, 7}, {0, 16}, {1, 11}, {2, 11}, {1, 13}, {1, 6}, {2, -10}, {0, 17}, {1, 18}, {1, 1}, {2, -11}, {1, 9}, {0, 16}, {2, 5}, {2, -6}}, {{0, 11}, {2, -2}, {1, 7}, {2, 8}, {2, 20}, {0, 7}, {0, 14}, {2, -17}, {2, 14}, {2, -14}, {2, -16}, {2, -12}, {2, -19}, {2, 10}, {2, -8}, {1, 1}, {1, 14}, {0, 5}, {0, 14}, {2, 14}}, {{2, 10}, {2, 18}, {1, 15}, {1, 15}, {2, 10}, {2, 14}, {1, 15}, {2, -16}, {2, -4}, {2, -1}, {2, -20}, {2, 2}, {1, 6}, {0, 2}, {2, -17}, {0, 13}, {2, -8}, {2, 18}, {2, 9}, {2, -12}}, {{2, -7}, {1, 16}, {2, 15}, {1, 14}, {1, 15}, {0, 8}, {1, 19}, {2, -13}, {2, 17}, {2, 4}, {2, -17}, {2, -2}, {0, 8}, {1, 11}, {2, 14}, {0, 13}, {2, -12}, {2, -1}, {2, -5}, {0, 6}}, {{0, 2}, {2, -1}, {2, -15}, {1, 9}, {0, 17}, {0, 8}, {2, 19}, {0, 5}, {1, 16}, {2, 3}, {1, 17}, {2, -8}, {2, -1}, {2, -4}, {2, -16}, {0, 4}, {2, -8}, {2, 14}, {2, -20}, {2, -15}}, {{0, 5}, {0, 20}, {1, 13}, {0, 13}, {2, 18}, {1, 19}, {0, 7}, {0, 13}, {2, -7}, {2, 11}, {0, 16}, {1, 6}, {2, -19}, {2, 6}, {1, 18}, {2, 4}, {2, -7}, {2, -8}, {2, 20}, {0, 19}}
+    };
+    // *INDENT-ON*
+
+    uint8_t buf[20];
+    uint8_t n = 0;
+    uint32_t bres = 0;
+    for(uint32_t i = 0; i < 100; i++) {
+        /* bring the pos back to the middle of the file */
+        int32_t pos = 500;
+        res = lv_fs_seek(&f, pos, LV_FS_SEEK_SET);
+        TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+        for(uint32_t j = 0; j < 20; j++) {
+            int8_t action = actions[i][j][0];
+            int8_t amount = actions[i][j][1];
+            switch(action) {
+                case 0: /* read */
+                    res = lv_fs_read(&f, buf, amount, &bres);
+                    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+                    TEST_ASSERT_EQUAL(amount, bres);
+                    TEST_ASSERT(0 == memcmp(buf, buf1000 + pos, amount));
+                    pos += amount;
+                    break;
+                case 1: /* write */
+                    for(int32_t k = 0; k < amount; k++) {
+                        buf[k] = n;
+                        buf1000[pos + k] = n;
+                        n++;
+                    }
+                    res = lv_fs_write(&f, buf, amount, &bres);
+                    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+                    TEST_ASSERT_EQUAL(amount, bres);
+                    pos += amount;
+                    break;
+                case 2: /* seek */
+                    pos += amount; /* amount may be negative */
+                    res = lv_fs_seek(&f, pos, LV_FS_SEEK_SET);
+                    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+                    break;
+            }
+        }
+    }
+
+    /* test SEEK_END */
+    uint32_t tell_pos;
+    res = lv_fs_seek(&f, 0, LV_FS_SEEK_END);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+    res = lv_fs_tell(&f, &tell_pos);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+    TEST_ASSERT_EQUAL(tell_pos, 1000);
+
+    res = lv_fs_close(&f);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+
+    drv->cache_size = original_cache_size;
+}
+
+void test_fs_is_ready(void)
+{
+    lv_test_fs_set_ready(true);
+    TEST_ASSERT_TRUE(lv_fs_is_ready('T'));
+    lv_test_fs_set_ready(false);
+    TEST_ASSERT_FALSE(lv_fs_is_ready('T'));
+    TEST_ASSERT_FALSE(lv_fs_is_ready('Z'));
+}
+
+void test_fs_open(void)
+{
+    /*'T' has cache*/
+    lv_fs_file_t fa;
+    lv_fs_res_t res;
+    res = lv_fs_open(&fa, NULL, LV_FS_MODE_RD);
+    TEST_ASSERT_EQUAL(LV_FS_RES_INV_PARAM, res);
+
+    lv_test_fs_set_ready(false);
+    res = lv_fs_open(&fa, "T:src/test_files/readtest.txt", LV_FS_MODE_RD);
+    TEST_ASSERT_EQUAL(LV_FS_RES_HW_ERR, res);
+
+    lv_test_fs_clear_open_cb(true);
+    lv_test_fs_set_ready(true);
+    res = lv_fs_open(&fa, "T:src/test_files/readtest.txt", LV_FS_MODE_RD);
+    TEST_ASSERT_EQUAL(LV_FS_RES_NOT_IMP, res);
+}
+
+void test_fs_close(void)
+{
+    lv_fs_file_t fa = {0};
+    TEST_ASSERT_EQUAL(LV_FS_RES_INV_PARAM, lv_fs_close(&fa));
+
+    lv_test_fs_clear_close_cb(true);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, lv_fs_open(&fa, "T:src/test_files/readtest.txt", LV_FS_MODE_RD));
+    TEST_ASSERT_EQUAL(LV_FS_RES_NOT_IMP, lv_fs_close(&fa));
+    lv_test_fs_clear_close_cb(false);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, lv_fs_close(&fa));
+}
+
+void test_fs_seek(void)
+{
+    lv_fs_res_t res;
+    lv_fs_file_t f;
+
+    /* Test with drive 'A' (has cache) */
+    res = lv_fs_open(&f, "A:src/test_files/readtest.txt", LV_FS_MODE_RD);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+
+    /* Test forward seek from current position */
+    uint8_t buf[10];
+    uint32_t br;
+
+    /* Read first 10 bytes to establish position */
+    res = lv_fs_read(&f, buf, sizeof(buf), &br);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+    TEST_ASSERT_EQUAL_UINT32(sizeof(buf), br);
+
+    /* Seek forward 5 bytes from current position */
+    res = lv_fs_seek(&f, 5, LV_FS_SEEK_CUR);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+
+    /* Read next 5 bytes to verify position */
+    res = lv_fs_read(&f, buf, 5, &br);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+    TEST_ASSERT_EQUAL_UINT32(5, br);
+
+    /* Verify we're at position 20 (10 + 5 + 5) */
+    uint32_t pos;
+    res = lv_fs_tell(&f, &pos);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+    TEST_ASSERT_EQUAL_UINT32(20, pos);
+
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, lv_fs_close(&f));
+
+    /* Test with drive 'B' (no cache) */
+    res = lv_fs_open(&f, "B:src/test_files/readtest.txt", LV_FS_MODE_RD);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+
+    /* Test backward seek from current position */
+    res = lv_fs_seek(&f, 20, LV_FS_SEEK_SET);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+
+    /* Read 5 bytes to establish position */
+    res = lv_fs_read(&f, buf, 5, &br);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+    TEST_ASSERT_EQUAL_UINT32(5, br);
+
+    /* Seek backward 3 bytes from current position */
+    res = lv_fs_seek(&f, -3, LV_FS_SEEK_CUR);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+
+    /* Verify position is now 22 (20 + 5 - 3) */
+    res = lv_fs_tell(&f, &pos);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+    TEST_ASSERT_EQUAL_UINT32(22, pos);
+
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, lv_fs_close(&f));
+
+    /* Test error cases */
+    lv_fs_file_t invalid_file = {0};
+    res = lv_fs_seek(&invalid_file, 0, LV_FS_SEEK_CUR);
+    TEST_ASSERT_EQUAL(LV_FS_RES_INV_PARAM, res);
+
+    /* Test with drive 'T' (has cache, but not ready) */
+    lv_test_fs_set_ready(false);
+    res = lv_fs_open(&f, "T:src/test_files/readtest.txt", LV_FS_MODE_RD);
+    TEST_ASSERT_EQUAL(LV_FS_RES_HW_ERR, res);
+    lv_test_fs_set_ready(true);
+}
+
+void test_fs_path_get_size(void)
+{
+    lv_fs_res_t res;
+    uint32_t size;
+    const uint32_t expected_size = 745; /* Size of readtest.txt */
+
+    /* Test with drive 'A' (has cache) */
+    res = lv_fs_path_get_size("A:src/test_files/readtest.txt", &size);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+    TEST_ASSERT_EQUAL_UINT32(expected_size, size);
+
+    /* Test with drive 'B' (no cache) */
+    res = lv_fs_path_get_size("B:src/test_files/readtest.txt", &size);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+    TEST_ASSERT_EQUAL_UINT32(expected_size, size);
+
+    /* Test error cases */
+    res = lv_fs_path_get_size(NULL, &size);
+    TEST_ASSERT_EQUAL(LV_FS_RES_INV_PARAM, res);
+
+    /* Test with non-existent file */
+    res = lv_fs_path_get_size("A:src/test_files/nonexistent.txt", &size);
+    TEST_ASSERT_EQUAL(LV_FS_RES_UNKNOWN, res);
+
+    /* Test with drive 'T' (has cache, but not ready) */
+    lv_test_fs_set_ready(false);
+    res = lv_fs_path_get_size("T:src/test_files/readtest.txt", &size);
+    TEST_ASSERT_EQUAL(LV_FS_RES_HW_ERR, res);
+    lv_test_fs_set_ready(true);
+}
+
+void test_fs_load_to_buf(void)
+{
+    lv_fs_res_t res;
+    uint8_t buf[256];
+
+    /* Test with drive 'A' (has cache) - load partial content */
+    res = lv_fs_load_to_buf(buf, 50, "A:src/test_files/readtest.txt");
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+
+    /* Verify first few bytes match expected content */
+    TEST_ASSERT_TRUE(lv_memcmp(buf, read_exp, 50) == 0);
+
+    /* Test with drive 'B' (no cache) - load full content */
+    res = lv_fs_load_to_buf(buf, sizeof(buf), "B:src/test_files/readtest.txt");
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+
+    /* Test with non-existent file */
+    res = lv_fs_load_to_buf(buf, 10, "A:src/test_files/nonexistent.txt");
+    TEST_ASSERT_EQUAL(LV_FS_RES_UNKNOWN, res);
+
+    /* Test with drive 'T' (has cache, but not ready) */
+    lv_test_fs_set_ready(false);
+    res = lv_fs_load_to_buf(buf, 10, "T:src/test_files/readtest.txt");
+    TEST_ASSERT_EQUAL(LV_FS_RES_HW_ERR, res);
+    lv_test_fs_set_ready(true);
+}
+
+void test_fs_dir_open(void)
+{
+    lv_fs_res_t res;
+    lv_fs_dir_t dir;
+
+    /* Test with NULL path */
+    res = lv_fs_dir_open(&dir, NULL);
+    TEST_ASSERT_EQUAL(LV_FS_RES_INV_PARAM, res);
+
+    /* Test with drive 'A' (has cache) */
+    res = lv_fs_dir_open(&dir, "A:src/test_files");
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, lv_fs_dir_close(&dir));
+
+    /* Test with drive 'B' (no cache) */
+    res = lv_fs_dir_open(&dir, "B:src/test_files");
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, lv_fs_dir_close(&dir));
+
+    /* Test with non-existent directory */
+    res = lv_fs_dir_open(&dir, "A:src/nonexistent_dir");
+    TEST_ASSERT_EQUAL(LV_FS_RES_UNKNOWN, res);
+
+    /* Test with drive 'T' (has cache, but not ready) */
+    lv_test_fs_set_ready(false);
+    res = lv_fs_dir_open(&dir, "T:src/test_files");
+    TEST_ASSERT_EQUAL(LV_FS_RES_HW_ERR, res);
+    lv_test_fs_set_ready(true);
+
+    /* Test with invalid drive letter */
+    res = lv_fs_dir_open(&dir, "Z:src/test_files");
+    TEST_ASSERT_EQUAL(LV_FS_RES_NOT_EX, res);
+}
+
+void test_fs_dir_read(void)
+{
+    lv_fs_res_t res;
+    lv_fs_dir_t dir;
+    char filename[256];
+
+    /* Test with invalid directory handle */
+    lv_fs_dir_t invalid_dir = {0};
+    res = lv_fs_dir_read(&invalid_dir, filename, sizeof(filename));
+    TEST_ASSERT_EQUAL(LV_FS_RES_INV_PARAM, res);
+    TEST_ASSERT_EQUAL_CHAR('\0', filename[0]);
+
+    /* Test with zero buffer length */
+    res = lv_fs_dir_open(&dir, "A:src/test_files");
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+    res = lv_fs_dir_read(&dir, filename, 0);
+    TEST_ASSERT_EQUAL(LV_FS_RES_INV_PARAM, res);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, lv_fs_dir_close(&dir));
+
+    /* Test normal directory reading with drive 'A' */
+    res = lv_fs_dir_open(&dir, "A:src/test_files");
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+
+    /* Read directory entries until end */
+    uint32_t entry_count = 0;
+    while((res = lv_fs_dir_read(&dir, filename, sizeof(filename))) == LV_FS_RES_OK) {
+        if(filename[0] == '\0') break; /* End of directory */
+        entry_count++;
+    }
+
+    /* Should have at least one entry (readtest.txt) */
+    TEST_ASSERT_TRUE(entry_count > 0);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, lv_fs_dir_close(&dir));
+
+    /* Test normal directory reading with drive 'B' */
+    res = lv_fs_dir_open(&dir, "B:src/test_files");
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+
+    entry_count = 0;
+    while((res = lv_fs_dir_read(&dir, filename, sizeof(filename))) == LV_FS_RES_OK) {
+        if(filename[0] == '\0') break;
+        entry_count++;
+    }
+
+    TEST_ASSERT_TRUE(entry_count > 0);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, lv_fs_dir_close(&dir));
+
+    /* Test with drive 'T' (has cache, but not ready) */
+    lv_test_fs_set_ready(false);
+    res = lv_fs_dir_open(&dir, "T:src/test_files");
+    TEST_ASSERT_EQUAL(LV_FS_RES_HW_ERR, res);
+    lv_test_fs_set_ready(true);
+}
+
+void test_fs_dir_close(void)
+{
+    lv_fs_res_t res;
+    lv_fs_dir_t dir;
+
+    /* Test with invalid directory handle */
+    lv_fs_dir_t invalid_dir = {0};
+    res = lv_fs_dir_close(&invalid_dir);
+    TEST_ASSERT_EQUAL(LV_FS_RES_INV_PARAM, res);
+
+    /* Test normal close with drive 'A' */
+    res = lv_fs_dir_open(&dir, "A:src/test_files");
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+    res = lv_fs_dir_close(&dir);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+
+    /* Test normal close with drive 'B' */
+    res = lv_fs_dir_open(&dir, "B:src/test_files");
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+    res = lv_fs_dir_close(&dir);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+
+    /* Test double close (should be safe) */
+    res = lv_fs_dir_open(&dir, "A:src/test_files");
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+    res = lv_fs_dir_close(&dir);
+    TEST_ASSERT_EQUAL(LV_FS_RES_OK, res);
+    res = lv_fs_dir_close(&dir); /* Second close on same handle */
+    TEST_ASSERT_EQUAL(LV_FS_RES_INV_PARAM, res);
+
+    /* Test with drive 'T' (has cache, but not ready) */
+    lv_test_fs_set_ready(false);
+    res = lv_fs_dir_open(&dir, "T:src/test_files");
+    TEST_ASSERT_EQUAL(LV_FS_RES_HW_ERR, res);
+    lv_test_fs_set_ready(true);
+}
+
+void test_fs_up(void)
+{
+    char path[256];
+
+    /* Test empty path */
+    lv_strcpy(path, "");
+    char * result = lv_fs_up(path);
+    TEST_ASSERT_EQUAL_STRING("", result);
+
+    /* Test root path (cannot go up further) */
+    lv_strcpy(path, "/");
+    result = lv_fs_up(path);
+    TEST_ASSERT_EQUAL_STRING("", result);
+
+    /* Test single level directory */
+    lv_strcpy(path, "/home");
+    result = lv_fs_up(path);
+    TEST_ASSERT_EQUAL_STRING("/home", result);
+
+    /* Test multi-level directory */
+    lv_strcpy(path, "/home/user/documents");
+    result = lv_fs_up(path);
+    TEST_ASSERT_EQUAL_STRING("/home/user", result);
+
+    /* Test path with trailing slash */
+    lv_strcpy(path, "/home/user/documents/");
+    result = lv_fs_up(path);
+    TEST_ASSERT_EQUAL_STRING("/home/user", result);
+
+    /* Test path with mixed slashes */
+    lv_strcpy(path, "C:\\Users\\Documents\\");
+    result = lv_fs_up(path);
+    TEST_ASSERT_EQUAL_STRING("C:\\Users", result);
+
+    /* Test path with only filename */
+    lv_strcpy(path, "file.txt");
+    result = lv_fs_up(path);
+    TEST_ASSERT_EQUAL_STRING("file.txt", result);
+
+    /* Test path with drive letter and multiple levels */
+    lv_strcpy(path, "A:src/test_files");
+    result = lv_fs_up(path);
+    TEST_ASSERT_EQUAL_STRING("A:src", result);
+}
+
+void test_fs_get_last(void)
+{
+    const char * result;
+
+    /* Test empty path */
+    result = lv_fs_get_last("");
+    TEST_ASSERT_EQUAL_STRING("", result);
+
+    /* Test path with only filename */
+    result = lv_fs_get_last("file.txt");
+    TEST_ASSERT_EQUAL_STRING("file.txt", result);
+
+    /* Test multi-level directory path */
+    result = lv_fs_get_last("/home/user/documents");
+    TEST_ASSERT_EQUAL_STRING("documents", result);
+
+    /* Test path with trailing slash */
+    result = lv_fs_get_last("/home/user/documents/");
+    TEST_ASSERT_EQUAL_STRING("documents/", result);
+
+    /* Test path with mixed slashes */
+    result = lv_fs_get_last("C:\\Users\\Documents");
+    TEST_ASSERT_EQUAL_STRING("Documents", result);
+
+    /* Test path with no separators */
+    result = lv_fs_get_last("filename");
+    TEST_ASSERT_EQUAL_STRING("filename", result);
+
+    /* Test root path */
+    result = lv_fs_get_last("/");
+    TEST_ASSERT_EQUAL_STRING("/", result);
+
+    /* Test path with drive letter */
+    result = lv_fs_get_last("A:src/test_files/readtest.txt");
+    TEST_ASSERT_EQUAL_STRING("readtest.txt", result);
+
+    /* Test path ending with separator */
+    result = lv_fs_get_last("A:src/test_files/");
+    TEST_ASSERT_EQUAL_STRING("test_files/", result);
+
+    /* Test single character path */
+    result = lv_fs_get_last("a");
+    TEST_ASSERT_EQUAL_STRING("a", result);
+}
+
+void test_fs_get_letters(void)
+{
+    char buf[16]; /* Increased buffer size to accommodate more drive letters */
+    char * result;
+
+    /* Test with sufficient buffer size */
+    result = lv_fs_get_letters(buf);
+    TEST_ASSERT_EQUAL_PTR(buf, result); /* Should return the same buffer */
+
+    /* Verify that the buffer contains valid drive letters */
+    TEST_ASSERT_EQUAL_STRING("TMBA", buf);
 }
 
 #endif

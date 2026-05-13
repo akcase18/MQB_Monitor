@@ -1,9 +1,8 @@
 #if LV_BUILD_TEST
 #include "../lvgl.h"
+#include "../../lvgl_private.h"
 
 #include "unity/unity.h"
-#include "lv_test_indev.h"
-#include "lv_test_helpers.h"
 
 static void create_ui(void);
 static void chart_type_observer_cb(lv_observer_t * observer, lv_subject_t * subject);
@@ -27,7 +26,7 @@ void test_binding(void)
     create_ui();
 
     /*Wait for the animation*/
-    lv_test_indev_wait(500);
+    lv_test_wait(500);
 
     TEST_ASSERT_EQUAL_SCREENSHOT("binding.png");
 }
@@ -76,7 +75,7 @@ static void create_ui(void)
     lv_chart_series_t * series = lv_chart_add_series(chart, c3, LV_CHART_AXIS_PRIMARY_X);
 
     static int32_t chart_y_array[10] = {10, 25, 50, 40, 30, 35, 60, 65, 70, 75};
-    lv_chart_set_ext_y_array(chart, series, chart_y_array);
+    lv_chart_set_series_ext_y_array(chart, series, chart_y_array);
 
     /*Add custom observer callback*/
     lv_subject_add_observer_obj(&chart_type_subject, chart_type_observer_cb, chart, NULL);
@@ -178,7 +177,7 @@ static void create_ui(void)
     lv_canvas_fill_bg(canvas, c2, LV_OPA_COVER);
     draw_to_canvas(canvas);
 
-    LV_IMG_DECLARE(test_img_lvgl_logo_jpg);
+    LV_IMAGE_DECLARE(test_img_lvgl_logo_jpg);
     lv_obj_t * img;
     img = lv_image_create(scr);
     lv_image_set_src(img, &test_img_lvgl_logo_jpg);

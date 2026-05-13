@@ -2,7 +2,12 @@
 #if LV_USE_TJPGD && LV_BUILD_EXAMPLES
 
 /**
- * Load a JPG image
+ * @title Decode JPEG with TJpgDec
+ * @brief Load a JPEG file through the TJpgDec decoder and center it on the screen.
+ *
+ * An image widget is created on the active screen with its source set to
+ * `A:test_img_lvgl_logo.jpg`, so the TJpgDec image decoder reads the file
+ * through the filesystem driver registered under drive letter `A`.
  */
 void lv_example_tjpgd_1(void)
 {
@@ -11,7 +16,7 @@ void lv_example_tjpgd_1(void)
     wp = lv_image_create(lv_screen_active());
     /* Assuming a File system is attached to letter 'A'
      * E.g. set LV_USE_FS_STDIO 'A' in lv_conf.h */
-    lv_image_set_src(wp, "A:lvgl/examples/libs/tjpgd/img_lvgl_logo.jpg");
+    lv_image_set_src(wp, "A:test_img_lvgl_logo.jpg");
     lv_obj_center(wp);
 }
 

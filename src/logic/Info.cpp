@@ -69,6 +69,11 @@ bool Info::get_metric()
     return _is_metric;
 }
 
+void Info::set_metric(bool is_metric)
+{
+    _is_metric = is_metric;
+}
+
 Request **Info::get_requests()
 {
     return _requests;
