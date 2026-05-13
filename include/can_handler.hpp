@@ -1,8 +1,10 @@
 #ifndef CAN_HANDLER_H
 #define CAN_HANDLER_H
 
-#include <FlexCAN_T4.h>
-#include "Request.hpp"
+#ifdef USE_ARDUINO
+
+    #include <FlexCAN_T4.h>
+    #include "Request.hpp"
 
 using namespace std;
 
@@ -52,4 +54,5 @@ void can_recv(const CAN_message_t &msg);
  */
 Request *get_request(uint16_t byte_1, uint16_t byte_2);
 
-#endif
+#endif // USE_ARDUINO
+#endif // CAN_HANDLER_H

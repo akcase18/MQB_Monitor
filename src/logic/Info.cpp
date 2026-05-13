@@ -6,16 +6,16 @@ static uint32_t info_unique_id = 0;
  Constructors
  =============================================================================*/
 
-Info::Info(String    name,
-           Unit_Type unit_type,
-           uint16_t  cycle_time,
-           Request **requests,
-           uint8_t   num_requests)
-    : _name(name)
-    , _cycle_time(cycle_time)
+Info::Info(const char *name,
+           Unit_Type   unit_type,
+           uint16_t    cycle_time,
+           Request   **requests,
+           uint8_t     num_requests)
+    : _cycle_time(cycle_time)
     , _requests(requests)
     , _num_requests(num_requests)
 {
+    snprintf(_name, sizeof(_name), "%s", name);
     uid = info_unique_id++;
     set_unit_type(unit_type);
     set_unit_label();
@@ -25,14 +25,14 @@ Info::Info(String    name,
  Public Functions
  =============================================================================*/
 
-String Info::get_name()
+const char *Info::get_name() const
 {
     return _name;
 }
 
-String Info::get_name_and_label()
+void Info::get_name_and_label(char *buf, uint8_t len) const
 {
-    return _name + " " + _unit_label;
+    snprintf(buf, len, "%s %s", _name, _unit_label);
 }
 
 void Info::set_unit_type(Unit_Type unit_type)
@@ -46,16 +46,17 @@ float Info::get_data()
     return _data;
 }
 
-String Info::get_data_str()
+void Info::get_data_str(char *buf, uint8_t len) const
 {
     for (uint8_t i = 0; i < _num_requests; i++)
     {
         if (!_requests[i]->get_recv())
         {
-            return "--";
+            snprintf(buf, len, "--");
         }
     }
-    return String(_data, (_is_metric) ? _decimals_m : _decimals_i);
+
+    snprintf(buf, len, "%.*f", _is_metric ? _decimals_m : _decimals_i, _data);
 }
 
 uint16_t Info::get_cycle_time()
@@ -102,39 +103,54 @@ void Info::set_unit_label()
     switch (_unit_type)
     {
         case Unit_Type::Degrees:
-            _unit_label = "[°]";
+            snprintf(_unit_label, sizeof(_unit_label), "%s", "[°]");
             break;
 
         case Unit_Type::Percent:
-            _unit_label = "[%]";
+            snprintf(_unit_label, sizeof(_unit_label), "%s", "[%]");
             break;
 
         case Unit_Type::Pressure:
-            _unit_label = _is_metric ? "[bar]" : "[psi]";
+            snprintf(_unit_label,
+                     sizeof(_unit_label),
+                     "%s",
+                     _is_metric ? "[bar]" : "[psi]");
             break;
 
         case Unit_Type::RPM:
-            _unit_label = "[rpm]";
+            snprintf(_unit_label, sizeof(_unit_label), "%s", "[rpm]");
             break;
 
         case Unit_Type::Speed:
-            _unit_label = _is_metric ? "[kph]" : "[mph]";
+            snprintf(_unit_label,
+                     sizeof(_unit_label),
+                     "%s",
+                     _is_metric ? "[kph]" : "[mph]");
             break;
 
         case Unit_Type::Temp:
-            _unit_label = _is_metric ? "[°C]" : "[°F]";
+            snprintf(_unit_label,
+                     sizeof(_unit_label),
+                     "%s",
+                     _is_metric ? "[°C]" : "[°F]");
             break;
 
         case Unit_Type::Torque:
-            _unit_label = _is_metric ? "[Nm]" : "[ft/lbs]";
+            snprintf(_unit_label,
+                     sizeof(_unit_label),
+                     "%s",
+                     _is_metric ? "[Nm]" : "[ft/lbs]");
             break;
 
         case Unit_Type::Volume:
-            _unit_label = _is_metric ? "[L]" : "[gal]";
+            snprintf(_unit_label,
+                     sizeof(_unit_label),
+                     "%s",
+                     _is_metric ? "[L]" : "[gal]");
             break;
 
         default:
-            _unit_label = "";
+            snprintf(_unit_label, sizeof(_unit_label), "%s", "");
             break;
     }
 }
@@ -241,8 +257,11 @@ void Info::round_data()
 float Info::round(float value, uint8_t decimal_places)
 {
     /* I don't remember how this works, but it's online somewhere */
-    int round_value = pow(10, decimal_places);
+    int scale = 1;
+    for (uint8_t i = 0; i < decimal_places; i++)
+    {
+        scale *= 10;
+    }
 
-    float val = (int)(value * round_value + 0.5);
-    return (float)(val / round_value);
+    return (int)(value * scale + 0.5f) / (float)scale;
 }

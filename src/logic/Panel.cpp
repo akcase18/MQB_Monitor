@@ -17,8 +17,6 @@ Panel::Panel()
 
 void Panel::init(lv_obj_t *parent)
 {
-    this->info = info;
-
     // Create the button
     this->btn = lv_btn_create(parent);
     lv_obj_add_style(this->btn, &style_panel_btn, 0);
@@ -55,13 +53,20 @@ void Panel::set_info(Info *new_info)
 {
     info = new_info;
 
-    lv_label_set_text(data, info->get_data_str().c_str());
-    lv_label_set_text(label, info->get_name_and_label().c_str());
+    char data_str[MAX_DATA_LEN];
+    info->get_data_str(data_str, sizeof(data_str));
+    lv_label_set_text(data, data_str);
+
+    char name_and_label[MAX_NAME_AND_LABEL_LEN];
+    info->get_name_and_label(name_and_label, sizeof(name_and_label));
+    lv_label_set_text(label, name_and_label);
 }
 
 void Panel::update()
 {
-    lv_label_set_text(data, info->get_data_str().c_str());
+    char data_str[MAX_DATA_LEN];
+    info->get_data_str(data_str, sizeof(data_str));
+    lv_label_set_text(data, data_str);
 }
 
 void Panel::set_sm_panel()

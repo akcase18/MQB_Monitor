@@ -23,17 +23,25 @@ void Configurator::init()
 
     this->info_roller = lv_roller_create(this->screen);
     lv_obj_add_style(this->info_roller, &style_config_roller, 0);
-    String roller_options;
-    for (uint i = 0; i < total_num_info; i++)
+
+    char roller_options[512] = "";
+    char line[MAX_NAME_AND_LABEL_LEN];
+    for (uint8_t i = 0; i < total_num_info; i++)
     {
-        roller_options += this->infos[i]->get_name_and_label();
-        if (i != (uint)(total_num_info - 1))
+        this->infos[i]->get_name_and_label(line, sizeof(line));
+        strncat(roller_options,
+                line,
+                sizeof(roller_options) - strlen(roller_options) - 1);
+
+        if (i != (total_num_info - 1))
         {
-            roller_options += "\n";
+            strncat(roller_options,
+                    "\n",
+                    sizeof(roller_options) - strlen(roller_options) - 1);
         }
     }
     lv_roller_set_options(
-        this->info_roller, roller_options.c_str(), LV_ROLLER_MODE_INFINITE);
+        this->info_roller, roller_options, LV_ROLLER_MODE_INFINITE);
     lv_roller_set_visible_row_count(this->info_roller, 4);
 
     this->done = lv_btn_create(this->screen);

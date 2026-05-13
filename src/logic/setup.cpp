@@ -223,7 +223,11 @@ void can_send_cb(lv_timer_t *timer)
 {
     if (!can_queue.empty())
     {
+#ifdef USE_ARDUINO
         can_send(can_queue.get());
+#else
+        can_queue.get();
+#endif
     }
 }
 

@@ -29,6 +29,7 @@ void Settings_Screen::init()
 
 void Settings_Screen::set_brightness(BrightMode mode)
 {
+#ifdef USE_ARDUINO
     pinMode(PWM_PIN, OUTPUT);
 
     switch (mode)
@@ -42,6 +43,7 @@ void Settings_Screen::set_brightness(BrightMode mode)
             analogWrite(PWM_PIN, this->brightness.day);
             break;
     }
+#endif
 }
 
 void Settings_Screen::set_brightness(BrightMode mode, uint8_t percent)

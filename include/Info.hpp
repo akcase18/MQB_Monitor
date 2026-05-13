@@ -2,6 +2,11 @@
 
 #include "Request.hpp"
 
+#define MAX_NAME_LEN           20
+#define MAX_LABEL_LEN          10
+#define MAX_NAME_AND_LABEL_LEN MAX_NAME_LEN + MAX_LABEL_LEN
+#define MAX_DATA_LEN 8
+
 enum class Unit_Type
 {
     None,
@@ -19,13 +24,13 @@ class Info
 {
     private:
         /* Private Variables */
-        String    _name;       // Name of the Info object
-        String    _unit_label; // The generated label for the units
-        uint8_t   _decimals_m; // Metric data decimal places
-        uint8_t   _decimals_i; // Imperial data decimal places
-        uint16_t  _cycle_time; // Update cycle time (in ms)
-        float     _data = 0.0; // Data value
-        Unit_Type _unit_type;  // Data unit type
+        char    _name[MAX_NAME_LEN];        // Name of the Info object
+        char    _unit_label[MAX_LABEL_LEN]; // The generated label for the units
+        uint8_t _decimals_m;                // Metric data decimal places
+        uint8_t _decimals_i;                // Imperial data decimal places
+        uint16_t  _cycle_time;              // Update cycle time (in ms)
+        float     _data = 0.0;              // Data value
+        Unit_Type _unit_type;               // Data unit type
         Request **_requests;
         uint8_t   _num_requests;
         float (*_transform)(Request **);
@@ -48,15 +53,15 @@ class Info
          * @param num_requests
          * @param transform
          */
-        Info(String    name,
-             Unit_Type unit_type,
-             uint16_t  cycle_time,
-             Request **requests,
-             uint8_t   num_requests);
+        Info(const char *name,
+             Unit_Type   unit_type,
+             uint16_t    cycle_time,
+             Request   **requests,
+             uint8_t     num_requests);
 
-        String get_name();
+        const char *get_name() const;
 
-        String get_name_and_label();
+        void get_name_and_label(char *buf, uint8_t len) const;
 
         /**
          * Sets the unit type of the Info object.
@@ -67,7 +72,7 @@ class Info
 
         float get_data();
 
-        String get_data_str();
+        void get_data_str(char *buf, uint8_t len) const;
 
         uint16_t get_cycle_time();
 

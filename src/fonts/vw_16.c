@@ -10,8 +10,6 @@
 #include "../lvgl/lvgl.h"
 #endif
 
-#include "avr/pgmspace.h"
-
 #ifndef VW_16
 #define VW_16 1
 #endif
@@ -23,7 +21,11 @@
  *----------------*/
 
 /*Store the image of the glyphs*/
+#ifdef USE_ARDUINO
 static LV_ATTRIBUTE_LARGE_CONST const uint8_t glyph_bitmap[] PROGMEM = {
+#else
+static LV_ATTRIBUTE_LARGE_CONST const uint8_t glyph_bitmap[] = {
+#endif
     /* U+0020 " " */
 
     /* U+0021 "!" */

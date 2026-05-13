@@ -1,22 +1,22 @@
 #ifndef TOUCHSCREEN_H
 #define TOUCHSCREEN_H
 
-#include <Arduino.h>
-#include <SPI.h>
+#ifdef USE_ARDUINO
 
-using namespace std;
+    #include <stdint.h>
+    #include <SPI.h>
 
-/*==============================================================================
- Defines
- =============================================================================*/
+    /*==============================================================================
+     Defines
+     =============================================================================*/
 
-#define X_CMD           0x91
-#define Y_CMD           0xD1
-#define Z1_CMD          0xB1
-#define Z2_CMD          0xC1
-#define Z_THRESHOLD     800
-#define Z_THRESHOLD_IRQ 800
-#define MIN_CYCLE_TIME  3
+    #define X_CMD           0x91
+    #define Y_CMD           0xD1
+    #define Z1_CMD          0xB1
+    #define Z2_CMD          0xC1
+    #define Z_THRESHOLD     800
+    #define Z_THRESHOLD_IRQ 800
+    #define MIN_CYCLE_TIME  3
 
 class Touchscreen
 {
@@ -63,4 +63,5 @@ class Touchscreen
         void print_values();
 };
 
-#endif
+#endif // USE_ARDUINO
+#endif // TOUCHSCREEN_H

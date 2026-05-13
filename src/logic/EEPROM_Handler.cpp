@@ -20,6 +20,7 @@ EEPROM_Handler::EEPROM_Handler()
 
 void EEPROM_Handler::load_config()
 {
+#ifdef USE_ARDUINO
     // Load header
     EEPROM.get(0, config.header);
 
@@ -41,27 +42,38 @@ void EEPROM_Handler::load_config()
         // Load full config
         EEPROM.get(0, config);
     }
+#else
+#endif
 }
 
 void EEPROM_Handler::save_config()
 {
+#ifdef USE_ARDUINO
     config.header.magic   = MAGIC_NUMBER;
     config.header.version = CURRENT_VERSION;
     EEPROM.put(0, config);
+#else
+#endif
 }
 
 void EEPROM_Handler::load_panel(uint8_t panel_num, Panel_Config &panel_info)
 {
+#ifdef USE_ARDUINO
     uint16_t addr = panelAddress(panel_num);
     EEPROM.get(addr, panel_info);
+#else
+#endif
 }
 
 void EEPROM_Handler::save_panel(uint8_t             panel_num,
                                 const Panel_Config &panel_info)
 {
+#ifdef USE_ARDUINO
     config.panels[panel_num] = panel_info;
     uint16_t addr            = panelAddress(panel_num);
     EEPROM.put(addr, panel_info);
+#else
+#endif
 }
 
 void EEPROM_Handler::set_defaults()
@@ -102,7 +114,10 @@ void EEPROM_Handler::migrate(uint8_t oldVersion)
                 Panel_Config    panels[MAX_NUM_PANELS];
         } oldConfig;
 
+#ifdef USE_ARDUINO
         EEPROM.get(0, oldConfig);
+#else
+#endif
 
         // Step 2: copy old fields into new config
         config.header.magic   = MAGIC_NUMBER;
