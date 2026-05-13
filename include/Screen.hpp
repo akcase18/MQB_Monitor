@@ -83,7 +83,8 @@ class Configurator : public Screen
 
         lv_obj_t *flex_col_1;
         lv_obj_t *flex_col_2;
-        lv_obj_t *info_roller; // Roller object
+        lv_obj_t *info_sel;   // Info selector
+        lv_obj_t *radio_cont; // Container to hold radio buttons
         lv_obj_t *radio_i;
         lv_obj_t *radio_m;
         lv_obj_t *settings;

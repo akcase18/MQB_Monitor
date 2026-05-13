@@ -36,6 +36,18 @@ static const lv_style_const_prop_t style_screen_props[] = {
 LV_STYLE_CONST_INIT(style_screen, style_screen_props);
 
 /*==============================================================================
+ Container Styles
+ =============================================================================*/
+
+static const lv_style_const_prop_t style_container_props[] = {
+    LV_STYLE_CONST_BG_COLOR(lv_color_black()),
+    LV_STYLE_CONST_BORDER_WIDTH(0),
+    LV_STYLE_CONST_RADIUS(0),
+    LV_STYLE_CONST_PROPS_END,
+};
+LV_STYLE_CONST_INIT(style_container, style_container_props);
+
+/*==============================================================================
  Panel Styles
  =============================================================================*/
 
@@ -69,13 +81,13 @@ static const lv_style_const_prop_t style_panel_btn_props[] = {
 LV_STYLE_CONST_INIT(style_panel_btn, style_panel_btn_props);
 
 static const lv_style_const_prop_t style_panel_btn_sm_props[] = {
-    LV_STYLE_CONST_HEIGHT((int32_t)(320 * 0.45)),
+    LV_STYLE_CONST_HEIGHT((int32_t)(LCD_Y * 0.45)),
     LV_STYLE_CONST_PROPS_END,
 };
 LV_STYLE_CONST_INIT(style_panel_btn_sm, style_panel_btn_sm_props);
 
 static const lv_style_const_prop_t style_panel_btn_lg_props[] = {
-    LV_STYLE_CONST_HEIGHT((int32_t)(320 * 0.55)),
+    LV_STYLE_CONST_HEIGHT((int32_t)(LCD_Y * 0.55)),
     LV_STYLE_CONST_PROPS_END,
 };
 LV_STYLE_CONST_INIT(style_panel_btn_lg, style_panel_btn_lg_props);
@@ -168,19 +180,20 @@ LV_STYLE_CONST_INIT(style_panel_label_lg, style_panel_label_lg_props);
 
 
 /**
- * Information Roller
+ * Information Selection
  *
  * Used to select Information objects in the configuration screen.
  */
-static const lv_style_const_prop_t style_config_roller_props[] = {
+static const lv_style_const_prop_t style_config_info_sel_props[] = {
     LV_STYLE_CONST_BG_COLOR(lv_color_white()),
     LV_STYLE_CONST_TEXT_COLOR(lv_color_black()),
+    // LV_STYLE_CONST_RADIUS(0),
     LV_STYLE_CONST_ALIGN(LV_ALIGN_TOP_LEFT),
     LV_STYLE_CONST_TEXT_FONT(&vw_18),
-    LV_STYLE_CONST_WIDTH(320),
+    LV_STYLE_CONST_WIDTH((uint32_t)(LCD_X / 3) * 2),
     LV_STYLE_CONST_PROPS_END,
 };
-LV_STYLE_CONST_INIT(style_config_roller, style_config_roller_props);
+LV_STYLE_CONST_INIT(style_config_info_sel, style_config_info_sel_props);
 
 /**
  * Radio Button (Unselected)
@@ -189,9 +202,9 @@ static const lv_style_const_prop_t style_config_radio_btn_props[] = {
     LV_STYLE_CONST_BG_COLOR(lv_color_black()),
     LV_STYLE_CONST_TEXT_COLOR(lv_color_white()),
     LV_STYLE_CONST_TEXT_FONT(&vw_18),
-    LV_STYLE_CONST_PAD_LEFT(20),
-    LV_STYLE_CONST_PAD_RIGHT(20),
-    LV_STYLE_CONST_WIDTH(160),
+    LV_STYLE_CONST_PAD_TOP(5),
+    LV_STYLE_CONST_PAD_BOTTOM(5),
+    // LV_STYLE_CONST_OUTLINE_COLOR(lv_color_white()),
     LV_STYLE_CONST_PROPS_END,
 };
 LV_STYLE_CONST_INIT(style_config_radio_btn, style_config_radio_btn_props);

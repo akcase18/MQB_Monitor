@@ -25,45 +25,53 @@ void Configurator::init()
     lv_obj_add_style(this->screen, &style_screen, 0);
 
     /* Info Selection */
-    this->info_roller = lv_roller_create(this->screen);
-    lv_obj_add_style(this->info_roller, &style_config_roller, 0);
+    this->info_sel = lv_dropdown_create(this->screen);
+    lv_obj_add_style(this->info_sel, &style_config_info_sel, LV_PART_MAIN);
+    lv_obj_set_style_text_font(
+        this->info_sel, &lv_font_montserrat_14, LV_PART_INDICATOR);
 
-    char roller_options[512] = "";
+    char info_options[512] = "";
     char line[MAX_NAME_AND_LABEL_LEN];
     for (uint8_t i = 0; i < total_num_info; i++)
     {
         this->infos[i]->get_name_and_label(line, sizeof(line));
-        strncat(roller_options,
+        strncat(info_options,
                 line,
-                sizeof(roller_options) - strlen(roller_options) - 1);
+                sizeof(info_options) - strlen(info_options) - 1);
 
         if (i != (total_num_info - 1))
         {
-            strncat(roller_options,
+            strncat(info_options,
                     "\n",
-                    sizeof(roller_options) - strlen(roller_options) - 1);
+                    sizeof(info_options) - strlen(info_options) - 1);
         }
     }
-    lv_roller_set_options(
-        this->info_roller, roller_options, LV_ROLLER_MODE_INFINITE);
-    lv_roller_set_visible_row_count(this->info_roller, 4);
+    lv_dropdown_set_options(this->info_sel, info_options);
 
     /* Unit Type Selection */
-    this->radio_i = lv_checkbox_create(this->screen);
+    this->radio_cont = lv_obj_create(this->screen);
+    lv_obj_set_size(this->radio_cont, (LCD_X / 3), (LCD_Y / 3));
+    lv_obj_align(this->radio_cont, LV_ALIGN_TOP_RIGHT, 0, 0);
+    lv_obj_add_style(this->radio_cont, &style_container, 0);
+    lv_obj_set_flex_flow(this->radio_cont, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(this->radio_cont,
+                          LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_START,
+                          LV_FLEX_ALIGN_CENTER);
+
+    this->radio_i = lv_checkbox_create(this->radio_cont);
     lv_checkbox_set_text(this->radio_i, "Imperial");
     lv_obj_add_style(this->radio_i, &style_config_radio_btn, 0);
     lv_obj_add_style(
         this->radio_i, &style_config_radio_btn_sel, LV_STATE_CHECKED);
-    lv_obj_align(this->radio_i, LV_ALIGN_TOP_RIGHT, 0, 40);
     lv_obj_add_event_cb(
         this->radio_i, radio_btn_sel_cb, LV_EVENT_CLICKED, this);
 
-    this->radio_m = lv_checkbox_create(this->screen);
+    this->radio_m = lv_checkbox_create(this->radio_cont);
     lv_checkbox_set_text(this->radio_m, "Metric");
     lv_obj_add_style(this->radio_m, &style_config_radio_btn, 0);
     lv_obj_add_style(
         this->radio_m, &style_config_radio_btn_sel, LV_STATE_CHECKED);
-    lv_obj_align(this->radio_m, LV_ALIGN_TOP_RIGHT, 0, 80);
     lv_obj_add_event_cb(
         this->radio_m, radio_btn_sel_cb, LV_EVENT_CLICKED, this);
 
@@ -85,7 +93,7 @@ void Configurator::init()
 void Configurator::open(Panel *panel)
 {
     lv_screen_load(this->screen);
-    lv_roller_set_selected(this->info_roller, panel->info->uid, LV_ANIM_OFF);
+    lv_dropdown_set_selected(this->info_sel, panel->info->uid);
     if (panel->info->get_metric())
     {
         lv_obj_add_state(this->radio_m, LV_STATE_CHECKED);
@@ -102,7 +110,7 @@ void Configurator::open(Panel *panel)
 void Configurator::close()
 {
     this->selected_panel->set_info(
-        this->infos[lv_roller_get_selected(this->info_roller)]);
+        this->infos[lv_dropdown_get_selected(this->info_sel)]);
     this->selected_panel->info->set_metric(lv_obj_get_state(this->radio_m)
                                            == LV_STATE_CHECKED);
     refresh_request_timers();
