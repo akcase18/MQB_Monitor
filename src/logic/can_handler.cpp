@@ -1,14 +1,16 @@
-#include "can_handler.hpp"
+#ifdef USE_ARDUINO
 
-/*==============================================================================
- Defines
- =============================================================================*/
+    #include "can_handler.hpp"
 
-/* CAN ID for UDP requests */
-#define CAN_ID            0x7E0
-#define NUM_DATA_BYTES    0x03
-#define ENHANCE_DATA_REQ  0x22
-#define ENHANCE_DATA_RESP 0x62
+    /*==============================================================================
+     Defines
+     =============================================================================*/
+
+    /* CAN ID for UDP requests */
+    #define CAN_ID            0x7E0
+    #define NUM_DATA_BYTES    0x03
+    #define ENHANCE_DATA_REQ  0x22
+    #define ENHANCE_DATA_RESP 0x62
 
 /*==============================================================================
  Main Functions
@@ -98,3 +100,5 @@ Request *get_request(uint16_t byte_1, uint16_t byte_2)
     }
     return nullptr;
 }
+
+#endif // USE_ARDUINO

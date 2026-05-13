@@ -21,7 +21,11 @@
  *----------------*/
 
 /*Store the image of the glyphs*/
+#ifdef USE_ARDUINO
 static LV_ATTRIBUTE_LARGE_CONST const uint8_t glyph_bitmap[] PROGMEM = {
+#else
+static LV_ATTRIBUTE_LARGE_CONST const uint8_t glyph_bitmap[] = {
+#endif
     /* U+002D "-" */
     0x3, 0xff, 0xff, 0xf0, 0x1, 0xff, 0xff, 0xfe,
     0x1, 0xff, 0xff, 0xff, 0xc0, 0xff, 0xff, 0xff,

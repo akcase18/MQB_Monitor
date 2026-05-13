@@ -1,6 +1,9 @@
 #pragma once
 
-#include "Arduino.h"
+#include <stdint.h>
+#include <string.h>
+#include <stdio.h>
+
 #include "styles.hpp"
 
 constexpr uint8_t NO_OFFSET = 0;

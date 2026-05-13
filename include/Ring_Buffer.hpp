@@ -126,6 +126,6 @@ class RingBuffer
         T       _buf[buf_size]; // Ring buffer
         uint8_t _head = 0;      // Index of "newest" item in buffer
         uint8_t _tail = 0;      // Index of "oldest" item in buffer
-        uint8_t _max_size;      // Maximum size of buffer
+        uint8_t _max_size = buf_size; // Maximum size of buffer
         bool    _full = 0;
 };

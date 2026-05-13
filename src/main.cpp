@@ -1,7 +1,10 @@
-#include "can_handler.hpp"
-#include "ILI948x_t4_mm.h"
-#include "EEPROM.h"
-#include "touchscreen.hpp"
+#ifdef USE_ARDUINO
+    #include "ILI948x_t4_mm.h"
+    #include "can_handler.hpp"
+    #include "touchscreen.hpp"
+#else
+    #include "app_hal.h"
+#endif
 
 #include "setup.hpp"
 #include "Screen.hpp"
@@ -20,7 +23,9 @@ static lv_color_t    buf_2[(LCD_HORZ * LCD_VERT) / 10];
 #define LCD_DC 5
 /* G9 */
 #define LCD_RST 32
+#ifdef USE_ARDUINO
 ILI948x_t4_mm lcd = ILI948x_t4_mm(LCD_DC, LCD_CS, LCD_RST);
+#endif
 
 /*==============================================================================
  Touch Constructor
@@ -32,7 +37,9 @@ static lv_indev_t *touch;
 #define CS_PIN 0
 /* G10 */
 #define TIRQ_PIN 33
+#ifdef USE_ARDUINO
 Touchscreen ts = Touchscreen(CS_PIN);
+#endif
 
 /*==============================================================================
  Queue
@@ -75,9 +82,11 @@ int  counter = 0;
  */
 void lcd_init()
 {
+#ifdef USE_ARDUINO
     lcd.begin(12);
     lcd.setBitDepth(16);
     lcd.setRotation(1);
+#endif
 }
 
 /**
@@ -86,9 +95,11 @@ void lcd_init()
  */
 void display_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *data)
 {
+#ifdef USE_ARDUINO
     lcd.pushPixels16bitDMA(
         (uint16_t *)data, area->x1, area->y1, area->x2, area->y2);
     lv_display_flush_ready(disp);
+#endif
 }
 
 /**
@@ -110,6 +121,7 @@ void display_init()
  */
 void touch_read(lv_indev_t *indev, lv_indev_data_t *data)
 {
+#ifdef USE_ARDUINO
     if (ts.touched())
     {
         data->point.x = (ts.get_x() * LCD_HORZ) / 4095;
@@ -120,6 +132,7 @@ void touch_read(lv_indev_t *indev, lv_indev_data_t *data)
     {
         data->state = LV_INDEV_STATE_RELEASED;
     }
+#endif
 }
 
 /**
@@ -128,10 +141,12 @@ void touch_read(lv_indev_t *indev, lv_indev_data_t *data)
  */
 void touch_init()
 {
+#ifdef USE_ARDUINO
     ts.start();
     touch = lv_indev_create();
     lv_indev_set_type(touch, LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(touch, touch_read);
+#endif
 }
 
 /**
@@ -156,15 +171,24 @@ void close_config_cb(lv_event_t *e)
 
 void setup()
 {
+#ifdef USE_ARDUINO
     Serial.begin(115200);
+#endif
+
     eeprom.load_config();
 
     lv_init();
 
+#ifdef USE_ARDUINO
     can_init();
+#endif
 
+#ifdef USE_ARDUINO
     display_init();
     touch_init();
+#else
+    hal_setup();
+#endif
 
     setup_init(eeprom);
 
@@ -183,7 +207,9 @@ void setup()
 
     lv_obj_add_event_cb(config.done, close_config_cb, LV_EVENT_CLICKED, NULL);
 
+#ifdef USE_ARDUINO
     lv_tick_set_cb(millis);
+#endif
 }
 
 void loop()
@@ -192,5 +218,16 @@ void loop()
 
     screen_1.update();
 
+#ifdef USE_ARDUINO
     can_loop();
+#endif
 }
+
+#ifndef USE_ARDUINO
+int main()
+{
+    setup();
+    hal_loop();
+    return 0;
+}
+#endif

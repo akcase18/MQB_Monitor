@@ -1,7 +1,11 @@
 #ifndef EEPROM_HANDLER_HPP
 #define EEPROM_HANDLER_HPP
 
-#include <EEPROM.h>
+#ifdef USE_ARDUINO
+    #include <EEPROM.h>
+#else
+    #include <stdint.h>
+#endif
 
 /*==============================================================================
  Defines

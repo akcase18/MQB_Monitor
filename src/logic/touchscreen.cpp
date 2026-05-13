@@ -1,4 +1,6 @@
-#include "touchscreen.hpp"
+#ifdef USE_ARDUINO
+
+    #include "touchscreen.hpp"
 
 static Touchscreen *ts_pointer;
 void                touch_interrupt();
@@ -230,3 +232,5 @@ void touch_interrupt(void)
     Touchscreen *ts = ts_pointer;
     ts->touch_wake  = true;
 }
+
+#endif // USE_ARDUINO
