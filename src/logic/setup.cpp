@@ -335,6 +335,7 @@ void init_screens()
 {
     screen_1.init(5);
     config.init();
+    settings.init();
 }
 
 void init_transforms()

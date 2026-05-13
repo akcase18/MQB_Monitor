@@ -1,5 +1,7 @@
 #include "Screen.hpp"
 
+static constexpr uint32_t SETTINGS_PULL_ANIM_MS = 220;
+
 /*==============================================================================
  Constructors
  =============================================================================*/
@@ -23,8 +25,31 @@ void Settings_Screen::init()
     lv_obj_center(this->screen);
     lv_obj_add_style(this->screen, &style_screen, 0);
 
-    this->day_icon   = lv_label_create(this->screen);
-    this->night_icon = lv_label_create(this->screen);
+    this->brightness_slider = lv_slider_create(this->screen);
+    lv_obj_center(this->brightness_slider);
+
+    this->done = lv_btn_create(this->screen);
+    lv_obj_add_style(this->done, &style_config_done, 0);
+    this->done_label = lv_label_create(this->done);
+    lv_obj_center(this->done_label);
+    lv_label_set_text(this->done_label, LV_SYMBOL_OK);
+}
+
+void Settings_Screen::open()
+{
+    lv_screen_load_anim(this->screen,
+                        LV_SCR_LOAD_ANIM_OVER_BOTTOM,
+                        SETTINGS_PULL_ANIM_MS,
+                        0,
+                        false);
+
+    lv_slider_set_value(
+        this->brightness_slider, this->brightness.day, LV_ANIM_OFF);
+}
+
+void Settings_Screen::close()
+{
+    this->brightness.day = lv_slider_get_value(this->brightness_slider);
 }
 
 void Settings_Screen::set_brightness(BrightMode mode)

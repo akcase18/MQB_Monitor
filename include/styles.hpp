@@ -183,10 +183,10 @@ static const lv_style_const_prop_t style_config_roller_props[] = {
 LV_STYLE_CONST_INIT(style_config_roller, style_config_roller_props);
 
 /**
- * Done button for the Configuration Screen
+ * Done button
  *
- * Used to go back (and save your changes) after opening the
- * Configuration screen.
+ * Used to go back (and save your changes) after opening a configuration or
+ * settings screen.
  */
 static const lv_style_const_prop_t style_config_done_props[] = {
     LV_STYLE_CONST_BG_COLOR(lv_color_black()),
@@ -199,3 +199,20 @@ static const lv_style_const_prop_t style_config_done_props[] = {
     LV_STYLE_CONST_PROPS_END,
 };
 LV_STYLE_CONST_INIT(style_config_done, style_config_done_props);
+
+/**
+ * Settings button for the Configuration Screen
+ *
+ * Used to open up additional settings.
+ */
+static const lv_style_const_prop_t style_config_settings_props[] = {
+    LV_STYLE_CONST_BG_COLOR(lv_color_black()),
+    LV_STYLE_CONST_TEXT_COLOR(lv_color_white()),
+    LV_STYLE_CONST_RADIUS(0),
+    LV_STYLE_CONST_TEXT_FONT(&lv_font_montserrat_32),
+    LV_STYLE_CONST_ALIGN(LV_ALIGN_BOTTOM_LEFT),
+    LV_STYLE_CONST_PAD_BOTTOM(20),
+    LV_STYLE_CONST_PAD_LEFT(20),
+    LV_STYLE_CONST_PROPS_END,
+};
+LV_STYLE_CONST_INIT(style_config_settings, style_config_settings_props);

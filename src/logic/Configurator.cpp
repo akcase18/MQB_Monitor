@@ -44,6 +44,12 @@ void Configurator::init()
         this->info_roller, roller_options, LV_ROLLER_MODE_INFINITE);
     lv_roller_set_visible_row_count(this->info_roller, 4);
 
+    this->settings = lv_btn_create(this->screen);
+    lv_obj_add_style(this->settings, &style_config_settings, 0);
+    this->settings_label = lv_label_create(this->settings);
+    lv_obj_center(this->settings_label);
+    lv_label_set_text(this->settings_label, LV_SYMBOL_SETTINGS);
+
     this->done = lv_btn_create(this->screen);
     lv_obj_add_style(this->done, &style_config_done, 0);
     this->done_label = lv_label_create(this->done);

@@ -43,14 +43,17 @@ class Settings_Screen : public Screen
 
         Brightness brightness;
 
-        lv_obj_t *day_icon;
-        lv_obj_t *day_slider;
-        lv_obj_t *night_icon;
-        lv_obj_t *night_slider;
+        lv_obj_t *brightness_slider;
+        lv_obj_t *done;
+        lv_obj_t *done_label;
 
         Settings_Screen();
 
         void init();
+
+        void open();
+
+        void close();
 
         void set_brightness(BrightMode mode);
         void set_brightness(BrightMode mode, uint8_t value);
@@ -83,6 +86,8 @@ class Configurator : public Screen
         lv_obj_t *info_roller; // Roller object
         lv_obj_t *radio_i;
         lv_obj_t *radio_m;
+        lv_obj_t *settings;
+        lv_obj_t *settings_label;
         lv_obj_t *done;
         lv_obj_t *done_label;
 

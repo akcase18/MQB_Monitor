@@ -54,6 +54,8 @@ lv_timer_t *can_send_timer;
 bool test    = false;
 int  counter = 0;
 
+static constexpr uint32_t SETTINGS_PULL_ANIM_MS = 220;
+
 /*==============================================================================
  Callbacks
  =============================================================================*/
@@ -169,6 +171,35 @@ void close_config_cb(lv_event_t *e)
     }
 }
 
+void open_settings_cb(lv_event_t *e)
+{
+    if (lv_event_get_code(e) == LV_EVENT_GESTURE)
+    {
+        lv_dir_t dir = lv_indev_get_gesture_dir(lv_indev_active());
+        lv_indev_wait_release(lv_indev_active());
+        if (dir == LV_DIR_BOTTOM)
+        {
+            settings.open();
+        }
+        else
+        {
+            return;
+        }
+    }
+}
+void close_settings_cb(lv_event_t *e)
+{
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+    {
+        settings.close();
+        lv_screen_load_anim(screen_1.screen,
+                            LV_SCR_LOAD_ANIM_OUT_TOP,
+                            SETTINGS_PULL_ANIM_MS,
+                            0,
+                            false);
+    }
+}
+
 void setup()
 {
 #ifdef USE_ARDUINO
@@ -205,7 +236,12 @@ void setup()
     lv_obj_add_event_cb(
         panel_5.btn, open_config_cb, LV_EVENT_CLICKED, &panel_5);
 
+    lv_obj_add_event_cb(
+        screen_1.screen, open_settings_cb, LV_EVENT_GESTURE, NULL);
+
     lv_obj_add_event_cb(config.done, close_config_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(
+        settings.done, close_settings_cb, LV_EVENT_CLICKED, NULL);
 
 #ifdef USE_ARDUINO
     lv_tick_set_cb(millis);
