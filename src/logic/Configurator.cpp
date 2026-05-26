@@ -1,14 +1,18 @@
 #include "Screen.hpp"
 
 static void radio_btn_sel_cb(lv_event_t *e);
+static void open_warning_settings_cb(lv_event_t *e);
 
 /*==============================================================================
  Constructors
  =============================================================================*/
 
-Configurator::Configurator(Info **info_list, uint8_t total_num_info)
+Configurator::Configurator(Info         **info_list,
+                           uint8_t        total_num_info,
+                           WarningConfig *warning_config)
     : infos(info_list)
     , total_num_info(total_num_info)
+    , warning_config(warning_config)
 {
 }
 
@@ -19,16 +23,13 @@ Configurator::Configurator(Info **info_list, uint8_t total_num_info)
 void Configurator::init()
 {
     /* Screen Setup */
-    this->screen = lv_obj_create(NULL);
-    lv_obj_set_size(this->screen, LCD_HORZ, LCD_VERT);
-    lv_obj_center(this->screen);
-    lv_obj_add_style(this->screen, &style_screen, 0);
+    this->screen = create_new_screen();
 
     /* Info Selection */
     this->info_sel = lv_dropdown_create(this->screen);
     lv_obj_add_style(this->info_sel, &style_config_info_sel, LV_PART_MAIN);
     lv_obj_set_style_text_font(
-        this->info_sel, &lv_font_montserrat_14, LV_PART_INDICATOR);
+        this->info_sel, &lv_font_montserrat_18, LV_PART_INDICATOR);
 
     char info_options[512] = "";
     char line[MAX_NAME_AND_LABEL_LEN];
@@ -58,36 +59,42 @@ void Configurator::init()
                           LV_FLEX_ALIGN_CENTER,
                           LV_FLEX_ALIGN_START,
                           LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_row(this->radio_cont, 20, 0);
 
+    /* Imperial Checkbox */
     this->radio_i = lv_checkbox_create(this->radio_cont);
     lv_checkbox_set_text(this->radio_i, "Imperial");
-    lv_obj_add_style(this->radio_i, &style_config_radio_btn, 0);
+    lv_obj_add_style(this->radio_i, &style_config_checkbox, 0);
     lv_obj_add_style(
-        this->radio_i, &style_config_radio_btn_sel, LV_STATE_CHECKED);
+        this->radio_i, &style_config_checkbox_sel, LV_STATE_CHECKED);
     lv_obj_add_event_cb(
         this->radio_i, radio_btn_sel_cb, LV_EVENT_CLICKED, this);
 
+    /* Metric Checkbox */
     this->radio_m = lv_checkbox_create(this->radio_cont);
     lv_checkbox_set_text(this->radio_m, "Metric");
-    lv_obj_add_style(this->radio_m, &style_config_radio_btn, 0);
+    lv_obj_add_style(this->radio_m, &style_config_checkbox, 0);
     lv_obj_add_style(
-        this->radio_m, &style_config_radio_btn_sel, LV_STATE_CHECKED);
+        this->radio_m, &style_config_checkbox_sel, LV_STATE_CHECKED);
     lv_obj_add_event_cb(
         this->radio_m, radio_btn_sel_cb, LV_EVENT_CLICKED, this);
 
+#if USE_WARNINGS
     /* More Settings */
     this->settings = lv_btn_create(this->screen);
     lv_obj_add_style(this->settings, &style_config_settings, 0);
+    lv_obj_add_event_cb(
+        this->settings, open_warning_settings_cb, LV_EVENT_CLICKED, this);
     this->settings_label = lv_label_create(this->settings);
     lv_obj_center(this->settings_label);
     lv_label_set_text(this->settings_label, LV_SYMBOL_SETTINGS);
+    lv_obj_add_style(this->settings, &style_btn_pressed, LV_STATE_PRESSED);
+#endif
 
     /* Done Button */
-    this->done = lv_btn_create(this->screen);
-    lv_obj_add_style(this->done, &style_config_done, 0);
-    this->done_label = lv_label_create(this->done);
-    lv_obj_center(this->done_label);
-    lv_label_set_text(this->done_label, LV_SYMBOL_OK);
+    done_btn_t done_btn = create_done_btn(this->screen);
+    this->done          = done_btn.btn;
+    this->done_label    = done_btn.label;
 }
 
 void Configurator::open(Panel *panel)
@@ -142,5 +149,15 @@ static void radio_btn_sel_cb(lv_event_t *e)
     else
     {
         /* Do nothing */
+    }
+}
+
+static void open_warning_settings_cb(lv_event_t *e)
+{
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+    {
+        Configurator *temp = (Configurator *)lv_event_get_user_data(e);
+
+        temp->warning_config->open(temp->selected_panel->info, temp->screen);
     }
 }

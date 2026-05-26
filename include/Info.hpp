@@ -34,8 +34,13 @@ class Info
         Request **_requests;
         uint8_t   _num_requests;
         float (*_transform)(Request **);
-        bool _is_metric = false;
-        bool _data_recv = false;
+        bool  _is_metric = false;
+        bool  _data_recv = false;
+        float _warning_max;
+        float _warning_min;
+        bool  _use_warning = false;
+        bool  _use_lo_warn = false;
+        bool  _use_hi_warn = false;
 
     public:
         /* Public Variables */
@@ -84,6 +89,24 @@ class Info
 
         void set_transform(float (*transform)(Request **));
         void do_transform();
+
+        bool get_use_warning();
+        void set_use_warning(bool use_warning);
+
+        bool get_use_hi_warning();
+        void set_use_hi_warning(bool use_hi_warning);
+
+        bool get_use_lo_warning();
+        void set_use_lo_warning(bool use_lo_warning);
+
+        float get_min_warning();
+        void  set_min_warning(float min);
+
+        float get_max_warning();
+        void  set_max_warning(float max);
+
+        bool low_warning_active();
+        bool high_warning_active();
 
     private:
         /* Private Functions */

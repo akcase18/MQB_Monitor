@@ -198,9 +198,10 @@ Panel *panel_list[NUM_PANELS]
  Screens
  =============================================================================*/
 
-Settings_Screen settings = Settings_Screen();
-Info_Screen     screen_1 = Info_Screen(panel_list, NUM_PANELS);
-Configurator    config   = Configurator(info_list, NUM_INFO);
+Settings_Screen settings       = Settings_Screen();
+Info_Screen     screen_1       = Info_Screen(panel_list, NUM_PANELS);
+WarningConfig   warning_config = WarningConfig();
+Configurator    config = Configurator(info_list, NUM_INFO, &warning_config);
 
 /*==============================================================================
  CAN
@@ -334,6 +335,7 @@ void init_panels(EEPROM_Handler &cfg)
 void init_screens()
 {
     screen_1.init(5);
+    warning_config.init();
     config.init();
     settings.init();
 }

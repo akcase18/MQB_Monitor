@@ -18,10 +18,7 @@ void Info_Screen::init(uint8_t num_panels)
 {
     this->num_panels = num_panels;
 
-    this->screen = lv_obj_create(NULL);
-    lv_obj_set_size(this->screen, LCD_HORZ, LCD_VERT);
-    lv_obj_center(this->screen);
-    lv_obj_add_style(this->screen, &style_screen, 0);
+    this->screen = create_new_screen();
 
     lv_obj_set_flex_flow(this->screen, LV_FLEX_FLOW_ROW_WRAP);
 

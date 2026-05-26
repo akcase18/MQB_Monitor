@@ -7,6 +7,7 @@
 
 #include "Ring_Buffer.hpp"
 #include "Panel.hpp"
+#include "helper.hpp"
 
 #define PWM_PIN               3
 #define MAX_BRIGHTNESS        256
@@ -73,13 +74,39 @@ class Info_Screen : public Screen
         void update();
 };
 
+class WarningConfig : public Screen
+{
+    public:
+        Info     *info;
+        lv_obj_t *return_screen;
+
+        lv_obj_t *use_warning_sel;
+        lv_obj_t *use_lo_sel;
+        lv_obj_t *lo_slider;
+        lv_obj_t *lo_label;
+        lv_obj_t *use_hi_sel;
+        lv_obj_t *hi_slider;
+        lv_obj_t *hi_label;
+        lv_obj_t *done;
+        lv_obj_t *done_label;
+
+        WarningConfig();
+
+        void init();
+
+        void open(Info *info, lv_obj_t *return_screen);
+
+        void close();
+};
+
 class Configurator : public Screen
 {
     public:
         Info  **infos;
         uint8_t total_num_info;
 
-        Panel *selected_panel;
+        Panel         *selected_panel;
+        WarningConfig *warning_config;
 
         lv_obj_t *flex_col_1;
         lv_obj_t *flex_col_2;
@@ -92,7 +119,9 @@ class Configurator : public Screen
         lv_obj_t *done;
         lv_obj_t *done_label;
 
-        Configurator(Info **info_list, uint8_t total_num_info);
+        Configurator(Info         **info_list,
+                     uint8_t        total_num_info,
+                     WarningConfig *warning_config);
 
         void init();
 
