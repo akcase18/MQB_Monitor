@@ -35,6 +35,9 @@ class Panel
 
         void update();
 
+        bool low_warning_active();
+        bool high_warning_active();
+
         void set_sm_panel();
         void set_lg_panel();
 };

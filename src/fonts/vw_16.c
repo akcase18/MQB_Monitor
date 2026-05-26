@@ -892,7 +892,7 @@ lv_font_t vw_16 = {
     .underline_thickness = 1,
 #endif
     .dsc = &font_dsc,          /*The custom font data. Will be accessed by `get_glyph_bitmap/dsc` */
-    .fallback = NULL,
+    .fallback = &lv_font_montserrat_18,
     .user_data = NULL
 };
 

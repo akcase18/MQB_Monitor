@@ -24,7 +24,7 @@ void Panel::init(lv_obj_t *parent)
         this->btn, &style_panel_btn_sm, LV_STATE_USER_1); // Small Panel
     lv_obj_add_style(
         this->btn, &style_panel_btn_lg, LV_STATE_USER_2); // Large Panel
-    lv_obj_add_style(this->btn, &style_panel_btn_pressed, LV_STATE_PRESSED);
+    lv_obj_add_style(this->btn, &style_btn_pressed, LV_STATE_PRESSED);
 
     // Create the label for the data
     this->data = lv_label_create(btn);
@@ -33,7 +33,8 @@ void Panel::init(lv_obj_t *parent)
         this->data, &style_panel_data_sm, LV_STATE_USER_1); // Small Panel
     lv_obj_add_style(
         this->data, &style_panel_data_lg, LV_STATE_USER_2); // Large Panel
-    // lv_label_set_text(this->data, info->get_data_str().c_str());
+    lv_obj_add_style(this->data, &style_panel_data_lo_warn, LV_STATE_USER_3);
+    lv_obj_add_style(this->data, &style_panel_data_hi_warn, LV_STATE_USER_4);
     lv_obj_center(this->data);
 
     // Create the label for the name
@@ -43,7 +44,6 @@ void Panel::init(lv_obj_t *parent)
         this->label, &style_panel_label_sm, LV_STATE_USER_1); // Small Panel
     lv_obj_add_style(
         this->label, &style_panel_label_lg, LV_STATE_USER_2); // Large Panel
-    // lv_label_set_text(this->label, info->get_name_and_label().c_str());
     lv_obj_set_align(this->label, LV_ALIGN_BOTTOM_MID);
 
     this->initialized = true;
@@ -64,6 +64,22 @@ void Panel::set_info(Info *new_info)
 
 void Panel::update()
 {
+    if (this->info->high_warning_active())
+    {
+        lv_obj_remove_state(this->data, LV_STATE_USER_3);
+        lv_obj_add_state(this->data, LV_STATE_USER_4);
+    }
+    else if (this->info->low_warning_active())
+    {
+        lv_obj_add_state(this->data, LV_STATE_USER_3);
+        lv_obj_remove_state(this->data, LV_STATE_USER_4);
+    }
+    else
+    {
+        lv_obj_remove_state(this->data, LV_STATE_USER_3);
+        lv_obj_remove_state(this->data, LV_STATE_USER_4);
+    }
+
     char data_str[MAX_DATA_LEN];
     info->get_data_str(data_str, sizeof(data_str));
     lv_label_set_text(data, data_str);

@@ -20,19 +20,14 @@ Settings_Screen::Settings_Screen()
 
 void Settings_Screen::init()
 {
-    this->screen = lv_obj_create(NULL);
-    lv_obj_set_size(this->screen, LCD_HORZ, LCD_VERT);
-    lv_obj_center(this->screen);
-    lv_obj_add_style(this->screen, &style_screen, 0);
+    this->screen = create_new_screen();
 
     this->brightness_slider = lv_slider_create(this->screen);
     lv_obj_center(this->brightness_slider);
 
-    this->done = lv_btn_create(this->screen);
-    lv_obj_add_style(this->done, &style_config_done, 0);
-    this->done_label = lv_label_create(this->done);
-    lv_obj_center(this->done_label);
-    lv_label_set_text(this->done_label, LV_SYMBOL_OK);
+    done_btn_t done_btn = create_done_btn(this->screen);
+    this->done          = done_btn.btn;
+    this->done_label    = done_btn.label;
 }
 
 void Settings_Screen::open()

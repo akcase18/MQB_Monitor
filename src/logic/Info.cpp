@@ -99,6 +99,110 @@ void Info::do_transform()
     round_data();
 }
 
+bool Info::get_use_warning()
+{
+    return _use_warning;
+}
+
+void Info::set_use_warning(bool use_warning)
+{
+    _use_warning = use_warning;
+}
+
+bool Info::get_use_hi_warning()
+{
+    if (_use_warning)
+    {
+        return _use_hi_warn;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+void Info::set_use_hi_warning(bool use_hi_warning)
+{
+    if (_use_warning)
+    {
+        _use_hi_warn = use_hi_warning;
+    }
+}
+
+bool Info::get_use_lo_warning()
+{
+    if (_use_warning)
+    {
+        return _use_lo_warn;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+void Info::set_use_lo_warning(bool use_lo_warning)
+{
+    if (_use_warning)
+    {
+        _use_lo_warn = use_lo_warning;
+    }
+}
+
+float Info::get_min_warning()
+{
+    return _warning_min;
+}
+
+void Info::set_min_warning(float min)
+{
+    _warning_min = min;
+}
+
+float Info::get_max_warning()
+{
+    return _warning_max;
+}
+
+void Info::set_max_warning(float max)
+{
+    _warning_max = max;
+}
+
+bool Info::low_warning_active()
+{
+    if (!get_use_lo_warning())
+    {
+        return false;
+    }
+
+    if (get_data() <= get_min_warning())
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+bool Info::high_warning_active()
+{
+    if (!get_use_hi_warning())
+    {
+        return false;
+    }
+
+    if (get_data() >= get_max_warning())
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
 /*==============================================================================
  Private Functions
  =============================================================================*/

@@ -97,11 +97,11 @@ LV_STYLE_CONST_INIT(style_panel_btn_lg, style_panel_btn_lg_props);
  *
  * This will lighten the button a little bit when it is pressed.
  */
-static const lv_style_const_prop_t style_panel_btn_pressed_props[] = {
+static const lv_style_const_prop_t style_btn_pressed_props[] = {
     LV_STYLE_CONST_BG_COLOR(lv_palette_darken(LV_PALETTE_GREY, 3)),
     LV_STYLE_CONST_PROPS_END,
 };
-LV_STYLE_CONST_INIT(style_panel_btn_pressed, style_panel_btn_pressed_props);
+LV_STYLE_CONST_INIT(style_btn_pressed, style_btn_pressed_props);
 
 /**
  * Data - Base
@@ -141,6 +141,28 @@ static const lv_style_const_prop_t style_panel_data_lg_props[] = {
 LV_STYLE_CONST_INIT(style_panel_data_lg, style_panel_data_lg_props);
 
 /**
+ * Data - Low Warning
+ *
+ * Colored background for data to show that low warning is active.
+ */
+static const lv_style_const_prop_t style_panel_data_lo_warn_props[] = {
+    LV_STYLE_CONST_BG_COLOR(lv_palette_darken(LV_PALETTE_BLUE, 2)),
+    LV_STYLE_CONST_PROPS_END,
+};
+LV_STYLE_CONST_INIT(style_panel_data_lo_warn, style_panel_data_lo_warn_props);
+
+/**
+ * Data - High Warning
+ *
+ * Colored background for data to show that high warning is active.
+ */
+static const lv_style_const_prop_t style_panel_data_hi_warn_props[] = {
+    LV_STYLE_CONST_BG_COLOR(lv_palette_darken(LV_PALETTE_RED, 2)),
+    LV_STYLE_CONST_PROPS_END,
+};
+LV_STYLE_CONST_INIT(style_panel_data_hi_warn, style_panel_data_hi_warn_props);
+
+/**
  * Label - Base
  *
  *
@@ -178,7 +200,6 @@ static const lv_style_const_prop_t style_panel_label_lg_props[] = {
 };
 LV_STYLE_CONST_INIT(style_panel_label_lg, style_panel_label_lg_props);
 
-
 /**
  * Information Selection
  *
@@ -187,10 +208,11 @@ LV_STYLE_CONST_INIT(style_panel_label_lg, style_panel_label_lg_props);
 static const lv_style_const_prop_t style_config_info_sel_props[] = {
     LV_STYLE_CONST_BG_COLOR(lv_color_white()),
     LV_STYLE_CONST_TEXT_COLOR(lv_color_black()),
-    // LV_STYLE_CONST_RADIUS(0),
     LV_STYLE_CONST_ALIGN(LV_ALIGN_TOP_LEFT),
+    LV_STYLE_CONST_X(20),
+    LV_STYLE_CONST_Y(20),
     LV_STYLE_CONST_TEXT_FONT(&vw_18),
-    LV_STYLE_CONST_WIDTH((uint32_t)(LCD_X / 3) * 2),
+    LV_STYLE_CONST_WIDTH((uint32_t)((LCD_X / 3) * 2) - 20),
     LV_STYLE_CONST_PROPS_END,
 };
 LV_STYLE_CONST_INIT(style_config_info_sel, style_config_info_sel_props);
@@ -198,26 +220,45 @@ LV_STYLE_CONST_INIT(style_config_info_sel, style_config_info_sel_props);
 /**
  * Radio Button (Unselected)
  */
-static const lv_style_const_prop_t style_config_radio_btn_props[] = {
+static const lv_style_const_prop_t style_config_checkbox_props[] = {
     LV_STYLE_CONST_BG_COLOR(lv_color_black()),
     LV_STYLE_CONST_TEXT_COLOR(lv_color_white()),
     LV_STYLE_CONST_TEXT_FONT(&vw_18),
-    LV_STYLE_CONST_PAD_TOP(5),
-    LV_STYLE_CONST_PAD_BOTTOM(5),
     // LV_STYLE_CONST_OUTLINE_COLOR(lv_color_white()),
     LV_STYLE_CONST_PROPS_END,
 };
-LV_STYLE_CONST_INIT(style_config_radio_btn, style_config_radio_btn_props);
+LV_STYLE_CONST_INIT(style_config_checkbox, style_config_checkbox_props);
 
 /**
  * Radio Button (Selected)
  */
-static const lv_style_const_prop_t style_config_radio_btn_sel_props[] = {
+static const lv_style_const_prop_t style_config_checkbox_sel_props[] = {
     LV_STYLE_CONST_BG_IMAGE_SRC(NULL),
     LV_STYLE_CONST_PROPS_END,
 };
-LV_STYLE_CONST_INIT(style_config_radio_btn_sel,
-                    style_config_radio_btn_sel_props);
+LV_STYLE_CONST_INIT(style_config_checkbox_sel, style_config_checkbox_sel_props);
+
+/**
+ * Radio Button (Disabled)
+ */
+static const lv_style_const_prop_t style_config_disable_props[] = {
+    LV_STYLE_CONST_TEXT_COLOR(lv_palette_darken(LV_PALETTE_GREY, 2)),
+    LV_STYLE_CONST_PROPS_END,
+};
+LV_STYLE_CONST_INIT(style_config_disable, style_config_disable_props);
+
+/**
+ * Slider
+ */
+
+/**
+ * Slider (Disabled)
+ */
+static const lv_style_const_prop_t style_slider_disable_props[] = {
+    LV_STYLE_CONST_BG_COLOR(lv_palette_darken(LV_PALETTE_GREY, 2)),
+    LV_STYLE_CONST_PROPS_END,
+};
+LV_STYLE_CONST_INIT(style_slider_disable, style_slider_disable_props);
 
 /**
  * Done button
@@ -228,7 +269,7 @@ LV_STYLE_CONST_INIT(style_config_radio_btn_sel,
 static const lv_style_const_prop_t style_config_done_props[] = {
     LV_STYLE_CONST_BG_COLOR(lv_color_black()),
     LV_STYLE_CONST_TEXT_COLOR(lv_color_white()),
-    LV_STYLE_CONST_RADIUS(0),
+    LV_STYLE_CONST_RADIUS(5),
     LV_STYLE_CONST_TEXT_FONT(&lv_font_montserrat_32),
     LV_STYLE_CONST_ALIGN(LV_ALIGN_BOTTOM_RIGHT),
     LV_STYLE_CONST_PAD_BOTTOM(20),
@@ -245,7 +286,7 @@ LV_STYLE_CONST_INIT(style_config_done, style_config_done_props);
 static const lv_style_const_prop_t style_config_settings_props[] = {
     LV_STYLE_CONST_BG_COLOR(lv_color_black()),
     LV_STYLE_CONST_TEXT_COLOR(lv_color_white()),
-    LV_STYLE_CONST_RADIUS(0),
+    LV_STYLE_CONST_RADIUS(5),
     LV_STYLE_CONST_TEXT_FONT(&lv_font_montserrat_32),
     LV_STYLE_CONST_ALIGN(LV_ALIGN_BOTTOM_LEFT),
     LV_STYLE_CONST_PAD_BOTTOM(20),
