@@ -11,7 +11,7 @@
 
 namespace
 {
-FlexCAN_T4<CAN3, RX_SIZE_16, TX_SIZE_16> s_bus;
+    FlexCAN_T4<CAN3, RX_SIZE_16, TX_SIZE_16> s_bus;
 }
 
 TeensyCanBus &TeensyCanBus::instance()

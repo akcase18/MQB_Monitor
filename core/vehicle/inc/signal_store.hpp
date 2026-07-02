@@ -14,47 +14,50 @@
 namespace core
 {
 
-struct SignalValue
-{
-        float    value          = 0.0f;
-        bool     has_data       = false;
-        uint32_t last_update_ms = 0;
-};
+    struct SignalValue
+    {
+            float    value          = 0.0f;
+            bool     has_data       = false;
+            uint32_t last_update_ms = 0;
+    };
 
-class SignalStore
-{
-    public:
-        /**
-         * Directly sets a signal's current value, e.g. from
-         * on_uds_response() once all its requests have reported.
-         */
-        void set(uint16_t id, float value, uint32_t now_ms);
+    class SignalStore
+    {
+        public:
+            /**
+             * Directly sets a signal's current value, e.g. from
+             * on_uds_response() once all its requests have reported.
+             */
+            void set(uint16_t id, float value, uint32_t now_ms);
 
-        const SignalValue &get(uint16_t id) const;
+            const SignalValue &get(uint16_t id) const;
 
-        /**
-         * @returns `id`'s current value converted to the requested unit
-         * system and rounded/truncated to that unit type's display
-         * precision (ported from the old Info::convert_units/round_data).
-         */
-        float get_display_value(uint16_t id, bool is_metric) const;
+            /**
+             * @returns `id`'s current value converted to the requested unit
+             * system and rounded/truncated to that unit type's display
+             * precision (ported from the old Info::convert_units/round_data).
+             */
+            float get_display_value(uint16_t id, bool is_metric) const;
 
-        /**
-         * Feeds one decoded UDS response into the store: finds every
-         * catalog request matching (byte1, byte2), decodes `raw` with that
-         * request's offset/scale, and once all of a signal's requests have
-         * reported, recomputes it via SignalSpec::transform.
-         */
-        void on_uds_response(uint8_t byte1, uint8_t byte2, float raw, uint32_t now_ms);
+            /**
+             * Feeds one decoded UDS response into the store: finds every
+             * catalog request matching (byte1, byte2), decodes `raw` with that
+             * request's offset/scale, and once all of a signal's requests have
+             * reported, recomputes it via SignalSpec::transform.
+             */
+            void on_uds_response(uint8_t  byte1,
+                                 uint8_t  byte2,
+                                 float    raw,
+                                 uint32_t now_ms);
 
-    private:
-        static SignalValue s_invalid;
+        private:
+            static SignalValue s_invalid;
 
-        SignalValue values_[SIGNAL_CATALOG_COUNT];
-        float
-            request_raw_[SIGNAL_CATALOG_COUNT][MAX_REQUESTS_PER_SIGNAL] = {};
-        bool
-            request_recv_[SIGNAL_CATALOG_COUNT][MAX_REQUESTS_PER_SIGNAL] = {};
-};
+            SignalValue values_[SIGNAL_CATALOG_COUNT];
+            float request_raw_[SIGNAL_CATALOG_COUNT][MAX_REQUESTS_PER_SIGNAL]
+                = {};
+            bool request_recv_[SIGNAL_CATALOG_COUNT][MAX_REQUESTS_PER_SIGNAL]
+                = {};
+    };
 
 } // namespace core

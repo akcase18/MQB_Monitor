@@ -14,38 +14,38 @@
 namespace core
 {
 
-class ConfigStore
-{
-    public:
-        static constexpr uint16_t MAGIC_NUMBER    = 0xFEA7;
-        static constexpr uint8_t  CURRENT_VERSION = 1;
+    class ConfigStore
+    {
+        public:
+            static constexpr uint16_t MAGIC_NUMBER    = 0xFEA7;
+            static constexpr uint8_t  CURRENT_VERSION = 1;
 
-        explicit ConfigStore(IConfigStore &backing);
+            explicit ConfigStore(IConfigStore &backing);
 
-        Config &get();
+            Config &get();
 
-        /**
-         * Loads from backing storage. Unrecognized magic -> defaults
-         * (and persists them). Older version -> migrate() (and persists
-         * the result). Current version -> full load.
-         */
-        void load();
+            /**
+             * Loads from backing storage. Unrecognized magic -> defaults
+             * (and persists them). Older version -> migrate() (and persists
+             * the result). Current version -> full load.
+             */
+            void load();
 
-        /** Writes the full config back to storage. */
-        void save();
+            /** Writes the full config back to storage. */
+            void save();
 
-        /** Writes only `panels[idx]` back to storage. */
-        void save_panel(uint8_t idx);
+            /** Writes only `panels[idx]` back to storage. */
+            void save_panel(uint8_t idx);
 
-        /** Writes only the given signal's SignalConfig back to storage. */
-        void save_signal(uint16_t signal_id);
+            /** Writes only the given signal's SignalConfig back to storage. */
+            void save_signal(uint16_t signal_id);
 
-    private:
-        void set_defaults();
-        void migrate(uint8_t old_version);
+        private:
+            void set_defaults();
+            void migrate(uint8_t old_version);
 
-        IConfigStore &backing_;
-        Config        config_{};
-};
+            IConfigStore &backing_;
+            Config        config_ {};
+    };
 
 } // namespace core

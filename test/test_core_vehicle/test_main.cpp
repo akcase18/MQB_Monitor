@@ -15,38 +15,42 @@
 
 namespace
 {
-constexpr uint32_t TX_ID = 0x7E0;
-constexpr uint32_t RX_ID = 0x7E8;
+    constexpr uint32_t TX_ID = 0x7E0;
+    constexpr uint32_t RX_ID = 0x7E8;
 
-void on_response(void *ctx, uint8_t byte1, uint8_t byte2, float raw)
-{
-    auto *store = static_cast<core::SignalStore *>(ctx);
-    store->on_uds_response(byte1, byte2, raw, 0);
-}
+    void on_response(void *ctx, uint8_t byte1, uint8_t byte2, float raw)
+    {
+        auto *store = static_cast<core::SignalStore *>(ctx);
+        store->on_uds_response(byte1, byte2, raw, 0);
+    }
 
-/* Deterministic IClock test double — real wall-clock time would make
- * Scheduler's due-task timing flaky under CI. */
-class FakeClock : public IClock
-{
-    public:
-        uint32_t millis() const override
-        {
-            return now_ms;
-        }
+    /* Deterministic IClock test double — real wall-clock time would make
+     * Scheduler's due-task timing flaky under CI. */
+    class FakeClock : public IClock
+    {
+        public:
+            uint32_t millis() const override
+            {
+                return now_ms;
+            }
 
-        uint32_t now_ms = 0;
-};
+            uint32_t now_ms = 0;
+    };
 } // namespace
 
-void setUp() {}
-void tearDown() {}
+void setUp()
+{
+}
+void tearDown()
+{
+}
 
 void test_single_request_round_trip()
 {
     SimulatorCanBus &bus = SimulatorCanBus::instance();
     bus.begin(TX_ID, RX_ID, 500000);
 
-    core::UdsClient  client(bus, TX_ID, RX_ID);
+    core::UdsClient   client(bus, TX_ID, RX_ID);
     core::SignalStore store;
 
     /* Signal 0: Coolant Temp, single request (0xF4, 0x05, offset -40). */
@@ -58,12 +62,10 @@ void test_single_request_round_trip()
     TEST_ASSERT_TRUE(value.has_data);
 
     /* SimulatorCanBus's fake_raw = (byte1*173 + byte2*37) % 4096. */
-    uint16_t fake_raw
-        = static_cast<uint16_t>((spec.requests[0].byte1 * 173u
-                                  + spec.requests[0].byte2 * 37u)
-                                 % 4096u);
+    uint16_t fake_raw = static_cast<uint16_t>(
+        (spec.requests[0].byte1 * 173u + spec.requests[0].byte2 * 37u) % 4096u);
     float expected = (static_cast<float>(fake_raw) + spec.requests[0].offset)
-                    * spec.requests[0].scale;
+                     * spec.requests[0].scale;
     TEST_ASSERT_EQUAL_FLOAT(expected, value.value);
 }
 
@@ -83,8 +85,9 @@ void test_display_value_unit_conversion()
     float imperial = store.get_display_value(spec.id, false);
 
     /* Temp: imperial = metric * 1.8 + 32, then both truncated toward 0. */
-    TEST_ASSERT_EQUAL_FLOAT(static_cast<float>(static_cast<int32_t>(metric * 1.8f + 32.0f)),
-                             imperial);
+    TEST_ASSERT_EQUAL_FLOAT(
+        static_cast<float>(static_cast<int32_t>(metric * 1.8f + 32.0f)),
+        imperial);
 }
 
 void test_multi_request_signal_waits_for_all_requests()
@@ -119,14 +122,12 @@ void test_multi_request_signal_waits_for_all_requests()
 
 void test_scheduler_fires_due_tasks()
 {
-    FakeClock      clock;
+    FakeClock       clock;
     core::Scheduler scheduler(clock);
 
-    int fire_count = 0;
-    core::TaskId id = scheduler.every(
-        100,
-        [](void *ctx) { (*static_cast<int *>(ctx))++; },
-        &fire_count);
+    int          fire_count = 0;
+    core::TaskId id         = scheduler.every(
+        100, [](void *ctx) { (*static_cast<int *>(ctx))++; }, &fire_count);
     TEST_ASSERT_NOT_EQUAL(core::Scheduler::INVALID_TASK, id);
 
     clock.now_ms = 50;

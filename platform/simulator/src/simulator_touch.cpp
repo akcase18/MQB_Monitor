@@ -12,9 +12,9 @@
 
 namespace
 {
-int16_t s_x       = 0;
-int16_t s_y       = 0;
-bool    s_pressed = false;
+    int16_t s_x       = 0;
+    int16_t s_y       = 0;
+    bool    s_pressed = false;
 } // namespace
 
 SimulatorTouch &SimulatorTouch::instance()
