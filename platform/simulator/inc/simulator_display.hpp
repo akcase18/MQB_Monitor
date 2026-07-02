@@ -1,7 +1,7 @@
 /**
  * @file simulator_display.hpp
- * @brief Simulator IDisplay implementation. Phase 1 stub — raw SDL2
- * window/texture wiring lands in Phase 2.
+ * @brief Simulator IDisplay implementation over raw SDL2 (not LVGL's own
+ * SDL driver — see platform/simulator/src/simulator_display.cpp for why).
  */
 #pragma once
 
@@ -24,4 +24,10 @@ class SimulatorDisplay : public IDisplay
 
     private:
         SimulatorDisplay() = default;
+
+        /* Opaque to keep SDL2 out of this header, matching how platform/
+         * vendor headers stay confined to the .cpp files. */
+        void *window_   = nullptr;
+        void *renderer_ = nullptr;
+        void *texture_  = nullptr;
 };

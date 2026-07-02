@@ -1,7 +1,6 @@
 /**
  * @file teensy_display.hpp
- * @brief Teensy IDisplay implementation. Phase 1 stub — no
- * ILI948x_t4_mm wiring yet, see teensy_display.cpp.
+ * @brief Teensy IDisplay implementation, wrapping ILI948x_t4_mm.
  */
 #pragma once
 

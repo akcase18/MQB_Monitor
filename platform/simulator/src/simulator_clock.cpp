@@ -1,9 +1,12 @@
 /**
  * @file simulator_clock.cpp
- * @brief Phase 1 stub. Wired to SDL_GetTicks() in Phase 2.
+ * @brief IClock over SDL_GetTicks().
  */
 
 #include "simulator_clock.hpp"
+
+#define SDL_MAIN_HANDLED
+#include <SDL2/SDL.h>
 
 SimulatorClock &SimulatorClock::instance()
 {
@@ -13,5 +16,5 @@ SimulatorClock &SimulatorClock::instance()
 
 uint32_t SimulatorClock::millis() const
 {
-    return 0;
+    return SDL_GetTicks();
 }
