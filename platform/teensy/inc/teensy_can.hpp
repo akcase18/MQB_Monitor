@@ -1,7 +1,6 @@
 /**
  * @file teensy_can.hpp
- * @brief Teensy ICanBus implementation. Phase 1 stub — no FlexCAN_T4
- * wiring yet, see teensy_can.cpp.
+ * @brief Teensy ICanBus implementation, backed by FlexCAN_T4.
  */
 #pragma once
 

@@ -1,7 +1,6 @@
 /**
  * @file teensy_config_store.hpp
- * @brief Teensy IConfigStore implementation. Phase 1 stub — no EEPROM.h
- * wiring yet, see teensy_config_store.cpp.
+ * @brief Teensy IConfigStore implementation, backed by EEPROM.h.
  */
 #pragma once
 
