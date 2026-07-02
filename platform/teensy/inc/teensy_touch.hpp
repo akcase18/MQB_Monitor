@@ -1,7 +1,7 @@
 /**
  * @file teensy_touch.hpp
- * @brief Teensy ITouch implementation. Phase 1 stub — no raw SPI
- * touch controller wiring yet, see teensy_touch.cpp.
+ * @brief Teensy ITouch implementation. Raw SPI XPT2046-style touch
+ * controller driver, ported from the old Touchscreen class.
  */
 #pragma once
 
@@ -17,4 +17,12 @@ class TeensyTouch : public ITouch
 
     private:
         TeensyTouch() = default;
+
+        int16_t get_single_axis(uint16_t cmd);
+        int16_t get_best_avg(int16_t x, int16_t y, int16_t z);
+        void    poll();
+
+        int16_t x_val_ = 0;
+        int16_t y_val_ = 0;
+        int16_t z_val_ = 0;
 };

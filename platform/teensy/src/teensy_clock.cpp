@@ -1,9 +1,11 @@
 /**
  * @file teensy_clock.cpp
- * @brief Phase 1 stub. Wired to Arduino millis() in Phase 2.
+ * @brief IClock over Arduino millis().
  */
 
 #include "teensy_clock.hpp"
+
+#include <Arduino.h>
 
 TeensyClock &TeensyClock::instance()
 {
@@ -13,5 +15,5 @@ TeensyClock &TeensyClock::instance()
 
 uint32_t TeensyClock::millis() const
 {
-    return 0;
+    return ::millis();
 }
