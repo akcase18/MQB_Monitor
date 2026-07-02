@@ -1,7 +1,9 @@
 /**
  * @file simulator_can.hpp
- * @brief Simulator ICanBus implementation. Phase 1 stub — a synthetic
- * loopback/mock source lands in Phase 2 (there's no real CAN bus on host).
+ * @brief Synthetic ICanBus for the simulator: send() immediately queues a
+ * fabricated UDS response for the next receive(), standing in for a real
+ * ECU so core/can + core/vehicle (and later gui/) can be exercised without
+ * real hardware.
  */
 #pragma once
 
@@ -18,4 +20,12 @@ class SimulatorCanBus : public ICanBus
 
     private:
         SimulatorCanBus() = default;
+
+        static constexpr uint8_t QUEUE_SIZE = 8;
+
+        CanFrame queue_[QUEUE_SIZE] = {};
+        uint8_t  head_              = 0;
+        uint8_t  tail_              = 0;
+        uint8_t  count_             = 0;
+        uint32_t rx_id_             = 0;
 };

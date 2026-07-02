@@ -64,7 +64,7 @@ void loop()
     }
 }
 
-#ifndef ARDUINO
+#if !defined(ARDUINO) && !defined(UNIT_TEST)
 int main()
 {
     setup();
