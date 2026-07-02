@@ -1,7 +1,6 @@
 /**
  * @file simulator_config_store.hpp
- * @brief Simulator IConfigStore implementation. Phase 1 stub — a local
- * file-backed store lands in Phase 2.
+ * @brief Simulator IConfigStore implementation, backed by a local file.
  */
 #pragma once
 

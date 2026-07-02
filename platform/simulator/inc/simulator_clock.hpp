@@ -1,7 +1,6 @@
 /**
  * @file simulator_clock.hpp
- * @brief Simulator IClock implementation. Phase 1 stub — wired to
- * SDL_GetTicks() in Phase 2.
+ * @brief Simulator IClock implementation, wired to SDL_GetTicks().
  */
 #pragma once
 

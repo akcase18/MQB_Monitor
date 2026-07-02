@@ -1,7 +1,6 @@
 /**
  * @file teensy_clock.hpp
- * @brief Teensy IClock implementation. Phase 1 stub — wired to
- * Arduino millis() in Phase 2.
+ * @brief Teensy IClock implementation, wired to Arduino millis().
  */
 #pragma once
 
