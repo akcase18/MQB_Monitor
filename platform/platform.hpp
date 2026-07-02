@@ -74,7 +74,8 @@ class IDisplay
         /**
          * Reports the panel's native resolution.
          */
-        virtual void get_resolution(uint16_t &width, uint16_t &height) const = 0;
+        virtual void get_resolution(uint16_t &width, uint16_t &height) const
+            = 0;
 
         /**
          * Sends the given pixel area to the display to write.
@@ -83,7 +84,8 @@ class IDisplay
          * @param y1     First y-coordinate, inclusive.
          * @param x2     Second x-coordinate, inclusive.
          * @param y2     Second y-coordinate, inclusive.
-         * @param pixels RGB565 pixel buffer to flush, (x2-x1+1)*(y2-y1+1) entries.
+         * @param pixels RGB565 pixel buffer to flush, (x2-x1+1)*(y2-y1+1)
+         * entries.
          */
         virtual void flush(int32_t         x1,
                            int32_t         y1,
@@ -148,9 +150,9 @@ class IConfigStore
     public:
         virtual ~IConfigStore() = default;
 
-        virtual bool read(uint32_t offset, void *buf, size_t len)        = 0;
-        virtual bool write(uint32_t offset, const void *buf, size_t len) = 0;
-        virtual size_t capacity() const                                  = 0;
+        virtual bool   read(uint32_t offset, void *buf, size_t len)        = 0;
+        virtual bool   write(uint32_t offset, const void *buf, size_t len) = 0;
+        virtual size_t capacity() const                                    = 0;
 };
 
 /*==============================================================================

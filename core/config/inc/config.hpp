@@ -15,51 +15,51 @@
 namespace core
 {
 
-constexpr uint8_t MAX_PANELS = 6;
+    constexpr uint8_t MAX_PANELS = 6;
 
-enum class UnitSystem
-{
-    Metric,
-    Imperial
-};
+    enum class UnitSystem
+    {
+        Metric,
+        Imperial
+    };
 
-enum class LayoutOrientation
-{
-    Horizontal,
-    Vertical
-};
+    enum class LayoutOrientation
+    {
+        Horizontal,
+        Vertical
+    };
 
-struct ConfigHeader
-{
-        uint16_t magic;
-        uint8_t  version;
-};
+    struct ConfigHeader
+    {
+            uint16_t magic;
+            uint8_t  version;
+    };
 
-struct Settings
-{
-        uint8_t           day_brightness;
-        uint8_t           night_brightness;
-        uint8_t           num_panels; /* 1-6, active count within MAX_PANELS */
-        LayoutOrientation orientation;
-};
+    struct Settings
+    {
+            uint8_t day_brightness;
+            uint8_t night_brightness;
+            uint8_t num_panels; /* 1-6, active count within MAX_PANELS */
+            LayoutOrientation orientation;
+    };
 
-struct PanelConfig
-{
-        uint16_t   signal_id;
-        UnitSystem units;
-};
+    struct PanelConfig
+    {
+            uint16_t   signal_id;
+            UnitSystem units;
+    };
 
-struct SignalConfig
-{
-        WarningThresholds warn;
-};
+    struct SignalConfig
+    {
+            WarningThresholds warn;
+    };
 
-struct Config
-{
-        ConfigHeader header;
-        Settings     settings;
-        PanelConfig  panels[MAX_PANELS];
-        SignalConfig signals[SIGNAL_CATALOG_COUNT];
-};
+    struct Config
+    {
+            ConfigHeader header;
+            Settings     settings;
+            PanelConfig  panels[MAX_PANELS];
+            SignalConfig signals[SIGNAL_CATALOG_COUNT];
+    };
 
 } // namespace core

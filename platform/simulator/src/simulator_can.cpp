@@ -9,9 +9,9 @@
 
 namespace
 {
-constexpr uint8_t UDS_REQUEST_SID  = 0x22;
-constexpr uint8_t UDS_RESPONSE_SID = 0x62;
-constexpr uint8_t TWO_BYTE_PAYLOAD = 0x05;
+    constexpr uint8_t UDS_REQUEST_SID  = 0x22;
+    constexpr uint8_t UDS_RESPONSE_SID = 0x62;
+    constexpr uint8_t TWO_BYTE_PAYLOAD = 0x05;
 } // namespace
 
 SimulatorCanBus &SimulatorCanBus::instance()
@@ -43,15 +43,15 @@ bool SimulatorCanBus::send(const CanFrame &frame)
 
     CanFrame &response = queue_[head_];
     response.id        = rx_id_;
-    response.len        = 8;
-    response.data[0]    = TWO_BYTE_PAYLOAD;
-    response.data[1]    = UDS_RESPONSE_SID;
-    response.data[2]    = byte1;
-    response.data[3]    = byte2;
-    response.data[4]    = static_cast<uint8_t>(fake_raw >> 8);
-    response.data[5]    = static_cast<uint8_t>(fake_raw & 0xFF);
-    response.data[6]    = 0;
-    response.data[7]    = 0;
+    response.len       = 8;
+    response.data[0]   = TWO_BYTE_PAYLOAD;
+    response.data[1]   = UDS_RESPONSE_SID;
+    response.data[2]   = byte1;
+    response.data[3]   = byte2;
+    response.data[4]   = static_cast<uint8_t>(fake_raw >> 8);
+    response.data[5]   = static_cast<uint8_t>(fake_raw & 0xFF);
+    response.data[6]   = 0;
+    response.data[7]   = 0;
 
     head_ = (head_ + 1) % QUEUE_SIZE;
     count_++;

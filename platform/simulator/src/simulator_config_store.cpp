@@ -13,8 +13,8 @@
 
 namespace
 {
-constexpr size_t     CONFIG_STORE_CAPACITY = 4096;
-constexpr const char *CONFIG_STORE_PATH    = "sim_config.bin";
+    constexpr size_t      CONFIG_STORE_CAPACITY = 4096;
+    constexpr const char *CONFIG_STORE_PATH     = "sim_config.bin";
 } // namespace
 
 SimulatorConfigStore &SimulatorConfigStore::instance()

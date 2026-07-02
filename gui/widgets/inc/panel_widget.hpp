@@ -15,39 +15,51 @@
 namespace gui
 {
 
-constexpr uint8_t PANEL_NAME_LEN       = 24;
-constexpr uint8_t PANEL_UNIT_LABEL_LEN = 10;
-constexpr uint8_t PANEL_VALUE_LEN      = 16;
+    constexpr uint8_t PANEL_NAME_LEN       = 24;
+    constexpr uint8_t PANEL_UNIT_LABEL_LEN = 10;
+    constexpr uint8_t PANEL_VALUE_LEN      = 16;
 
-struct PanelViewModel
-{
-        char name[PANEL_NAME_LEN]       = "";
-        char unit_label[PANEL_UNIT_LABEL_LEN] = "";
-        char value_str[PANEL_VALUE_LEN] = "--";
-        bool large                      = false;
-        bool warn_lo_active             = false;
-        bool warn_hi_active             = false;
-};
+    struct PanelViewModel
+    {
+            char name[PANEL_NAME_LEN]             = "";
+            char unit_label[PANEL_UNIT_LABEL_LEN] = "";
+            char value_str[PANEL_VALUE_LEN]       = "--";
+            bool large                            = false;
+            bool warn_lo_active                   = false;
+            bool warn_hi_active                   = false;
+    };
 
-class PanelWidget
-{
-    public:
-        /** Creates the button/data/label objects under `parent`. */
-        void init(lv_obj_t *parent, const Theme &theme);
+    class PanelWidget
+    {
+        public:
+            /**
+             * Creates the button/data/label objects under `parent`. Sizing is
+             * entirely the parent's responsibility (grid cell, flex, whatever)
+             * — this widget only ever sets its own internal content styling
+             * (fonts/colors/text), never its own width/height, so it works
+             * the same whether previewed standalone or placed by
+             * gui/screens::compute_layout().
+             */
+            void init(lv_obj_t *parent, const Theme &theme);
 
-        /** Applies a new view-model: text, size variant, warning highlight. */
-        void set_view_model(const PanelViewModel &vm);
+            /** Applies a new view-model: text, size variant, warning highlight.
+             */
+            void set_view_model(const PanelViewModel &vm);
 
-        lv_obj_t *button() const
-        {
-            return btn_;
-        }
+            /** Shows/hides the panel without destroying it (for reflows where
+             * the active panel count shrinks). */
+            void set_visible(bool visible);
 
-    private:
-        lv_obj_t     *btn_   = nullptr;
-        lv_obj_t     *data_  = nullptr;
-        lv_obj_t     *label_ = nullptr;
-        const Theme *theme_ = nullptr;
-};
+            lv_obj_t *button() const
+            {
+                return btn_;
+            }
+
+        private:
+            lv_obj_t    *btn_   = nullptr;
+            lv_obj_t    *data_  = nullptr;
+            lv_obj_t    *label_ = nullptr;
+            const Theme *theme_ = nullptr;
+    };
 
 } // namespace gui

@@ -12,11 +12,9 @@
 
 Platform &platform_get()
 {
-    static Platform s_platform{
-        TeensyCanBus::instance(),
-        TeensyDisplay::instance(),
-        TeensyTouch::instance(),
-        TeensyConfigStore::instance(),
+    static Platform s_platform {
+        TeensyCanBus::instance(), TeensyDisplay::instance(),
+        TeensyTouch::instance(),  TeensyConfigStore::instance(),
         TeensyClock::instance(),
     };
     return s_platform;

@@ -14,8 +14,8 @@
 
 namespace
 {
-constexpr uint16_t SIM_HOR_RES = 480;
-constexpr uint16_t SIM_VER_RES = 320;
+    constexpr uint16_t SIM_HOR_RES = 480;
+    constexpr uint16_t SIM_VER_RES = 320;
 } // namespace
 
 SimulatorDisplay &SimulatorDisplay::instance()
@@ -55,20 +55,18 @@ void SimulatorDisplay::get_resolution(uint16_t &width, uint16_t &height) const
     height = SIM_VER_RES;
 }
 
-void SimulatorDisplay::flush(int32_t         x1,
-                             int32_t         y1,
-                             int32_t         x2,
-                             int32_t         y2,
-                             const uint16_t *pixels)
+void SimulatorDisplay::flush(
+    int32_t x1, int32_t y1, int32_t x2, int32_t y2, const uint16_t *pixels)
 {
-    SDL_Rect rect{ x1, y1, x2 - x1 + 1, y2 - y1 + 1 };
+    SDL_Rect rect { x1, y1, x2 - x1 + 1, y2 - y1 + 1 };
     SDL_UpdateTexture(static_cast<SDL_Texture *>(texture_),
                       &rect,
                       pixels,
                       rect.w * static_cast<int>(sizeof(uint16_t)));
 
     SDL_Renderer *renderer = static_cast<SDL_Renderer *>(renderer_);
-    SDL_RenderCopy(renderer, static_cast<SDL_Texture *>(texture_), nullptr, nullptr);
+    SDL_RenderCopy(
+        renderer, static_cast<SDL_Texture *>(texture_), nullptr, nullptr);
     SDL_RenderPresent(renderer);
 }
 

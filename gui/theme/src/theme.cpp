@@ -2,48 +2,49 @@
 
 extern "C"
 {
-extern const lv_font_t digital_display_80_v2;
-extern const lv_font_t digital_display_115_v2;
-extern const lv_font_t vw_16;
-extern const lv_font_t vw_18;
-extern const lv_font_t vw_24;
+    extern const lv_font_t digital_display_80_v2;
+    extern const lv_font_t digital_display_115_v2;
+    extern const lv_font_t vw_16;
+    extern const lv_font_t vw_18;
+    extern const lv_font_t vw_24;
 }
 
 namespace gui
 {
 
-/**
- * Palette, fonts, and metrics ported from the old include/styles.hpp /
- * Screen.hpp: black panels, white text, grey pressed-highlight, blue/red
- * low/high warning highlights; 45%/55% screen-height small/large panels
- * on a 480x320 panel.
- */
-const Theme THEME_DEFAULT = {
-    /* palette */
-    {
-        lv_color_black(),                      /* bg */
-        lv_color_white(),                      /* fg */
-        lv_palette_darken(LV_PALETTE_GREY, 3),  /* accent */
-        lv_palette_darken(LV_PALETTE_BLUE, 2),  /* warn_lo */
-        lv_palette_darken(LV_PALETTE_RED, 2),   /* warn_hi */
-    },
-    /* typography */
-    {
-        &digital_display_80_v2,
-        &digital_display_115_v2,
-        &vw_16,
-        &vw_18,
-        &vw_24,
-    },
-    /* metrics */
-    {
-        480,
-        320,
-        10,
-        4,
-        0.45f,
-        0.55f,
-    },
-};
+    /**
+     * Palette, fonts, and metrics ported from the old include/styles.hpp /
+     * Screen.hpp: black panels, white text, grey pressed-highlight, blue/red
+     * low/high warning highlights; 45%/55% screen-height small/large panels
+     * on a 480x320 panel.
+     */
+    const Theme THEME_DEFAULT = {
+        /* palette */
+        {
+            lv_color_black(),                      /* bg */
+            lv_color_white(),                      /* fg */
+            lv_palette_darken(LV_PALETTE_GREY, 3), /* accent */
+            lv_palette_darken(LV_PALETTE_BLUE, 2), /* warn_lo */
+            lv_palette_darken(LV_PALETTE_RED, 2),  /* warn_hi */
+        },
+        /* typography */
+        {
+            &digital_display_80_v2,
+            &digital_display_115_v2,
+            &vw_16,
+            &vw_18,
+            &vw_24,
+            &lv_font_montserrat_32,
+        },
+        /* metrics */
+        {
+            480,
+            320,
+            10,
+            4,
+            0.45f,
+            0.55f,
+        },
+    };
 
 } // namespace gui

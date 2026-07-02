@@ -14,20 +14,20 @@
 
 namespace
 {
-/* CS1 */
-constexpr uint8_t CS_PIN = 0;
+    /* CS1 */
+    constexpr uint8_t CS_PIN = 0;
 
-constexpr uint16_t X_CMD           = 0x91;
-constexpr uint16_t Y_CMD           = 0xD1;
-constexpr uint16_t Z1_CMD          = 0xB1;
-constexpr uint16_t Z2_CMD          = 0xC1;
-constexpr int16_t  Z_THRESHOLD     = 800;
-constexpr uint32_t MIN_CYCLE_TIME  = 3;
+    constexpr uint16_t X_CMD          = 0x91;
+    constexpr uint16_t Y_CMD          = 0xD1;
+    constexpr uint16_t Z1_CMD         = 0xB1;
+    constexpr uint16_t Z2_CMD         = 0xC1;
+    constexpr int16_t  Z_THRESHOLD    = 800;
+    constexpr uint32_t MIN_CYCLE_TIME = 3;
 
-constexpr uint16_t LCD_HORZ = 480;
-constexpr uint16_t LCD_VERT = 320;
+    constexpr uint16_t LCD_HORZ = 480;
+    constexpr uint16_t LCD_VERT = 320;
 
-uint32_t s_last_poll_tick = 0;
+    uint32_t s_last_poll_tick = 0;
 } // namespace
 
 TeensyTouch &TeensyTouch::instance()
@@ -86,9 +86,9 @@ void TeensyTouch::poll()
 
     if (z < Z_THRESHOLD)
     {
-        z_val_ = 0;
-        x_val_ = 0;
-        y_val_ = 0;
+        z_val_           = 0;
+        x_val_           = 0;
+        y_val_           = 0;
         s_last_poll_tick = curr_tick;
         return;
     }

@@ -12,11 +12,9 @@
 
 Platform &platform_get()
 {
-    static Platform s_platform{
-        SimulatorCanBus::instance(),
-        SimulatorDisplay::instance(),
-        SimulatorTouch::instance(),
-        SimulatorConfigStore::instance(),
+    static Platform s_platform {
+        SimulatorCanBus::instance(), SimulatorDisplay::instance(),
+        SimulatorTouch::instance(),  SimulatorConfigStore::instance(),
         SimulatorClock::instance(),
     };
     return s_platform;
