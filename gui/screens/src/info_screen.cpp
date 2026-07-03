@@ -23,8 +23,8 @@ namespace gui
         press_ctx_   = press_ctx;
 
         screen_ = create_screen(theme);
-        lv_obj_set_style_pad_all(screen_, 0, 0);
-        lv_obj_set_style_pad_gap(screen_, 0, 0);
+        lv_obj_set_style_pad_all(screen_, theme.metrics.screen_margin, 0);
+        lv_obj_set_style_pad_gap(screen_, theme.metrics.panel_gap, 0);
         lv_obj_set_scrollbar_mode(screen_, LV_SCROLLBAR_MODE_OFF);
 
         for (uint8_t i = 0; i < MAX_PANELS; i++)
