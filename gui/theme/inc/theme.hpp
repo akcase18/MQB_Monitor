@@ -43,6 +43,7 @@ namespace gui
             uint16_t screen_height;
             uint8_t  panel_radius;
             uint8_t  panel_gap;
+            uint8_t  screen_margin; /* outer padding around the panel grid */
             float    panel_height_sm_pct; /* fraction of screen_height */
             float    panel_height_lg_pct; /* fraction of screen_height */
     };
@@ -55,5 +56,10 @@ namespace gui
     };
 
     extern const Theme THEME_DEFAULT;
+
+    /** A second, visually distinct variant proving THEME_DEFAULT is the only
+     * lever a reskin needs to pull — swapping which of these is passed to
+     * gui::* screens touches nothing outside gui/theme. */
+    extern const Theme THEME_ALT;
 
 } // namespace gui
