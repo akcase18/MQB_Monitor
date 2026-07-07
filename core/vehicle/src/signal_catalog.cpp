@@ -40,7 +40,9 @@ namespace core
           2000,
           { { 0xF4, 0x05, -40.0f, NO_SCALE } },
           1,
-          transform_default },
+          transform_default,
+          -40.0f,
+          130.0f },
 
         /* Engine Oil Temp */
         { 1,
@@ -49,7 +51,9 @@ namespace core
           1000,
           { { 0x40, 0xD5, NO_OFFSET, 0.1f } },
           1,
-          transform_default },
+          transform_default,
+          -40.0f,
+          150.0f },
 
         /* Intake Air Temp */
         { 2,
@@ -58,7 +62,9 @@ namespace core
           100,
           { { 0xF4, 0x0F, -40.0f, NO_SCALE } },
           1,
-          transform_default },
+          transform_default,
+          -40.0f,
+          80.0f },
 
         /* Charge Pressure */
         { 3,
@@ -67,7 +73,9 @@ namespace core
           100,
           { { 0x20, 0x2A, NO_OFFSET, 0.001f } },
           1,
-          transform_default },
+          transform_default,
+          0.0f,
+          3.0f },
 
         /* Intake Pressure */
         { 4,
@@ -76,7 +84,9 @@ namespace core
           20,
           { { 0x3E, 0x70, NO_OFFSET, 0.001f } },
           1,
-          transform_default },
+          transform_default,
+          0.0f,
+          3.0f },
 
         /* Ambient Pressure */
         { 5,
@@ -85,7 +95,9 @@ namespace core
           1000,
           { { 0x13, 0xCA, NO_OFFSET, 0.0001f } },
           1,
-          transform_default },
+          transform_default,
+          0.8f,
+          1.1f },
 
         /* Actual Intake Pressure (intake minus ambient) */
         { 6,
@@ -95,7 +107,9 @@ namespace core
           { { 0x13, 0xCA, NO_OFFSET, 0.0001f },
             { 0x3E, 0x70, NO_OFFSET, 0.001f } },
           2,
-          transform_actual_intake_pressure },
+          transform_actual_intake_pressure,
+          -1.0f,
+          2.0f },
 
         /* Engine RPM */
         { 7,
@@ -104,7 +118,9 @@ namespace core
           20,
           { { 0x20, 0x6E, NO_OFFSET, NO_SCALE } },
           1,
-          transform_default },
+          transform_default,
+          0.0f,
+          7000.0f },
 
         /* Engine Torque */
         { 8,
@@ -113,7 +129,9 @@ namespace core
           20,
           { { 0x43, 0x7C, NO_OFFSET, 0.1f } },
           1,
-          transform_default },
+          transform_default,
+          0.0f,
+          500.0f },
 
         /* Vehicle Speed */
         { 9,
@@ -122,7 +140,9 @@ namespace core
           100,
           { { 0x20, 0x33, NO_OFFSET, 0.01f } },
           1,
-          transform_default },
+          transform_default,
+          0.0f,
+          300.0f },
 
         /* Fuel Level (Volume) */
         { 10,
@@ -131,7 +151,9 @@ namespace core
           5000,
           { { 0x22, 0x06, NO_OFFSET, NO_SCALE } },
           1,
-          transform_default },
+          transform_default,
+          0.0f,
+          70.0f },
 
         /* Fuel Level (Percentage) */
         { 11,
@@ -140,7 +162,9 @@ namespace core
           5000,
           { { 0xF4, 0x2F, NO_OFFSET, 1.0f / 2.55f } },
           1,
-          transform_default },
+          transform_default,
+          0.0f,
+          100.0f },
 
         /* Throttle Position */
         { 12,
@@ -149,7 +173,9 @@ namespace core
           20,
           { { 0xF4, 0x11, NO_OFFSET, 1.0f / 2.55f } },
           1,
-          transform_default },
+          transform_default,
+          0.0f,
+          100.0f },
 
         /* Misfires (Sum) */
         { 13,
@@ -158,7 +184,9 @@ namespace core
           500,
           { { 0x29, 0x04, NO_OFFSET, NO_SCALE } },
           1,
-          transform_default },
+          transform_default,
+          0.0f,
+          500.0f },
 
         /* Misfires (Cylinder 1-4) */
         { 14,
@@ -167,28 +195,36 @@ namespace core
           500,
           { { 0x29, 0x66, NO_OFFSET, NO_SCALE } },
           1,
-          transform_default },
+          transform_default,
+          0.0f,
+          200.0f },
         { 15,
           "Misfire Cnt Cyl 2",
           UnitType::None,
           500,
           { { 0x29, 0x67, NO_OFFSET, NO_SCALE } },
           1,
-          transform_default },
+          transform_default,
+          0.0f,
+          200.0f },
         { 16,
           "Misfire Cnt Cyl 3",
           UnitType::None,
           500,
           { { 0x29, 0x68, NO_OFFSET, NO_SCALE } },
           1,
-          transform_default },
+          transform_default,
+          0.0f,
+          200.0f },
         { 17,
           "Misfire Cnt Cyl 4",
           UnitType::None,
           500,
           { { 0x29, 0x69, NO_OFFSET, NO_SCALE } },
           1,
-          transform_default },
+          transform_default,
+          0.0f,
+          200.0f },
 
         /* Timing Correction (Cylinder 1-4) */
         { 18,
@@ -197,28 +233,36 @@ namespace core
           100,
           { { 0x20, 0x0A, NO_OFFSET, 0.01f } },
           1,
-          transform_default },
+          transform_default,
+          -10.0f,
+          10.0f },
         { 19,
           "Time Corr. Cyl 2",
           UnitType::Degrees,
           100,
           { { 0x20, 0x0B, NO_OFFSET, 0.01f } },
           1,
-          transform_default },
+          transform_default,
+          -10.0f,
+          10.0f },
         { 20,
           "Time Corr. Cyl 3",
           UnitType::Degrees,
           100,
           { { 0x20, 0x0C, NO_OFFSET, 0.01f } },
           1,
-          transform_default },
+          transform_default,
+          -10.0f,
+          10.0f },
         { 21,
           "Time Corr. Cyl 4",
           UnitType::Degrees,
           100,
           { { 0x20, 0x0D, NO_OFFSET, 0.01f } },
           1,
-          transform_default },
+          transform_default,
+          -10.0f,
+          10.0f },
     };
 
     static_assert(
@@ -243,21 +287,21 @@ namespace core
         switch (type)
         {
             case UnitType::Degrees:
-                return "[°]";
+                return "°";
             case UnitType::Percent:
-                return "[%]";
+                return "%";
             case UnitType::Pressure:
-                return is_metric ? "[bar]" : "[psi]";
+                return is_metric ? "bar" : "psi";
             case UnitType::RPM:
-                return "[rpm]";
+                return "rpm";
             case UnitType::Speed:
-                return is_metric ? "[kph]" : "[mph]";
+                return is_metric ? "kph" : "mph";
             case UnitType::Temp:
-                return is_metric ? "[°C]" : "[°F]";
+                return is_metric ? "°C" : "°F";
             case UnitType::Torque:
-                return is_metric ? "[Nm]" : "[ft/lbs]";
+                return is_metric ? "Nm" : "lb-ft";
             case UnitType::Volume:
-                return is_metric ? "[L]" : "[gal]";
+                return is_metric ? "L" : "gal";
             case UnitType::None:
             default:
                 return "";
@@ -274,6 +318,29 @@ namespace core
                 return 1;
             default:
                 return 0;
+        }
+    }
+
+    float warning_step(UnitType type)
+    {
+        switch (type)
+        {
+            case UnitType::Pressure:
+                return 0.1f;
+            case UnitType::RPM:
+                return 50.0f;
+            case UnitType::Speed:
+                return 5.0f;
+            case UnitType::Torque:
+                return 10.0f;
+            case UnitType::None:
+                return 5.0f;
+            case UnitType::Temp:
+            case UnitType::Degrees:
+            case UnitType::Percent:
+            case UnitType::Volume:
+            default:
+                return 1.0f;
         }
     }
 
@@ -294,6 +361,26 @@ namespace core
             case UnitType::None:
             default:
                 return metric_value;
+        }
+    }
+
+    float unit_convert_to_metric(UnitType type, float imperial_value)
+    {
+        switch (type)
+        {
+            case UnitType::Pressure:
+                return imperial_value / 14.5038f;
+            case UnitType::Speed:
+                return imperial_value * 1.609f;
+            case UnitType::Temp:
+                return (imperial_value - 32.0f) / 1.8f;
+            case UnitType::Torque:
+                return imperial_value / 0.7375621493f;
+            case UnitType::Volume:
+                return imperial_value * 3.785f;
+            case UnitType::None:
+            default:
+                return imperial_value;
         }
     }
 

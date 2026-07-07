@@ -5,8 +5,6 @@ namespace gui
 
     namespace
     {
-        constexpr uint8_t BAND_UNITS = 6;
-
         void fill_band(PanelSlot *out,
                        uint8_t    start_index,
                        uint8_t    band_count,
@@ -53,7 +51,7 @@ namespace gui
             count = MAX_PANELS;
         }
 
-        if (count <= 3)
+        if (count <= 2)
         {
             uint8_t colspan = static_cast<uint8_t>(BAND_UNITS / count);
             for (uint8_t i = 0; i < count; i++)
@@ -65,6 +63,15 @@ namespace gui
                 out[i].large   = true;
             }
         }
+        else if (count == 3)
+        {
+            /* Two stacked minors on the left, one wide hero on the right —
+             * lower indices are the smaller panels, matching the small-
+             * band-first convention used by the count > 3 case below. */
+            out[0] = { 0, 0, STACK_COLSPAN, 1, false };
+            out[1] = { 0, 1, STACK_COLSPAN, 1, false };
+            out[2] = { STACK_COLSPAN, 0, HERO_COLSPAN, 2, true };
+        }
         else
         {
             uint8_t small_count
@@ -73,6 +80,24 @@ namespace gui
 
             fill_band(out, 0, small_count, 0, false);
             fill_band(out, small_count, large_count, 1, true);
+
+            /* 4 and 6 are even splits where every cell is the same size —
+             * unlike 5 (today's fixed layout, kept as-is), there's no
+             * small/large distinction to preserve here. */
+            if (count == 4)
+            {
+                for (uint8_t i = 0; i < count; i++)
+                {
+                    out[i].large = true;
+                }
+            }
+            else if (count == 6)
+            {
+                for (uint8_t i = 0; i < count; i++)
+                {
+                    out[i].large = false;
+                }
+            }
         }
 
         if (orientation == LayoutOrientation::Vertical)

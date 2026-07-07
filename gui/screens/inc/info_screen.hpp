@@ -20,8 +20,10 @@ namespace gui
     class InfoScreen
     {
         public:
-            using ViewModelBuilder
-                = PanelViewModel (*)(void *ctx, uint8_t panel_idx, bool large);
+            using ViewModelBuilder   = PanelViewModel (*)(void   *ctx,
+                                                          uint8_t panel_idx,
+                                                          bool    large,
+                                                          bool    hero);
             using PanelPressCallback = void (*)(void *ctx, uint8_t panel_idx);
 
             void init(const Theme       &theme,
@@ -61,8 +63,12 @@ namespace gui
 
             PanelWidget panels_[MAX_PANELS];
             bool        panel_large_[MAX_PANELS] = {};
-            ClickCtx    click_ctx_[MAX_PANELS]   = {};
-            uint8_t     num_panels_              = 0;
+            /** True for the truly roomy full-height slots — count 1's
+             * panel and count 3's hero, not count 2's narrower columns —
+             * derived from PanelSlot::rowspan/colspan in rebuild(). */
+            bool     panel_hero_[MAX_PANELS] = {};
+            ClickCtx click_ctx_[MAX_PANELS]  = {};
+            uint8_t  num_panels_             = 0;
 
             lv_coord_t col_dsc_[MAX_PANELS + 1] = {};
             lv_coord_t row_dsc_[MAX_PANELS + 1] = {};

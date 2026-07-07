@@ -5,11 +5,6 @@
 namespace gui
 {
 
-    namespace
-    {
-        constexpr uint8_t BAND_UNITS = 6;
-    } // namespace
-
     void InfoScreen::init(const Theme       &theme,
                           ViewModelBuilder   builder,
                           void              *builder_ctx,
@@ -66,10 +61,21 @@ namespace gui
         }
         band_dsc[band_axis_len] = LV_GRID_TEMPLATE_LAST;
 
-        split_dsc[0] = LV_GRID_FR(
-            static_cast<int32_t>(theme_->metrics.panel_height_sm_pct * 100.0f));
-        split_dsc[1] = LV_GRID_FR(
-            static_cast<int32_t>(theme_->metrics.panel_height_lg_pct * 100.0f));
+        /* Only the fixed 5-panel layout keeps the small/large band split —
+         * every other count either has no meaningful row split (1/2, both
+         * rows fully spanned) or wants equal-sized cells (3/4/6), so it
+         * splits 50/50 instead of pulling the theme's legacy sm/lg
+         * fractions. */
+        float sm_pct = 0.5f;
+        float lg_pct = 0.5f;
+        if (count == 5)
+        {
+            sm_pct = theme_->metrics.panel_height_sm_pct;
+            lg_pct = theme_->metrics.panel_height_lg_pct;
+        }
+
+        split_dsc[0] = LV_GRID_FR(static_cast<int32_t>(sm_pct * 100.0f));
+        split_dsc[1] = LV_GRID_FR(static_cast<int32_t>(lg_pct * 100.0f));
         split_dsc[2] = LV_GRID_TEMPLATE_LAST;
 
         lv_obj_set_grid_dsc_array(screen_, col_dsc_, row_dsc_);
@@ -93,6 +99,11 @@ namespace gui
                                  slot.row,
                                  slot.rowspan);
             panel_large_[i] = slot.large;
+            /* rowspan==2 alone would also catch count 2's columns, which
+             * are tall but only a third of the screen wide — nowhere near
+             * as roomy as count 1's full-width panel or count 3's hero, so
+             * they don't get the huge hero-only Digital font. */
+            panel_hero_[i] = slot.rowspan == 2 && slot.colspan >= 4;
         }
 
         num_panels_ = count;
@@ -108,13 +119,26 @@ namespace gui
 
         for (uint8_t i = 0; i < num_panels_; i++)
         {
-            PanelViewModel vm = builder_(builder_ctx_, i, panel_large_[i]);
+            PanelViewModel vm
+                = builder_(builder_ctx_, i, panel_large_[i], panel_hero_[i]);
             panels_[i].set_view_model(vm);
         }
     }
 
     void InfoScreen::panel_clicked_cb(lv_event_t *e)
     {
+        /* LVGL fires CLICKED on release whenever no ancestor actually
+         * scrolled, even if the press traveled far enough to also fire a
+         * GESTURE (this screen doesn't scroll, so a swipe-to-open-Settings
+         * that starts on a panel would otherwise open that panel too).
+         * gesture_dir stays set for the rest of this press once a gesture
+         * fires, so this reliably tells a real tap from a swipe that
+         * happened to start on a panel. */
+        if (lv_indev_get_gesture_dir(lv_indev_active()) != LV_DIR_NONE)
+        {
+            return;
+        }
+
         auto *ctx = static_cast<ClickCtx *>(lv_event_get_user_data(e));
         if (ctx->screen->press_cb_ != nullptr)
         {

@@ -23,26 +23,35 @@ namespace gui
 
             /**
              * Builds panel_idx's view-model from whatever signal it's
-             * currently assigned to. `large` is a layout decision (see
-             * gui/screens/layout.hpp), passed through rather than derived
-             * from vehicle data.
+             * currently assigned to. `large`/`hero` are layout decisions
+             * (see gui/screens/layout.hpp), passed through rather than
+             * derived from vehicle data.
              */
             PanelViewModel build_view_model(uint8_t panel_idx,
-                                            bool    large) const;
+                                            bool    large,
+                                            bool    hero) const;
 
-            /** Reassigns panel_idx to a different signal/unit system, persisted
-             * immediately. */
+            /** Reassigns panel_idx to a different signal/unit system/display
+             * mode, persisted immediately. */
             void apply_configurator_change(uint8_t          panel_idx,
                                            uint16_t         new_signal_id,
-                                           core::UnitSystem units);
+                                           core::UnitSystem units,
+                                           DisplayMode      mode);
 
             /** Reads signal_id's current warning thresholds, for opening
-             * WarningConfigScreen. */
+             * WarningConfigScreen. `is_metric` is the unit system of the
+             * panel that's opening the editor — lo/hi/min_value/max_value/
+             * step come back already converted to that unit system, since
+             * editing e.g. a Fahrenheit-displayed signal's threshold in its
+             * native Celsius storage unit would show a confusingly wrong
+             * number. */
             WarningThresholdViewModel read_warning_thresholds(
-                uint16_t signal_id) const;
+                uint16_t signal_id, bool is_metric) const;
 
             /** Updates signal_id's warning thresholds, persisted immediately.
-             */
+             * `vm.lo`/`vm.hi` are converted from `vm.is_metric`'s unit
+             * system back to the signal's native (metric) storage unit
+             * before saving. */
             void apply_warning_change(uint16_t signal_id,
                                       const WarningThresholdViewModel &vm);
 

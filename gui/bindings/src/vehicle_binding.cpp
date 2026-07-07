@@ -7,6 +7,37 @@
 namespace gui
 {
 
+    namespace
+    {
+        DisplayMode to_gui_display_mode(core::DisplayMode mode)
+        {
+            switch (mode)
+            {
+                case core::DisplayMode::Bar:
+                    return DisplayMode::Bar;
+                case core::DisplayMode::Gauge:
+                    return DisplayMode::Gauge;
+                case core::DisplayMode::Digital:
+                default:
+                    return DisplayMode::Digital;
+            }
+        }
+
+        core::DisplayMode to_core_display_mode(DisplayMode mode)
+        {
+            switch (mode)
+            {
+                case DisplayMode::Bar:
+                    return core::DisplayMode::Bar;
+                case DisplayMode::Gauge:
+                    return core::DisplayMode::Gauge;
+                case DisplayMode::Digital:
+                default:
+                    return core::DisplayMode::Digital;
+            }
+        }
+    } // namespace
+
     VehicleBinding::VehicleBinding(core::SignalStore &signals,
                                    core::ConfigStore &config)
         : signals_(signals)
@@ -15,10 +46,12 @@ namespace gui
     }
 
     PanelViewModel VehicleBinding::build_view_model(uint8_t panel_idx,
-                                                    bool    large) const
+                                                    bool    large,
+                                                    bool    hero) const
     {
         PanelViewModel vm {};
         vm.large = large;
+        vm.hero  = hero;
 
         if (panel_idx >= core::MAX_PANELS)
         {
@@ -63,24 +96,38 @@ namespace gui
         vm.warn_lo_active = warn.lo_active;
         vm.warn_hi_active = warn.hi_active;
 
+        vm.mode = to_gui_display_mode(panel.display_mode);
+        if (vm.mode != DisplayMode::Digital && value.has_data)
+        {
+            float range  = spec.display_max - spec.display_min;
+            float pct    = (range > 0.0f)
+                               ? (value.value - spec.display_min) / range
+                               : 0.0f;
+            vm.range_pct = pct < 0.0f ? 0.0f : (pct > 1.0f ? 1.0f : pct);
+        }
+
         return vm;
     }
 
     void VehicleBinding::apply_configurator_change(uint8_t  panel_idx,
                                                    uint16_t new_signal_id,
-                                                   core::UnitSystem units)
+                                                   core::UnitSystem units,
+                                                   DisplayMode      mode)
     {
         if (panel_idx >= core::MAX_PANELS)
         {
             return;
         }
 
-        config_.get().panels[panel_idx] = { new_signal_id, units };
+        core::PanelConfig &panel = config_.get().panels[panel_idx];
+        panel.signal_id          = new_signal_id;
+        panel.units              = units;
+        panel.display_mode       = to_core_display_mode(mode);
         config_.save_panel(panel_idx);
     }
 
     WarningThresholdViewModel VehicleBinding::read_warning_thresholds(
-        uint16_t signal_id) const
+        uint16_t signal_id, bool is_metric) const
     {
         WarningThresholdViewModel vm {};
 
@@ -90,12 +137,45 @@ namespace gui
             return vm;
         }
 
+        const core::SignalSpec        &spec = core::SIGNAL_CATALOG[catalog_idx];
         const core::WarningThresholds &warn
             = config_.get().signals[catalog_idx].warn;
         vm.use_lo = warn.use_lo;
         vm.use_hi = warn.use_hi;
-        vm.lo     = warn.lo;
-        vm.hi     = warn.hi;
+
+        float lo        = warn.lo;
+        float hi        = warn.hi;
+        float min_value = spec.display_min;
+        float max_value = spec.display_max;
+        float step      = core::warning_step(spec.unit_type);
+
+        if (!is_metric)
+        {
+            lo = core::unit_convert_to_imperial(spec.unit_type, lo);
+            hi = core::unit_convert_to_imperial(spec.unit_type, hi);
+            min_value
+                = core::unit_convert_to_imperial(spec.unit_type, min_value);
+            max_value
+                = core::unit_convert_to_imperial(spec.unit_type, max_value);
+            /* step is a delta, not an absolute value — only the
+             * conversion's multiplicative scale applies, not Temp's +32
+             * offset, so subtract off the zero-point's converted value. */
+            step = core::unit_convert_to_imperial(spec.unit_type, step)
+                   - core::unit_convert_to_imperial(spec.unit_type, 0.0f);
+        }
+
+        vm.lo        = lo;
+        vm.hi        = hi;
+        vm.min_value = min_value;
+        vm.max_value = max_value;
+        vm.step      = step;
+        vm.decimals  = core::unit_decimals(spec.unit_type, is_metric);
+        vm.is_metric = is_metric;
+        snprintf(vm.name, sizeof(vm.name), "%s", spec.name);
+        snprintf(vm.unit_label,
+                 sizeof(vm.unit_label),
+                 "%s",
+                 core::unit_label(spec.unit_type, is_metric));
         return vm;
     }
 
@@ -108,9 +188,17 @@ namespace gui
             return;
         }
 
-        core::WarningThresholds thresholds {
-            vm.lo, vm.hi, vm.use_lo, vm.use_hi
-        };
+        const core::SignalSpec &spec = core::SIGNAL_CATALOG[catalog_idx];
+
+        float lo = vm.lo;
+        float hi = vm.hi;
+        if (!vm.is_metric)
+        {
+            lo = core::unit_convert_to_metric(spec.unit_type, lo);
+            hi = core::unit_convert_to_metric(spec.unit_type, hi);
+        }
+
+        core::WarningThresholds thresholds { lo, hi, vm.use_lo, vm.use_hi };
         config_.get().signals[catalog_idx].warn = thresholds;
         config_.save_signal(signal_id);
     }

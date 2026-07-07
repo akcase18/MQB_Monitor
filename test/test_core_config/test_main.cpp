@@ -80,6 +80,31 @@ void test_defaults_on_blank_storage()
     TEST_ASSERT_EQUAL_UINT16(12, cfg.panels[1].signal_id); // Throttle Pos
     TEST_ASSERT_EQUAL_UINT16(
         8, cfg.panels[5].signal_id); // Engine Torque (inactive slot)
+
+    for (uint8_t i = 0; i < core::MAX_PANELS; i++)
+    {
+        TEST_ASSERT_TRUE(core::DisplayMode::Digital
+                         == cfg.panels[i].display_mode);
+    }
+}
+
+void test_display_mode_round_trips_via_save_panel()
+{
+    FakeConfigStore backing;
+
+    core::ConfigStore store(backing);
+    store.load();
+
+    store.get().panels[2].display_mode = core::DisplayMode::Gauge;
+    store.save_panel(2);
+
+    core::ConfigStore store2(backing);
+    store2.load();
+
+    TEST_ASSERT_TRUE(core::DisplayMode::Gauge
+                     == store2.get().panels[2].display_mode);
+    TEST_ASSERT_TRUE(core::DisplayMode::Digital
+                     == store2.get().panels[0].display_mode); // untouched
 }
 
 void test_load_round_trips_after_modification()
@@ -196,6 +221,7 @@ int main(int argc, char **argv)
 
     UNITY_BEGIN();
     RUN_TEST(test_defaults_on_blank_storage);
+    RUN_TEST(test_display_mode_round_trips_via_save_panel);
     RUN_TEST(test_load_round_trips_after_modification);
     RUN_TEST(test_save_panel_only_writes_that_slot);
     RUN_TEST(test_save_signal_only_writes_that_slot);

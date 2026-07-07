@@ -12,6 +12,16 @@ namespace gui
 {
 
     constexpr uint8_t MAX_PANELS = 6;
+    constexpr uint8_t BAND_UNITS = 6;
+
+    /**
+     * count == 3's hero/stack width split, in units of BAND_UNITS — a
+     * starting point pending an on-hardware check of what actually reads
+     * well at arm's length. Adjust both together; they must sum to
+     * BAND_UNITS.
+     */
+    constexpr uint8_t HERO_COLSPAN  = 4;
+    constexpr uint8_t STACK_COLSPAN = BAND_UNITS - HERO_COLSPAN;
 
     enum class LayoutOrientation
     {
@@ -38,12 +48,15 @@ namespace gui
 
     /**
      * Computes slot positions for `count` panels (clamped to 1-6) in the
-     * given orientation.
+     * given orientation. Each count gets its own shape:
      *
-     * count <= 3: a single full-span band (`large` = true), split evenly.
-     * count >= 4: ceil(count/2) panels in the small band, the rest in the
-     * large band — e.g. count=5 gives 3 small + 2 large, matching the old
-     * fixed 5-panel layout exactly.
+     * 1: one full-screen panel.
+     * 2: two equal full-height columns.
+     * 3: a wide hero (large) plus two stacked minors (small) — not three
+     *    narrow columns.
+     * 4: an even 2x2, all panels the same size (large).
+     * 5: 3 small panels over 2 large ones, matching the old fixed layout.
+     * 6: an even 2x3, all panels the same size (small).
      *
      * @returns The number of slots written to `out` (the clamped count).
      */

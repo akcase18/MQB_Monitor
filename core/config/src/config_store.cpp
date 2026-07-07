@@ -91,6 +91,8 @@ namespace core
         config_.settings.night_brightness = 20;
         config_.settings.num_panels       = 5;
         config_.settings.orientation      = LayoutOrientation::Horizontal;
+        config_.settings.accent_color
+            = 0x4CAF50; /* green, gui::ACCENT_PRESETS[0] */
 
         /* Ported from the old EEPROM_Handler::set_defaults(). info_list's
          * declaration order there matches SIGNAL_CATALOG's id assignment here
@@ -112,11 +114,11 @@ namespace core
 
     void ConfigStore::migrate(uint8_t old_version)
     {
-        /* CURRENT_VERSION is 1 — the first version of this schema, so there's
-         * nothing older to convert from yet. Any unrecognized version resets
-         * to defaults, matching the old EEPROM_Handler's fallback for unknown
-         * versions. Future version bumps add real field-by-field migration
-         * here, keyed on old_version. */
+        /* No device has shipped with saved config yet, so every version
+         * bump so far just resets to defaults rather than converting old
+         * fields — matching the old EEPROM_Handler's fallback for unknown
+         * versions. Once something has actually shipped, this needs real
+         * field-by-field migration keyed on old_version instead. */
         (void)old_version;
         set_defaults();
     }

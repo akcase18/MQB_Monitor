@@ -43,6 +43,17 @@ namespace core
              * offset/scaled) into the signal's displayed value.
              */
             float (*transform)(const float *raw_values, uint8_t n);
+
+            /**
+             * Full-scale bounds for this signal, in the same native
+             * (metric) unit its raw value is stored/compared in — scales a
+             * Bar/Gauge panel's fill and bounds the warning-threshold
+             * editor's +/- buttons. Sensible engineering defaults, not a
+             * per-vehicle-tuned range (that's a future phone-app feature);
+             * unbounded counters (misfires) get a generous, arbitrary cap.
+             */
+            float display_min;
+            float display_max;
     };
 
     extern const SignalSpec SIGNAL_CATALOG[];
@@ -66,9 +77,24 @@ namespace core
     uint8_t unit_decimals(UnitType type, bool is_metric);
 
     /**
+     * @returns The +/- step size for adjusting this unit type's warning
+     * thresholds (see SignalSpec::display_min/max) — one tap/repeat-tick's
+     * worth of adjustment, in the same native (metric) unit.
+     */
+    float warning_step(UnitType type);
+
+    /**
      * Converts a metric value to imperial for the given unit type. No-op for
      * unit types with no imperial conversion (None, Degrees, Percent, RPM).
      */
     float unit_convert_to_imperial(UnitType type, float metric_value);
+
+    /**
+     * Inverse of unit_convert_to_imperial — converts an imperial value back
+     * to the signal's native (metric) storage/comparison unit. Needed by
+     * the warning-threshold editor, which edits in whichever unit system
+     * the panel currently displays but must persist/compare in metric.
+     */
+    float unit_convert_to_metric(UnitType type, float imperial_value);
 
 } // namespace core

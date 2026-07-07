@@ -27,4 +27,17 @@ namespace gui
      */
     DoneButton create_done_button(lv_obj_t *parent, const Theme &theme);
 
+    /** A borderless, shadowless top-right X close button — the exit control
+     * WarningConfigScreen/SettingsScreen/ConfiguratorScreen/
+     * SignalPickerScreen use instead of the bottom-right checkmark, freeing
+     * the rest of the screen for a nav bar (title + this button) over
+     * stacked, divider-separated sections. */
+    DoneButton create_close_button(lv_obj_t *parent, const Theme &theme);
+
+    /** A full-width, theme-colored 2px horizontal rule at `y` — separates
+     * the stacked sections under a nav bar. */
+    lv_obj_t *create_divider(lv_obj_t    *parent,
+                             const Theme &theme,
+                             lv_coord_t   y);
+
 } // namespace gui
