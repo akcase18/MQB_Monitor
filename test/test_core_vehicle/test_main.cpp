@@ -120,6 +120,37 @@ void test_multi_request_signal_waits_for_all_requests()
     TEST_ASSERT_EQUAL_FLOAT(expected, store.get(spec.id).value);
 }
 
+void test_signal_catalog_display_ranges_are_valid()
+{
+    for (size_t i = 0; i < core::SIGNAL_CATALOG_COUNT; i++)
+    {
+        const core::SignalSpec &spec = core::SIGNAL_CATALOG[i];
+        TEST_ASSERT_TRUE_MESSAGE(spec.display_min < spec.display_max,
+                                 spec.name);
+        TEST_ASSERT_TRUE_MESSAGE(core::warning_step(spec.unit_type) > 0.0f,
+                                 spec.name);
+    }
+}
+
+void test_unit_convert_round_trips()
+{
+    /* Regression for the warning-editor bug where a signal's imperial-unit
+     * threshold was silently compared/edited against its metric value —
+     * to_imperial(to_metric(x)) must return x for every convertible type. */
+    const core::UnitType types[] = { core::UnitType::Pressure,
+                                     core::UnitType::Speed,
+                                     core::UnitType::Temp,
+                                     core::UnitType::Torque,
+                                     core::UnitType::Volume };
+    for (core::UnitType type : types)
+    {
+        float metric     = 42.0f;
+        float imperial   = core::unit_convert_to_imperial(type, metric);
+        float round_trip = core::unit_convert_to_metric(type, imperial);
+        TEST_ASSERT_FLOAT_WITHIN(0.001f, metric, round_trip);
+    }
+}
+
 void test_scheduler_fires_due_tasks()
 {
     FakeClock       clock;
@@ -156,6 +187,8 @@ int main(int argc, char **argv)
     RUN_TEST(test_single_request_round_trip);
     RUN_TEST(test_display_value_unit_conversion);
     RUN_TEST(test_multi_request_signal_waits_for_all_requests);
+    RUN_TEST(test_signal_catalog_display_ranges_are_valid);
+    RUN_TEST(test_unit_convert_round_trips);
     RUN_TEST(test_scheduler_fires_due_tasks);
     return UNITY_END();
 }

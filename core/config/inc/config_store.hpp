@@ -17,8 +17,12 @@ namespace core
     class ConfigStore
     {
         public:
-            static constexpr uint16_t MAGIC_NUMBER    = 0xFEA7;
-            static constexpr uint8_t  CURRENT_VERSION = 1;
+            static constexpr uint16_t MAGIC_NUMBER = 0xFEA7;
+            /* v2: added PanelConfig::display_mode. v3: added
+             * Settings::accent_color. No device has shipped with saved
+             * config yet, so migrate() still just falls through to
+             * defaults rather than preserving old fields. */
+            static constexpr uint8_t CURRENT_VERSION = 3;
 
             explicit ConfigStore(IConfigStore &backing);
 
