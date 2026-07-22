@@ -33,12 +33,12 @@ namespace gui
     {
         public:
             using DoneCallback = void (*)(void       *ctx,
-                                          uint8_t     panel_idx,
+                                          uint8_t     rank,
                                           uint16_t    signal_id,
                                           bool        is_metric,
                                           DisplayMode mode);
             using SettingsCallback
-                = void (*)(void *ctx, uint8_t panel_idx, uint16_t signal_id);
+                = void (*)(void *ctx, uint8_t rank, uint16_t signal_id);
             /** Fired when the Signal row is tapped — `current_signal_id` is
              * the pending selection (not necessarily what the panel was
              * opened with, if the user already picked a different one and
@@ -65,9 +65,9 @@ namespace gui
                       PickSignalCallback       pick_signal_cb,
                       void                    *pick_signal_ctx);
 
-            /** Opens the screen for `panel_idx`, pre-selecting
+            /** Opens the screen for `rank`, pre-selecting
              * `signal_id`/`is_metric`/`mode`. */
-            void open(uint8_t     panel_idx,
+            void open(uint8_t     rank,
                       uint16_t    signal_id,
                       bool        is_metric,
                       DisplayMode mode);
@@ -99,7 +99,7 @@ namespace gui
             const uint16_t    *signal_ids_   = nullptr;
             uint16_t           num_signals_  = 0;
 
-            uint8_t  current_panel_idx_ = 0;
+            uint8_t  current_rank_      = 0;
             uint16_t opened_signal_id_  = 0;
             uint16_t pending_signal_id_ = 0;
 

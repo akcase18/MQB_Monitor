@@ -3,7 +3,12 @@
  * @brief Persisted configuration schema, stored over IConfigStore. Warning
  * thresholds are keyed by signal (Config.signals[], indexed by catalog
  * position) rather than by panel slot, so moving a signal to a different
- * panel carries its thresholds with it automatically.
+ * panel carries its thresholds with it automatically. Config.priorities[]
+ * follows the same principle one level further: it's indexed by priority
+ * rank (0 = most important), not screen slot, so the most important signal
+ * stays the most prominent one on screen regardless of how many panels are
+ * currently shown — resolve rank -> slot via
+ * gui::compute_prominence_ranks() for the current panel count/orientation.
  */
 #pragma once
 
@@ -59,7 +64,9 @@ namespace core
             uint32_t accent_color;
     };
 
-    struct PanelConfig
+    /** A single priority-ranked signal assignment — see the file doc
+     * comment on Config.priorities[] for what the index means. */
+    struct PrioritizedSignal
     {
             uint16_t    signal_id;
             UnitSystem  units;
@@ -69,14 +76,20 @@ namespace core
     struct SignalConfig
     {
             WarningThresholds warn;
+            /* Per-vehicle override of SignalSpec::display_min/max — resolve
+             * through core::resolve_display_range() rather than reading
+             * these directly. */
+            bool  use_custom_range = false;
+            float custom_min       = 0.0f;
+            float custom_max       = 0.0f;
     };
 
     struct Config
     {
-            ConfigHeader header;
-            Settings     settings;
-            PanelConfig  panels[MAX_PANELS];
-            SignalConfig signals[SIGNAL_CATALOG_COUNT];
+            ConfigHeader      header;
+            Settings          settings;
+            PrioritizedSignal priorities[MAX_PANELS];
+            SignalConfig      signals[SIGNAL_CATALOG_COUNT];
     };
 
 } // namespace core

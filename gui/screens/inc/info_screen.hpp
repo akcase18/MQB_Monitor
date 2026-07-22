@@ -20,11 +20,13 @@ namespace gui
     class InfoScreen
     {
         public:
+            /** `rank` is priority rank (0 = most important, see
+             * core::Config::priorities[]) — not a screen slot index. */
             using ViewModelBuilder   = PanelViewModel (*)(void   *ctx,
-                                                          uint8_t panel_idx,
-                                                          bool    large,
-                                                          bool    hero);
-            using PanelPressCallback = void (*)(void *ctx, uint8_t panel_idx);
+                                                        uint8_t rank,
+                                                        bool    large,
+                                                        bool    hero);
+            using PanelPressCallback = void (*)(void *ctx, uint8_t rank);
 
             void init(const Theme       &theme,
                       ViewModelBuilder   builder,
@@ -69,6 +71,12 @@ namespace gui
             bool     panel_hero_[MAX_PANELS] = {};
             ClickCtx click_ctx_[MAX_PANELS]  = {};
             uint8_t  num_panels_             = 0;
+
+            /** rank_of_slot_[i] = which priority rank the widget in slot i
+             * currently displays — recomputed every rebuild() via
+             * compute_prominence_ranks(), consumed by refresh() and by
+             * click_ctx_[i].index so a tap reports rank, not slot. */
+            uint8_t rank_of_slot_[MAX_PANELS] = {};
 
             lv_coord_t col_dsc_[MAX_PANELS + 1] = {};
             lv_coord_t row_dsc_[MAX_PANELS + 1] = {};

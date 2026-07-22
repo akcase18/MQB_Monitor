@@ -108,4 +108,33 @@ namespace gui
         return count;
     }
 
+    bool is_hero_slot(const PanelSlot &slot)
+    {
+        return slot.rowspan == 2 && slot.colspan >= 4;
+    }
+
+    void compute_prominence_ranks(const PanelSlot slots[MAX_PANELS],
+                                  uint8_t         count,
+                                  uint8_t         rank_of_slot[MAX_PANELS])
+    {
+        uint8_t rank = 0;
+
+        /* Pass 0: hero. Pass 1: large-but-not-hero. Pass 2: everything
+         * else (small). Within a pass, slots are visited in their
+         * existing index order, which compute_layout() already produces
+         * left-to-right/top-to-bottom — no sort required. */
+        for (uint8_t pass = 0; pass < 3; pass++)
+        {
+            for (uint8_t i = 0; i < count; i++)
+            {
+                bool    hero = is_hero_slot(slots[i]);
+                uint8_t tier = hero ? 0 : (slots[i].large ? 1 : 2);
+                if (tier == pass)
+                {
+                    rank_of_slot[i] = rank++;
+                }
+            }
+        }
+    }
+
 } // namespace gui

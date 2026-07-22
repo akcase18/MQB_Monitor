@@ -34,12 +34,21 @@ TeensyDisplay &TeensyDisplay::instance()
 
 void TeensyDisplay::begin()
 {
+    /* Drive the backlight pin low before touching the panel at all —
+     * pinMode() defaults to INPUT at boot, which leaves it floating (not
+     * actually off) for however long s_lcd.begin()'s reset/init sequence
+     * takes, so whatever's left over in GRAM from power-on can flash
+     * through if there's a pull-up on the gate. Actively holding it low
+     * first closes that window. Stays low after init too — the panel's
+     * GRAM is still stale/uninitialized until the first real frame is
+     * flushed, so it's on the caller (see main.cpp's display_flush_cb) to
+     * turn the backlight on once that's actually happened. */
+    pinMode(PWM_PIN, OUTPUT);
+    digitalWrite(PWM_PIN, LOW);
+
     s_lcd.begin(12);
     s_lcd.setBitDepth(16);
     s_lcd.setRotation(1);
-
-    pinMode(PWM_PIN, OUTPUT);
-    analogWrite(PWM_PIN, 255);
 }
 
 void TeensyDisplay::get_resolution(uint16_t &width, uint16_t &height) const
@@ -68,5 +77,15 @@ void TeensyDisplay::set_backlight(uint8_t pct)
     {
         pct = 100;
     }
-    analogWrite(PWM_PIN, (static_cast<uint16_t>(pct) * 255) / 100);
+
+    /* Below ~15% duty the panel reads as fully black rather than dim, so
+     * the user-facing 0-100% range maps onto an actual
+     * MIN_BACKLIGHT_PCT-100% duty cycle instead of 0-100% — 0% is "as dim
+     * as it gets" rather than "off". */
+    constexpr uint32_t MIN_BACKLIGHT_PCT = 15;
+    uint32_t           effective_pct
+        = MIN_BACKLIGHT_PCT
+          + (static_cast<uint32_t>(pct) * (100 - MIN_BACKLIGHT_PCT)) / 100;
+
+    analogWrite(PWM_PIN, (effective_pct * 255) / 100);
 }

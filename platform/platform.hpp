@@ -156,6 +156,49 @@ class IConfigStore
 };
 
 /*==============================================================================
+ * SERIAL LINK
+ =============================================================================*/
+
+/**
+ * Raw, non-blocking byte transport to a companion board (e.g. an ESP32-C3
+ * running the wireless-configuration front end). remote/protocol owns
+ * framing/CRC on top of this; this interface only knows about bytes, same
+ * relationship IConfigStore has to core/config's schema.
+ */
+class ISerialLink
+{
+    public:
+        virtual ~ISerialLink() = default;
+
+        /**
+         * One-time peripheral initialization.
+         *
+         * @param baud Link baud rate, in bits/sec.
+         */
+        virtual void begin(uint32_t baud) = 0;
+
+        /**
+         * Non-blocking read. Reads up to `len` bytes without blocking.
+         *
+         * @param buf Buffer to read into.
+         * @param len Maximum number of bytes to read.
+         *
+         * @returns Number of bytes actually read (0 if none available).
+         */
+        virtual size_t read(uint8_t *buf, size_t len) = 0;
+
+        /**
+         * Non-blocking write.
+         *
+         * @param buf Bytes to write.
+         * @param len Number of bytes to write.
+         *
+         * @returns Number of bytes actually written.
+         */
+        virtual size_t write(const uint8_t *buf, size_t len) = 0;
+};
+
+/*==============================================================================
  * CLOCK
  =============================================================================*/
 
@@ -184,6 +227,7 @@ struct Platform
         ITouch       &touch;
         IConfigStore &config_store;
         IClock       &clock;
+        ISerialLink  &serial;
 };
 
 /**

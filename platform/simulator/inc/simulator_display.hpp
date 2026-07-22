@@ -22,6 +22,14 @@ class SimulatorDisplay : public IDisplay
         bool flush_ready() const override;
         void set_backlight(uint8_t pct) override;
 
+        /* Writes the window's current on-screen position to disk so the
+         * next launch can reopen there instead of recentering — see
+         * begin()'s load side in simulator_display.cpp. Public so the
+         * atexit/SIGTERM/SIGINT handlers registered in begin() can call it
+         * however the dev workflow kills the simulator binary (window
+         * close, pkill, Ctrl+C). */
+        void save_position() const;
+
     private:
         SimulatorDisplay() = default;
 

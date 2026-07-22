@@ -1,0 +1,259 @@
+/**
+ * @file remote_protocol.hpp
+ * @brief Wire format for the Teensy<->ESP32-C3 link: message types, framing
+ * (sync/length/CRC), and per-record encode/decode for every payload shape.
+ * Zero core::/gui::/LVGL deps so this compiles verbatim into both
+ * firmwares — the wire format can't drift between them. Every multi-byte
+ * value is hand-packed little-endian via the put/get helpers below,
+ * never memcpy'd from a struct — the two firmwares are different
+ * toolchains (arm-none-eabi vs riscv32-esp) with no guaranteed-identical
+ * struct padding/enum sizing, so nothing here relies on either.
+ */
+#pragma once
+
+#include <stddef.h>
+#include <stdint.h>
+
+/* FLASHMEM/DMAMEM (Teensyduino, from avr/pgmspace.h) place a function in
+ * flash or a buffer in RAM2/OCRAM instead of the tight, shared RAM1 pool
+ * core::/gui:: compete for — this link runs rarely (a batch config
+ * load/save, an AP enable/disable), never on a hot path, so there's no
+ * reason for any of it to sit in RAM1 at all. Apply both to every
+ * function/large buffer in remote/ as a matter of course. A no-op off
+ * Teensy (ARDUINO isn't defined for the native simulator build). */
+#if defined(ARDUINO_ARCH_ESP32)
+    #define FLASHMEM
+    #define DMAMEM
+#elif defined(ARDUINO)
+    #include <avr/pgmspace.h>
+#else
+    #define FLASHMEM
+    #define DMAMEM
+#endif
+
+namespace remote::protocol
+{
+    /*==========================================================================
+     * BYTE-LEVEL PUT/GET HELPERS (little-endian)
+     =========================================================================*/
+
+    uint8_t *put_u8(uint8_t *p, uint8_t v);
+    uint8_t *put_u16(uint8_t *p, uint16_t v);
+    uint8_t *put_u32(uint8_t *p, uint32_t v);
+    uint8_t *put_f32(uint8_t *p, float v);
+    uint8_t *put_bytes(uint8_t *p, const void *src, size_t n);
+
+    const uint8_t *get_u8(const uint8_t *p, uint8_t &out);
+    const uint8_t *get_u16(const uint8_t *p, uint16_t &out);
+    const uint8_t *get_u32(const uint8_t *p, uint32_t &out);
+    const uint8_t *get_f32(const uint8_t *p, float &out);
+    const uint8_t *get_bytes(const uint8_t *p, void *dst, size_t n);
+
+    /*==========================================================================
+     * FRAMING
+     =========================================================================*/
+
+    constexpr uint8_t FRAME_SYNC = 0xA5;
+    /* Comfortably above RESP_STATE's worst-case ~1223-byte payload (22
+     * signals' worth of catalog + config), with headroom for catalog
+     * growth. */
+    constexpr uint16_t FRAME_MAX_PAYLOAD = 1536;
+    /* ~3x the worst-case transfer time at a conservative 115200 baud. */
+    constexpr uint32_t FRAME_TIMEOUT_MS = 300;
+
+    constexpr uint8_t WIRE_NAME_LEN = 24; /* matches gui::PANEL_NAME_LEN */
+
+    enum class MsgType : uint8_t
+    {
+        REQ_GET_STATE     = 0x01, /* C3 -> Teensy */
+        RESP_STATE        = 0x02, /* Teensy -> C3 */
+        REQ_APPLY_CONFIG  = 0x03, /* C3 -> Teensy */
+        RESP_APPLY_RESULT = 0x04, /* Teensy -> C3 */
+        RESP_ERROR
+        = 0x05, /* Teensy -> C3, fallback for malformed/unknown REQ_* */
+
+        CMD_AP_ENABLE   = 0x10, /* Teensy -> C3 */
+        EVT_AP_READY    = 0x11, /* C3 -> Teensy, async */
+        CMD_AP_DISABLE  = 0x12, /* Teensy -> C3 */
+        EVT_AP_DISABLED = 0x13, /* C3 -> Teensy, best-effort ack */
+    };
+
+    enum class ApplyResult : uint8_t
+    {
+        Ok                     = 0,
+        ErrSignalCountMismatch = 1,
+        ErrInvalidSignal       = 2,
+        ErrInvalidEnum         = 3,
+    };
+
+    /** Standard CRC-16/CCITT-FALSE: poly 0x1021, init 0xFFFF, no reflect,
+     * no post-XOR. Table-driven (built once at static-init) — not for
+     * speed (frames here are rare), but because a lookup table is
+     * trivially identical across compilers, unlike a hand-rolled bit
+     * loop. Computed over everything after SYNC and before the CRC
+     * itself (MSG_TYPE || LEN || PAYLOAD). */
+    uint16_t crc16_ccitt(const uint8_t *data, size_t len);
+
+    /** Folds `len` more bytes into a running CRC — lets a CRC be computed
+     * over non-contiguous spans (a header and a separately-buffered
+     * payload, say) by chaining calls. crc16_ccitt(data, len) is exactly
+     * crc16_ccitt_continue(0xFFFF, data, len). */
+    uint16_t crc16_ccitt_continue(uint16_t       crc,
+                                  const uint8_t *data,
+                                  size_t         len);
+
+    /** Wraps `payload` into a full SYNC/TYPE/LEN/PAYLOAD/CRC frame.
+     *
+     * @returns Bytes written to `out`, or 0 if `out_cap` is too small or
+     * `payload_len` exceeds FRAME_MAX_PAYLOAD.
+     */
+    size_t encode_frame(MsgType        type,
+                        const uint8_t *payload,
+                        uint16_t       payload_len,
+                        uint8_t       *out,
+                        size_t         out_cap);
+
+    struct DecodedFrame
+    {
+            MsgType        type        = MsgType::RESP_ERROR;
+            const uint8_t *payload     = nullptr;
+            uint16_t       payload_len = 0;
+    };
+
+    /**
+     * Non-blocking, byte-at-a-time frame assembler — feed it one received
+     * byte per call so it can run from a main loop without blocking, the
+     * same shape core::can::UdsClient::poll() already has for CAN frames.
+     * Self-resyncs on a stray non-sync byte, drops a frame whose CRC
+     * doesn't match, and drops a frame that stalls mid-receive past
+     * FRAME_TIMEOUT_MS — none of those can wedge the reader.
+     */
+    class FrameReader
+    {
+        public:
+            /**
+             * Feeds one received byte.
+             *
+             * @returns True exactly on the byte that completes a
+             * CRC-valid frame; decoded_frame() is valid until the next
+             * on_byte() call (its `payload` pointer aliases this
+             * instance's internal buffer).
+             */
+            bool on_byte(uint8_t b, uint32_t now_ms);
+
+            const DecodedFrame &decoded_frame() const
+            {
+                return frame_;
+            }
+
+        private:
+            enum class State : uint8_t
+            {
+                WaitSync,
+                Type,
+                LenLo,
+                LenHi,
+                Payload,
+                CrcLo,
+                CrcHi
+            };
+
+            void reset();
+
+            State    state_          = State::WaitSync;
+            uint8_t  msg_type_       = 0;
+            uint16_t len_            = 0;
+            uint16_t received_       = 0;
+            uint16_t crc_received_   = 0;
+            uint32_t frame_start_ms_ = 0;
+            /* static, not a plain member: GCC rejects a `section`
+             * attribute on a non-static data member (there's no
+             * independent storage to place — it's part of whatever object
+             * contains it), so DMAMEM placement needs static storage
+             * duration; see the out-of-class definition in
+             * remote_protocol.cpp. Safe because there's only ever one
+             * FrameReader alive in the real app (inside RemoteConfigLink,
+             * inside the Composition singleton); tests construct more
+             * than one, but Unity runs test cases sequentially, never two
+             * FrameReaders mid-frame at once. Never read before being
+             * written (bounded by payload_len), so it doesn't need — and
+             * DMAMEM's .bss.dma section doesn't guarantee — zero-
+             * initialization at startup. */
+            static uint8_t buf_[FRAME_MAX_PAYLOAD];
+            DecodedFrame   frame_ {};
+    };
+
+    /*==========================================================================
+     * PER-RECORD WIRE STRUCTS
+     *
+     * Plain in-memory records (not wire-laid-out — see the file doc
+     * comment) built/consumed one at a time by remote/server, looping
+     * over MAX_PANELS/SIGNAL_CATALOG_COUNT itself rather than this layer
+     * holding a fixed-size array of them.
+     =========================================================================*/
+
+    struct SettingsWire
+    {
+            uint8_t  day_brightness   = 0;
+            uint8_t  night_brightness = 0;
+            uint8_t  num_panels       = 0;
+            uint8_t  orientation      = 0; /* 0=Horizontal, 1=Vertical */
+            uint32_t accent_color     = 0;
+    };
+    uint8_t       *encode_settings(uint8_t *p, const SettingsWire &v);
+    const uint8_t *decode_settings(const uint8_t *p, SettingsWire &out);
+
+    struct PanelWire
+    {
+            uint16_t signal_id    = 0;
+            uint8_t  units        = 0; /* 0=Metric, 1=Imperial */
+            uint8_t  display_mode = 0; /* 0=Digital, 1=Bar, 2=Gauge */
+    };
+    uint8_t       *encode_panel(uint8_t *p, const PanelWire &v);
+    const uint8_t *decode_panel(const uint8_t *p, PanelWire &out);
+
+    struct SignalCatalogEntryWire
+    {
+            uint16_t id                  = 0;
+            char     name[WIRE_NAME_LEN] = "";
+            uint8_t  unit_type           = 0;
+            float    display_min         = 0.0f;
+            float    display_max         = 0.0f;
+    };
+    uint8_t       *encode_signal_catalog_entry(uint8_t                      *p,
+                                               const SignalCatalogEntryWire &v);
+    const uint8_t *decode_signal_catalog_entry(const uint8_t          *p,
+                                               SignalCatalogEntryWire &out);
+
+    struct SignalConfigWire
+    {
+            float   lo               = 0.0f;
+            float   hi               = 0.0f;
+            uint8_t use_lo           = 0;
+            uint8_t use_hi           = 0;
+            uint8_t use_custom_range = 0;
+            float   custom_min       = 0.0f;
+            float   custom_max       = 0.0f;
+    };
+    uint8_t       *encode_signal_config(uint8_t *p, const SignalConfigWire &v);
+    const uint8_t *decode_signal_config(const uint8_t    *p,
+                                        SignalConfigWire &out);
+
+    /** WPA2 max sizes + NUL. Generated fresh in RAM by the Teensy on every
+     * Wireless Setup activation, never persisted. */
+    struct ApEnableWire
+    {
+            char ssid[33]     = "";
+            char password[65] = "";
+    };
+    uint8_t       *encode_ap_enable(uint8_t *p, const ApEnableWire &v);
+    const uint8_t *decode_ap_enable(const uint8_t *p, ApEnableWire &out);
+
+    struct ApReadyWire
+    {
+            uint8_t ip[4] = { 0, 0, 0, 0 };
+    };
+    uint8_t       *encode_ap_ready(uint8_t *p, const ApReadyWire &v);
+    const uint8_t *decode_ap_ready(const uint8_t *p, ApReadyWire &out);
+
+} // namespace remote::protocol

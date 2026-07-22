@@ -50,14 +50,14 @@ namespace gui
         DoneButton close {};
 
         close.btn = lv_btn_create(parent);
-        lv_obj_set_size(close.btn, 32, 32);
+        lv_obj_set_size(close.btn, 40, 40);
         lv_obj_set_style_bg_opa(close.btn, LV_OPA_TRANSP, 0);
         lv_obj_set_style_border_width(close.btn, 0, 0);
         lv_obj_set_style_shadow_width(close.btn, 0, 0);
         lv_obj_set_style_bg_color(
             close.btn, theme.palette.accent, LV_STATE_PRESSED);
         lv_obj_set_style_bg_opa(close.btn, LV_OPA_COVER, LV_STATE_PRESSED);
-        lv_obj_align(close.btn, LV_ALIGN_TOP_RIGHT, -16, 8);
+        lv_obj_align(close.btn, LV_ALIGN_TOP_RIGHT, -16, 6);
 
         close.label = lv_label_create(close.btn);
         lv_obj_set_style_text_font(close.label, theme.typography.symbol_lg, 0);

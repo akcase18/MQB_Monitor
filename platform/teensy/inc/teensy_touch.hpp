@@ -22,7 +22,8 @@ class TeensyTouch : public ITouch
         int16_t get_best_avg(int16_t x, int16_t y, int16_t z);
         void    poll();
 
-        int16_t x_val_ = 0;
-        int16_t y_val_ = 0;
-        int16_t z_val_ = 0;
+        int16_t x_val_       = 0;
+        int16_t y_val_       = 0;
+        int16_t z_val_       = 0;
+        bool    was_pressed_ = false;
 };

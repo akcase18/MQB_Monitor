@@ -76,35 +76,35 @@ void test_defaults_on_blank_storage()
     TEST_ASSERT_EQUAL_UINT8(5, cfg.settings.num_panels);
     TEST_ASSERT_TRUE(core::LayoutOrientation::Horizontal
                      == cfg.settings.orientation);
-    TEST_ASSERT_EQUAL_UINT16(0, cfg.panels[0].signal_id);  // Coolant Temp
-    TEST_ASSERT_EQUAL_UINT16(12, cfg.panels[1].signal_id); // Throttle Pos
+    TEST_ASSERT_EQUAL_UINT16(0, cfg.priorities[0].signal_id);  // Coolant Temp
+    TEST_ASSERT_EQUAL_UINT16(12, cfg.priorities[1].signal_id); // Throttle Pos
     TEST_ASSERT_EQUAL_UINT16(
-        8, cfg.panels[5].signal_id); // Engine Torque (inactive slot)
+        8, cfg.priorities[5].signal_id); // Engine Torque (inactive rank)
 
     for (uint8_t i = 0; i < core::MAX_PANELS; i++)
     {
         TEST_ASSERT_TRUE(core::DisplayMode::Digital
-                         == cfg.panels[i].display_mode);
+                         == cfg.priorities[i].display_mode);
     }
 }
 
-void test_display_mode_round_trips_via_save_panel()
+void test_display_mode_round_trips_via_save_priority()
 {
     FakeConfigStore backing;
 
     core::ConfigStore store(backing);
     store.load();
 
-    store.get().panels[2].display_mode = core::DisplayMode::Gauge;
-    store.save_panel(2);
+    store.get().priorities[2].display_mode = core::DisplayMode::Gauge;
+    store.save_priority(2);
 
     core::ConfigStore store2(backing);
     store2.load();
 
     TEST_ASSERT_TRUE(core::DisplayMode::Gauge
-                     == store2.get().panels[2].display_mode);
+                     == store2.get().priorities[2].display_mode);
     TEST_ASSERT_TRUE(core::DisplayMode::Digital
-                     == store2.get().panels[0].display_mode); // untouched
+                     == store2.get().priorities[0].display_mode); // untouched
 }
 
 void test_load_round_trips_after_modification()
@@ -117,7 +117,7 @@ void test_load_round_trips_after_modification()
 
         core::Config &cfg           = store.get();
         cfg.settings.day_brightness = 42;
-        cfg.panels[2].signal_id     = 99;
+        cfg.priorities[2].signal_id = 99;
         store.save();
     }
 
@@ -126,24 +126,25 @@ void test_load_round_trips_after_modification()
     store2.load();
 
     TEST_ASSERT_EQUAL_UINT8(42, store2.get().settings.day_brightness);
-    TEST_ASSERT_EQUAL_UINT16(99, store2.get().panels[2].signal_id);
+    TEST_ASSERT_EQUAL_UINT16(99, store2.get().priorities[2].signal_id);
 }
 
-void test_save_panel_only_writes_that_slot()
+void test_save_priority_only_writes_that_rank()
 {
     FakeConfigStore backing;
 
     core::ConfigStore store(backing);
     store.load(); // defaults + full save
 
-    store.get().panels[3].signal_id = 7;
-    store.save_panel(3); // partial write, no full save()
+    store.get().priorities[3].signal_id = 7;
+    store.save_priority(3); // partial write, no full save()
 
     core::ConfigStore store2(backing);
     store2.load();
 
-    TEST_ASSERT_EQUAL_UINT16(7, store2.get().panels[3].signal_id);
-    TEST_ASSERT_EQUAL_UINT16(0, store2.get().panels[0].signal_id); // untouched
+    TEST_ASSERT_EQUAL_UINT16(7, store2.get().priorities[3].signal_id);
+    TEST_ASSERT_EQUAL_UINT16(0,
+                             store2.get().priorities[0].signal_id); // untouched
 }
 
 void test_save_signal_only_writes_that_slot()
@@ -165,6 +166,34 @@ void test_save_signal_only_writes_that_slot()
     TEST_ASSERT_TRUE(store2.get().signals[6].warn.use_lo);
     TEST_ASSERT_TRUE(store2.get().signals[6].warn.use_hi);
     TEST_ASSERT_FALSE(store2.get().signals[0].warn.use_lo); // untouched
+}
+
+void test_custom_range_defaults_off_and_round_trips_via_save_signal()
+{
+    FakeConfigStore backing;
+
+    core::ConfigStore store(backing);
+    store.load();
+
+    for (size_t i = 0; i < core::SIGNAL_CATALOG_COUNT; i++)
+    {
+        TEST_ASSERT_FALSE(store.get().signals[i].use_custom_range);
+        TEST_ASSERT_EQUAL_FLOAT(0.0f, store.get().signals[i].custom_min);
+        TEST_ASSERT_EQUAL_FLOAT(0.0f, store.get().signals[i].custom_max);
+    }
+
+    store.get().signals[0].use_custom_range = true;
+    store.get().signals[0].custom_min       = 0.0f;
+    store.get().signals[0].custom_max       = 50.0f;
+    store.save_signal(0);
+
+    core::ConfigStore store2(backing);
+    store2.load();
+
+    TEST_ASSERT_TRUE(store2.get().signals[0].use_custom_range);
+    TEST_ASSERT_EQUAL_FLOAT(0.0f, store2.get().signals[0].custom_min);
+    TEST_ASSERT_EQUAL_FLOAT(50.0f, store2.get().signals[0].custom_max);
+    TEST_ASSERT_FALSE(store2.get().signals[1].use_custom_range); // untouched
 }
 
 void test_unrecognized_version_resets_to_defaults()
@@ -221,10 +250,11 @@ int main(int argc, char **argv)
 
     UNITY_BEGIN();
     RUN_TEST(test_defaults_on_blank_storage);
-    RUN_TEST(test_display_mode_round_trips_via_save_panel);
+    RUN_TEST(test_display_mode_round_trips_via_save_priority);
     RUN_TEST(test_load_round_trips_after_modification);
-    RUN_TEST(test_save_panel_only_writes_that_slot);
+    RUN_TEST(test_save_priority_only_writes_that_rank);
     RUN_TEST(test_save_signal_only_writes_that_slot);
+    RUN_TEST(test_custom_range_defaults_off_and_round_trips_via_save_signal);
     RUN_TEST(test_unrecognized_version_resets_to_defaults);
     RUN_TEST(test_evaluate_warning);
     return UNITY_END();

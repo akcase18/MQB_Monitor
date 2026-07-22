@@ -16,14 +16,14 @@ namespace gui
          * row here is a single line, so there's no natural content to
          * spread across extra vertical space the way a slider or a
          * roller would use it. */
-        constexpr lv_coord_t HEADER_DIVIDER_Y = 44;
-        constexpr lv_coord_t SIGNAL_ROW_Y     = 58;
-        constexpr lv_coord_t DIVIDER1_Y       = 104;
-        constexpr lv_coord_t UNITS_ROW_Y      = 118;
-        constexpr lv_coord_t DIVIDER2_Y       = 164;
-        constexpr lv_coord_t DISPLAY_ROW_Y    = 178;
-        constexpr lv_coord_t DIVIDER3_Y       = 224;
-        constexpr lv_coord_t WARN_ROW_Y       = 238;
+        constexpr lv_coord_t HEADER_DIVIDER_Y = 50;
+        constexpr lv_coord_t SIGNAL_ROW_Y     = 64;
+        constexpr lv_coord_t DIVIDER1_Y       = 110;
+        constexpr lv_coord_t UNITS_ROW_Y      = 124;
+        constexpr lv_coord_t DIVIDER2_Y       = 170;
+        constexpr lv_coord_t DISPLAY_ROW_Y    = 184;
+        constexpr lv_coord_t DIVIDER3_Y       = 230;
+        constexpr lv_coord_t WARN_ROW_Y       = 244;
 
         /* Restyles a checkable lv_buttonmatrix away from LVGL's default
          * light-mode card+shadow look to match the flat, bordered,
@@ -114,7 +114,7 @@ namespace gui
         lv_obj_t *signal_label = lv_label_create(signal_row_btn);
         lv_label_set_text(signal_label, "Signal");
         lv_obj_set_style_text_color(signal_label, theme.palette.fg, 0);
-        lv_obj_set_style_text_font(signal_label, theme.typography.ui, 0);
+        lv_obj_set_style_text_font(signal_label, theme.typography.label_lg, 0);
         lv_obj_align(signal_label, LV_ALIGN_LEFT_MID, 0, 0);
 
         signal_chevron_ = lv_label_create(signal_row_btn);
@@ -135,24 +135,36 @@ namespace gui
          * static "Signal" label at a glance. */
         lv_obj_set_style_text_color(
             signal_value_lbl_, lv_color_darken(theme.palette.fg, 60), 0);
-        lv_obj_set_style_text_font(signal_value_lbl_, theme.typography.ui, 0);
+        lv_obj_set_style_text_font(
+            signal_value_lbl_, theme.typography.label_lg, 0);
 
         create_divider(screen_, theme, DIVIDER1_Y);
 
         /* Units section — a single row, label left / segmented control
          * right, rather than a second stacked sub-row: Imperial vs Metric
-         * doesn't need the extra room a +/- control would. */
-        lv_obj_t *units_label = lv_label_create(screen_);
+         * doesn't need the extra room a +/- control would. Label and
+         * matrix are both LEFT_MID/RIGHT_MID children of one row
+         * container so they vertically center against each other
+         * regardless of font size or matrix height — a fixed TOP_LEFT
+         * label offset tuned for one font looked visibly off-center
+         * against the (taller) matrix once the label's font changed. */
+        lv_obj_t *units_row = lv_obj_create(screen_);
+        lv_obj_remove_style_all(units_row);
+        lv_obj_set_size(
+            units_row, theme.metrics.screen_width - 40, ROW_HEIGHT + 8);
+        lv_obj_align(units_row, LV_ALIGN_TOP_MID, 0, UNITS_ROW_Y - 6);
+
+        lv_obj_t *units_label = lv_label_create(units_row);
         lv_label_set_text(units_label, "Units");
-        lv_obj_align(units_label, LV_ALIGN_TOP_LEFT, 20, UNITS_ROW_Y);
         lv_obj_set_style_text_color(units_label, theme.palette.fg, 0);
-        lv_obj_set_style_text_font(units_label, theme.typography.ui, 0);
+        lv_obj_set_style_text_font(units_label, theme.typography.label_lg, 0);
+        lv_obj_align(units_label, LV_ALIGN_LEFT_MID, 0, 0);
 
         static const char *const units_map[] = { "Imperial", "Metric", "" };
-        units_matrix_                        = lv_buttonmatrix_create(screen_);
-        lv_obj_set_style_text_font(units_matrix_, theme.typography.ui, 0);
+        units_matrix_ = lv_buttonmatrix_create(units_row);
+        lv_obj_set_style_text_font(units_matrix_, theme.typography.label_lg, 0);
         lv_obj_set_size(units_matrix_, 240, ROW_HEIGHT + 8);
-        lv_obj_align(units_matrix_, LV_ALIGN_TOP_RIGHT, -20, UNITS_ROW_Y - 6);
+        lv_obj_align(units_matrix_, LV_ALIGN_RIGHT_MID, 0, 0);
         lv_buttonmatrix_set_map(units_matrix_, units_map);
         lv_buttonmatrix_set_one_checked(units_matrix_, true);
         lv_buttonmatrix_set_button_ctrl_all(units_matrix_,
@@ -163,21 +175,27 @@ namespace gui
 
         /* Display section — same single-row shape as Units, just with a
          * 3rd segment. */
-        lv_obj_t *display_label = lv_label_create(screen_);
+        lv_obj_t *display_row = lv_obj_create(screen_);
+        lv_obj_remove_style_all(display_row);
+        lv_obj_set_size(
+            display_row, theme.metrics.screen_width - 40, ROW_HEIGHT + 8);
+        lv_obj_align(display_row, LV_ALIGN_TOP_MID, 0, DISPLAY_ROW_Y - 6);
+
+        lv_obj_t *display_label = lv_label_create(display_row);
         /* "Mode", not "Display" — the shorter label leaves the 3-segment
          * matrix room for the same per-button breathing room the 2-segment
          * Units matrix above it has ("Digital" is nearly as wide as
          * "Imperial", but there's a 3rd segment to fit in the same row). */
         lv_label_set_text(display_label, "Mode");
-        lv_obj_align(display_label, LV_ALIGN_TOP_LEFT, 20, DISPLAY_ROW_Y);
         lv_obj_set_style_text_color(display_label, theme.palette.fg, 0);
-        lv_obj_set_style_text_font(display_label, theme.typography.ui, 0);
+        lv_obj_set_style_text_font(display_label, theme.typography.label_lg, 0);
+        lv_obj_align(display_label, LV_ALIGN_LEFT_MID, 0, 0);
 
         static const char *const mode_map[] = { "Digital", "Bar", "Gauge", "" };
-        mode_matrix_                        = lv_buttonmatrix_create(screen_);
-        lv_obj_set_style_text_font(mode_matrix_, theme.typography.ui, 0);
+        mode_matrix_ = lv_buttonmatrix_create(display_row);
+        lv_obj_set_style_text_font(mode_matrix_, theme.typography.label_lg, 0);
         lv_obj_set_size(mode_matrix_, 360, ROW_HEIGHT + 8);
-        lv_obj_align(mode_matrix_, LV_ALIGN_TOP_RIGHT, -20, DISPLAY_ROW_Y - 6);
+        lv_obj_align(mode_matrix_, LV_ALIGN_RIGHT_MID, 0, 0);
         lv_buttonmatrix_set_map(mode_matrix_, mode_map);
         lv_buttonmatrix_set_one_checked(mode_matrix_, true);
         lv_buttonmatrix_set_button_ctrl_all(mode_matrix_,
@@ -206,7 +224,7 @@ namespace gui
         lv_obj_t *warn_label = lv_label_create(warn_row_btn);
         lv_label_set_text(warn_label, "Warning Thresholds");
         lv_obj_set_style_text_color(warn_label, theme.palette.fg, 0);
-        lv_obj_set_style_text_font(warn_label, theme.typography.ui, 0);
+        lv_obj_set_style_text_font(warn_label, theme.typography.label_lg, 0);
         lv_obj_align(warn_label, LV_ALIGN_LEFT_MID, 0, 0);
 
         lv_obj_t *warn_chevron = lv_label_create(warn_row_btn);
@@ -216,12 +234,12 @@ namespace gui
         lv_obj_align(warn_chevron, LV_ALIGN_RIGHT_MID, 0, 0);
     }
 
-    void ConfiguratorScreen::open(uint8_t     panel_idx,
+    void ConfiguratorScreen::open(uint8_t     rank,
                                   uint16_t    signal_id,
                                   bool        is_metric,
                                   DisplayMode mode)
     {
-        current_panel_idx_ = panel_idx;
+        current_rank_      = rank;
         opened_signal_id_  = signal_id;
         pending_signal_id_ = signal_id;
         refresh_signal_row_label();
@@ -292,7 +310,7 @@ namespace gui
         }
 
         self->done_cb_(self->done_ctx_,
-                       self->current_panel_idx_,
+                       self->current_rank_,
                        self->pending_signal_id_,
                        is_metric,
                        mode);
@@ -305,7 +323,7 @@ namespace gui
         if (self->settings_cb_ != nullptr)
         {
             self->settings_cb_(self->settings_ctx_,
-                               self->current_panel_idx_,
+                               self->current_rank_,
                                self->pending_signal_id_);
         }
     }

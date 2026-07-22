@@ -49,8 +49,12 @@ namespace core
              * (metric) unit its raw value is stored/compared in — scales a
              * Bar/Gauge panel's fill and bounds the warning-threshold
              * editor's +/- buttons. Sensible engineering defaults, not a
-             * per-vehicle-tuned range (that's a future phone-app feature);
-             * unbounded counters (misfires) get a generous, arbitrary cap.
+             * per-vehicle-tuned range; unbounded counters (misfires) get a
+             * generous, arbitrary cap. A user can override these per
+             * signal (core::config::SignalConfig::use_custom_range) —
+             * always resolve the *effective* range via
+             * resolve_display_range() below rather than reading these
+             * fields directly.
              */
             float display_min;
             float display_max;
@@ -58,6 +62,28 @@ namespace core
 
     extern const SignalSpec SIGNAL_CATALOG[];
     inline constexpr size_t SIGNAL_CATALOG_COUNT = 22;
+
+    /** A signal's effective display range — either SignalSpec's compiled-in
+     * default or a user-calibrated override. */
+    struct DisplayRange
+    {
+            float min;
+            float max;
+    };
+
+    /**
+     * Resolves `spec`'s effective display range: `spec.display_min/max`, or
+     * `custom_min/custom_max` if `use_custom_range` is set. Takes plain
+     * values rather than a core::config::SignalConfig so core/vehicle stays
+     * ignorant of core/config's existence — the same relationship
+     * evaluate_warning() already has to WarningThresholds. If
+     * `custom_min >= custom_max`, falls back to the catalog default rather
+     * than returning a degenerate range.
+     */
+    DisplayRange resolve_display_range(const SignalSpec &spec,
+                                       bool              use_custom_range,
+                                       float             custom_min,
+                                       float             custom_max);
 
     /**
      * @returns The catalog index for `id`, or -1 if not found.

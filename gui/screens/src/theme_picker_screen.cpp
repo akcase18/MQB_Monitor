@@ -7,8 +7,8 @@ namespace gui
 
     namespace
     {
-        constexpr lv_coord_t HEADER_DIVIDER_Y = 44;
-        constexpr lv_coord_t GRID_START_Y     = 56;
+        constexpr lv_coord_t HEADER_DIVIDER_Y = 50;
+        constexpr lv_coord_t GRID_START_Y     = 62;
         /* 3x3 for ACCENT_PRESET_COUNT=9 — smaller than the original 4x2's
          * swatches since a 3rd row has to fit in the same screen height. */
         constexpr lv_coord_t SWATCH_SIZE = 76;

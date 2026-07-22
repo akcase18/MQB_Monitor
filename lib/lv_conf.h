@@ -181,12 +181,12 @@
     #define LV_DRAW_SW_SUPPORT_RGB565A8     0
     #define LV_DRAW_SW_SUPPORT_RGB888       0
     #define LV_DRAW_SW_SUPPORT_XRGB8888     0
-    #define LV_DRAW_SW_SUPPORT_ARGB8888     0
+    #define LV_DRAW_SW_SUPPORT_ARGB8888     1
     #define LV_DRAW_SW_SUPPORT_ARGB8888_PREMULTIPLIED 0
     #define LV_DRAW_SW_SUPPORT_L8           0
     #define LV_DRAW_SW_SUPPORT_AL88         0
     #define LV_DRAW_SW_SUPPORT_A8           0
-    #define LV_DRAW_SW_SUPPORT_I1           0
+    #define LV_DRAW_SW_SUPPORT_I1           1
 
     /* The threshold of the luminance to consider a pixel as
      * active in indexed color format */
@@ -651,8 +651,24 @@
  *  E.g. __attribute__((aligned(4)))*/
 #define LV_ATTRIBUTE_MEM_ALIGN
 
-/** Attribute to mark large constant arrays, for example for font bitmaps */
-#define LV_ATTRIBUTE_LARGE_CONST
+/** Attribute to mark large constant arrays, for example for font bitmaps.
+ *  Teensy's linker script shadows ALL rodata into the same tight RAM1
+ *  (DTCM) pool core::/gui:: compete for, rather than leaving it in flash —
+ *  font glyph bitmaps are the single largest consumer of that by far, so
+ *  DMAMEM (Teensyduino's RAM2/OCRAM placement attribute, ~512KB and
+ *  otherwise nearly empty) buys back a large, permanent chunk of RAM1
+ *  headroom for everything else. A no-op off Teensy. */
+#if defined(PLATFORM_TEENSY)
+    #include <avr/pgmspace.h>
+    /* PROGMEM (Teensy 4's .progmem section) is pure `> FLASH` — true
+     * execute-in-place, unlike DMAMEM's `.dmabuffers` which is NOLOAD and
+     * never gets its initial data copied in at boot. Font glyph bitmaps are
+     * compile-time constant data, not a runtime-filled buffer, so they need
+     * an initialized section, not an uninitialized one. */
+    #define LV_ATTRIBUTE_LARGE_CONST PROGMEM
+#else
+    #define LV_ATTRIBUTE_LARGE_CONST
+#endif
 
 /** Compiler prefix for a large array declaration in RAM */
 #define LV_ATTRIBUTE_LARGE_RAM_ARRAY
@@ -1044,13 +1060,13 @@
 #define LV_USE_GSTREAMER 0
 
 /** Decode bin images to RAM */
-#define LV_BIN_DECODER_RAM_LOAD 0
+#define LV_BIN_DECODER_RAM_LOAD 1
 
 /** RLE decompress library */
 #define LV_USE_RLE 0
 
 /** QR code library */
-#define LV_USE_QRCODE 0
+#define LV_USE_QRCODE 1
 
 /** Barcode code library */
 #define LV_USE_BARCODE 0

@@ -12,10 +12,49 @@
 #define SDL_MAIN_HANDLED
 #include <SDL2/SDL.h>
 
+#include <csignal>
+#include <cstdio>
+#include <cstdlib>
+
 namespace
 {
     constexpr uint16_t SIM_HOR_RES = 480;
     constexpr uint16_t SIM_VER_RES = 320;
+
+    const char *position_file_path()
+    {
+        const char *home = getenv("HOME");
+        static char path[512];
+        snprintf(path,
+                 sizeof(path),
+                 "%s/.mqb_sim_window_pos",
+                 home != nullptr ? home : "/tmp");
+        return path;
+    }
+
+    bool load_saved_position(int &x, int &y)
+    {
+        FILE *f = fopen(position_file_path(), "r");
+        if (f == nullptr)
+        {
+            return false;
+        }
+        bool ok = fscanf(f, "%d %d", &x, &y) == 2;
+        fclose(f);
+        return ok;
+    }
+
+    void atexit_save_position()
+    {
+        SimulatorDisplay::instance().save_position();
+    }
+
+    /* exit() (rather than the signal's default terminate-immediately
+     * behavior) so the atexit_save_position handler above still runs. */
+    void handle_terminating_signal(int)
+    {
+        exit(0);
+    }
 } // namespace
 
 SimulatorDisplay &SimulatorDisplay::instance()
@@ -28,9 +67,13 @@ void SimulatorDisplay::begin()
 {
     SDL_InitSubSystem(SDL_INIT_VIDEO);
 
+    int win_x = SDL_WINDOWPOS_CENTERED;
+    int win_y = SDL_WINDOWPOS_CENTERED;
+    load_saved_position(win_x, win_y);
+
     SDL_Window *window = SDL_CreateWindow("MQB Monitor Simulator",
-                                          SDL_WINDOWPOS_CENTERED,
-                                          SDL_WINDOWPOS_CENTERED,
+                                          win_x,
+                                          win_y,
                                           SIM_HOR_RES,
                                           SIM_VER_RES,
                                           SDL_WINDOW_SHOWN);
@@ -47,6 +90,30 @@ void SimulatorDisplay::begin()
     window_   = window;
     renderer_ = renderer;
     texture_  = texture;
+
+    atexit(atexit_save_position);
+    signal(SIGTERM, handle_terminating_signal);
+    signal(SIGINT, handle_terminating_signal);
+}
+
+void SimulatorDisplay::save_position() const
+{
+    SDL_Window *window = static_cast<SDL_Window *>(window_);
+    if (window == nullptr)
+    {
+        return;
+    }
+
+    int x = 0;
+    int y = 0;
+    SDL_GetWindowPosition(window, &x, &y);
+
+    FILE *f = fopen(position_file_path(), "w");
+    if (f != nullptr)
+    {
+        fprintf(f, "%d %d", x, y);
+        fclose(f);
+    }
 }
 
 void SimulatorDisplay::get_resolution(uint16_t &width, uint16_t &height) const

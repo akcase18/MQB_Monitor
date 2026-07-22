@@ -384,4 +384,17 @@ namespace core
         }
     }
 
+    DisplayRange resolve_display_range(const SignalSpec &spec,
+                                       bool              use_custom_range,
+                                       float             custom_min,
+                                       float             custom_max)
+    {
+        if (use_custom_range && custom_min < custom_max)
+        {
+            return { custom_min, custom_max };
+        }
+
+        return { spec.display_min, spec.display_max };
+    }
+
 } // namespace core

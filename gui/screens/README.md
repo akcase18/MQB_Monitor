@@ -5,7 +5,9 @@ Every screen in the app, the panel-layout algorithm, and small helpers shared ac
 ## Navigation
 
 ```
-InfoScreen  ──(swipe down gesture)──>  SettingsScreen ──(Theme row)──> ThemePickerScreen
+InfoScreen  ──(swipe down gesture)──>  SettingsScreen ──(Theme row)──────────> ThemePickerScreen
+     │                                       │
+     │                                       └─(Wireless Setup row)──> WirelessSetupScreen
      │
      └─(tap a panel)──> ConfiguratorScreen ──(Signal row)────> SignalPickerScreen
                               │
@@ -34,9 +36,11 @@ All screens except `InfoScreen` use a top nav bar (title + X close button) over 
 
 - **`inc/warning_config_screen.hpp`** / **`src/warning_config_screen.cpp`** — `WarningConfigScreen`, the low/high threshold editor for one signal — toggle each bound on/off, adjust with +/- buttons (tap-to-step, hold-to-repeat) bounded by that signal's `SignalSpec::display_min/max`. Actually wired to persistence (via `DoneCallback` → [gui/bindings](../bindings/README.md)'s `apply_warning_change`) — the original version of this screen had a dead Done button that never saved anything.
 
-- **`inc/settings_screen.hpp`** / **`src/settings_screen.cpp`** — `SettingsScreen`: a Brightness section (one slider, 5%-stepped, editing whichever of day/night the adjacent Day/Night toggle button currently selects — day and night are rarely tuned side by side, so one slider covers both rather than showing two), a Panels section (1–6 count picker), and a compact Theme row that hands off to `ThemePickerScreen`. The Day/Night toggle is a single button whose sun/moon glyph swaps on tap; toggling and every slider move fire `PreviewBrightnessCallback` immediately so a change is visible on the real backlight without waiting for Done — useful mid-drive, not just a setting tuned once and forgotten.
+- **`inc/settings_screen.hpp`** / **`src/settings_screen.cpp`** — `SettingsScreen`: a Brightness section (one slider, 5%-stepped, editing whichever of day/night the adjacent Day/Night toggle button currently selects — day and night are rarely tuned side by side, so one slider covers both rather than showing two), a Panels section (1–6 count picker), and two compact rows — Theme (hands off to `ThemePickerScreen`) and Wireless Setup (hands off to `WirelessSetupScreen`). The Day/Night toggle is a single button whose sun/moon glyph swaps on tap; toggling and every slider move fire `PreviewBrightnessCallback` immediately so a change is visible on the real backlight without waiting for Done — useful mid-drive, not just a setting tuned once and forgotten.
 
 - **`inc/theme_picker_screen.hpp`** / **`src/theme_picker_screen.cpp`** — `ThemePickerScreen`: a grid of `gui::ACCENT_PRESETS` swatches. Tapping one fires `DoneCallback` immediately (no separate confirmation step) — there's nothing to review before committing to a color choice.
+
+- **`inc/wireless_setup_screen.hpp`** / **`src/wireless_setup_screen.cpp`** — `WirelessSetupScreen`: brings up the ESP32-C3's Wi-Fi AP so the rest of configuration can happen from a phone browser instead of this touchscreen. Opening the screen activates the AP immediately (no Activate step). Two mutually-exclusive states driven by `WirelessSetupViewModel::phase` (Idle/Activating → spinner; Active → an `lv_qrcode` linking to the config page plus the SSID/URL as text — the AP is deliberately open, no password). `refresh()` re-pulls the phase without changing screens, so the async Activating → Active round trip (and an idle-timeout auto-deactivation) show up live while the screen is open — see [gui/bindings](../bindings/README.md)'s `RemoteBinding`. The close (X) button is the only way out and deactivates the AP on the way, optimistically rather than waiting to watch the state machine settle — there's no separate Turn Off control.
 
 - **`inc/screen_helpers.hpp`** / **`src/screen_helpers.cpp`** — shared pieces every screen uses: `create_screen()` (a full-size, theme-backgrounded top-level screen object), `create_close_button()` (the top-right X every screen but `InfoScreen` uses to exit, freeing the rest of the screen for a nav bar over stacked sections — currently used by all five of Configurator/SignalPicker/WarningConfig/Settings/ThemePicker), `create_divider()` (a full-width horizontal rule separating stacked sections). `create_done_button()` (a bottom-right checkmark, the original exit style before the nav-bar pattern) is also declared here but currently unused by any screen.
 

@@ -132,6 +132,28 @@ void test_signal_catalog_display_ranges_are_valid()
     }
 }
 
+void test_resolve_display_range_defaults_and_override()
+{
+    const core::SignalSpec &spec = core::SIGNAL_CATALOG[0]; // Coolant Temp
+
+    core::DisplayRange no_override
+        = core::resolve_display_range(spec, false, 0.0f, 50.0f);
+    TEST_ASSERT_EQUAL_FLOAT(spec.display_min, no_override.min);
+    TEST_ASSERT_EQUAL_FLOAT(spec.display_max, no_override.max);
+
+    core::DisplayRange custom
+        = core::resolve_display_range(spec, true, 0.0f, 50.0f);
+    TEST_ASSERT_EQUAL_FLOAT(0.0f, custom.min);
+    TEST_ASSERT_EQUAL_FLOAT(50.0f, custom.max);
+
+    /* Degenerate custom range (min >= max) falls back to the catalog
+     * default rather than returning a zero/negative-width range. */
+    core::DisplayRange degenerate
+        = core::resolve_display_range(spec, true, 50.0f, 50.0f);
+    TEST_ASSERT_EQUAL_FLOAT(spec.display_min, degenerate.min);
+    TEST_ASSERT_EQUAL_FLOAT(spec.display_max, degenerate.max);
+}
+
 void test_unit_convert_round_trips()
 {
     /* Regression for the warning-editor bug where a signal's imperial-unit
@@ -188,6 +210,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_display_value_unit_conversion);
     RUN_TEST(test_multi_request_signal_waits_for_all_requests);
     RUN_TEST(test_signal_catalog_display_ranges_are_valid);
+    RUN_TEST(test_resolve_display_range_defaults_and_override);
     RUN_TEST(test_unit_convert_round_trips);
     RUN_TEST(test_scheduler_fires_due_tasks);
     return UNITY_END();

@@ -10,37 +10,38 @@ namespace gui
 
     namespace
     {
-        /* Nav bar (0-44), then Brightness/Panels as two compressed
-         * equal-ish sections (divider -> label(+14) -> control row(+38)),
-         * plus a third compact Theme row sized like ConfiguratorScreen's
-         * tappable rows rather than a third full section — a color swatch
-         * grid doesn't need a whole section's worth of room the way a
-         * slider or button matrix does. */
-        constexpr lv_coord_t HEADER_DIVIDER_Y   = 44;
-        constexpr lv_coord_t BRIGHTNESS_LABEL_Y = 58;
-        /* Row holding both the slider (native/default height) and the
-         * taller Day/Night button — the button is vertically centered on
-         * the slider (see LV_ALIGN_OUT_RIGHT_MID below), not stretched to
-         * match its height, since a slider's *own* height sets its track
-         * thickness in LVGL rather than just its knob travel — forcing it
-         * tall turns the whole track into a fat pill. */
-        constexpr lv_coord_t BRIGHTNESS_ROW_Y  = 108;
-        constexpr lv_coord_t DIVIDER1_Y        = 156;
-        constexpr lv_coord_t PANELS_LABEL_Y    = 164;
-        constexpr lv_coord_t PANELS_MATRIX_Y   = 204;
-        constexpr lv_coord_t DIVIDER2_Y        = 262;
-        constexpr lv_coord_t THEME_ROW_Y       = 270;
-        constexpr lv_coord_t THEME_ROW_HEIGHT  = 36;
-        constexpr lv_coord_t THEME_SWATCH_SIZE = 24;
+        /* Nav bar, then Brightness and Panels as single label+control rows
+         * (not label-above-control — that cost a whole extra line each,
+         * and this screen doesn't have room to spare), then a footer of
+         * two compact tappable rows (Theme, Wireless Setup). Every row is
+         * separated from its neighbor by a divider so each reads as its
+         * own distinct row instead of blurring into the next one. */
+        constexpr lv_coord_t HEADER_DIVIDER_Y = 50;
+
+        constexpr lv_coord_t BRIGHTNESS_ROW_Y          = 70;
+        constexpr lv_coord_t BRIGHTNESS_ROW_HEIGHT     = 40;
+        constexpr lv_coord_t BRIGHTNESS_LABEL_GAP      = 24;
+        constexpr lv_coord_t BRIGHTNESS_SLIDER_BTN_GAP = 24;
+        constexpr lv_coord_t DIVIDER1_Y                = 120;
+
+        constexpr lv_coord_t PANELS_ROW_Y      = 136;
+        constexpr lv_coord_t PANELS_ROW_HEIGHT = 40;
+        constexpr lv_coord_t PANELS_LABEL_GAP  = 10;
+        /* Matches style_flat_matrix()'s pad_gap below — used to compute a
+         * single panel-count button's width so the Day/Night button
+         * (built first, in the Brightness row above this one) can match
+         * it exactly rather than being an arbitrary square. */
+        constexpr uint8_t    PANEL_BTN_COUNT = 6;
+        constexpr lv_coord_t PANEL_BTN_GAP   = 8;
+        constexpr lv_coord_t DIVIDER2_Y      = 186;
+
+        constexpr lv_coord_t THEME_ROW_Y        = 202;
+        constexpr lv_coord_t DIVIDER3_Y         = 248;
+        constexpr lv_coord_t WIRELESS_ROW_Y     = 262;
+        constexpr lv_coord_t COMPACT_ROW_HEIGHT = 38;
+        constexpr lv_coord_t THEME_SWATCH_SIZE  = 22;
 
         constexpr lv_coord_t SCREEN_MARGIN = 20;
-        /* Sized to match a single button in the Panels matrix below: same
-         * button count/gap/margin formula, so the two read as the same
-         * control size even though they're separate widgets. */
-        constexpr uint8_t    PANEL_BTN_COUNT      = 6;
-        constexpr lv_coord_t MATRIX_BTN_GAP       = 8;
-        constexpr lv_coord_t DAY_NIGHT_BTN_HEIGHT = 50;
-        constexpr lv_coord_t SLIDER_BTN_GAP       = 32;
 
         constexpr int32_t BRIGHTNESS_STEP = 5;
 
@@ -83,7 +84,9 @@ namespace gui
                               PreviewBrightnessCallback preview_cb,
                               void                     *preview_ctx,
                               PickThemeCallback         pick_theme_cb,
-                              void                     *pick_theme_ctx)
+                              void                     *pick_theme_ctx,
+                              PickWirelessCallback      pick_wireless_cb,
+                              void                     *pick_wireless_ctx)
     {
         day_brightness_pct_   = initial_day_brightness_pct;
         night_brightness_pct_ = initial_night_brightness_pct;
@@ -95,6 +98,8 @@ namespace gui
         preview_ctx_          = preview_ctx;
         pick_theme_cb_        = pick_theme_cb;
         pick_theme_ctx_       = pick_theme_ctx;
+        pick_wireless_cb_     = pick_wireless_cb;
+        pick_wireless_ctx_    = pick_wireless_ctx;
 
         screen_ = create_screen(theme);
 
@@ -111,50 +116,49 @@ namespace gui
 
         create_divider(screen_, theme, HEADER_DIVIDER_Y);
 
-        /* Brightness section */
-        lv_obj_t *brightness_label = lv_label_create(screen_);
-        lv_label_set_text(brightness_label, "Brightness");
+        /* Brightness section — label, slider, and the Day/Night toggle
+         * all share a single row (no separate "100%" readout — the
+         * slider's own knob position already shows the value, and a
+         * numeric readout wasn't earning its keep). */
+        lv_obj_t *brightness_row = lv_obj_create(screen_);
+        lv_obj_remove_style_all(brightness_row);
+        lv_obj_set_size(brightness_row,
+                        theme.metrics.screen_width - 2 * SCREEN_MARGIN,
+                        BRIGHTNESS_ROW_HEIGHT);
         lv_obj_align(
-            brightness_label, LV_ALIGN_TOP_LEFT, 20, BRIGHTNESS_LABEL_Y);
+            brightness_row, LV_ALIGN_TOP_LEFT, SCREEN_MARGIN, BRIGHTNESS_ROW_Y);
+
+        lv_obj_t *brightness_label = lv_label_create(brightness_row);
+        lv_label_set_text(brightness_label, "Brightness");
         lv_obj_set_style_text_color(brightness_label, theme.palette.fg, 0);
-        lv_obj_set_style_text_font(brightness_label, theme.typography.ui, 0);
-
-        brightness_value_lbl_ = lv_label_create(screen_);
-        lv_obj_set_style_text_color(brightness_value_lbl_, theme.palette.fg, 0);
         lv_obj_set_style_text_font(
-            brightness_value_lbl_, theme.typography.ui, 0);
-        lv_obj_align(brightness_value_lbl_,
-                     LV_ALIGN_TOP_RIGHT,
-                     -SCREEN_MARGIN,
-                     BRIGHTNESS_LABEL_Y);
+            brightness_label, theme.typography.label_lg, 0);
+        lv_obj_align(brightness_label, LV_ALIGN_LEFT_MID, 0, 0);
 
-        /* Day/Night button is sized to match one Panels-matrix button
-         * (same count/gap/margin formula) and reserves that width plus a
-         * gap out of the slider's row, so the slider ends, a little
-         * space, then the toggle sits flush against the right margin. */
-        lv_coord_t panels_row_width
-            = theme.metrics.screen_width - 2 * SCREEN_MARGIN;
-        lv_coord_t day_night_btn_width
-            = (panels_row_width - (PANEL_BTN_COUNT - 1) * MATRIX_BTN_GAP)
+        /* Measured, not guessed — a hardcoded reserved width drifted out
+         * of sync with this label's actual rendered width (a monospace
+         * UI font renders wider per character than it looks like it
+         * should) and let the slider start underneath the text. */
+        lv_obj_update_layout(brightness_label);
+        lv_coord_t brightness_label_width = lv_obj_get_width(brightness_label);
+
+        /* A throwaway probe, deleted immediately after measuring — lets
+         * the Day/Night button (built next) be sized to exactly match a
+         * real Panels-matrix button before that matrix exists yet, without
+         * duplicating PANEL_BTN_COUNT/PANEL_BTN_GAP's math against a
+         * guessed label width. */
+        lv_obj_t *panels_label_probe = lv_label_create(screen_);
+        lv_obj_set_style_text_font(
+            panels_label_probe, theme.typography.label_lg, 0);
+        lv_label_set_text(panels_label_probe, "Panels");
+        lv_obj_update_layout(panels_label_probe);
+        lv_coord_t panels_matrix_width
+            = (theme.metrics.screen_width - 2 * SCREEN_MARGIN)
+              - lv_obj_get_width(panels_label_probe) - PANELS_LABEL_GAP;
+        lv_obj_delete(panels_label_probe);
+        lv_coord_t panel_btn_width
+            = (panels_matrix_width - (PANEL_BTN_COUNT - 1) * PANEL_BTN_GAP)
               / PANEL_BTN_COUNT;
-        lv_coord_t slider_width
-            = panels_row_width - SLIDER_BTN_GAP - day_night_btn_width;
-
-        brightness_slider_ = lv_slider_create(screen_);
-        lv_obj_set_width(brightness_slider_, slider_width);
-        lv_obj_align(brightness_slider_,
-                     LV_ALIGN_TOP_LEFT,
-                     SCREEN_MARGIN,
-                     BRIGHTNESS_ROW_Y);
-        lv_slider_set_range(brightness_slider_, 0, 100);
-        lv_obj_set_style_bg_color(
-            brightness_slider_, theme.palette.accent, LV_PART_INDICATOR);
-        lv_obj_set_style_bg_color(
-            brightness_slider_, theme.palette.accent, LV_PART_KNOB);
-        lv_obj_add_event_cb(brightness_slider_,
-                            brightness_changed_cb,
-                            LV_EVENT_VALUE_CHANGED,
-                            this);
 
         /* Day/Night is a fast manual switch, not automatic (no clock/
          * light-sensor wiring yet) — flipping it immediately re-applies
@@ -163,15 +167,12 @@ namespace gui
          * single button whose glyph swaps between sun/moon
          * (theme.typography.icon_day_night) on each tap, rather than a
          * two-button matrix — one button that toggles reads more like a
-         * standard day/night switch than two icon buttons side by side. */
-        day_night_btn_ = lv_btn_create(screen_);
-        lv_obj_set_size(
-            day_night_btn_, day_night_btn_width, DAY_NIGHT_BTN_HEIGHT);
-        lv_obj_align_to(day_night_btn_,
-                        brightness_slider_,
-                        LV_ALIGN_OUT_RIGHT_MID,
-                        SLIDER_BTN_GAP,
-                        0);
+         * standard day/night switch than two icon buttons side by side.
+         * Sized to match a single Panels-matrix button exactly, so the
+         * two rows' rightmost controls read as the same control size. */
+        day_night_btn_ = lv_btn_create(brightness_row);
+        lv_obj_set_size(day_night_btn_, panel_btn_width, BRIGHTNESS_ROW_HEIGHT);
+        lv_obj_align(day_night_btn_, LV_ALIGN_RIGHT_MID, 0, 0);
         lv_obj_set_style_bg_color(day_night_btn_, theme.palette.bg, 0);
         lv_obj_set_style_bg_opa(day_night_btn_, LV_OPA_COVER, 0);
         lv_obj_set_style_radius(day_night_btn_, 8, 0);
@@ -191,26 +192,68 @@ namespace gui
         lv_obj_set_style_text_color(day_night_icon_lbl_, theme.palette.fg, 0);
         lv_obj_center(day_night_icon_lbl_);
 
+        /* Slider fills whatever's left between the label's actual width
+         * and the Day/Night button. */
+        lv_coord_t slider_width
+            = (theme.metrics.screen_width - 2 * SCREEN_MARGIN)
+              - brightness_label_width - BRIGHTNESS_LABEL_GAP - panel_btn_width
+              - BRIGHTNESS_SLIDER_BTN_GAP;
+
+        brightness_slider_ = lv_slider_create(brightness_row);
+        lv_obj_set_width(brightness_slider_, slider_width);
+        lv_obj_align(brightness_slider_,
+                     LV_ALIGN_LEFT_MID,
+                     brightness_label_width + BRIGHTNESS_LABEL_GAP,
+                     0);
+        lv_slider_set_range(brightness_slider_, 0, 100);
+        lv_obj_set_style_bg_color(
+            brightness_slider_, theme.palette.accent, LV_PART_INDICATOR);
+        lv_obj_set_style_bg_color(
+            brightness_slider_, theme.palette.accent, LV_PART_KNOB);
+        lv_obj_add_event_cb(brightness_slider_,
+                            brightness_changed_cb,
+                            LV_EVENT_VALUE_CHANGED,
+                            this);
+
         create_divider(screen_, theme, DIVIDER1_Y);
 
-        /* Panels section */
-        lv_obj_t *panel_count_label = lv_label_create(screen_);
-        lv_obj_set_style_text_font(panel_count_label, theme.typography.ui, 0);
+        /* Panels section — label and the 1-6 count matrix share a single
+         * row (label left, matrix filling the rest of the width) rather
+         * than label-above-matrix, which cost a whole extra line of
+         * vertical space this screen doesn't have to spare. */
+        lv_obj_t *panels_row = lv_obj_create(screen_);
+        lv_obj_remove_style_all(panels_row);
+        lv_obj_set_size(panels_row,
+                        theme.metrics.screen_width - 2 * SCREEN_MARGIN,
+                        PANELS_ROW_HEIGHT);
+        lv_obj_align(
+            panels_row, LV_ALIGN_TOP_LEFT, SCREEN_MARGIN, PANELS_ROW_Y);
+
+        lv_obj_t *panel_count_label = lv_label_create(panels_row);
+        lv_obj_set_style_text_font(
+            panel_count_label, theme.typography.label_lg, 0);
         lv_obj_set_style_text_color(panel_count_label, theme.palette.fg, 0);
         lv_label_set_text(panel_count_label, "Panels");
-        lv_obj_align(panel_count_label, LV_ALIGN_TOP_LEFT, 20, PANELS_LABEL_Y);
+        lv_obj_align(panel_count_label, LV_ALIGN_LEFT_MID, 0, 0);
 
-        /* A single row of buttons instead of a vertical roller — the
-         * roller's 3 visible rows stood tall enough to cover the "Panels"
-         * label above it; this is a fixed, compact height regardless of
-         * how many options there are. */
+        /* Measured, not guessed — see the matching comment on Brightness's
+         * label above. */
+        lv_obj_update_layout(panel_count_label);
+        lv_coord_t panels_label_width = lv_obj_get_width(panel_count_label);
+
+        /* A row of buttons instead of a vertical roller — the roller's 3
+         * visible rows stood tall enough to cover the "Panels" label
+         * above it; this is a fixed, compact height regardless of how
+         * many options there are. */
         static const char *const panel_count_map[]
             = { "1", "2", "3", "4", "5", "6", "" };
-        panel_count_matrix_ = lv_buttonmatrix_create(screen_);
+        panel_count_matrix_ = lv_buttonmatrix_create(panels_row);
         lv_obj_set_style_text_font(panel_count_matrix_, theme.typography.ui, 0);
-        lv_obj_set_size(
-            panel_count_matrix_, theme.metrics.screen_width - 40, 50);
-        lv_obj_align(panel_count_matrix_, LV_ALIGN_TOP_MID, 0, PANELS_MATRIX_Y);
+        lv_obj_set_size(panel_count_matrix_,
+                        theme.metrics.screen_width - 2 * SCREEN_MARGIN
+                            - panels_label_width - PANELS_LABEL_GAP,
+                        PANELS_ROW_HEIGHT);
+        lv_obj_align(panel_count_matrix_, LV_ALIGN_RIGHT_MID, 0, 0);
         lv_buttonmatrix_set_map(panel_count_matrix_, panel_count_map);
         lv_buttonmatrix_set_one_checked(panel_count_matrix_, true);
         lv_buttonmatrix_set_button_ctrl_all(panel_count_matrix_,
@@ -224,7 +267,7 @@ namespace gui
          * Signal/Warning Thresholds rows. */
         lv_obj_t *theme_row_btn = lv_btn_create(screen_);
         lv_obj_set_size(
-            theme_row_btn, theme.metrics.screen_width - 40, THEME_ROW_HEIGHT);
+            theme_row_btn, theme.metrics.screen_width - 40, COMPACT_ROW_HEIGHT);
         lv_obj_align(theme_row_btn, LV_ALIGN_TOP_MID, 0, THEME_ROW_Y);
         lv_obj_set_style_bg_opa(theme_row_btn, LV_OPA_TRANSP, 0);
         lv_obj_set_style_border_width(theme_row_btn, 0, 0);
@@ -239,7 +282,7 @@ namespace gui
         lv_obj_t *theme_label = lv_label_create(theme_row_btn);
         lv_label_set_text(theme_label, "Theme");
         lv_obj_set_style_text_color(theme_label, theme.palette.fg, 0);
-        lv_obj_set_style_text_font(theme_label, theme.typography.ui, 0);
+        lv_obj_set_style_text_font(theme_label, theme.typography.label_lg, 0);
         lv_obj_align(theme_label, LV_ALIGN_LEFT_MID, 0, 0);
 
         lv_obj_t *theme_chevron = lv_label_create(theme_row_btn);
@@ -262,6 +305,40 @@ namespace gui
         lv_obj_set_style_shadow_width(theme_swatch_, 0, 0);
         lv_obj_align_to(
             theme_swatch_, theme_chevron, LV_ALIGN_OUT_LEFT_MID, -12, 0);
+
+        create_divider(screen_, theme, DIVIDER3_Y);
+
+        /* Wireless Setup row: tappable, hands off to WirelessSetupScreen —
+         * same shape as the Theme row above it, just without a preview
+         * swatch (there's no "current value" to show at a glance). */
+        lv_obj_t *wireless_row_btn = lv_btn_create(screen_);
+        lv_obj_set_size(wireless_row_btn,
+                        theme.metrics.screen_width - 40,
+                        COMPACT_ROW_HEIGHT);
+        lv_obj_align(wireless_row_btn, LV_ALIGN_TOP_MID, 0, WIRELESS_ROW_Y);
+        lv_obj_set_style_bg_opa(wireless_row_btn, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(wireless_row_btn, 0, 0);
+        lv_obj_set_style_shadow_width(wireless_row_btn, 0, 0);
+        lv_obj_set_style_pad_all(wireless_row_btn, 0, 0);
+        lv_obj_set_style_bg_color(
+            wireless_row_btn, theme.palette.accent, LV_STATE_PRESSED);
+        lv_obj_set_style_bg_opa(wireless_row_btn, LV_OPA_30, LV_STATE_PRESSED);
+        lv_obj_add_event_cb(
+            wireless_row_btn, pick_wireless_cb_handler, LV_EVENT_CLICKED, this);
+
+        lv_obj_t *wireless_label = lv_label_create(wireless_row_btn);
+        lv_label_set_text(wireless_label, "Wireless Setup");
+        lv_obj_set_style_text_color(wireless_label, theme.palette.fg, 0);
+        lv_obj_set_style_text_font(
+            wireless_label, theme.typography.label_lg, 0);
+        lv_obj_align(wireless_label, LV_ALIGN_LEFT_MID, 0, 0);
+
+        lv_obj_t *wireless_chevron = lv_label_create(wireless_row_btn);
+        lv_obj_set_style_text_font(
+            wireless_chevron, theme.typography.symbol_lg, 0);
+        lv_label_set_text(wireless_chevron, LV_SYMBOL_RIGHT);
+        lv_obj_set_style_text_color(wireless_chevron, theme.palette.fg, 0);
+        lv_obj_align(wireless_chevron, LV_ALIGN_RIGHT_MID, 0, 0);
     }
 
     void SettingsScreen::open()
@@ -273,7 +350,6 @@ namespace gui
                             showing_night_ ? night_brightness_pct_
                                            : day_brightness_pct_,
                             LV_ANIM_OFF);
-        refresh_brightness_label();
         refresh_day_night_icon();
 
         uint8_t selected = (num_panels_ >= 1 && num_panels_ <= 6)
@@ -292,16 +368,6 @@ namespace gui
     {
         accent_color_ = accent_color;
         refresh_theme_swatch();
-    }
-
-    void SettingsScreen::refresh_brightness_label()
-    {
-        char buf[8];
-        snprintf(buf,
-                 sizeof(buf),
-                 "%d%%",
-                 static_cast<int>(lv_slider_get_value(brightness_slider_)));
-        lv_label_set_text(brightness_value_lbl_, buf);
     }
 
     void SettingsScreen::refresh_theme_swatch()
@@ -345,7 +411,6 @@ namespace gui
             lv_slider_set_value(self->brightness_slider_, snapped, LV_ANIM_OFF);
         }
 
-        self->refresh_brightness_label();
         self->capture_slider_value();
         if (self->preview_cb_ != nullptr)
         {
@@ -366,7 +431,6 @@ namespace gui
         uint8_t value = self->showing_night_ ? self->night_brightness_pct_
                                              : self->day_brightness_pct_;
         lv_slider_set_value(self->brightness_slider_, value, LV_ANIM_ON);
-        self->refresh_brightness_label();
 
         if (self->preview_cb_ != nullptr)
         {
@@ -380,6 +444,15 @@ namespace gui
         if (self->pick_theme_cb_ != nullptr)
         {
             self->pick_theme_cb_(self->pick_theme_ctx_);
+        }
+    }
+
+    void SettingsScreen::pick_wireless_cb_handler(lv_event_t *e)
+    {
+        auto *self = static_cast<SettingsScreen *>(lv_event_get_user_data(e));
+        if (self->pick_wireless_cb_ != nullptr)
+        {
+            self->pick_wireless_cb_(self->pick_wireless_ctx_);
         }
     }
 
