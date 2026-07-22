@@ -32,14 +32,14 @@ namespace gui
          * everything below it mirrors High's internal rhythm (divider ->
          * label 14, label -> row 38, row height 56) so the trailing gap
          * after each section's control row comes out equal too. */
-        constexpr lv_coord_t HEADER_DIVIDER_Y  = 44;
-        constexpr lv_coord_t HI_LABEL_Y        = 58;
-        constexpr lv_coord_t HI_SWITCH_Y       = 60;
-        constexpr lv_coord_t HI_ROW_Y          = 96;
-        constexpr lv_coord_t SECTION_DIVIDER_Y = 182;
-        constexpr lv_coord_t LO_LABEL_Y        = 196;
-        constexpr lv_coord_t LO_SWITCH_Y       = 198;
-        constexpr lv_coord_t LO_ROW_Y          = 234;
+        constexpr lv_coord_t HEADER_DIVIDER_Y  = 50;
+        constexpr lv_coord_t HI_LABEL_Y        = 64;
+        constexpr lv_coord_t HI_SWITCH_Y       = 66;
+        constexpr lv_coord_t HI_ROW_Y          = 102;
+        constexpr lv_coord_t SECTION_DIVIDER_Y = 185;
+        constexpr lv_coord_t LO_LABEL_Y        = 199;
+        constexpr lv_coord_t LO_SWITCH_Y       = 201;
+        constexpr lv_coord_t LO_ROW_Y          = 237;
 
         void style_step_button(lv_obj_t *btn, const Theme &theme)
         {

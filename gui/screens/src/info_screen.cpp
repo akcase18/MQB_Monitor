@@ -49,6 +49,9 @@ namespace gui
         PanelSlot slots[MAX_PANELS];
         compute_layout(count, orientation, slots);
 
+        uint8_t rank_of_slot[MAX_PANELS];
+        compute_prominence_ranks(slots, count, rank_of_slot);
+
         bool    horizontal    = orientation == LayoutOrientation::Horizontal;
         uint8_t band_axis_len = horizontal ? BAND_UNITS : 2;
 
@@ -99,11 +102,10 @@ namespace gui
                                  slot.row,
                                  slot.rowspan);
             panel_large_[i] = slot.large;
-            /* rowspan==2 alone would also catch count 2's columns, which
-             * are tall but only a third of the screen wide — nowhere near
-             * as roomy as count 1's full-width panel or count 3's hero, so
-             * they don't get the huge hero-only Digital font. */
-            panel_hero_[i] = slot.rowspan == 2 && slot.colspan >= 4;
+            panel_hero_[i]  = is_hero_slot(slot);
+
+            rank_of_slot_[i]    = rank_of_slot[i];
+            click_ctx_[i].index = rank_of_slot[i];
         }
 
         num_panels_ = count;
@@ -119,8 +121,10 @@ namespace gui
 
         for (uint8_t i = 0; i < num_panels_; i++)
         {
-            PanelViewModel vm
-                = builder_(builder_ctx_, i, panel_large_[i], panel_hero_[i]);
+            PanelViewModel vm = builder_(builder_ctx_,
+                                         rank_of_slot_[i],
+                                         panel_large_[i],
+                                         panel_hero_[i]);
             panels_[i].set_view_model(vm);
         }
     }

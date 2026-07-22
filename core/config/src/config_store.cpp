@@ -7,10 +7,10 @@ namespace core
 
     namespace
     {
-        size_t panel_offset(uint8_t idx)
+        size_t priority_offset(uint8_t rank)
         {
-            return offsetof(Config, panels)
-                   + static_cast<size_t>(idx) * sizeof(PanelConfig);
+            return offsetof(Config, priorities)
+                   + static_cast<size_t>(rank) * sizeof(PrioritizedSignal);
         }
 
         size_t signal_offset(size_t idx)
@@ -58,15 +58,16 @@ namespace core
         backing_.write(0, &config_, sizeof(config_));
     }
 
-    void ConfigStore::save_panel(uint8_t idx)
+    void ConfigStore::save_priority(uint8_t rank)
     {
-        if (idx >= MAX_PANELS)
+        if (rank >= MAX_PANELS)
         {
             return;
         }
 
-        backing_.write(
-            panel_offset(idx), &config_.panels[idx], sizeof(PanelConfig));
+        backing_.write(priority_offset(rank),
+                       &config_.priorities[rank],
+                       sizeof(PrioritizedSignal));
     }
 
     void ConfigStore::save_signal(uint16_t signal_id)
@@ -95,16 +96,18 @@ namespace core
             = 0x4CAF50; /* green, gui::ACCENT_PRESETS[0] */
 
         /* Ported from the old EEPROM_Handler::set_defaults(). info_list's
-         * declaration order there matches SIGNAL_CATALOG's id assignment here
-         * 1:1, so the same positions carry over directly. panels[5] was dead
-         * (old NUM_PANELS=5 never wired panel_6) — it's now a real, simply
-         * inactive slot since num_panels defaults to 5. */
-        config_.panels[0] = { 0, UnitSystem::Imperial };  /* Coolant Temp */
-        config_.panels[1] = { 12, UnitSystem::Imperial }; /* Throttle Pos */
-        config_.panels[2] = { 2, UnitSystem::Imperial };  /* Int Air Temp */
-        config_.panels[3] = { 1, UnitSystem::Imperial };  /* Eng Oil Temp */
-        config_.panels[4] = { 6, UnitSystem::Imperial };  /* Int Pres Act. */
-        config_.panels[5] = { 8, UnitSystem::Imperial };  /* Engine Torque */
+         * declaration order there matches SIGNAL_CATALOG's id assignment
+         * here 1:1, so the same positions carry over directly, now read as
+         * priority order (rank 0 = most important) rather than slot order
+         * — Coolant Temp lands in the most prominent slot at every panel
+         * count instead of just being "whatever's in slot 0". priorities[5]
+         * is a real, simply-inactive rank since num_panels defaults to 5. */
+        config_.priorities[0] = { 0, UnitSystem::Imperial };  /* Coolant Temp */
+        config_.priorities[1] = { 12, UnitSystem::Imperial }; /* Throttle Pos */
+        config_.priorities[2] = { 2, UnitSystem::Imperial };  /* Int Air Temp */
+        config_.priorities[3] = { 1, UnitSystem::Imperial };  /* Eng Oil Temp */
+        config_.priorities[4] = { 6, UnitSystem::Imperial }; /* Int Pres Act. */
+        config_.priorities[5] = { 8, UnitSystem::Imperial }; /* Engine Torque */
 
         for (size_t i = 0; i < SIGNAL_CATALOG_COUNT; i++)
         {

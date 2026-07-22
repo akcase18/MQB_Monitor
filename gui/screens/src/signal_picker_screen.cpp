@@ -11,8 +11,8 @@ namespace gui
     {
         constexpr size_t OPTIONS_BUF_LEN = 1024;
 
-        constexpr lv_coord_t HEADER_DIVIDER_Y = 44;
-        constexpr lv_coord_t ROLLER_Y         = 60;
+        constexpr lv_coord_t HEADER_DIVIDER_Y = 50;
+        constexpr lv_coord_t ROLLER_Y         = 66;
     } // namespace
 
     void SignalPickerScreen::init(const Theme             &theme,

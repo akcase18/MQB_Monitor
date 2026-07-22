@@ -13,11 +13,13 @@
  * Layout follows WarningConfigScreen's pattern: a top nav bar (title + X
  * close, instead of the bottom-right checkmark other screens use) over two
  * equal-height sections (Brightness, Panels) separated by full-width
- * dividers, plus a third compact Theme row (matching ConfiguratorScreen's
- * tappable-row style) that hands off to ThemePickerScreen rather than
- * embedding a color grid here. The Brightness section's one slider edits
- * whichever of day/night the toggle currently selects, rather than
- * showing two sliders — day and night are rarely tuned side by side.
+ * dividers, plus two compact tappable rows (matching ConfiguratorScreen's
+ * Signal/Warning Thresholds rows) — Theme, which hands off to
+ * ThemePickerScreen, and Wireless Setup, which hands off to
+ * WirelessSetupScreen — rather than embedding either's controls here. The
+ * Brightness section's one slider edits whichever of day/night the toggle
+ * currently selects, rather than showing two sliders — day and night are
+ * rarely tuned side by side.
  */
 #pragma once
 
@@ -42,6 +44,8 @@ namespace gui
                 = void (*)(void *ctx, uint8_t brightness_pct);
             /** Fired when the Theme row is tapped. */
             using PickThemeCallback = void (*)(void *ctx);
+            /** Fired when the Wireless Setup row is tapped. */
+            using PickWirelessCallback = void (*)(void *ctx);
 
             void init(const Theme              &theme,
                       uint8_t                   initial_day_brightness_pct,
@@ -53,7 +57,9 @@ namespace gui
                       PreviewBrightnessCallback preview_cb,
                       void                     *preview_ctx,
                       PickThemeCallback         pick_theme_cb,
-                      void                     *pick_theme_ctx);
+                      void                     *pick_theme_ctx,
+                      PickWirelessCallback      pick_wireless_cb,
+                      void                     *pick_wireless_ctx);
 
             void open();
 
@@ -72,8 +78,8 @@ namespace gui
             static void brightness_changed_cb(lv_event_t *e);
             static void day_night_clicked_cb(lv_event_t *e);
             static void pick_theme_cb_handler(lv_event_t *e);
+            static void pick_wireless_cb_handler(lv_event_t *e);
 
-            void refresh_brightness_label();
             void refresh_theme_swatch();
             /** Sets the toggle button's glyph to match showing_night_. */
             void refresh_day_night_icon();
@@ -84,13 +90,12 @@ namespace gui
              * lost. */
             void capture_slider_value();
 
-            lv_obj_t *screen_               = nullptr;
-            lv_obj_t *brightness_slider_    = nullptr;
-            lv_obj_t *brightness_value_lbl_ = nullptr;
-            lv_obj_t *day_night_btn_        = nullptr;
-            lv_obj_t *day_night_icon_lbl_   = nullptr;
-            lv_obj_t *panel_count_matrix_   = nullptr;
-            lv_obj_t *theme_swatch_         = nullptr;
+            lv_obj_t *screen_             = nullptr;
+            lv_obj_t *brightness_slider_  = nullptr;
+            lv_obj_t *day_night_btn_      = nullptr;
+            lv_obj_t *day_night_icon_lbl_ = nullptr;
+            lv_obj_t *panel_count_matrix_ = nullptr;
+            lv_obj_t *theme_swatch_       = nullptr;
 
             uint8_t  day_brightness_pct_   = 100;
             uint8_t  night_brightness_pct_ = 20;
@@ -98,12 +103,14 @@ namespace gui
             uint8_t  num_panels_           = 5;
             uint32_t accent_color_         = 0;
 
-            DoneCallback              done_cb_        = nullptr;
-            void                     *done_ctx_       = nullptr;
-            PreviewBrightnessCallback preview_cb_     = nullptr;
-            void                     *preview_ctx_    = nullptr;
-            PickThemeCallback         pick_theme_cb_  = nullptr;
-            void                     *pick_theme_ctx_ = nullptr;
+            DoneCallback              done_cb_           = nullptr;
+            void                     *done_ctx_          = nullptr;
+            PreviewBrightnessCallback preview_cb_        = nullptr;
+            void                     *preview_ctx_       = nullptr;
+            PickThemeCallback         pick_theme_cb_     = nullptr;
+            void                     *pick_theme_ctx_    = nullptr;
+            PickWirelessCallback      pick_wireless_cb_  = nullptr;
+            void                     *pick_wireless_ctx_ = nullptr;
     };
 
 } // namespace gui

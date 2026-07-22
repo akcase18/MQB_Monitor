@@ -64,4 +64,22 @@ namespace gui
                            LayoutOrientation orientation,
                            PanelSlot         out[MAX_PANELS]);
 
+    /**
+     * True for the truly roomy full-height slots — count 1's panel and
+     * count 3's hero — not count 2's narrower full-height columns.
+     */
+    bool is_hero_slot(const PanelSlot &slot);
+
+    /**
+     * For each of the `count` slots compute_layout() just produced, which
+     * priority rank (0 = most important) should be displayed there.
+     * Prominence order is hero > large > small; within a tier, existing
+     * slot index order (already left-to-right/top-to-bottom by
+     * construction, see fill_band() in layout.cpp) — three passes over
+     * [0,count), no sort needed.
+     */
+    void compute_prominence_ranks(const PanelSlot slots[MAX_PANELS],
+                                  uint8_t         count,
+                                  uint8_t         rank_of_slot[MAX_PANELS]);
+
 } // namespace gui

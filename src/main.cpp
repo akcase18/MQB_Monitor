@@ -17,13 +17,19 @@
 #include "signal_store.hpp"
 #include "uds_client.hpp"
 
+#include "remote_ap_controller.hpp"
+#include "remote_config_link.hpp"
+#include "remote_config_server.hpp"
+
 #include "configurator_screen.hpp"
 #include "info_screen.hpp"
+#include "remote_binding.hpp"
 #include "settings_screen.hpp"
 #include "signal_picker_screen.hpp"
 #include "theme_picker_screen.hpp"
 #include "vehicle_binding.hpp"
 #include "warning_config_screen.hpp"
+#include "wireless_setup_screen.hpp"
 
 #include <lvgl.h>
 #include <stdint.h>
@@ -44,7 +50,12 @@ namespace
     constexpr uint32_t CAN_RX_ID = 0x7E8;
     constexpr uint32_t CAN_BAUD  = 500000;
 
-    constexpr uint32_t INFO_SCREEN_REFRESH_MS = 200;
+    /* Teensy<->ESP32-C3 wireless-configuration link. See remote/protocol
+     * for the framing this carries. */
+    constexpr uint32_t REMOTE_SERIAL_BAUD = 115200;
+
+    constexpr uint32_t INFO_SCREEN_REFRESH_MS     = 200;
+    constexpr uint32_t WIRELESS_SCREEN_REFRESH_MS = 500;
 
     lv_color_t s_draw_buf_1[(LCD_HORZ * LCD_VERT) / 10];
     lv_color_t s_draw_buf_2[(LCD_HORZ * LCD_VERT) / 10];
@@ -64,7 +75,12 @@ namespace
             core::UdsClient   uds_client;
             core::Scheduler   scheduler;
 
+            remote::server::RemoteConfigServer remote_server;
+            remote::server::RemoteConfigLink   remote_link;
+            remote::server::RemoteApController remote_ap;
+
             gui::VehicleBinding vehicle_binding;
+            gui::RemoteBinding  remote_binding;
 
             gui::InfoScreen          info_screen;
             gui::ConfiguratorScreen  configurator_screen;
@@ -72,6 +88,7 @@ namespace
             gui::WarningConfigScreen warning_screen;
             gui::SettingsScreen      settings_screen;
             gui::ThemePickerScreen   theme_picker_screen;
+            gui::WirelessSetupScreen wireless_setup_screen;
 
             const char *signal_names[core::SIGNAL_CATALOG_COUNT];
             uint16_t    signal_ids[core::SIGNAL_CATALOG_COUNT];
@@ -80,7 +97,11 @@ namespace
                 : config_store(platform.config_store)
                 , uds_client(platform.can, CAN_TX_ID, CAN_RX_ID)
                 , scheduler(platform.clock)
+                , remote_server(config_store, signal_store)
+                , remote_link(platform.serial, remote_server)
+                , remote_ap(remote_link, platform.clock)
                 , vehicle_binding(signal_store, config_store)
+                , remote_binding(remote_ap)
             {
                 for (uint16_t i = 0; i < core::SIGNAL_CATALOG_COUNT; i++)
                 {
@@ -130,6 +151,22 @@ namespace
             area->y2,
             reinterpret_cast<const uint16_t *>(px_map));
         lv_display_flush_ready(disp);
+
+        /* The draw buffer only covers a fraction of the screen (see
+         * s_draw_buf_1's size below), so the panel's first real frame
+         * takes several flush() calls to land in full — turning the
+         * backlight on after just the first of those would show the rest
+         * of the screen still holding whatever garbage was in GRAM from
+         * power-on. lv_display_flush_is_last() marks the flush that
+         * completes the current render pass, so wait for that instead.
+         * TeensyDisplay::begin() leaves the backlight pin held low for
+         * exactly this reason (see its own comment). */
+        static bool s_first_frame_flushed = false;
+        if (!s_first_frame_flushed && lv_display_flush_is_last(disp))
+        {
+            s_first_frame_flushed = true;
+            platform_get().display.set_backlight(100);
+        }
     }
 
     void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
@@ -178,13 +215,35 @@ namespace
             byte1, byte2, raw, platform_get().clock.millis());
     }
 
+    /* Request/response pairs are handled internally by
+     * RemoteConfigLink::poll(); this only ever sees the async EVT_*
+     * messages (EVT_AP_READY/EVT_AP_DISABLED). */
+    FLASHMEM void remote_evt_cb(void                     *ctx,
+                                remote::protocol::MsgType type,
+                                const uint8_t            *payload,
+                                uint16_t                  len)
+    {
+        (void)ctx;
+        composition().remote_ap.on_event(
+            type, payload, len, platform_get().clock.millis());
+    }
+
+    /* Registered once at remote::server::AP_IDLE_CHECK_PERIOD_MS via
+     * core::Scheduler — a no-op unless RemoteApController actually has a
+     * timeout to act on (see remote::server::RemoteApController::tick()). */
+    FLASHMEM void remote_ap_idle_check_task(void *ctx)
+    {
+        (void)ctx;
+        composition().remote_ap.tick(platform_get().clock.millis());
+    }
+
     gui::PanelViewModel view_model_builder(void   *ctx,
-                                           uint8_t panel_idx,
+                                           uint8_t rank,
                                            bool    large,
                                            bool    hero)
     {
         auto *binding = static_cast<gui::VehicleBinding *>(ctx);
-        return binding->build_view_model(panel_idx, large, hero);
+        return binding->build_view_model(rank, large, hero);
     }
 
     gui::DisplayMode to_gui_display_mode(core::DisplayMode mode)
@@ -201,28 +260,28 @@ namespace
         }
     }
 
-    void panel_pressed_cb(void *ctx, uint8_t panel_idx)
+    void panel_pressed_cb(void *ctx, uint8_t rank)
     {
         (void)ctx;
-        const core::Config      &cfg   = composition().config_store.get();
-        const core::PanelConfig &panel = cfg.panels[panel_idx];
+        const core::Config            &cfg   = composition().config_store.get();
+        const core::PrioritizedSignal &panel = cfg.priorities[rank];
 
         composition().configurator_screen.open(
-            panel_idx,
+            rank,
             panel.signal_id,
             panel.units == core::UnitSystem::Metric,
             to_gui_display_mode(panel.display_mode));
     }
 
     void configurator_done_cb(void            *ctx,
-                              uint8_t          panel_idx,
+                              uint8_t          rank,
                               uint16_t         signal_id,
                               bool             is_metric,
                               gui::DisplayMode mode)
     {
         (void)ctx;
         composition().vehicle_binding.apply_configurator_change(
-            panel_idx,
+            rank,
             signal_id,
             is_metric ? core::UnitSystem::Metric : core::UnitSystem::Imperial,
             mode);
@@ -230,14 +289,12 @@ namespace
         lv_screen_load(composition().info_screen.screen());
     }
 
-    void configurator_settings_cb(void    *ctx,
-                                  uint8_t  panel_idx,
-                                  uint16_t signal_id)
+    void configurator_settings_cb(void *ctx, uint8_t rank, uint16_t signal_id)
     {
         (void)ctx;
 
-        const core::Config      &cfg   = composition().config_store.get();
-        const core::PanelConfig &panel = cfg.panels[panel_idx];
+        const core::Config            &cfg   = composition().config_store.get();
+        const core::PrioritizedSignal &panel = cfg.priorities[rank];
         bool is_metric = panel.units == core::UnitSystem::Metric;
 
         gui::WarningThresholdViewModel vm
@@ -284,7 +341,13 @@ namespace
                           uint8_t num_panels)
     {
         (void)ctx;
-        platform_get().display.set_backlight(day_brightness_pct);
+        /* No set_backlight() here — settings_preview_brightness_cb already
+         * pushed the real backlight live on every slider move and Day/
+         * Night toggle, so it's already showing whichever of day/night was
+         * actually active when Done was pressed. Re-applying
+         * day_brightness_pct unconditionally here was wrong: it stomped
+         * over a Night-mode edit with the (usually untouched, 100%) Day
+         * value on every exit. */
 
         core::Settings &settings  = composition().config_store.get().settings;
         settings.day_brightness   = day_brightness_pct;
@@ -318,6 +381,38 @@ namespace
         composition().config_store.save();
 
         lv_async_call(rebuild_screens_for_theme_change, nullptr);
+    }
+
+    /* Opening this screen activates the AP immediately — no separate
+     * Activate step (see wireless_setup_screen.hpp's file doc comment).
+     * activate() is a no-op unless the AP is currently Idle, so reopening
+     * while already Active/Activating just shows the current state. */
+    void settings_pick_wireless_cb(void *ctx)
+    {
+        (void)ctx;
+        Composition &app = composition();
+        app.remote_binding.activate();
+        app.wireless_setup_screen.open(app.remote_binding.build_view_model(),
+                                       app.settings_screen.screen());
+    }
+
+    void wireless_deactivate_cb(void *ctx)
+    {
+        (void)ctx;
+        composition().remote_binding.deactivate();
+    }
+
+    /* Registered at a modest cadence (see WIRELESS_SCREEN_REFRESH_MS) so
+     * the Activating -> Active transition (an async round trip to the C3)
+     * and an idle-timeout auto-deactivation both show up while this
+     * screen is on-screen — unconditional like refresh_info_screen_task,
+     * since WirelessSetupScreen::refresh() is a cheap no-op unless the
+     * phase actually changed. */
+    void refresh_wireless_screen_task(void *ctx)
+    {
+        (void)ctx;
+        composition().wireless_setup_screen.refresh(
+            composition().remote_binding.build_view_model());
     }
 
     void info_screen_gesture_cb(lv_event_t *e)
@@ -379,8 +474,11 @@ namespace
                                  settings_preview_brightness_cb,
                                  nullptr,
                                  settings_pick_theme_cb,
+                                 nullptr,
+                                 settings_pick_wireless_cb,
                                  nullptr);
         app.theme_picker_screen.init(theme, theme_picker_done_cb, nullptr);
+        app.wireless_setup_screen.init(theme, wireless_deactivate_cb, nullptr);
 
         lv_obj_add_event_cb(app.info_screen.screen(),
                             info_screen_gesture_cb,
@@ -413,6 +511,7 @@ namespace
         lv_obj_delete(app.warning_screen.screen());
         lv_obj_delete(app.settings_screen.screen());
         lv_obj_delete(app.theme_picker_screen.screen());
+        lv_obj_delete(app.wireless_setup_screen.screen());
 
         return transition;
     }
@@ -448,6 +547,7 @@ void setup()
     platform.display.begin();
     platform.touch.begin();
     platform.can.begin(CAN_TX_ID, CAN_RX_ID, CAN_BAUD);
+    platform.serial.begin(REMOTE_SERIAL_BAUD);
 
     lv_init();
     lv_tick_set_cb(tick_cb);
@@ -508,6 +608,11 @@ void setup()
     }
     app.scheduler.every(
         INFO_SCREEN_REFRESH_MS, refresh_info_screen_task, nullptr);
+    app.scheduler.every(remote::server::AP_IDLE_CHECK_PERIOD_MS,
+                        remote_ap_idle_check_task,
+                        nullptr);
+    app.scheduler.every(
+        WIRELESS_SCREEN_REFRESH_MS, refresh_wireless_screen_task, nullptr);
 
     lv_screen_load(app.info_screen.screen());
 }
@@ -518,6 +623,7 @@ void loop()
 
     app.scheduler.tick();
     app.uds_client.poll(on_uds_response, nullptr);
+    app.remote_link.poll(remote_evt_cb, nullptr, platform_get().clock.millis());
 
     lv_timer_handler();
 }

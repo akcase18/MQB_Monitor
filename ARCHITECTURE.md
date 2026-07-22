@@ -3,16 +3,17 @@
 MQB Monitor is split into four layers with a strict, one-way dependency rule:
 
 ```
-platform/  →  core/  →  gui/bindings  →  gui/screens, gui/widgets
-                                 ↑
-                              gui/theme
+platform/  →  core/         →  gui/bindings  →  gui/screens, gui/widgets
+           →  remote/server ↗                ↑
+                                           gui/theme
 ```
 
-- **`platform/`** knows nothing above it. It's the only place that touches Arduino, FlexCAN_T4, SDL2, or EEPROM.h directly.
+- **`platform/`** knows nothing above it. It's the only place that touches Arduino, FlexCAN_T4, SDL2, EEPROM.h, or a raw serial port directly.
 - **`core/`** only includes `platform/platform.hpp` (the interfaces, never a concrete `teensy_*`/`simulator_*` class) plus the standard library. It has zero LVGL, zero Arduino, zero SDL — it builds and unit-tests on a plain host compiler.
-- **`gui/widgets`** and **`gui/screens`** only include `gui/theme` and their own plain-data view-model structs. They never include anything from `core/` or `platform/` — every screen and widget can be driven with fabricated data, independent of real CAN/config wiring.
-- **`gui/bindings`** is the *only* place allowed to include both a `core/*` header and a `gui/widgets`/`gui/screens` header. It's the sole translator between vehicle data and the UI.
-- **`src/main.cpp`** is the composition root: the only file that calls a concrete `platform_get()`, and the only place outside `gui/bindings` that depends on both `core::` and `gui::` directly.
+- **`remote/protocol`** has zero deps (compiles into both the Teensy and ESP32-C3 firmwares); **`remote/server`** builds on it plus `platform/platform.hpp` (`ISerialLink`, `IClock`) and `core/config` — same platform-agnostic, host-testable discipline as `core/`.
+- **`gui/widgets`** and **`gui/screens`** only include `gui/theme` and their own plain-data view-model structs. They never include anything from `core/`, `remote/`, or `platform/` — every screen and widget can be driven with fabricated data, independent of real CAN/config/AP wiring.
+- **`gui/bindings`** is the *only* place allowed to include both a `core/*`/`remote/*` header and a `gui/widgets`/`gui/screens` header. It's the sole translator between vehicle/AP data and the UI — `VehicleBinding` for the former, `RemoteBinding` for the latter.
+- **`src/main.cpp`** is the composition root: the only file that calls a concrete `platform_get()`, and the only place outside `gui/bindings` that depends on both `core::`/`remote::` and `gui::` directly.
 
 This means a given `.cpp` file's `#include`s tell you which layer it belongs to, and there are no `#ifdef PLATFORM_TEENSY`/`#ifdef PLATFORM_SIMULATOR` branches anywhere outside `platform/` itself — `platformio.ini` picks which board's `platform/<board>/src` files get compiled into a given build (see [Build system](#build-system) below), so the rest of the codebase never needs to know which board it's running on.
 
@@ -27,12 +28,14 @@ This means a given `.cpp` file's `#include`s tell you which layer it belongs to,
 | `core/time/` | `Scheduler` — fixed-capacity periodic task runner, the CAN polling heartbeat. | [core/time/README.md](core/time/README.md) |
 | `core/can/` | `UdsClient` — UDS request/response protocol over `ICanBus`. | [core/can/README.md](core/can/README.md) |
 | `core/vehicle/` | The 22-signal catalog, the runtime value store, and warning-threshold evaluation. | [core/vehicle/README.md](core/vehicle/README.md) |
-| `core/config/` | Persisted config schema (`Config`/`Settings`/`PanelConfig`/`SignalConfig`) and `ConfigStore`'s load/save/migrate logic over `IConfigStore`. | [core/config/README.md](core/config/README.md) |
+| `core/config/` | Persisted config schema (`Config`/`Settings`/`PrioritizedSignal`/`SignalConfig`) and `ConfigStore`'s load/save/migrate logic over `IConfigStore`. | [core/config/README.md](core/config/README.md) |
+| `remote/protocol/` | Wire format for the Teensy↔ESP32-C3 link: message types, framing, CRC, per-record encode/decode. Zero deps — compiles into both firmwares. | — |
+| `remote/server/` | Teensy-side: `RemoteConfigServer` (batch-validates and applies a config over the wire), `RemoteConfigLink` (UART bytes ↔ frames), `RemoteApController` (AP lifecycle state machine). | — |
 | `gui/` | The LVGL presentation layer. | [gui/README.md](gui/README.md) |
 | `gui/theme/` | Palette/typography/metrics tokens — the one file a reskin touches. | [gui/theme/README.md](gui/theme/README.md) |
 | `gui/widgets/` | `PanelWidget` — the single reusable data-panel building block. | [gui/widgets/README.md](gui/widgets/README.md) |
-| `gui/screens/` | Every screen (Info, Configurator, Signal Picker, Warning Config, Settings, Theme Picker) plus the panel-layout algorithm and shared screen helpers. | [gui/screens/README.md](gui/screens/README.md) |
-| `gui/bindings/` | `VehicleBinding` — the sole bridge between `core::` data and `gui::` view-models. | [gui/bindings/README.md](gui/bindings/README.md) |
+| `gui/screens/` | Every screen (Info, Configurator, Signal Picker, Warning Config, Settings, Theme Picker, Wireless Setup) plus the panel-layout algorithm and shared screen helpers. | [gui/screens/README.md](gui/screens/README.md) |
+| `gui/bindings/` | `VehicleBinding` — the sole bridge between `core::` data and `gui::` view-models — and `RemoteBinding`, the same for `remote::server`'s AP lifecycle. | [gui/bindings/README.md](gui/bindings/README.md) |
 | `gui/assets/` | Font source files and their licenses. | [gui/assets/README.md](gui/assets/README.md) |
 | `src/` | `main.cpp`, the composition root. | (see below) |
 | `support/` | PlatformIO pre/post build scripts for the simulator (SDL2 discovery, the "execute" target). | [support/README.md](support/README.md) |

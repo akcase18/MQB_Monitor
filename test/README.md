@@ -10,9 +10,9 @@ Running tests overwrites the simulator environment's build output — run `pio r
 
 ## Suites
 
-- **`test_core_config/`** — [core/config](../core/config/README.md)'s `ConfigStore` and [core/vehicle](../core/vehicle/README.md)'s `evaluate_warning()`: defaults on blank storage, save/load round-trips (including `display_mode` and partial `save_panel`/`save_signal` writes), and falling back to defaults on an unrecognized config version.
+- **`test_core_config/`** — [core/config](../core/config/README.md)'s `ConfigStore` and [core/vehicle](../core/vehicle/README.md)'s `evaluate_warning()`: defaults on blank storage, save/load round-trips (including `display_mode` and partial `save_priority`/`save_signal` writes), and falling back to defaults on an unrecognized config version.
 - **`test_core_vehicle/`** — [core/vehicle](../core/vehicle/README.md)'s `SignalStore` and [core/time](../core/time/README.md)'s `Scheduler`: single- and multi-request signal round-trips (a multi-request signal doesn't resolve until *all* its requests report), unit-conversion/display-value correctness, that every catalog entry's `display_min < display_max`, metric↔imperial round-tripping, and that the scheduler actually fires tasks once they're due.
-- **`test_gui_layout/`** — [gui/screens](../gui/screens/README.md)'s `compute_layout()`: the exact shape of each panel count (1 full-screen, 2 equal columns, 3 hero+stack, 4 even 2×2, 5 matching the legacy fixed layout, 6 even 2×3), that every count's slots fully tile the grid with no gaps/overlaps, that vertical orientation is a true transpose of horizontal, and that an out-of-range count gets clamped to 1–6.
+- **`test_gui_layout/`** — [gui/screens](../gui/screens/README.md)'s `compute_layout()` and `compute_prominence_ranks()`: the exact shape of each panel count (1 full-screen, 2 equal columns, 3 hero+stack, 4 even 2×2, 5 matching the legacy fixed layout, 6 even 2×3), that every count's slots fully tile the grid with no gaps/overlaps, that vertical orientation is a true transpose of horizontal (including prominence ranks), that an out-of-range count gets clamped to 1–6, and that priority rank 0 always resolves to the most prominent slot (hero > large > small) regardless of raw slot index.
 
 ## Adding a test
 

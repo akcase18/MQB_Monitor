@@ -22,11 +22,11 @@ Reworked from the old README's list against what's actually implemented as of th
 - [ ] Permanent power and sleep mode — currently powered from ignition (off whenever the car is off); running off permanent power would need a low-power sleep mode instead.
 - [ ] Micro-SD card support.
 - [ ] Data logging (record signal history to Micro-SD).
-- [ ] Wireless connectivity to a phone app for customization/setup — also the intended home for real per-vehicle range/threshold tuning (today's `SignalSpec::display_min/max` are sensible engineering defaults, not tuned per car).
+- [X] Wireless connectivity to a phone app for customization/setup — also the intended home for real per-vehicle range/threshold tuning (today's `SignalSpec::display_min/max` are sensible engineering defaults, not tuned per car). The SoftAP + QR-code hookup and the phone-facing config form ([gui/screens/inc/wireless_setup_screen.hpp](gui/screens/inc/wireless_setup_screen.hpp), [platform/esp32](platform/esp32/README.md)) both work end to end — the form covers everything the touchscreen does (brightness, panel/signal/units/display-mode assignment, warning thresholds) plus per-signal custom display-range, which has no touchscreen UI at all.
 - [ ] ISO-TP support for CAN (multi-frame UDS responses) — current `core::can::UdsClient` only decodes single-frame responses.
 - [ ] Firmware update strategy (OTA or otherwise).
 - [ ] Expand to other vehicle platforms — the `platform/` HAL split and `core/vehicle` signal catalog make this architecturally possible, but the current catalog is still MQB-specific and no second platform is implemented.
-- [ ] ESP32 platform support — `platform/platform.hpp`'s interfaces were designed with this in mind, but no `platform/esp32/` implementation exists yet.
+- [X] ESP32-C3 relay firmware skeleton — [platform/esp32](platform/esp32/README.md) drives the SoftAP and speaks `remote::protocol`'s `CMD_AP_ENABLE`/`CMD_AP_DISABLE`/`EVT_AP_READY`/`EVT_AP_DISABLED`. It's a standalone sketch (`env:esp32c3`), not another `platform.hpp` `Platform` implementation — the C3 has no display/touch/CAN to back those interfaces.
 
 ## Manual validation still needed
 

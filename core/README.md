@@ -9,7 +9,7 @@ Every collection in `core/` is a fixed-size array sized by a `constexpr` count k
 - **[time/](time/README.md)** — `core::Scheduler`, a periodic task runner. Drives CAN request pacing and the Info screen's refresh cadence.
 - **[can/](can/README.md)** — `core::UdsClient`, the UDS request/response protocol over `ICanBus`.
 - **[vehicle/](vehicle/README.md)** — the signal catalog (`SignalSpec`, `SIGNAL_CATALOG`), the runtime value store (`SignalStore`), and warning-threshold evaluation.
-- **[config/](config/README.md)** — the persisted config schema (`Config`, `Settings`, `PanelConfig`, `SignalConfig`) and `ConfigStore`'s load/save/migrate logic over `IConfigStore`.
+- **[config/](config/README.md)** — the persisted config schema (`Config`, `Settings`, `PrioritizedSignal`, `SignalConfig`) and `ConfigStore`'s load/save/migrate logic over `IConfigStore`.
 
 ## Dependency shape
 

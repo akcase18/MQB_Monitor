@@ -45,7 +45,7 @@ namespace gui
     {
     }
 
-    PanelViewModel VehicleBinding::build_view_model(uint8_t panel_idx,
+    PanelViewModel VehicleBinding::build_view_model(uint8_t rank,
                                                     bool    large,
                                                     bool    hero) const
     {
@@ -53,13 +53,13 @@ namespace gui
         vm.large = large;
         vm.hero  = hero;
 
-        if (panel_idx >= core::MAX_PANELS)
+        if (rank >= core::MAX_PANELS)
         {
             return vm;
         }
 
-        const core::Config      &cfg   = config_.get();
-        const core::PanelConfig &panel = cfg.panels[panel_idx];
+        const core::Config            &cfg   = config_.get();
+        const core::PrioritizedSignal &panel = cfg.priorities[rank];
 
         int catalog_idx = core::signal_catalog_find(panel.signal_id);
         if (catalog_idx < 0)
@@ -99,31 +99,35 @@ namespace gui
         vm.mode = to_gui_display_mode(panel.display_mode);
         if (vm.mode != DisplayMode::Digital && value.has_data)
         {
-            float range  = spec.display_max - spec.display_min;
-            float pct    = (range > 0.0f)
-                               ? (value.value - spec.display_min) / range
-                               : 0.0f;
+            const core::SignalConfig &sig_cfg = cfg.signals[catalog_idx];
+            core::DisplayRange        range
+                = core::resolve_display_range(spec,
+                                              sig_cfg.use_custom_range,
+                                              sig_cfg.custom_min,
+                                              sig_cfg.custom_max);
+            float span = range.max - range.min;
+            float pct = (span > 0.0f) ? (value.value - range.min) / span : 0.0f;
             vm.range_pct = pct < 0.0f ? 0.0f : (pct > 1.0f ? 1.0f : pct);
         }
 
         return vm;
     }
 
-    void VehicleBinding::apply_configurator_change(uint8_t  panel_idx,
+    void VehicleBinding::apply_configurator_change(uint8_t  rank,
                                                    uint16_t new_signal_id,
                                                    core::UnitSystem units,
                                                    DisplayMode      mode)
     {
-        if (panel_idx >= core::MAX_PANELS)
+        if (rank >= core::MAX_PANELS)
         {
             return;
         }
 
-        core::PanelConfig &panel = config_.get().panels[panel_idx];
-        panel.signal_id          = new_signal_id;
-        panel.units              = units;
-        panel.display_mode       = to_core_display_mode(mode);
-        config_.save_panel(panel_idx);
+        core::PrioritizedSignal &panel = config_.get().priorities[rank];
+        panel.signal_id                = new_signal_id;
+        panel.units                    = units;
+        panel.display_mode             = to_core_display_mode(mode);
+        config_.save_priority(rank);
     }
 
     WarningThresholdViewModel VehicleBinding::read_warning_thresholds(
@@ -137,16 +141,22 @@ namespace gui
             return vm;
         }
 
-        const core::SignalSpec        &spec = core::SIGNAL_CATALOG[catalog_idx];
-        const core::WarningThresholds &warn
-            = config_.get().signals[catalog_idx].warn;
-        vm.use_lo = warn.use_lo;
-        vm.use_hi = warn.use_hi;
+        const core::SignalSpec   &spec    = core::SIGNAL_CATALOG[catalog_idx];
+        const core::SignalConfig &sig_cfg = config_.get().signals[catalog_idx];
+        const core::WarningThresholds &warn = sig_cfg.warn;
+        vm.use_lo                           = warn.use_lo;
+        vm.use_hi                           = warn.use_hi;
+
+        core::DisplayRange range
+            = core::resolve_display_range(spec,
+                                          sig_cfg.use_custom_range,
+                                          sig_cfg.custom_min,
+                                          sig_cfg.custom_max);
 
         float lo        = warn.lo;
         float hi        = warn.hi;
-        float min_value = spec.display_min;
-        float max_value = spec.display_max;
+        float min_value = range.min;
+        float max_value = range.max;
         float step      = core::warning_step(spec.unit_type);
 
         if (!is_metric)

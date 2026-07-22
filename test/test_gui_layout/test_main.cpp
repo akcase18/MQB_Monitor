@@ -194,6 +194,139 @@ void test_vertical_is_a_transpose_of_horizontal()
     }
 }
 
+void test_hero_slot_extraction_matches_table()
+{
+    gui::PanelSlot slots[gui::MAX_PANELS];
+
+    /* Count 1: the sole full-screen panel is a hero. */
+    gui::compute_layout(1, gui::LayoutOrientation::Horizontal, slots);
+    TEST_ASSERT_TRUE(gui::is_hero_slot(slots[0]));
+
+    /* Count 2: full-height but only 1/2 width — large, not hero. */
+    gui::compute_layout(2, gui::LayoutOrientation::Horizontal, slots);
+    TEST_ASSERT_FALSE(gui::is_hero_slot(slots[0]));
+    TEST_ASSERT_FALSE(gui::is_hero_slot(slots[1]));
+
+    /* Count 3: slot 2 (the wide right panel) is the hero; the two
+     * stacked minors are not. */
+    gui::compute_layout(3, gui::LayoutOrientation::Horizontal, slots);
+    TEST_ASSERT_FALSE(gui::is_hero_slot(slots[0]));
+    TEST_ASSERT_FALSE(gui::is_hero_slot(slots[1]));
+    TEST_ASSERT_TRUE(gui::is_hero_slot(slots[2]));
+
+    /* Counts 4/5/6 have no rowspan-2 slots at all — no hero anywhere. */
+    for (uint8_t count = 4; count <= 6; count++)
+    {
+        gui::compute_layout(count, gui::LayoutOrientation::Horizontal, slots);
+        for (uint8_t i = 0; i < count; i++)
+        {
+            TEST_ASSERT_FALSE(gui::is_hero_slot(slots[i]));
+        }
+    }
+}
+
+void test_prominence_rank_count1()
+{
+    gui::PanelSlot slots[gui::MAX_PANELS];
+    uint8_t        rank_of_slot[gui::MAX_PANELS];
+    gui::compute_layout(1, gui::LayoutOrientation::Horizontal, slots);
+    gui::compute_prominence_ranks(slots, 1, rank_of_slot);
+
+    TEST_ASSERT_EQUAL_UINT8(0, rank_of_slot[0]);
+}
+
+void test_prominence_rank_count2()
+{
+    gui::PanelSlot slots[gui::MAX_PANELS];
+    uint8_t        rank_of_slot[gui::MAX_PANELS];
+    gui::compute_layout(2, gui::LayoutOrientation::Horizontal, slots);
+    gui::compute_prominence_ranks(slots, 2, rank_of_slot);
+
+    /* Both slots are tied (large, not hero) — tie-break is index order. */
+    TEST_ASSERT_EQUAL_UINT8(0, rank_of_slot[0]);
+    TEST_ASSERT_EQUAL_UINT8(1, rank_of_slot[1]);
+}
+
+void test_prominence_rank_count3()
+{
+    gui::PanelSlot slots[gui::MAX_PANELS];
+    uint8_t        rank_of_slot[gui::MAX_PANELS];
+    gui::compute_layout(3, gui::LayoutOrientation::Horizontal, slots);
+    gui::compute_prominence_ranks(slots, 3, rank_of_slot);
+
+    /* Slot 2 (hero) is rank 0 despite being the last index — this is the
+     * exact case motivating compute_prominence_ranks() to exist. */
+    TEST_ASSERT_EQUAL_UINT8(1, rank_of_slot[0]);
+    TEST_ASSERT_EQUAL_UINT8(2, rank_of_slot[1]);
+    TEST_ASSERT_EQUAL_UINT8(0, rank_of_slot[2]);
+}
+
+void test_prominence_rank_count4()
+{
+    gui::PanelSlot slots[gui::MAX_PANELS];
+    uint8_t        rank_of_slot[gui::MAX_PANELS];
+    gui::compute_layout(4, gui::LayoutOrientation::Horizontal, slots);
+    gui::compute_prominence_ranks(slots, 4, rank_of_slot);
+
+    /* All 4 tied (large, not hero) — index order throughout. */
+    for (uint8_t i = 0; i < 4; i++)
+    {
+        TEST_ASSERT_EQUAL_UINT8(i, rank_of_slot[i]);
+    }
+}
+
+void test_prominence_rank_count5()
+{
+    gui::PanelSlot slots[gui::MAX_PANELS];
+    uint8_t        rank_of_slot[gui::MAX_PANELS];
+    gui::compute_layout(5, gui::LayoutOrientation::Horizontal, slots);
+    gui::compute_prominence_ranks(slots, 5, rank_of_slot);
+
+    /* Slots 3,4 (the large bottom band) outrank slots 0,1,2 (the small
+     * top band) despite having later indices — the other case motivating
+     * compute_prominence_ranks() to exist. */
+    TEST_ASSERT_EQUAL_UINT8(2, rank_of_slot[0]);
+    TEST_ASSERT_EQUAL_UINT8(3, rank_of_slot[1]);
+    TEST_ASSERT_EQUAL_UINT8(4, rank_of_slot[2]);
+    TEST_ASSERT_EQUAL_UINT8(0, rank_of_slot[3]);
+    TEST_ASSERT_EQUAL_UINT8(1, rank_of_slot[4]);
+}
+
+void test_prominence_rank_count6()
+{
+    gui::PanelSlot slots[gui::MAX_PANELS];
+    uint8_t        rank_of_slot[gui::MAX_PANELS];
+    gui::compute_layout(6, gui::LayoutOrientation::Horizontal, slots);
+    gui::compute_prominence_ranks(slots, 6, rank_of_slot);
+
+    /* All 6 tied (small, not hero/large) — index order throughout. */
+    for (uint8_t i = 0; i < 6; i++)
+    {
+        TEST_ASSERT_EQUAL_UINT8(i, rank_of_slot[i]);
+    }
+}
+
+void test_prominence_rank_matches_horizontal_under_vertical_transpose()
+{
+    for (uint8_t count = 1; count <= gui::MAX_PANELS; count++)
+    {
+        gui::PanelSlot h_slots[gui::MAX_PANELS];
+        gui::PanelSlot v_slots[gui::MAX_PANELS];
+        gui::compute_layout(count, gui::LayoutOrientation::Horizontal, h_slots);
+        gui::compute_layout(count, gui::LayoutOrientation::Vertical, v_slots);
+
+        uint8_t h_rank[gui::MAX_PANELS];
+        uint8_t v_rank[gui::MAX_PANELS];
+        gui::compute_prominence_ranks(h_slots, count, h_rank);
+        gui::compute_prominence_ranks(v_slots, count, v_rank);
+
+        for (uint8_t i = 0; i < count; i++)
+        {
+            TEST_ASSERT_EQUAL_UINT8(h_rank[i], v_rank[i]);
+        }
+    }
+}
+
 void test_count_is_clamped_to_valid_range()
 {
     gui::PanelSlot slots[gui::MAX_PANELS];
@@ -220,5 +353,13 @@ int main(int argc, char **argv)
     RUN_TEST(test_horizontal_full_coverage_for_every_count);
     RUN_TEST(test_vertical_is_a_transpose_of_horizontal);
     RUN_TEST(test_count_is_clamped_to_valid_range);
+    RUN_TEST(test_hero_slot_extraction_matches_table);
+    RUN_TEST(test_prominence_rank_count1);
+    RUN_TEST(test_prominence_rank_count2);
+    RUN_TEST(test_prominence_rank_count3);
+    RUN_TEST(test_prominence_rank_count4);
+    RUN_TEST(test_prominence_rank_count5);
+    RUN_TEST(test_prominence_rank_count6);
+    RUN_TEST(test_prominence_rank_matches_horizontal_under_vertical_transpose);
     return UNITY_END();
 }

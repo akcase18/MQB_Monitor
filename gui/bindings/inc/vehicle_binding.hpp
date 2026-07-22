@@ -3,7 +3,10 @@
  * @brief The sole bridge between core:: and gui/widgets: translates
  * core::SignalStore/core::ConfigStore data into PanelViewModels, and
  * routes gui/screens callbacks (panel reassignment, warning threshold
- * edits) back into core::ConfigStore persistence.
+ * edits) back into core::ConfigStore persistence. `rank` throughout this
+ * class means priority rank (Config.priorities[] index, 0 = most
+ * important) — callers resolve which on-screen slot a rank occupies via
+ * gui::compute_prominence_ranks(), not here.
  */
 #pragma once
 
@@ -22,18 +25,18 @@ namespace gui
                            core::ConfigStore &config);
 
             /**
-             * Builds panel_idx's view-model from whatever signal it's
-             * currently assigned to. `large`/`hero` are layout decisions
-             * (see gui/screens/layout.hpp), passed through rather than
-             * derived from vehicle data.
+             * Builds rank's view-model from whatever signal it's currently
+             * assigned to. `large`/`hero` are layout decisions (see
+             * gui/screens/layout.hpp), passed through rather than derived
+             * from vehicle data.
              */
-            PanelViewModel build_view_model(uint8_t panel_idx,
+            PanelViewModel build_view_model(uint8_t rank,
                                             bool    large,
                                             bool    hero) const;
 
-            /** Reassigns panel_idx to a different signal/unit system/display
+            /** Reassigns rank to a different signal/unit system/display
              * mode, persisted immediately. */
-            void apply_configurator_change(uint8_t          panel_idx,
+            void apply_configurator_change(uint8_t          rank,
                                            uint16_t         new_signal_id,
                                            core::UnitSystem units,
                                            DisplayMode      mode);

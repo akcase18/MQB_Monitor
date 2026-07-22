@@ -8,6 +8,7 @@
 #include "teensy_clock.hpp"
 #include "teensy_config_store.hpp"
 #include "teensy_display.hpp"
+#include "teensy_serial_link.hpp"
 #include "teensy_touch.hpp"
 
 Platform &platform_get()
@@ -15,7 +16,7 @@ Platform &platform_get()
     static Platform s_platform {
         TeensyCanBus::instance(), TeensyDisplay::instance(),
         TeensyTouch::instance(),  TeensyConfigStore::instance(),
-        TeensyClock::instance(),
+        TeensyClock::instance(),  TeensySerialLink::instance(),
     };
     return s_platform;
 }
