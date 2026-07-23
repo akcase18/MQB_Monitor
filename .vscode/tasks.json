@@ -1,0 +1,74 @@
+{
+  // Tasks for the MQB Monitor Mac tool (tools/monitor). Run with
+  // "Terminal > Run Task…" (or ⇧⌘B for the default build task = Demo).
+  // All monitor tasks run from tools/monitor so the mqb_monitor package
+  // resolves, using that folder's virtualenv interpreter.
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Monitor: Demo (no hardware)",
+      "type": "shell",
+      "command": "${workspaceFolder}/tools/monitor/.venv/bin/python",
+      "args": ["run.py", "--demo"],
+      "options": { "cwd": "${workspaceFolder}/tools/monitor" },
+      "problemMatcher": [],
+      "group": { "kind": "build", "isDefault": true },
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "Monitor: Connect to Teensy (auto-detect port)",
+      "type": "shell",
+      "command": "${workspaceFolder}/tools/monitor/.venv/bin/python",
+      "args": ["run.py"],
+      "options": { "cwd": "${workspaceFolder}/tools/monitor" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "Monitor: Connect to Teensy (choose port…)",
+      "type": "shell",
+      "command": "${workspaceFolder}/tools/monitor/.venv/bin/python",
+      "args": ["run.py", "--port", "${input:serialPort}"],
+      "options": { "cwd": "${workspaceFolder}/tools/monitor" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "Monitor: Selftest (headless)",
+      "type": "shell",
+      "command": "${workspaceFolder}/tools/monitor/.venv/bin/python",
+      "args": ["run.py", "--selftest"],
+      "options": { "cwd": "${workspaceFolder}/tools/monitor" },
+      "problemMatcher": [],
+      "group": "test",
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "Monitor: Set up venv",
+      "detail": "Create tools/monitor/.venv and install PySide6 + pyserial",
+      "type": "shell",
+      "command": "python3 -m venv .venv && .venv/bin/pip install -r requirements.txt",
+      "options": { "cwd": "${workspaceFolder}/tools/monitor" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "Catalog: Regenerate from signals.json",
+      "detail": "Run tools/gen_catalog.py after editing the signal catalog",
+      "type": "shell",
+      "command": "python3",
+      "args": ["tools/gen_catalog.py"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "serialPort",
+      "type": "promptString",
+      "description": "Serial port of the Teensy sniffer",
+      "default": "/dev/tty.usbmodem"
+    }
+  ]
+}
