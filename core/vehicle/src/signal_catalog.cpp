@@ -1,11 +1,18 @@
 /**
  * @file signal_catalog.cpp
- * @brief The 22 signals ported from the old Info/Request catalog
- * (src/logic/setup.cpp). Literal offsets/scales audited against that file;
- * two dead, unused requests (actual/specified lambda, both bugged with an
- * integer-division `(1 / 1024)` scale that always evaluated to 0) and one
- * unused turbo-speed request were never wired to an Info and are dropped
- * rather than ported, since nothing referenced them.
+ * @brief Home of the transform_* functions and unit helpers for the signal
+ * catalog. The SIGNAL_CATALOG[] array itself is GENERATED from
+ * core/vehicle/data/signals.json -- the canonical catalog shared with the
+ * Mac monitor tool (tools/monitor) -- into signal_catalog.generated.inc by
+ * tools/gen_catalog.py. Edit signals.json and re-run that script to change a
+ * signal; add a new transform here (and reference it by name in the JSON's
+ * "transform" field) to add non-default combining behavior.
+ *
+ * History: the 22 signals were ported from the old Info/Request catalog
+ * (src/logic/setup.cpp). Two dead, unused requests (actual/specified lambda,
+ * both bugged with an integer-division `(1 / 1024)` scale that always
+ * evaluated to 0) and one unused turbo-speed request were never wired to an
+ * Info and are dropped rather than ported.
  */
 #include "signal_catalog.hpp"
 
@@ -14,9 +21,6 @@ namespace core
 
     namespace
     {
-        constexpr float NO_OFFSET = 0.0f;
-        constexpr float NO_SCALE  = 1.0f;
-
         float transform_default(const float *raw_values, uint8_t n)
         {
             (void)n;
@@ -32,238 +36,7 @@ namespace core
         }
     } // namespace
 
-    const SignalSpec SIGNAL_CATALOG[] = {
-        /* Coolant Temp */
-        { 0,
-          "Cool Temp",
-          UnitType::Temp,
-          2000,
-          { { 0xF4, 0x05, -40.0f, NO_SCALE } },
-          1,
-          transform_default,
-          -40.0f,
-          130.0f },
-
-        /* Engine Oil Temp */
-        { 1,
-          "Eng Oil Temp",
-          UnitType::Temp,
-          1000,
-          { { 0x40, 0xD5, NO_OFFSET, 0.1f } },
-          1,
-          transform_default,
-          -40.0f,
-          150.0f },
-
-        /* Intake Air Temp */
-        { 2,
-          "Int Air Temp",
-          UnitType::Temp,
-          100,
-          { { 0xF4, 0x0F, -40.0f, NO_SCALE } },
-          1,
-          transform_default,
-          -40.0f,
-          80.0f },
-
-        /* Charge Pressure */
-        { 3,
-          "Charge Pres",
-          UnitType::Pressure,
-          100,
-          { { 0x20, 0x2A, NO_OFFSET, 0.001f } },
-          1,
-          transform_default,
-          0.0f,
-          3.0f },
-
-        /* Intake Pressure */
-        { 4,
-          "Int Pres",
-          UnitType::Pressure,
-          20,
-          { { 0x3E, 0x70, NO_OFFSET, 0.001f } },
-          1,
-          transform_default,
-          0.0f,
-          3.0f },
-
-        /* Ambient Pressure */
-        { 5,
-          "Amb Pres",
-          UnitType::Pressure,
-          1000,
-          { { 0x13, 0xCA, NO_OFFSET, 0.0001f } },
-          1,
-          transform_default,
-          0.8f,
-          1.1f },
-
-        /* Actual Intake Pressure (intake minus ambient) */
-        { 6,
-          "Int Pres Act.",
-          UnitType::Pressure,
-          20,
-          { { 0x13, 0xCA, NO_OFFSET, 0.0001f },
-            { 0x3E, 0x70, NO_OFFSET, 0.001f } },
-          2,
-          transform_actual_intake_pressure,
-          -1.0f,
-          2.0f },
-
-        /* Engine RPM */
-        { 7,
-          "Engine Speed",
-          UnitType::RPM,
-          20,
-          { { 0x20, 0x6E, NO_OFFSET, NO_SCALE } },
-          1,
-          transform_default,
-          0.0f,
-          7000.0f },
-
-        /* Engine Torque */
-        { 8,
-          "Engine Torque",
-          UnitType::Torque,
-          20,
-          { { 0x43, 0x7C, NO_OFFSET, 0.1f } },
-          1,
-          transform_default,
-          0.0f,
-          500.0f },
-
-        /* Vehicle Speed */
-        { 9,
-          "Speed",
-          UnitType::Speed,
-          100,
-          { { 0x20, 0x33, NO_OFFSET, 0.01f } },
-          1,
-          transform_default,
-          0.0f,
-          300.0f },
-
-        /* Fuel Level (Volume) */
-        { 10,
-          "Fuel",
-          UnitType::Volume,
-          5000,
-          { { 0x22, 0x06, NO_OFFSET, NO_SCALE } },
-          1,
-          transform_default,
-          0.0f,
-          70.0f },
-
-        /* Fuel Level (Percentage) */
-        { 11,
-          "Fuel",
-          UnitType::Percent,
-          5000,
-          { { 0xF4, 0x2F, NO_OFFSET, 1.0f / 2.55f } },
-          1,
-          transform_default,
-          0.0f,
-          100.0f },
-
-        /* Throttle Position */
-        { 12,
-          "Throttle Pos",
-          UnitType::Percent,
-          20,
-          { { 0xF4, 0x11, NO_OFFSET, 1.0f / 2.55f } },
-          1,
-          transform_default,
-          0.0f,
-          100.0f },
-
-        /* Misfires (Sum) */
-        { 13,
-          "Misfire Cnt",
-          UnitType::None,
-          500,
-          { { 0x29, 0x04, NO_OFFSET, NO_SCALE } },
-          1,
-          transform_default,
-          0.0f,
-          500.0f },
-
-        /* Misfires (Cylinder 1-4) */
-        { 14,
-          "Misfire Cnt Cyl 1",
-          UnitType::None,
-          500,
-          { { 0x29, 0x66, NO_OFFSET, NO_SCALE } },
-          1,
-          transform_default,
-          0.0f,
-          200.0f },
-        { 15,
-          "Misfire Cnt Cyl 2",
-          UnitType::None,
-          500,
-          { { 0x29, 0x67, NO_OFFSET, NO_SCALE } },
-          1,
-          transform_default,
-          0.0f,
-          200.0f },
-        { 16,
-          "Misfire Cnt Cyl 3",
-          UnitType::None,
-          500,
-          { { 0x29, 0x68, NO_OFFSET, NO_SCALE } },
-          1,
-          transform_default,
-          0.0f,
-          200.0f },
-        { 17,
-          "Misfire Cnt Cyl 4",
-          UnitType::None,
-          500,
-          { { 0x29, 0x69, NO_OFFSET, NO_SCALE } },
-          1,
-          transform_default,
-          0.0f,
-          200.0f },
-
-        /* Timing Correction (Cylinder 1-4) */
-        { 18,
-          "Time Corr. Cyl 1",
-          UnitType::Degrees,
-          100,
-          { { 0x20, 0x0A, NO_OFFSET, 0.01f } },
-          1,
-          transform_default,
-          -10.0f,
-          10.0f },
-        { 19,
-          "Time Corr. Cyl 2",
-          UnitType::Degrees,
-          100,
-          { { 0x20, 0x0B, NO_OFFSET, 0.01f } },
-          1,
-          transform_default,
-          -10.0f,
-          10.0f },
-        { 20,
-          "Time Corr. Cyl 3",
-          UnitType::Degrees,
-          100,
-          { { 0x20, 0x0C, NO_OFFSET, 0.01f } },
-          1,
-          transform_default,
-          -10.0f,
-          10.0f },
-        { 21,
-          "Time Corr. Cyl 4",
-          UnitType::Degrees,
-          100,
-          { { 0x20, 0x0D, NO_OFFSET, 0.01f } },
-          1,
-          transform_default,
-          -10.0f,
-          10.0f },
-    };
+#include "signal_catalog.generated.inc"
 
     static_assert(
         sizeof(SIGNAL_CATALOG) / sizeof(SIGNAL_CATALOG[0])
