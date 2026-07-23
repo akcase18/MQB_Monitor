@@ -4,7 +4,9 @@ The vehicle-signal data model: a static, ROM-able catalog of every signal the da
 
 ## Files
 
-- **`inc/signal_catalog.hpp`** / **`src/signal_catalog.cpp`** — `SIGNAL_CATALOG`, the 22 signals ported from the original firmware, each a `SignalSpec`:
+- **`data/signals.json`** — the **canonical** catalog: a plain-data file that is the single source of truth shared between this firmware and the Mac monitor tool ([tools/monitor](../../tools/README.md)). `src/signal_catalog.cpp`'s `SIGNAL_CATALOG[]` array is **generated** from it into `src/signal_catalog.generated.inc` by [`tools/gen_catalog.py`](../../tools/gen_catalog.py) — edit the JSON and re-run that script (commit both). Only the `transform_*` functions and unit helpers are hand-written in the `.cpp`; a signal's JSON `"transform"` field names one of them.
+
+- **`inc/signal_catalog.hpp`** / **`src/signal_catalog.cpp`** — `SIGNAL_CATALOG`, the 22 signals (generated from `data/signals.json`, above), each a `SignalSpec`:
   - `id`, `name`, `unit_type` (`UnitType::{None,Degrees,Percent,Pressure,RPM,Speed,Temp,Torque,Volume}`), `cycle_time_ms` (how often it's polled).
   - `requests[]`/`num_requests` — up to 2 `UdsRequestSpec`s (see [core/can](../can/README.md)) whose decoded values feed this signal.
   - `transform` — combines those decoded, already offset/scaled request values into the signal's final value (most signals are a straight passthrough; a couple, like actual intake pressure, are a difference of two requests).
@@ -22,4 +24,4 @@ The vehicle-signal data model: a static, ROM-able catalog of every signal the da
 
 ## Usage
 
-`core::SIGNAL_CATALOG_COUNT` (22) sizes fixed arrays throughout the app — `SignalStore`'s value cache, `core::Config::signals[]` (see [core/config](../config/README.md)), and the `signal_names`/`signal_ids` tables `src/main.cpp` builds for the Configurator/Signal Picker screens. Adding a signal means adding one entry to `SIGNAL_CATALOG` and bumping `SIGNAL_CATALOG_COUNT` to match — everything downstream sizes off that constant.
+`core::SIGNAL_CATALOG_COUNT` (22) sizes fixed arrays throughout the app — `SignalStore`'s value cache, `core::Config::signals[]` (see [core/config](../config/README.md)), and the `signal_names`/`signal_ids` tables `src/main.cpp` builds for the Configurator/Signal Picker screens. Adding a signal means adding one entry to `data/signals.json`, re-running `tools/gen_catalog.py`, and bumping `SIGNAL_CATALOG_COUNT` in `signal_catalog.hpp` to match — everything downstream sizes off that constant, and the generated `.inc`'s `static_assert` fails the build if the count is stale.

@@ -1,0 +1,119 @@
+{
+  "_comment": "Canonical, single source of truth for the vehicle signal catalog. Both the firmware (via tools/gen_catalog.py -> core/vehicle/src/signal_catalog.generated.inc) and the Mac monitor tool (tools/monitor) read this file. Byte fields are UDS read-data-by-identifier (service 0x22) DID pairs. A signal's displayed value is transform(over each request's (raw + offset) * scale). 'transform' names a C++ function (transform_<name>) defined in signal_catalog.cpp AND a Python function in tools/monitor; 'default' returns request 0's value. Edit here, then run tools/gen_catalog.py.",
+  "unit_types": ["None", "Degrees", "Percent", "Pressure", "RPM", "Speed", "Temp", "Torque", "Volume"],
+  "signals": [
+    {
+      "id": 0, "name": "Cool Temp", "unit": "Temp", "cycle_time_ms": 2000,
+      "transform": "default", "display_min": -40.0, "display_max": 130.0,
+      "requests": [ { "byte1": "0xF4", "byte2": "0x05", "offset": -40.0, "scale": 1.0 } ]
+    },
+    {
+      "id": 1, "name": "Eng Oil Temp", "unit": "Temp", "cycle_time_ms": 1000,
+      "transform": "default", "display_min": -40.0, "display_max": 150.0,
+      "requests": [ { "byte1": "0x40", "byte2": "0xD5", "offset": 0.0, "scale": 0.1 } ]
+    },
+    {
+      "id": 2, "name": "Int Air Temp", "unit": "Temp", "cycle_time_ms": 100,
+      "transform": "default", "display_min": -40.0, "display_max": 80.0,
+      "requests": [ { "byte1": "0xF4", "byte2": "0x0F", "offset": -40.0, "scale": 1.0 } ]
+    },
+    {
+      "id": 3, "name": "Charge Pres", "unit": "Pressure", "cycle_time_ms": 100,
+      "transform": "default", "display_min": 0.0, "display_max": 3.0,
+      "requests": [ { "byte1": "0x20", "byte2": "0x2A", "offset": 0.0, "scale": 0.001 } ]
+    },
+    {
+      "id": 4, "name": "Int Pres", "unit": "Pressure", "cycle_time_ms": 20,
+      "transform": "default", "display_min": 0.0, "display_max": 3.0,
+      "requests": [ { "byte1": "0x3E", "byte2": "0x70", "offset": 0.0, "scale": 0.001 } ]
+    },
+    {
+      "id": 5, "name": "Amb Pres", "unit": "Pressure", "cycle_time_ms": 1000,
+      "transform": "default", "display_min": 0.8, "display_max": 1.1,
+      "requests": [ { "byte1": "0x13", "byte2": "0xCA", "offset": 0.0, "scale": 0.0001 } ]
+    },
+    {
+      "id": 6, "name": "Int Pres Act.", "unit": "Pressure", "cycle_time_ms": 20,
+      "transform": "actual_intake_pressure", "display_min": -1.0, "display_max": 2.0,
+      "requests": [
+        { "byte1": "0x13", "byte2": "0xCA", "offset": 0.0, "scale": 0.0001 },
+        { "byte1": "0x3E", "byte2": "0x70", "offset": 0.0, "scale": 0.001 }
+      ]
+    },
+    {
+      "id": 7, "name": "Engine Speed", "unit": "RPM", "cycle_time_ms": 20,
+      "transform": "default", "display_min": 0.0, "display_max": 7000.0,
+      "requests": [ { "byte1": "0x20", "byte2": "0x6E", "offset": 0.0, "scale": 1.0 } ]
+    },
+    {
+      "id": 8, "name": "Engine Torque", "unit": "Torque", "cycle_time_ms": 20,
+      "transform": "default", "display_min": 0.0, "display_max": 500.0,
+      "requests": [ { "byte1": "0x43", "byte2": "0x7C", "offset": 0.0, "scale": 0.1 } ]
+    },
+    {
+      "id": 9, "name": "Speed", "unit": "Speed", "cycle_time_ms": 100,
+      "transform": "default", "display_min": 0.0, "display_max": 300.0,
+      "requests": [ { "byte1": "0x20", "byte2": "0x33", "offset": 0.0, "scale": 0.01 } ]
+    },
+    {
+      "id": 10, "name": "Fuel", "unit": "Volume", "cycle_time_ms": 5000,
+      "transform": "default", "display_min": 0.0, "display_max": 70.0,
+      "requests": [ { "byte1": "0x22", "byte2": "0x06", "offset": 0.0, "scale": 1.0 } ]
+    },
+    {
+      "id": 11, "name": "Fuel", "unit": "Percent", "cycle_time_ms": 5000,
+      "transform": "default", "display_min": 0.0, "display_max": 100.0,
+      "requests": [ { "byte1": "0xF4", "byte2": "0x2F", "offset": 0.0, "scale": 0.39215686274509803 } ]
+    },
+    {
+      "id": 12, "name": "Throttle Pos", "unit": "Percent", "cycle_time_ms": 20,
+      "transform": "default", "display_min": 0.0, "display_max": 100.0,
+      "requests": [ { "byte1": "0xF4", "byte2": "0x11", "offset": 0.0, "scale": 0.39215686274509803 } ]
+    },
+    {
+      "id": 13, "name": "Misfire Cnt", "unit": "None", "cycle_time_ms": 500,
+      "transform": "default", "display_min": 0.0, "display_max": 500.0,
+      "requests": [ { "byte1": "0x29", "byte2": "0x04", "offset": 0.0, "scale": 1.0 } ]
+    },
+    {
+      "id": 14, "name": "Misfire Cnt Cyl 1", "unit": "None", "cycle_time_ms": 500,
+      "transform": "default", "display_min": 0.0, "display_max": 200.0,
+      "requests": [ { "byte1": "0x29", "byte2": "0x66", "offset": 0.0, "scale": 1.0 } ]
+    },
+    {
+      "id": 15, "name": "Misfire Cnt Cyl 2", "unit": "None", "cycle_time_ms": 500,
+      "transform": "default", "display_min": 0.0, "display_max": 200.0,
+      "requests": [ { "byte1": "0x29", "byte2": "0x67", "offset": 0.0, "scale": 1.0 } ]
+    },
+    {
+      "id": 16, "name": "Misfire Cnt Cyl 3", "unit": "None", "cycle_time_ms": 500,
+      "transform": "default", "display_min": 0.0, "display_max": 200.0,
+      "requests": [ { "byte1": "0x29", "byte2": "0x68", "offset": 0.0, "scale": 1.0 } ]
+    },
+    {
+      "id": 17, "name": "Misfire Cnt Cyl 4", "unit": "None", "cycle_time_ms": 500,
+      "transform": "default", "display_min": 0.0, "display_max": 200.0,
+      "requests": [ { "byte1": "0x29", "byte2": "0x69", "offset": 0.0, "scale": 1.0 } ]
+    },
+    {
+      "id": 18, "name": "Time Corr. Cyl 1", "unit": "Degrees", "cycle_time_ms": 100,
+      "transform": "default", "display_min": -10.0, "display_max": 10.0,
+      "requests": [ { "byte1": "0x20", "byte2": "0x0A", "offset": 0.0, "scale": 0.01 } ]
+    },
+    {
+      "id": 19, "name": "Time Corr. Cyl 2", "unit": "Degrees", "cycle_time_ms": 100,
+      "transform": "default", "display_min": -10.0, "display_max": 10.0,
+      "requests": [ { "byte1": "0x20", "byte2": "0x0B", "offset": 0.0, "scale": 0.01 } ]
+    },
+    {
+      "id": 20, "name": "Time Corr. Cyl 3", "unit": "Degrees", "cycle_time_ms": 100,
+      "transform": "default", "display_min": -10.0, "display_max": 10.0,
+      "requests": [ { "byte1": "0x20", "byte2": "0x0C", "offset": 0.0, "scale": 0.01 } ]
+    },
+    {
+      "id": 21, "name": "Time Corr. Cyl 4", "unit": "Degrees", "cycle_time_ms": 100,
+      "transform": "default", "display_min": -10.0, "display_max": 10.0,
+      "requests": [ { "byte1": "0x20", "byte2": "0x0D", "offset": 0.0, "scale": 0.01 } ]
+    }
+  ]
+}
