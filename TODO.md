@@ -30,5 +30,5 @@ Reworked from the old README's list against what's actually implemented as of th
 
 ## Manual validation still needed
 
-- [ ] On-hardware check of `gui/screens/inc/layout.hpp`'s `HERO_COLSPAN`/`STACK_COLSPAN` split (the 3-panel layout's hero-vs-stack width ratio) — currently a starting guess, not yet confirmed to read well at arm's length in the car.
+- [X] On-hardware check of `gui/screens/inc/layout.hpp`'s `HERO_COLSPAN`/`STACK_COLSPAN` split (the 3-panel layout's hero-vs-stack width ratio) — currently a starting guess, not yet confirmed to read well at arm's length in the car.
 - [ ] Real-vehicle validation of `SignalSpec::display_min/max` range defaults used to scale Bar/Gauge fills.

@@ -8,6 +8,7 @@
 #include "teensy_clock.hpp"
 #include "teensy_config_store.hpp"
 #include "teensy_display.hpp"
+#include "teensy_sd_card.hpp"
 #include "teensy_serial_link.hpp"
 #include "teensy_touch.hpp"
 
@@ -17,6 +18,7 @@ Platform &platform_get()
         TeensyCanBus::instance(), TeensyDisplay::instance(),
         TeensyTouch::instance(),  TeensyConfigStore::instance(),
         TeensyClock::instance(),  TeensySerialLink::instance(),
+        TeensySdCard::instance(),
     };
     return s_platform;
 }

@@ -199,6 +199,91 @@ class ISerialLink
 };
 
 /*==============================================================================
+ * SD CARD
+ =============================================================================*/
+
+enum class SdFileMode
+{
+        Read,  /* Existing file; fails if missing. */
+        Write, /* Create/truncate from scratch. */
+        Append /* Create if missing, else write from end-of-file. */
+};
+
+/**
+ * Raw file I/O on a removable Micro-SD card. One file open at a time,
+ * matching ICanBus/ISerialLink's single-stream style rather than a
+ * multi-handle filesystem API. Neither board wires a card-detect pin, so
+ * presence comes from actually attempting SPI communication with a card
+ * (retried a few times -- see is_present()), not a live GPIO signal.
+ * "Present" is deliberately independent of "has a valid filesystem": a
+ * blank/corrupted card still reads as present (so it can be formatted)
+ * rather than looking identical to no card at all -- see format().
+ */
+class ISdCard
+{
+    public:
+        virtual ~ISdCard() = default;
+
+        /**
+         * Initializes raw SPI communication with the card and mounts its
+         * filesystem.
+         *
+         * @returns True only if both succeed -- a present-but-unformatted
+         * or corrupted card returns false here even though is_present()
+         * is true; call format(), which re-mounts on success.
+         */
+        virtual bool begin() = 0;
+
+        /**
+         * Whether raw SPI communication with a card has succeeded. Cheap
+         * when already true (returns the cached flag, demoted to false by
+         * a failed read()/write() -- a card pulled mid-session is only
+         * discovered that way, never proactively). When false, re-attempts
+         * the same retry-probe begin() uses, so a freshly-inserted card is
+         * picked up without a dedicated rescan call. Not const -- it can
+         * trigger real hardware I/O.
+         */
+        virtual bool is_present() = 0;
+
+        /**
+         * Wipes the card and creates a fresh filesystem, then re-mounts
+         * it. Two distinct callers, both real, not just an error path:
+         * (1) recovery for a blank/corrupted card that failed begin()'s
+         * volume-mount step (is_present() true, begin() false), and (2)
+         * the intended everyday way to reclaim space -- e.g. once logs
+         * have been offloaded to a computer, format() clears everything
+         * before logging starts again, on an otherwise perfectly healthy,
+         * already-mounted card. Requires is_present() but NOT a prior
+         * successful begin(). Fails if a file is currently open (close()
+         * it first). Destroys all existing data.
+         */
+        virtual bool format() = 0;
+
+        /**
+         * Opens `path` in `mode`. Fails if a file's already open (close()
+         * it first) or the card isn't mounted.
+         */
+        virtual bool open(const char *path, SdFileMode mode) = 0;
+
+        virtual bool is_open() const = 0;
+        virtual void close()         = 0;
+
+        /**
+         * @returns Bytes actually read (0 at EOF or on failure).
+         */
+        virtual size_t read(void *buf, size_t len) = 0;
+
+        /**
+         * @returns Bytes actually written (< len signals failure, e.g.
+         * the card having been pulled).
+         */
+        virtual size_t write(const void *buf, size_t len) = 0;
+
+        virtual bool exists(const char *path) const = 0;
+        virtual bool remove(const char *path)        = 0;
+};
+
+/*==============================================================================
  * CLOCK
  =============================================================================*/
 
@@ -228,6 +313,7 @@ struct Platform
         IConfigStore &config_store;
         IClock       &clock;
         ISerialLink  &serial;
+        ISdCard      &sd_card;
 };
 
 /**
