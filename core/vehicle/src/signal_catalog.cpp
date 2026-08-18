@@ -27,12 +27,39 @@ namespace core
             return raw_values[0];
         }
 
-        float transform_actual_intake_pressure(const float *raw_values,
-                                               uint8_t      n)
+        /* Generic two-request combiners for compound signals built via the
+         * monitor tool's Registry "New Compound Signal..." dialog -- no new
+         * C++ needed per combination. */
+        float transform_sum(const float *raw_values, uint8_t n)
         {
             (void)n;
-            /* index 0 = ambient pressure, index 1 = intake pressure */
+            return raw_values[0] + raw_values[1];
+        }
+
+        float transform_difference(const float *raw_values, uint8_t n)
+        {
+            (void)n;
             return raw_values[1] - raw_values[0];
+        }
+
+        float transform_average(const float *raw_values, uint8_t n)
+        {
+            (void)n;
+            return (raw_values[0] + raw_values[1]) * 0.5f;
+        }
+
+        float transform_min(const float *raw_values, uint8_t n)
+        {
+            (void)n;
+            return raw_values[0] < raw_values[1] ? raw_values[0]
+                                                 : raw_values[1];
+        }
+
+        float transform_max(const float *raw_values, uint8_t n)
+        {
+            (void)n;
+            return raw_values[0] > raw_values[1] ? raw_values[0]
+                                                 : raw_values[1];
         }
     } // namespace
 

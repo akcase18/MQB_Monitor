@@ -1,15 +1,25 @@
 """PySide6 GUI for the MQB monitor.
 
-A sidebar shell over a shared MonitorEngine, polled on a timer, with four
+A sidebar shell over a shared MonitorEngine, polled on a timer, with five
 pages:
-  * Signals -- a user-built watchlist of known catalog signals, decoded live.
-  * Traffic -- rolling decoded UDS message log (request/response, latency),
-               with CSV export (decoded or raw frames) via Save Log.
-  * Learn   -- unknown DIDs seen on the bus; commit one straight to the
-               catalog, or save it as WIP if you don't have a confirmed
-               scale/offset yet.
-  * WIP     -- signals saved as WIP from Learn: resume to keep refining, or
-               delete. Nothing here reaches signals.json until promoted.
+  * Signals  -- a user-built watchlist of active catalog signals, decoded live.
+  * Traffic  -- rolling decoded UDS message log (request/response, latency),
+                with CSV export (decoded or raw frames) via Save Log.
+  * Registry -- every signal in signals.json, active and WIP alike -- the
+                birds-eye view for reviewing what's actually validated.
+                Filter, bulk Toggle Status, or Edit any entry. Also where new
+                compound signals are built (CompoundSignalDialog): combine
+                two existing direct signals with sum/difference/average/min/
+                max, no new firmware code required.
+  * Learn    -- unknown DIDs seen on the bus; save one Active (straight into
+                the compiled catalog) or WIP (offset/scale not confirmed
+                yet) via SignalEditorDialog's Status combo.
+  * WIP      -- every WIP-status signal, for resuming (keep refining) or
+                deleting. Nothing here reaches the compiled catalog until
+                its status is flipped to Active.
+
+Registry/Learn/WIP all read and write the same two-stage registry (see
+catalog.py's module docstring) -- there is no separate WIP file anymore.
 """
 from __future__ import annotations
 
@@ -51,6 +61,7 @@ from PySide6.QtWidgets import (
 )
 
 from .catalog import (
+    COMPOUND_TRANSFORMS,
     REPO_ROOT,
     Catalog,
     Request,
@@ -62,6 +73,8 @@ from .catalog import (
 )
 from .session import MonitorEngine, Snapshot
 from .sources import (
+    DEFAULT_CAN_BAUD,
+    SLCAN_BAUD_INDEX,
     DemoSource,
     SlcanSerialSource,
     available_ports,
@@ -69,13 +82,15 @@ from .sources import (
 )
 from .theme import (
     ACCENT,
+    AMBER,
     GREEN,
     MONO_FONT,
     TEXT_DIM,
     apply_theme,
     mark_primary,
 )
-from .wip import MAX_SAMPLES, WipSignal, WipStore
+
+MAX_SAMPLES = 20  # mirrors session.MAX_UNKNOWN_SAMPLES / wip.MAX_SAMPLES (retired)
 
 UNIT_TYPES = [
     "None", "Degrees", "Percent", "Pressure",
@@ -567,21 +582,18 @@ COLOR_WIP_ROW = QColor(76, 141, 255, 26)  # faint accent tint: "already has WIP 
 class LearnTab(QWidget):
     COLUMNS = ["DID", "Count", "Last payload", "as u8", "as i16", "Age", "Status"]
 
-    def __init__(
-        self, catalog: Catalog, engine: MonitorEngine, wip_store: WipStore, window
-    ) -> None:
+    def __init__(self, catalog: Catalog, engine: MonitorEngine, window) -> None:
         super().__init__()
         self.catalog = catalog
         self.engine = engine
-        self.wip_store = wip_store
         self.window = window
         self._dids: list[tuple[int, int]] = []
 
         layout = QVBoxLayout(self)
         info = QLabel(
             "Unknown DIDs seen on the bus (an OBDEleven query with no catalog "
-            "match). Select one and click Add to define it — you can commit "
-            "it straight to the catalog, or save it as WIP if you don't have "
+            "match). Select one and click Add to define it — save it Active "
+            "to commit it straight to the catalog, or WIP if you don't have "
             "a confirmed scale/offset yet (see the WIP tab)."
         )
         info.setWordWrap(True)
@@ -612,7 +624,9 @@ class LearnTab(QWidget):
             last = u.samples[-1] if u.samples else b""
             raw = decode_raw_payload(last) if last else 0
             i16 = int(raw)
-            is_wip = self.wip_store.get(u.did) is not None
+            # Any status here is WIP -- an active-status match wouldn't show
+            # up as "unknown" at all (Catalog._reindex is active-only).
+            is_wip = bool(self.catalog.find_by_did(u.did))
             vals = [
                 f"{u.did[0]:02X} {u.did[1]:02X}",
                 str(u.count),
@@ -639,79 +653,125 @@ class LearnTab(QWidget):
         did = self._dids[row]
         entry = self.engine.snapshot().unknown.get(did)
         samples = list(entry.samples) if entry else []
-        wip = self.wip_store.get(did)
-        dlg = LearnDialog(did, samples, self.catalog, self.wip_store, wip=wip, parent=self)
+        matches = self.catalog.find_by_did(did)
+        existing = matches[0] if matches else None
+        dlg = SignalEditorDialog(
+            self.catalog, existing=existing, did=None if existing else did,
+            live_samples=samples, parent=self,
+        )
         if dlg.exec() == QDialog.Accepted:
-            if dlg.saved_kind == "catalog":
-                self.window.on_signal_learned(
-                    dlg.saved_path, dlg.regenerated, dlg.saved_signal_id
-                )
-            elif dlg.saved_kind == "wip":
-                self.window.on_wip_saved()
+            self.window.on_signal_saved(dlg.saved_signal, dlg.saved_path, dlg.regenerated)
+            # Jump to where it landed: Signals if newly active, WIP if still WIP.
+            self.window._select_page(0 if dlg.saved_signal.status == "active" else 4)
 
 
-class LearnDialog(QDialog):
-    """Turns an unknown DID into either a saved WIP note (offset/scale not
-    yet confirmed -- see wip.py) or a committed catalog signal. Can be opened
-    fresh (wip=None) or resuming previously saved WIP notes for this DID,
-    which pre-fill every field."""
+class SignalEditorDialog(QDialog):
+    """The single editing surface for a registry entry (core/vehicle/data/
+    signals.json), in one of three modes:
+
+      * Discover -- `did` given, no `existing`: a freshly-seen unknown DID
+        from the Learn tab. Defaults to WIP status.
+      * Create -- neither `did` nor `existing`: a signal you already know
+        about (e.g. from documentation) that hasn't been seen on the bus
+        yet. Shows DID byte1/byte2 entry fields, hidden in the other modes.
+      * Edit -- `existing` given: review/refine any registry entry (active
+        or WIP) from the Registry or WIP tab. Saving replaces it in place
+        via Catalog.update_signal, preserving its id and list position.
+
+    Status (Active/WIP) is one combo box, not a button choice -- this dialog
+    *is* the two-stage toggle, in whichever mode it's opened."""
 
     def __init__(
         self,
-        did,
-        samples,
         catalog: Catalog,
-        wip_store: WipStore,
-        wip: WipSignal | None = None,
+        existing: Signal | None = None,
+        did: tuple[int, int] | None = None,
+        live_samples: list[bytes] | None = None,
         parent=None,
     ) -> None:
         super().__init__(parent)
-        self.did = did
         self.catalog = catalog
-        self.wip_store = wip_store
+        self.existing = existing
+        self.saved_signal: Signal | None = None
         self.saved_path: Path | None = None
-        self.saved_signal_id: int | None = None
-        self.saved_kind: str | None = None  # "catalog" | "wip" | None (cancelled)
         self.regenerated = False
 
-        # Merge this session's live samples with any samples saved earlier
-        # alongside the WIP note, newest-last, capped like the engine's own
-        # unknown-DID buffer.
-        merged = [bytes.fromhex(h) for h in (wip.samples if wip else [])] + list(samples)
+        if existing is not None:
+            self._composite = existing.is_composite
+            first_req = existing.requests[0] if existing.requests else None
+            self._did = first_req.did if first_req else None
+            self._creating = False
+        elif did is not None:
+            self._composite = False
+            self._did = did
+            self._creating = False
+        else:
+            self._composite = False
+            self._did = None  # entered by the user in the DID fields below
+            self._creating = True
+
+        # Merge stored WIP samples with any live ones seen right now.
+        stored = [bytes.fromhex(h) for h in (existing.samples if existing else [])]
+        merged = stored + list(live_samples or [])
         self._samples = merged[-MAX_SAMPLES:]
         last = self._samples[-1] if self._samples else b""
         self._last_raw = decode_raw_payload(last) if last else 0.0
 
-        self.setWindowTitle(
-            f"{'Resume' if wip else 'Learn'} DID {did[0]:02X} {did[1]:02X}"
-        )
+        title_did = f"{self._did[0]:02X} {self._did[1]:02X}" if self._did else None
+        if existing is not None:
+            self.setWindowTitle(f"Edit {existing.name or ('DID ' + title_did if title_did else 'signal')}")
+        elif did is not None:
+            self.setWindowTitle(f"Learn DID {title_did}")
+        else:
+            self.setWindowTitle("New Signal")
         self.setMinimumWidth(480)
 
         form = QFormLayout(self)
-        header = (
-            f"<b>DID {did[0]:02X} {did[1]:02X}</b> — "
-            f"{len(self._samples)} sample(s), last payload "
-            f"[{last.hex(' ') or 'none'}], decoded raw = {self._last_raw:.0f}"
-        )
-        if wip:
-            header += "<br><i>Resuming saved WIP notes.</i>"
-        form.addRow(QLabel(header))
 
-        self.name = QLineEdit(wip.name if wip else "")
-        self.name.setPlaceholderText("e.g. Oil Pressure (optional for WIP)")
+        header_bits = []
+        if title_did:
+            header_bits.append(f"<b>DID {title_did}</b>")
+        if self._samples:
+            header_bits.append(
+                f"{len(self._samples)} sample(s), last payload "
+                f"[{last.hex(' ')}], decoded raw = {self._last_raw:.0f}"
+            )
+        if header_bits:
+            form.addRow(QLabel(" — ".join(header_bits)))
+
+        self.status_combo = QComboBox()
+        self.status_combo.addItems(["WIP", "Active"])
+        self.status_combo.setCurrentText(
+            "Active" if (existing and existing.status == "active") else "WIP"
+        )
+        form.addRow("Status", self.status_combo)
+
+        self.name = QLineEdit(existing.name if existing else "")
+        self.name.setPlaceholderText("e.g. Oil Pressure (optional while WIP)")
         form.addRow("Name", self.name)
 
         self.unit = QComboBox()
         self.unit.addItems(UNIT_TYPES)
-        if wip and wip.unit in UNIT_TYPES:
-            self.unit.setCurrentText(wip.unit)
+        if existing and existing.unit in UNIT_TYPES:
+            self.unit.setCurrentText(existing.unit)
         form.addRow("Unit", self.unit)
 
         self.cycle = QSpinBox()
         self.cycle.setRange(10, 60000)
-        self.cycle.setValue(wip.cycle_time_ms if wip else 100)
+        self.cycle.setValue(existing.cycle_time_ms if existing else 100)
         self.cycle.setSuffix(" ms")
         form.addRow("Cycle time", self.cycle)
+
+        self.did_byte1 = self.did_byte2 = None
+        if self._creating:
+            self.did_byte1 = QLineEdit("00")
+            self.did_byte2 = QLineEdit("00")
+            for w in (self.did_byte1, self.did_byte2):
+                w.setMaxLength(2)
+                w.setFixedWidth(50)
+            form.addRow("DID (hex)", self._pair(self.did_byte1, "/", self.did_byte2))
+
+        existing_req = existing.requests[0] if (existing and existing.requests) else None
 
         # Two-point calibration: raw -> true value solves scale & offset.
         self.raw1 = self._dspin(self._last_raw)
@@ -724,24 +784,31 @@ class LearnDialog(QDialog):
         form.addRow("Point 2: raw", self._pair(self.raw2, "→ value", self.val2))
         form.addRow("", solve)
 
-        self.offset = self._dspin(wip.offset if wip and wip.offset is not None else 0.0)
-        self.scale = self._dspin(wip.scale if wip and wip.scale is not None else 1.0)
+        self.offset = self._dspin(existing_req.offset if existing_req else 0.0)
+        self.scale = self._dspin(existing_req.scale if existing_req else 1.0)
         self.scale.setDecimals(6)
         self.offset.setDecimals(4)
         self.scale.valueChanged.connect(self._update_preview)
         self.offset.valueChanged.connect(self._update_preview)
         form.addRow("Offset", self.offset)
         form.addRow("Scale", self.scale)
-        unconfirmed_hint = QLabel(
-            "Not confirmed yet? Leave the defaults and use "
-            "<b>Save as WIP</b> below instead of committing to the catalog."
-        )
-        unconfirmed_hint.setWordWrap(True)
-        unconfirmed_hint.setStyleSheet(f"color: {TEXT_DIM}; font-size: 11px;")
-        form.addRow("", unconfirmed_hint)
 
-        self.dmin = self._dspin(wip.display_min if wip else 0.0)
-        self.dmax = self._dspin(wip.display_max if wip else 100.0)
+        if self._composite:
+            for w in (self.raw1, self.val1, self.raw2, self.val2, solve, self.offset, self.scale):
+                w.setEnabled(False)
+            hint = QLabel(
+                "This signal combines multiple UDS requests using a "
+                "hand-written transform (advanced) — edit its requests[] "
+                "directly in signals.json."
+            )
+        else:
+            hint = QLabel("Not confirmed yet? Leave Status set to WIP above.")
+        hint.setWordWrap(True)
+        hint.setStyleSheet(f"color: {TEXT_DIM}; font-size: 11px;")
+        form.addRow("", hint)
+
+        self.dmin = self._dspin(existing.display_min if existing else 0.0)
+        self.dmax = self._dspin(existing.display_max if existing else 100.0)
         form.addRow("Display min", self.dmin)
         form.addRow("Display max", self.dmax)
 
@@ -749,7 +816,7 @@ class LearnDialog(QDialog):
         form.addRow("Preview", self.preview)
         self._update_preview()
 
-        self.notes = QPlainTextEdit(wip.notes if wip else "")
+        self.notes = QPlainTextEdit(existing.notes if existing else "")
         self.notes.setPlaceholderText(
             "What you've tried, what still needs verifying, related "
             "signals, where you saw the real value to compare against…"
@@ -766,17 +833,10 @@ class LearnDialog(QDialog):
         cancel_btn = QPushButton("Cancel")
         cancel_btn.clicked.connect(self.reject)
         buttons.addWidget(cancel_btn)
-        wip_btn = QPushButton("Save as WIP")
-        wip_btn.setToolTip(
-            "Save name/unit/notes/samples (and offset/scale if you've set "
-            "them) without touching the real catalog or the firmware."
-        )
-        wip_btn.clicked.connect(self._save_wip)
-        buttons.addWidget(wip_btn)
-        catalog_btn = QPushButton("Add to Catalog")
-        mark_primary(catalog_btn)
-        catalog_btn.clicked.connect(self._save)
-        buttons.addWidget(catalog_btn)
+        save_btn = QPushButton("Save")
+        mark_primary(save_btn)
+        save_btn.clicked.connect(self._save)
+        buttons.addWidget(save_btn)
         form.addRow(buttons)
 
     def _dspin(self, value: float) -> QDoubleSpinBox:
@@ -816,23 +876,57 @@ class LearnDialog(QDialog):
         label = unit_label(self.unit.currentText(), True)
         self.preview.setText(f"last sample decodes to {decoded:.3f} {label}")
 
+    def _resolve_did(self) -> tuple[int, int] | None:
+        if self._did is not None:
+            return self._did
+        try:
+            b1 = int(self.did_byte1.text(), 16)
+            b2 = int(self.did_byte2.text(), 16)
+        except ValueError:
+            return None
+        if not (0 <= b1 <= 0xFF and 0 <= b2 <= 0xFF):
+            return None
+        return (b1, b2)
+
     def _save(self) -> None:
+        status = "active" if self.status_combo.currentText() == "Active" else "wip"
         name = self.name.text().strip()
-        if not name:
-            QMessageBox.warning(self, "Save", "Give the signal a name.")
+        if status == "active" and not name:
+            QMessageBox.warning(
+                self, "Save", "Give the signal a name before marking it Active."
+            )
             return
+
+        if self._composite:
+            requests = list(self.existing.requests)  # untouched -- see hint
+        else:
+            did = self._resolve_did()
+            if did is None:
+                QMessageBox.warning(self, "Save", "Enter a valid DID (two hex bytes).")
+                return
+            requests = [
+                Request(did[0], did[1], self.offset.value(), self.scale.value())
+            ]
+
         signal = Signal(
-            id=self.catalog.next_id(),
+            id=self.existing.id if self.existing else self.catalog.next_id(),
             name=name,
             unit=self.unit.currentText(),
             cycle_time_ms=self.cycle.value(),
-            transform="default",
+            transform=self.existing.transform if self.existing else "default",
             display_min=self.dmin.value(),
             display_max=self.dmax.value(),
-            requests=[Request(self.did[0], self.did[1], self.offset.value(), self.scale.value())],
+            requests=requests,
+            status=status,
+            notes=self.notes.toPlainText().strip(),
+            samples=[s.hex() for s in self._samples],
         )
-        self.catalog.add_signal(signal)
-        self.saved_signal_id = signal.id
+
+        if self.existing is not None:
+            self.catalog.update_signal(signal)
+        else:
+            self.catalog.add_signal(signal)
+        self.saved_signal = signal
         self.saved_path = self.catalog.save()
 
         if self.regen.isChecked():
@@ -848,54 +942,306 @@ class LearnDialog(QDialog):
                     f"Saved signals.json, but gen_catalog.py failed:\n{e}",
                 )
 
-        # This DID just graduated -- drop its now-redundant WIP note, if any.
-        if self.wip_store.get(self.did) is not None:
-            self.wip_store.remove(self.did)
-            self.wip_store.save()
-
-        self.saved_kind = "catalog"
         self.accept()
 
-    def _save_wip(self) -> None:
-        wip_signal = WipSignal(
-            did=self.did,
-            name=self.name.text().strip(),
+
+class CompoundSignalDialog(QDialog):
+    """Builds -- or edits -- a signal whose value is computed from two
+    existing DIRECT signals (single request, "default" transform) in the
+    registry -- e.g. "boost above ambient" = charge pressure - ambient
+    pressure. There's no offset/scale to solve here: each source's own
+    (already-calibrated) request is copied over verbatim, so all this dialog
+    decides is *which two* and *how to combine them* (one of
+    catalog.COMPOUND_TRANSFORMS -- sum/difference/average/min/max), which
+    needs no new C++ per signal since those transforms already exist in both
+    signal_catalog.cpp and this tool's TRANSFORMS.
+
+    Two modes, like SignalEditorDialog:
+      * Create -- `existing` is None: pick two sources from scratch.
+      * Edit -- `existing` given (must be composite with a transform in
+        COMPOUND_TRANSFORMS -- callers are responsible for routing bespoke-
+        transform composites like actual_intake_pressure to SignalEditorDialog
+        instead, since those aren't expressible as "two named sources").
+        Each side's source picker tries to match `existing`'s stored request
+        back to a live signal (by identical DID+offset+scale); if the
+        original source was since deleted or edited, that side falls back to
+        an "(unchanged)" placeholder holding the request as originally
+        saved, so editing metadata never silently changes a source you
+        didn't touch.
+
+    A signal built this way reports is_composite == True, so it's excluded
+    from the Signals watchlist picker like any other composite signal."""
+
+    def __init__(
+        self, catalog: Catalog, existing: Signal | None = None, parent=None,
+    ) -> None:
+        super().__init__(parent)
+        self.catalog = catalog
+        self.existing = existing
+        self.saved_signal: Signal | None = None
+        self.saved_path: Path | None = None
+        self.regenerated = False
+
+        self._sources = sorted(
+            (s for s in catalog.signals if not s.is_composite),
+            key=lambda s: s.name.lower(),
+        )
+
+        self.setWindowTitle(
+            f"Edit Compound Signal — {existing.name}" if existing else "New Compound Signal"
+        )
+        self.setMinimumWidth(480)
+        form = QFormLayout(self)
+
+        if existing is None and len(self._sources) < 2:
+            form.addRow(QLabel(
+                "Need at least two direct (non-compound) signals in the "
+                "registry before you can combine any — add those first."
+            ))
+            buttons = QDialogButtonBox(QDialogButtonBox.Close)
+            buttons.rejected.connect(self.reject)
+            buttons.accepted.connect(self.reject)
+            form.addRow(buttons)
+            self._disabled = True
+            return
+        self._disabled = False
+
+        self.status_combo = QComboBox()
+        self.status_combo.addItems(["WIP", "Active"])
+        self.status_combo.setCurrentText(
+            "Active" if (existing and existing.status == "active") else "WIP"
+        )
+        form.addRow("Status", self.status_combo)
+
+        self.name = QLineEdit(existing.name if existing else "")
+        self.name.setPlaceholderText("e.g. Boost Above Ambient")
+        form.addRow("Name", self.name)
+
+        self.unit = QComboBox()
+        self.unit.addItems(UNIT_TYPES)
+        if existing and existing.unit in UNIT_TYPES:
+            self.unit.setCurrentText(existing.unit)
+        form.addRow("Unit", self.unit)
+
+        self.cycle = QSpinBox()
+        self.cycle.setRange(10, 60000)
+        self.cycle.setValue(existing.cycle_time_ms if existing else 100)
+        self.cycle.setSuffix(" ms")
+        form.addRow("Cycle time", self.cycle)
+
+        self.op = QComboBox()
+        for key, label in COMPOUND_TRANSFORMS.items():
+            self.op.addItem(label, userData=key)
+        if existing and existing.transform in COMPOUND_TRANSFORMS:
+            self.op.setCurrentIndex(self.op.findData(existing.transform))
+        self.op.currentIndexChanged.connect(self._update_preview)
+        form.addRow("Combine using", self.op)
+
+        self.preview = QLabel()  # created early: setCurrentIndex below fires
+        self.preview.setWordWrap(True)  # _update_preview before this row is added
+
+        req_a = existing.requests[0] if (existing and len(existing.requests) > 0) else None
+        req_b = existing.requests[1] if (existing and len(existing.requests) > 1) else None
+        match_a = self._find_source_match(req_a)
+        match_b = self._find_source_match(req_b)
+        self._fallback_a = req_a if (req_a is not None and match_a is None) else None
+        self._fallback_b = req_b if (req_b is not None and match_b is None) else None
+
+        self.source_a = QComboBox()
+        self.source_b = QComboBox()
+        self._populate_source_combo(self.source_a, self._fallback_a)
+        self._populate_source_combo(self.source_b, self._fallback_b)
+        if match_a is not None:
+            self.source_a.setCurrentIndex(self.source_a.findData(match_a.id))
+        if match_b is not None:
+            self.source_b.setCurrentIndex(self.source_b.findData(match_b.id))
+        elif existing is None:
+            self.source_b.setCurrentIndex(min(1, self.source_b.count() - 1))
+        self.source_a.currentIndexChanged.connect(self._update_preview)
+        self.source_b.currentIndexChanged.connect(self._update_preview)
+        form.addRow("A", self.source_a)
+        form.addRow("B", self.source_b)
+
+        form.addRow("Formula", self.preview)
+        self._update_preview()
+
+        self.dmin = self._dspin(existing.display_min if existing else 0.0)
+        self.dmax = self._dspin(existing.display_max if existing else 100.0)
+        form.addRow("Display min", self.dmin)
+        form.addRow("Display max", self.dmax)
+
+        self.notes = QPlainTextEdit(existing.notes if existing else "")
+        self.notes.setPlaceholderText(
+            "What this combination means, why it's useful…"
+        )
+        self.notes.setMaximumHeight(60)
+        form.addRow("Notes", self.notes)
+
+        self.regen = QCheckBox("Regenerate firmware catalog (run gen_catalog.py)")
+        self.regen.setChecked(True)
+        form.addRow("", self.regen)
+
+        buttons = QHBoxLayout()
+        buttons.addStretch(1)
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.clicked.connect(self.reject)
+        buttons.addWidget(cancel_btn)
+        save_btn = QPushButton("Save")
+        mark_primary(save_btn)
+        save_btn.clicked.connect(self._save)
+        buttons.addWidget(save_btn)
+        form.addRow(buttons)
+
+    def _dspin(self, value: float) -> QDoubleSpinBox:
+        sp = QDoubleSpinBox()
+        sp.setRange(-1e9, 1e9)
+        sp.setDecimals(4)
+        sp.setValue(value)
+        return sp
+
+    def _find_source_match(self, req: Request | None) -> Signal | None:
+        """A live direct signal whose own request is identical to `req` --
+        used in edit mode to preselect where a stored request came from."""
+        if req is None:
+            return None
+        return next(
+            (
+                s for s in self._sources
+                if s.requests
+                and s.requests[0].byte1 == req.byte1
+                and s.requests[0].byte2 == req.byte2
+                and s.requests[0].offset == req.offset
+                and s.requests[0].scale == req.scale
+            ),
+            None,
+        )
+
+    def _populate_source_combo(self, combo: QComboBox, fallback: Request | None) -> None:
+        if fallback is not None:
+            combo.addItem(
+                f"(unchanged — DID {fallback.byte1:02X} {fallback.byte2:02X}, "
+                "no longer matches a registry signal)",
+                userData=None,
+            )
+        for sig in self._sources:
+            unit = f" ({sig.unit})" if sig.unit != "None" else ""
+            combo.addItem(f"{sig.name}{unit}", userData=sig.id)
+
+    def _selected_source(self, combo: QComboBox) -> Signal | None:
+        sid = combo.currentData()
+        return next((s for s in self._sources if s.id == sid), None)
+
+    def _resolve_request(self, combo: QComboBox, fallback: Request | None) -> Request | None:
+        sig = self._selected_source(combo)
+        if sig is not None:
+            return sig.requests[0]
+        return fallback  # the "(unchanged)" placeholder is still selected
+
+    def _update_preview(self) -> None:
+        a = self._selected_source(self.source_a)
+        b = self._selected_source(self.source_b)
+        op_key = self.op.currentData()
+        a_name = a.name if a else ("A" if self._fallback_a is None else "(unchanged A)")
+        b_name = b.name if b else ("B" if self._fallback_b is None else "(unchanged B)")
+        formula = {
+            "sum": f"{a_name} + {b_name}",
+            "difference": f"{b_name} − {a_name}",
+            "average": f"average({a_name}, {b_name})",
+            "min": f"min({a_name}, {b_name})",
+            "max": f"max({a_name}, {b_name})",
+        }.get(op_key, "")
+        self.preview.setText(formula)
+
+    def _save(self) -> None:
+        req_a = self._resolve_request(self.source_a, self._fallback_a)
+        req_b = self._resolve_request(self.source_b, self._fallback_b)
+        if req_a is None or req_b is None:
+            QMessageBox.warning(self, "Save", "Choose two different signals.")
+            return
+        sid_a, sid_b = self.source_a.currentData(), self.source_b.currentData()
+        if sid_a is not None and sid_a == sid_b:
+            QMessageBox.warning(self, "Save", "Choose two different signals.")
+            return
+
+        status = "active" if self.status_combo.currentText() == "Active" else "wip"
+        name = self.name.text().strip()
+        if status == "active" and not name:
+            QMessageBox.warning(
+                self, "Save", "Give the signal a name before marking it Active."
+            )
+            return
+
+        signal = Signal(
+            id=self.existing.id if self.existing else self.catalog.next_id(),
+            name=name,
             unit=self.unit.currentText(),
             cycle_time_ms=self.cycle.value(),
-            notes=self.notes.toPlainText().strip(),
-            offset=self.offset.value(),
-            scale=self.scale.value(),
+            transform=self.op.currentData(),
             display_min=self.dmin.value(),
             display_max=self.dmax.value(),
-            samples=[s.hex() for s in self._samples],
+            requests=[
+                Request(req_a.byte1, req_a.byte2, req_a.offset, req_a.scale),
+                Request(req_b.byte1, req_b.byte2, req_b.offset, req_b.scale),
+            ],
+            status=status,
+            notes=self.notes.toPlainText().strip(),
+            samples=list(self.existing.samples) if self.existing else [],
         )
-        self.wip_store.upsert(wip_signal)
-        self.wip_store.save()
-        self.saved_kind = "wip"
+
+        if self.existing is not None:
+            self.catalog.update_signal(signal)
+        else:
+            self.catalog.add_signal(signal)
+        self.saved_signal = signal
+        self.saved_path = self.catalog.save()
+
+        if self.regen.isChecked():
+            try:
+                subprocess.run(
+                    ["python3", str(REPO_ROOT / "tools/gen_catalog.py")],
+                    check=True, capture_output=True, text=True,
+                )
+                self.regenerated = True
+            except (subprocess.CalledProcessError, OSError) as e:
+                QMessageBox.warning(
+                    self, "Regenerate",
+                    f"Saved signals.json, but gen_catalog.py failed:\n{e}",
+                )
+
         self.accept()
+
+
+def _open_signal_editor(catalog: Catalog, existing: Signal, parent=None) -> QDialog:
+    """Routes to the right editor for an existing registry entry: composite
+    signals built by CompoundSignalDialog's generic transforms go back
+    through it (so their sources/operation stay editable); everything else
+    -- direct signals, and composites with a bespoke transform like
+    actual_intake_pressure -- goes through SignalEditorDialog as before."""
+    if existing.is_composite and existing.transform in COMPOUND_TRANSFORMS:
+        return CompoundSignalDialog(catalog, existing=existing, parent=parent)
+    return SignalEditorDialog(catalog, existing=existing, parent=parent)
 
 
 class WipTab(QWidget):
-    """Every saved-but-not-yet-committed signal: a holding area for DIDs
-    you've started reverse-engineering but haven't confirmed a scale/offset
-    for. Resume one to keep refining it, or delete it if it turned out to be
-    a dead end. Nothing here ever reaches signals.json until you resume an
-    entry and explicitly hit Add to Catalog."""
+    """Every saved-but-not-yet-active signal: a holding area for DIDs you've
+    started reverse-engineering but haven't confirmed a scale/offset for.
+    Resume one to keep refining it, or delete it if it turned out to be a
+    dead end. Nothing here reaches the firmware's compiled catalog until you
+    resume an entry and set its Status to Active."""
 
     COLUMNS = ["DID", "Name", "Unit", "Notes", "Samples", "Live?", "Updated"]
 
-    def __init__(self, wip_store: WipStore, catalog: Catalog, window) -> None:
+    def __init__(self, catalog: Catalog, window) -> None:
         super().__init__()
-        self.wip_store = wip_store
         self.catalog = catalog
         self.window = window
-        self._dids: list[tuple[int, int]] = []
+        self._entries: list[Signal] = []
 
         layout = QVBoxLayout(self)
         info = QLabel(
             "Signals you've started figuring out but haven't confirmed a "
             "scale/offset for yet. Nothing here affects the dashboard or "
-            "firmware until you resume one and commit it to the catalog."
+            "firmware until you resume one and set its Status to Active."
         )
         info.setWordWrap(True)
         layout.addWidget(info)
@@ -932,8 +1278,11 @@ class WipTab(QWidget):
         self.refresh(unknown_dids=set())
 
     def refresh(self, unknown_dids: set[tuple[int, int]]) -> None:
-        entries = self.wip_store.all()
-        self._dids = [w.did for w in entries]
+        entries = sorted(
+            (s for s in self.catalog.signals if s.is_wip),
+            key=lambda s: s.updated_at, reverse=True,
+        )
+        self._entries = entries
 
         empty = not entries
         self.hint.setVisible(empty)
@@ -943,16 +1292,17 @@ class WipTab(QWidget):
             return
 
         self.table.setRowCount(len(entries))
-        for row, w in enumerate(entries):
-            live = w.did in unknown_dids
+        for row, sig in enumerate(entries):
+            did = sig.requests[0].did if sig.requests else None
+            live = did is not None and did in unknown_dids
             vals = [
-                w.did_str,
-                w.name or "(unnamed)",
-                w.unit,
-                w.notes.replace("\n", " ") or "—",
-                str(len(w.samples)),
+                f"{did[0]:02X} {did[1]:02X}" if did else "—",
+                sig.name or "(unnamed)",
+                sig.unit,
+                sig.notes.replace("\n", " ") or "—",
+                str(len(sig.samples)),
                 "● live" if live else "—",
-                _fmt_age(time.time(), w.updated_at),
+                _fmt_age(time.time(), sig.updated_at),
             ]
             for col, text in enumerate(vals):
                 item = QTableWidgetItem(text)
@@ -962,49 +1312,266 @@ class WipTab(QWidget):
                     item.setForeground(QColor(GREEN))
                 self.table.setItem(row, col, item)
 
-    def _selected_did(self) -> tuple[int, int] | None:
+    def _selected_signal(self) -> Signal | None:
         row = self.table.currentRow()
-        if row < 0 or row >= len(self._dids):
+        if row < 0 or row >= len(self._entries):
             return None
-        return self._dids[row]
+        return self._entries[row]
 
     def _resume_selected(self) -> None:
-        did = self._selected_did()
-        if did is None:
+        signal = self._selected_signal()
+        if signal is None:
             QMessageBox.information(self, "WIP", "Select a WIP signal first.")
             return
-        wip = self.wip_store.get(did)
-        if wip is None:
-            return
-        live_samples = self.window.engine.snapshot().unknown.get(did)
-        samples = list(live_samples.samples) if live_samples else []
-        dlg = LearnDialog(did, samples, self.catalog, self.wip_store, wip=wip, parent=self)
+        if signal.is_composite and signal.transform in COMPOUND_TRANSFORMS:
+            dlg = CompoundSignalDialog(self.catalog, existing=signal, parent=self)
+        else:
+            did = signal.requests[0].did if signal.requests else None
+            live_entry = self.window.engine.snapshot().unknown.get(did) if did else None
+            samples = list(live_entry.samples) if live_entry else []
+            dlg = SignalEditorDialog(self.catalog, existing=signal, live_samples=samples, parent=self)
         if dlg.exec() == QDialog.Accepted:
-            if dlg.saved_kind == "catalog":
-                self.window.on_signal_learned(
-                    dlg.saved_path, dlg.regenerated, dlg.saved_signal_id
-                )
-            elif dlg.saved_kind == "wip":
-                self.window.on_wip_saved()
+            self.window.on_signal_saved(dlg.saved_signal, dlg.saved_path, dlg.regenerated)
+            if dlg.saved_signal.status == "active":
+                self.window._select_page(0)  # graduated -- show it live
 
     def _delete_selected(self) -> None:
-        did = self._selected_did()
-        if did is None:
+        signal = self._selected_signal()
+        if signal is None:
             QMessageBox.information(self, "WIP", "Select a WIP signal first.")
             return
-        wip = self.wip_store.get(did)
-        name = (wip.name if wip else "") or f"DID {did[0]:02X} {did[1]:02X}"
+        name = signal.name or f"signal {signal.id}"
         if QMessageBox.question(
             self, "Delete WIP signal", f"Delete WIP notes for “{name}”?"
         ) != QMessageBox.Yes:
             return
-        self.wip_store.remove(did)
-        self.wip_store.save()
+        self.catalog.remove_signal(signal.id)
+        self.catalog.save()
         self.window.on_wip_saved()
 
 
+class RegistryTab(QWidget):
+    """Every signal in the registry, active and WIP alike -- the birds-eye
+    view for reviewing what's actually validated. Learn (bus discovery) and
+    WIP (holding-area review) stay dedicated workflows; this tab is where
+    you go through the whole registry at once: filter, Toggle Status for a
+    fast flip, Edit… to change anything else, or Move Up/Down to reorder
+    (see Catalog.move_signal -- only enabled with the "All" filter, since a
+    filtered view isn't the registry's real, contiguous order)."""
+
+    COLUMNS = ["ID", "Name", "Status", "Unit", "DID(s)", "Cycle", "Notes"]
+
+    def __init__(self, catalog: Catalog, window) -> None:
+        super().__init__()
+        self.catalog = catalog
+        self.window = window
+        self._rows: list[Signal] = []
+
+        layout = QVBoxLayout(self)
+
+        controls = QHBoxLayout()
+        controls.addWidget(QLabel("Filter:"))
+        self.filter = QComboBox()
+        self.filter.addItems(["All", "Active only", "WIP only"])
+        self.filter.currentIndexChanged.connect(self.refresh)
+        controls.addWidget(self.filter)
+        controls.addStretch(1)
+        self.count_label = QLabel()
+        controls.addWidget(self.count_label)
+        layout.addLayout(controls)
+
+        self.table = QTableWidget(0, len(self.COLUMNS))
+        self.table.setHorizontalHeaderLabels(self.COLUMNS)
+        self.table.verticalHeader().setVisible(False)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.table.horizontalHeader().setSectionResizeMode(6, QHeaderView.Stretch)
+        self.table.doubleClicked.connect(lambda *_: self._edit_selected())
+        layout.addWidget(self.table, stretch=1)
+
+        btns = QHBoxLayout()
+        new_btn = QPushButton("New Signal…")
+        new_btn.clicked.connect(self._new_signal)
+        btns.addWidget(new_btn)
+        new_compound_btn = QPushButton("New Compound Signal…")
+        new_compound_btn.setToolTip(
+            "Combine two existing direct signals (e.g. a difference or "
+            "average) into a new computed signal — no new firmware code "
+            "needed for sum/difference/average/min/max."
+        )
+        new_compound_btn.clicked.connect(self._new_compound_signal)
+        btns.addWidget(new_compound_btn)
+        del_btn = QPushButton("Delete")
+        del_btn.clicked.connect(self._delete_selected)
+        btns.addWidget(del_btn)
+        move_up_btn = QPushButton("Move Up")
+        move_up_btn.setToolTip(
+            "Move the selected signal earlier in the registry's own order "
+            "(filter must be \"All\"). This is the order gen_catalog.py "
+            "compiles active signals into, so it changes the firmware's "
+            "SIGNAL_CATALOG[] array order too."
+        )
+        move_up_btn.clicked.connect(lambda: self._move_selected(-1))
+        btns.addWidget(move_up_btn)
+        move_down_btn = QPushButton("Move Down")
+        move_down_btn.setToolTip("Move the selected signal later in the registry's own order.")
+        move_down_btn.clicked.connect(lambda: self._move_selected(1))
+        btns.addWidget(move_down_btn)
+        btns.addStretch(1)
+        toggle_btn = QPushButton("Toggle Status")
+        toggle_btn.setToolTip(
+            "Flip the selected signal(s) between Active and WIP without "
+            "opening the editor. Run Regenerate afterward to sync the "
+            "firmware's compiled catalog."
+        )
+        toggle_btn.clicked.connect(self._toggle_selected)
+        btns.addWidget(toggle_btn)
+        edit_btn = QPushButton("Edit…")
+        edit_btn.clicked.connect(self._edit_selected)
+        btns.addWidget(edit_btn)
+        regen_btn = QPushButton("Regenerate Firmware Catalog")
+        mark_primary(regen_btn)
+        regen_btn.setToolTip(
+            "Run tools/gen_catalog.py so signal_catalog.generated.inc "
+            "reflects any status changes made here."
+        )
+        regen_btn.clicked.connect(self._regenerate)
+        btns.addWidget(regen_btn)
+        layout.addLayout(btns)
+
+        self.refresh()
+
+    def refresh(self) -> None:
+        f = self.filter.currentText()
+        signals = self.catalog.signals
+        if f == "Active only":
+            signals = [s for s in signals if s.status == "active"]
+        elif f == "WIP only":
+            signals = [s for s in signals if s.status == "wip"]
+        self._rows = signals
+
+        self.table.setRowCount(len(signals))
+        for row, sig in enumerate(signals):
+            dids = "; ".join(f"{r.byte1:02X} {r.byte2:02X}" for r in sig.requests) or "—"
+            vals = [
+                str(sig.id),
+                sig.name or "(unnamed)",
+                "Active" if sig.status == "active" else "WIP",
+                sig.unit,
+                dids,
+                str(sig.cycle_time_ms),
+                sig.notes.replace("\n", " ") or "—",
+            ]
+            for col, text in enumerate(vals):
+                item = QTableWidgetItem(text)
+                if col in (0, 5):
+                    item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                if col in (0, 4, 5):
+                    _mono(item)
+                if col == 2:
+                    item.setForeground(QColor(GREEN if sig.status == "active" else AMBER))
+                self.table.setItem(row, col, item)
+
+        self.count_label.setText(f"{len(signals)} of {len(self.catalog.signals)} signals")
+
+    def _selected_signals(self) -> list[Signal]:
+        rows = sorted({i.row() for i in self.table.selectedItems()})
+        return [self._rows[r] for r in rows if r < len(self._rows)]
+
+    def _edit_selected(self) -> None:
+        selected = self._selected_signals()
+        if not selected:
+            QMessageBox.information(self, "Registry", "Select a signal first.")
+            return
+        dlg = _open_signal_editor(self.catalog, selected[0], parent=self)
+        if dlg.exec() == QDialog.Accepted:
+            self.window.on_signal_saved(dlg.saved_signal, dlg.saved_path, dlg.regenerated)
+
+    def _new_signal(self) -> None:
+        dlg = SignalEditorDialog(self.catalog, parent=self)
+        if dlg.exec() == QDialog.Accepted:
+            self.window.on_signal_saved(dlg.saved_signal, dlg.saved_path, dlg.regenerated)
+
+    def _new_compound_signal(self) -> None:
+        dlg = CompoundSignalDialog(self.catalog, parent=self)
+        if dlg.exec() == QDialog.Accepted:
+            self.window.on_signal_saved(dlg.saved_signal, dlg.saved_path, dlg.regenerated)
+
+    def _toggle_selected(self) -> None:
+        selected = self._selected_signals()
+        if not selected:
+            QMessageBox.information(self, "Registry", "Select at least one signal first.")
+            return
+        for sig in selected:
+            sig.status = "wip" if sig.status == "active" else "active"
+            self.catalog.update_signal(sig)
+        self.catalog.save()
+        self.refresh()
+        self.window.on_registry_changed()
+
+    def _delete_selected(self) -> None:
+        selected = self._selected_signals()
+        if not selected:
+            QMessageBox.information(self, "Registry", "Select a signal first.")
+            return
+        names = ", ".join(s.name or f"signal {s.id}" for s in selected)
+        msg = f"Delete {len(selected)} signal(s): {names}?"
+        if any(s.status == "active" for s in selected):
+            msg += (
+                "\n\nThis includes ACTIVE signal(s) currently compiled into "
+                "the firmware."
+            )
+        if QMessageBox.question(self, "Delete signal(s)", msg) != QMessageBox.Yes:
+            return
+        for sig in selected:
+            self.catalog.remove_signal(sig.id)
+        self.catalog.save()
+        self.refresh()
+        self.window.on_registry_changed()
+
+    def _move_selected(self, delta: int) -> None:
+        if self.filter.currentText() != "All":
+            QMessageBox.information(
+                self, "Reorder",
+                "Switch the filter to \"All\" first — reordering works on "
+                "the registry's real order, which a filtered view doesn't "
+                "show contiguously.",
+            )
+            return
+        selected = self._selected_signals()
+        if len(selected) != 1:
+            QMessageBox.information(self, "Reorder", "Select exactly one signal to move.")
+            return
+        sig = selected[0]
+        if not self.catalog.move_signal(sig.id, delta):
+            return  # already at that end -- silently a no-op, same as the buttons being disabled
+        self.catalog.save()
+        self.refresh()
+        self._select_signal_id(sig.id)
+        self.window.on_registry_changed()
+
+    def _select_signal_id(self, signal_id: int) -> None:
+        for row, sig in enumerate(self._rows):
+            if sig.id == signal_id:
+                self.table.selectRow(row)
+                self.table.scrollToItem(self.table.item(row, 0))
+                return
+
+    def _regenerate(self) -> None:
+        try:
+            subprocess.run(
+                ["python3", str(REPO_ROOT / "tools/gen_catalog.py")],
+                check=True, capture_output=True, text=True,
+            )
+        except (subprocess.CalledProcessError, OSError) as e:
+            QMessageBox.warning(self, "Regenerate", f"gen_catalog.py failed:\n{e}")
+            return
+        QMessageBox.information(self, "Regenerate", "Firmware catalog regenerated.")
+
+
 class MainWindow(QMainWindow):
-    PAGES = ["Signals", "Traffic", "Learn", "WIP"]
+    PAGES = ["Signals", "Traffic", "Registry", "Learn", "WIP"]
 
     def __init__(self, port: str | None, demo: bool, listen_only: bool) -> None:
         super().__init__()
@@ -1013,7 +1580,6 @@ class MainWindow(QMainWindow):
 
         self.catalog = Catalog.load()
         self.engine = MonitorEngine(self.catalog)
-        self.wip_store = WipStore()
         self.settings = QSettings("MQBMonitor", "monitor")
         self.source = None
         self.listen_only = listen_only
@@ -1038,9 +1604,13 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget()
         self.signals_tab = SignalsTab(self.catalog, self.settings)
         self.traffic_tab = TrafficTab()
-        self.learn_tab = LearnTab(self.catalog, self.engine, self.wip_store, self)
-        self.wip_tab = WipTab(self.wip_store, self.catalog, self)
-        for page in (self.signals_tab, self.traffic_tab, self.learn_tab, self.wip_tab):
+        self.registry_tab = RegistryTab(self.catalog, self)
+        self.learn_tab = LearnTab(self.catalog, self.engine, self)
+        self.wip_tab = WipTab(self.catalog, self)
+        for page in (
+            self.signals_tab, self.traffic_tab, self.registry_tab,
+            self.learn_tab, self.wip_tab,
+        ):
             self.stack.addWidget(page)
         body_layout.addWidget(self.stack, stretch=1)
 
@@ -1107,8 +1677,32 @@ class MainWindow(QMainWindow):
         refresh.clicked.connect(self._populate_ports)
         layout.addWidget(refresh)
 
+        baud_label = QLabel("Baud")
+        baud_label.setObjectName("FieldLabel")
+        layout.addWidget(baud_label)
+        self.baud_combo = QComboBox()
+        self.baud_combo.setToolTip(
+            "CAN bus bitrate the Teensy sniffer opens at -- must match "
+            "whatever's actually on the bus. 500 kbit/s is the MQB "
+            "powertrain rate; the others are for bench testing against a "
+            "different bus."
+        )
+        for rate in sorted(SLCAN_BAUD_INDEX):
+            label = f"{rate // 1000} kbit/s"
+            if rate == DEFAULT_CAN_BAUD:
+                label += " (MQB)"
+            self.baud_combo.addItem(label, userData=rate)
+        saved_baud = int(self.settings.value("can_baud", DEFAULT_CAN_BAUD))
+        idx = self.baud_combo.findData(saved_baud)
+        self.baud_combo.setCurrentIndex(idx if idx >= 0 else self.baud_combo.findData(DEFAULT_CAN_BAUD))
+        self.baud_combo.currentIndexChanged.connect(
+            lambda: self.settings.setValue("can_baud", self.baud_combo.currentData())
+        )
+        layout.addWidget(self.baud_combo)
+
         self.connect_btn = QPushButton("Connect")
         mark_primary(self.connect_btn)
+        self.connect_btn.setMinimumWidth(100)  # fits "Disconnect" too -- no jump on toggle
         self.connect_btn.clicked.connect(self._toggle_connect)
         layout.addWidget(self.connect_btn)
 
@@ -1132,6 +1726,11 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.status_dot)
         self.status = QLabel("Disconnected")
         self.status.setObjectName("StatsLabel")
+        self.status.setFont(MONO_FONT)
+        # Fixed + right-aligned so growing frame/rate/DID counts don't keep
+        # reflowing the whole trailing group of the bar every tick.
+        self.status.setMinimumWidth(340)
+        self.status.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         layout.addWidget(self.status)
 
         return bar
@@ -1166,6 +1765,7 @@ class MainWindow(QMainWindow):
                 self.source = SlcanSerialSource(
                     choice, self.engine.feed,
                     listen_only=self.listen_check.isChecked(),
+                    can_baud=self.baud_combo.currentData(),
                 )
             self.source.start()
         except Exception as e:  # noqa: BLE001 -- surface any connect failure
@@ -1175,6 +1775,7 @@ class MainWindow(QMainWindow):
         self.connect_btn.setText("Disconnect")
         self.source_combo.setEnabled(False)
         self.listen_check.setEnabled(False)
+        self.baud_combo.setEnabled(False)
 
     def _disconnect(self) -> None:
         if self.source is not None:
@@ -1183,24 +1784,36 @@ class MainWindow(QMainWindow):
         self.connect_btn.setText("Connect")
         self.source_combo.setEnabled(True)
         self.listen_check.setEnabled(True)
+        self.baud_combo.setEnabled(True)
 
-    def on_signal_learned(self, path, regenerated: bool, signal_id) -> None:
+    def on_signal_saved(self, signal, path, regenerated: bool) -> None:
+        """Called whenever SignalEditorDialog commits a save (from Learn,
+        WIP-resume, or the Registry tab). Refreshes every view that depends
+        on the registry. Deliberately doesn't navigate or pop up a message --
+        callers decide navigation themselves (Learn/WIP want to jump to
+        where the signal landed; Registry wants to stay put for batch
+        review), and the tables updating live is confirmation enough."""
         self.engine.refresh_catalog()
         self.signals_tab.refresh_catalog()
-        if signal_id is not None:
-            self.signals_tab.add_watch(signal_id)  # watch what you just learned
+        if signal is not None and signal.status == "active":
+            self.signals_tab.add_watch(signal.id)
+        self.registry_tab.refresh()
         self.wip_tab.refresh(set(self.engine.snapshot().unknown.keys()))
-        self._select_page(0)
-        msg = f"Saved to {path}."
-        if regenerated:
-            msg += "\nFirmware catalog regenerated (rebuild/flash to use it)."
-        else:
-            msg += "\nRun tools/gen_catalog.py before rebuilding the firmware."
-        QMessageBox.information(self, "Signal added", msg)
 
     def on_wip_saved(self) -> None:
+        """WIP tab's own Delete action, which mutates the catalog directly
+        without going through SignalEditorDialog."""
+        self.engine.refresh_catalog()
+        self.registry_tab.refresh()
         self.wip_tab.refresh(set(self.engine.snapshot().unknown.keys()))
-        self._select_page(3)
+
+    def on_registry_changed(self) -> None:
+        """Registry tab's Toggle Status / Delete, which also mutate the
+        catalog directly."""
+        self.engine.refresh_catalog()
+        self.signals_tab.refresh_catalog()
+        self.learn_tab.update_view(self.engine.snapshot())
+        self.wip_tab.refresh(set(self.engine.snapshot().unknown.keys()))
 
     def _tick(self) -> None:
         snap = self.engine.snapshot()

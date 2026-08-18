@@ -26,8 +26,21 @@ OnFrame = Callable[[CanFrame], None]
 OBD_TX_ID = 0x7E0  # tester -> ECU (requests)
 OBD_RX_ID = 0x7E8  # ECU -> tester (responses)
 
-# SLCAN bitrate index for 500 kbit/s (the MQB powertrain rate).
-SLCAN_500K = "S6"
+# SLCAN Sn bitrate indices -- keep in sync with can_sniffer.cpp's
+# baud_for_index(). 500k is the MQB powertrain rate (the default); the rest
+# exist for bench testing against other buses/rates.
+SLCAN_BAUD_INDEX: dict[int, str] = {
+    10_000: "S0",
+    20_000: "S1",
+    50_000: "S2",
+    100_000: "S3",
+    125_000: "S4",
+    250_000: "S5",
+    500_000: "S6",
+    800_000: "S7",
+    1_000_000: "S8",
+}
+DEFAULT_CAN_BAUD = 500_000
 
 
 def available_ports() -> list[tuple[str, str]]:
@@ -52,21 +65,23 @@ class SlcanSerialSource:
         port: str,
         on_frame: OnFrame,
         listen_only: bool = True,
-        baud: int = 115200,
+        can_baud: int = DEFAULT_CAN_BAUD,
+        serial_baud: int = 115200,
     ) -> None:
         self.port = port
         self.on_frame = on_frame
         self.listen_only = listen_only
-        self.baud = baud
+        self.can_baud = can_baud
+        self.serial_baud = serial_baud
         self._ser: serial.Serial | None = None
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
 
     def start(self) -> None:
-        self._ser = serial.Serial(self.port, self.baud, timeout=0.1)
+        self._ser = serial.Serial(self.port, self.serial_baud, timeout=0.1)
         # Handshake: close (in case it was left open), set bitrate, open.
         self._ser.write(b"C\r")
-        self._ser.write((SLCAN_500K + "\r").encode())
+        self._ser.write((SLCAN_BAUD_INDEX[self.can_baud] + "\r").encode())
         self._ser.write(b"L\r" if self.listen_only else b"O\r")
         self._ser.reset_input_buffer()
         self._stop.clear()
