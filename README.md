@@ -21,11 +21,12 @@ Built on a Teensy MicroMod, [LVGL](https://lvgl.io/) for the UI, and a from-scra
 
 ## Hardware
 
-- **MCU**: Teensy MicroMod (`teensymm`), Arduino framework.
-- **Display**: ILI948x-family 480x320 TFT via the `ILI948x_t4_mm` library.
-- **Touch**: resistive touch panel over SPI (XPT2046-style protocol).
+- **MCUs**: Teensy MicroMod (`teensymm`) for general processing. ESP32-C3 for wireless connectivity.
+- **Display**: ILI948x-family 480x320 TFT via the `ILI948x_t4_mm` library, mounted directly to the PCB.
+- **Touch**: capacitive touch panel over I2C (FT6236). A resistive SPI (XPT2046-style) driver is also kept and switchable in code — see [platform/teensy](platform/teensy/README.md) — for whenever a resistive panel is back in the design.
 - **CAN**: `FlexCAN_T4`, polling the vehicle's OBD2 UDS enhanced-diagnostic-session service.
-- **Storage**: onboard EEPROM for persisted settings/panel/warning configuration.
+- **Config storage**: onboard EEPROM for persisted settings/panel/warning configuration.
+- **Log storage**: onboard 16MB QSPI NOR flash via LittleFS, in place ahead of the data-logging feature itself (see [TODO.md](TODO.md)). A Micro-SD implementation is also kept and switchable in code for whenever a card slot is back in the design.
 - **PCB**: custom board (v2), designed in-house.
 
 ## Current State
@@ -33,7 +34,6 @@ Built on a Teensy MicroMod, [LVGL](https://lvgl.io/) for the UI, and a from-scra
 Running in the car and working well — CAN polling, panel display, warning thresholds, and settings all confirmed on real hardware and real vehicle data.
 
 Outstanding hardware work:
-- BOOT and RESET buttons are still not populated on the PCB (provisions exist, buttons just need to be ordered/installed).
 - The board/enclosure needs a physical redesign to be smaller and more heat-resistant for permanent in-car mounting.
 
 Software TODO list, including deferred features (automatic day/night switching, additional signal sources, data logging, etc.), is tracked in [TODO.md](TODO.md).
@@ -61,7 +61,7 @@ The simulator env needs SDL2 installed (Homebrew on macOS, MSYS2 on Windows) —
 ## Repository Layout
 
 ```
-platform/   hardware abstraction (CAN, display, touch, config storage, clock) — one implementation per board
+platform/   hardware abstraction (CAN, display, touch, config storage, log storage, serial link, clock) — one implementation per board
 core/       platform-agnostic vehicle domain logic (scheduling, UDS, signal catalog, config schema)
 gui/        LVGL presentation layer (theme, widgets, screens, and the one bridge into core/)
 src/        composition root — wires platform/core/gui together per build environment

@@ -109,9 +109,12 @@ void TeensyTouch::poll()
      * low-confidence zone. */
     if (!was_pressed_ || z > Z_CONFIDENT_THRESHOLD)
     {
-        /* rotation 2, matching the old driver's unchanged default */
-        x_val_ = y;
-        y_val_ = 4095 - x;
+        /* rotation 2, matching the old driver's unchanged default, then
+         * flipped 180 -- x_val_/y_val_ each negated relative to their
+         * 0-4095 range -- to track the display's setRotation(3) (see
+         * teensy_display.cpp). */
+        x_val_ = 4095 - y;
+        y_val_ = x;
     }
     was_pressed_ = true;
 
