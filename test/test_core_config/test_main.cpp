@@ -155,8 +155,8 @@ void test_save_signal_only_writes_that_slot()
     store.load();
 
     core::WarningThresholds thresholds { 10.0f, 90.0f, true, true };
-    store.get().signals[6].warn = thresholds; // Actual Intake Pressure
-    store.save_signal(6);
+    store.get().signals[6].warn = thresholds; // Int Pres Act. (signal id 22)
+    store.save_signal(22);
 
     core::ConfigStore store2(backing);
     store2.load();

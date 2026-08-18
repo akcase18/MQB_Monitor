@@ -106,7 +106,7 @@ namespace core
         config_.priorities[1] = { 12, UnitSystem::Imperial }; /* Throttle Pos */
         config_.priorities[2] = { 2, UnitSystem::Imperial };  /* Int Air Temp */
         config_.priorities[3] = { 1, UnitSystem::Imperial };  /* Eng Oil Temp */
-        config_.priorities[4] = { 6, UnitSystem::Imperial }; /* Int Pres Act. */
+        config_.priorities[4] = { 22, UnitSystem::Imperial }; /* Int Pres Act. */
         config_.priorities[5] = { 8, UnitSystem::Imperial }; /* Engine Torque */
 
         for (size_t i = 0; i < SIGNAL_CATALOG_COUNT; i++)

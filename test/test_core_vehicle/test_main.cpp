@@ -98,7 +98,8 @@ void test_multi_request_signal_waits_for_all_requests()
     core::UdsClient   client(bus, TX_ID, RX_ID);
     core::SignalStore store;
 
-    /* Signal 6: Actual Intake Pressure = intake (req[1]) - ambient (req[0]). */
+    /* Catalog index 6: Int Pres Act. = intake (req[1]) - ambient (req[0]),
+     * via the generic "difference" transform. */
     const core::SignalSpec &spec = core::SIGNAL_CATALOG[6];
     TEST_ASSERT_EQUAL_UINT8(2, spec.num_requests);
 

@@ -31,10 +31,13 @@
  * only for the later active-probing phase, where the tool deliberately sends
  * its own UDS requests.
  *
- * Hardware: CAN3 peripheral -> pins 30 (CRX3) / 31 (CTX3) on the Teensy 4.0,
- * into the on-board TI CAN transceiver, tapped across CAN-H / CAN-L of the
- * bus between the OBDEleven and the car. Same CAN3 peripheral the display
- * firmware's TeensyCanBus uses (platform/teensy/src/teensy_can.cpp).
+ * Hardware: CAN1 peripheral -> pins 22 (CTX1) / 23 (CRX1) on this standalone
+ * Teensy 4.0, into its on-board TI CAN transceiver, tapped across CAN-H /
+ * CAN-L of the bus between the OBDEleven and the car. This is a DIFFERENT
+ * peripheral than the display firmware's TeensyCanBus, which runs on a
+ * separate Teensy MicroMod board and uses CAN3 (platform/teensy/src/
+ * teensy_can.cpp) -- the two boards just happen to share the same FlexCAN_T4
+ * library, not a bus or a peripheral.
  */
 #include <Arduino.h>
 #include <FlexCAN_T4.h>
@@ -43,7 +46,7 @@ namespace
 {
     /* FIFO + a deep software RX ring: the MQB bus is busy and USB drain can
      * briefly stall, so over-provision to avoid dropping frames. */
-    FlexCAN_T4<CAN3, RX_SIZE_256, TX_SIZE_16> g_can;
+    FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> g_can;
 
     constexpr char CR   = '\r';
     constexpr char BELL = '\a'; /* 0x07 */
@@ -72,16 +75,24 @@ namespace
         uint32_t v = 0;
         for (uint8_t i = 0; i < count; i++)
         {
-            char     c = s[i];
-            uint8_t  d;
+            char    c = s[i];
+            uint8_t d;
             if (c >= '0' && c <= '9')
+            {
                 d = c - '0';
+            }
             else if (c >= 'A' && c <= 'F')
+            {
                 d = c - 'A' + 10;
+            }
             else if (c >= 'a' && c <= 'f')
+            {
                 d = c - 'a' + 10;
+            }
             else
+            {
                 return false;
+            }
             v = (v << 4) | d;
         }
         out = v;
@@ -104,16 +115,26 @@ namespace
     {
         switch (idx)
         {
-            case '0': return 10000;
-            case '1': return 20000;
-            case '2': return 50000;
-            case '3': return 100000;
-            case '4': return 125000;
-            case '5': return 250000;
-            case '6': return 500000;
-            case '7': return 800000;
-            case '8': return 1000000;
-            default:  return 0;
+            case '0':
+                return 10000;
+            case '1':
+                return 20000;
+            case '2':
+                return 50000;
+            case '3':
+                return 100000;
+            case '4':
+                return 125000;
+            case '5':
+                return 250000;
+            case '6':
+                return 500000;
+            case '7':
+                return 800000;
+            case '8':
+                return 1000000;
+            default:
+                return 0;
         }
     }
 
@@ -138,16 +159,18 @@ namespace
     /* Emits one received frame as an SLCAN line into the USB serial stream. */
     void emit_frame(const CAN_message_t &msg)
     {
-        char    out[32];
-        size_t  n   = 0;
-        bool    ext = msg.flags.extended;
+        char   out[32];
+        size_t n   = 0;
+        bool   ext = msg.flags.extended;
 
         out[n++] = ext ? 'T' : 't';
 
         if (ext)
         {
             for (int shift = 28; shift >= 0; shift -= 4)
+            {
                 out[n++] = hex_digit((msg.id >> shift) & 0x0F);
+            }
         }
         else
         {
@@ -182,8 +205,8 @@ namespace
      * listen-only so python-can's periodic keep-alives can't fault the bus. */
     void handle_transmit(const char *cmd, size_t len, bool ext)
     {
-        uint8_t  id_chars = ext ? 8 : 3;
-        size_t   min_len  = 1u + id_chars + 1u; /* kind + id + dlc */
+        uint8_t id_chars = ext ? 8 : 3;
+        size_t  min_len  = 1u + id_chars + 1u; /* kind + id + dlc */
         if (len < min_len)
         {
             reply_err();
@@ -211,10 +234,10 @@ namespace
         }
 
         CAN_message_t msg;
-        msg.id            = id;
-        msg.len           = static_cast<uint8_t>(dlc);
+        msg.id             = id;
+        msg.len            = static_cast<uint8_t>(dlc);
         msg.flags.extended = ext;
-        const char *data  = cmd + 1 + id_chars + 1;
+        const char *data   = cmd + 1 + id_chars + 1;
         for (uint32_t i = 0; i < dlc; i++)
         {
             uint32_t byte;
@@ -227,7 +250,9 @@ namespace
         }
 
         if (g_open && !g_listen_only)
+        {
             g_can.write(msg);
+        }
 
         reply_ok();
     }
@@ -261,7 +286,9 @@ namespace
             }
             case 'O': /* open, normal mode */
                 if (g_open)
+                {
                     reply_err();
+                }
                 else
                 {
                     open_channel(false);
@@ -270,7 +297,9 @@ namespace
                 return;
             case 'L': /* open, listen-only */
                 if (g_open)
+                {
                     reply_err();
+                }
                 else
                 {
                     open_channel(true);
@@ -279,7 +308,9 @@ namespace
                 return;
             case 'C': /* close */
                 if (!g_open)
+                {
                     reply_err();
+                }
                 else
                 {
                     close_channel();
@@ -294,7 +325,9 @@ namespace
                 return;
             case 'Z': /* timestamp on/off */
                 if (len < 2)
+                {
                     reply_err();
+                }
                 else
                 {
                     g_timestamps = (cmd[1] == '1');
@@ -349,13 +382,17 @@ namespace
     void poll_can()
     {
         if (!g_open)
+        {
             return;
+        }
 
         CAN_message_t msg;
         /* Drain everything queued this iteration so a burst doesn't back up
          * into an RX overrun. */
         while (g_can.read(msg))
+        {
             emit_frame(msg);
+        }
     }
 } // namespace
 

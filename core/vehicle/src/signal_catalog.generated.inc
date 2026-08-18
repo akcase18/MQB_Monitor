@@ -1,10 +1,11 @@
 /**
  * @file signal_catalog.generated.inc
  * @brief GENERATED FILE -- do not hand-edit. Produced by tools/gen_catalog.py
- * from core/vehicle/data/signals.json, the canonical signal catalog. Edit
- * that file and re-run the script, then commit both. Included by
- * signal_catalog.cpp inside `namespace core`, after the transform_* function
- * definitions it references by name.
+ * from core/vehicle/data/signals.json, filtered to that registry's "active"
+ * entries only (WIP entries are excluded). Edit signals.json -- by hand, or
+ * via the monitor tool's Registry/Learn tabs -- and re-run the script, then
+ * commit both. Included by signal_catalog.cpp inside `namespace core`, after
+ * the transform_* function definitions it references by name.
  */
 
 const SignalSpec SIGNAL_CATALOG[] = {
@@ -69,13 +70,13 @@ const SignalSpec SIGNAL_CATALOG[] = {
       0.8f,
       1.1f },
     /* Int Pres Act. */
-    { 6,
+    { 22,
       "Int Pres Act.",
       UnitType::Pressure,
       20,
       { { 0x13, 0xCA, 0.0f, 0.0001f }, { 0x3E, 0x70, 0.0f, 0.001f } },
       2,
-      transform_actual_intake_pressure,
+      transform_difference,
       -1.0f,
       2.0f },
     /* Engine Speed */
