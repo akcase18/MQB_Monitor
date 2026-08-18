@@ -4,9 +4,11 @@ Reworked from the old README's list against what's actually implemented as of th
 
 ## Hardware
 
-- [ ] Populate BOOT and RESET buttons on the PCB (provisions exist on the board, buttons just need to be ordered/installed).
 - [ ] Physical redesign — smaller and more heat-resistant board/enclosure for permanent in-car mounting.
+  - In Progress
+- [X] Populate BOOT and RESET buttons on the PCB (provisions exist on the board, buttons just need to be ordered/installed).
 - [X] Touch screen support — SPI SDI/SCL lines were swapped on PCB v2; fixed on the schematic/PCB and confirmed working in the car.
+- [X] Capacitive touch controller (FT6236, I2C) — replaces the resistive XPT2046 on the new PCB (panel now mounts directly to the board instead of via the old breakout board). Both drivers kept and switchable in code — [platform/teensy](platform/teensy/README.md).
 
 ## Software
 
@@ -20,8 +22,8 @@ Reworked from the old README's list against what's actually implemented as of th
 - [ ] Vertical layout orientation has no UI to select it yet — `core::LayoutOrientation::Vertical` and `gui::compute_layout()`'s transpose path both exist and are exercised by tests, but nothing in Settings lets a user actually switch to it.
 - [ ] Additional signal sources: transmission data (temp, clamping pressure, etc.), Haldex data, and similar beyond the current 22-signal engine/OBD2 catalog.
 - [ ] Permanent power and sleep mode — currently powered from ignition (off whenever the car is off); running off permanent power would need a low-power sleep mode instead.
-- [ ] Micro-SD card support.
-- [ ] Data logging (record signal history to Micro-SD).
+- [X] Storage abstraction (platform-layer HAL only — mount + file I/O, not the logging format/rotation) — `platform::IStorage`. Onboard QSPI flash is the active backend; Micro-SD is kept as a switchable alternate implementation for whenever a card slot is back in the design — [platform/teensy](platform/teensy/README.md).
+- [ ] Data logging (record signal history via `platform::IStorage`) — the HAL primitive above is done; the on-disk format, rotation policy, and any GUI are not.
 - [X] Wireless connectivity to a phone app for customization/setup — also the intended home for real per-vehicle range/threshold tuning (today's `SignalSpec::display_min/max` are sensible engineering defaults, not tuned per car). The SoftAP + QR-code hookup and the phone-facing config form ([gui/screens/inc/wireless_setup_screen.hpp](gui/screens/inc/wireless_setup_screen.hpp), [platform/esp32](platform/esp32/README.md)) both work end to end — the form covers everything the touchscreen does (brightness, panel/signal/units/display-mode assignment, warning thresholds) plus per-signal custom display-range, which has no touchscreen UI at all.
 - [ ] ISO-TP support for CAN (multi-frame UDS responses) — current `core::can::UdsClient` only decodes single-frame responses.
 - [ ] Firmware update strategy (OTA or otherwise).
@@ -31,4 +33,5 @@ Reworked from the old README's list against what's actually implemented as of th
 ## Manual validation still needed
 
 - [X] On-hardware check of `gui/screens/inc/layout.hpp`'s `HERO_COLSPAN`/`STACK_COLSPAN` split (the 3-panel layout's hero-vs-stack width ratio) — currently a starting guess, not yet confirmed to read well at arm's length in the car.
-- [ ] Real-vehicle validation of `SignalSpec::display_min/max` range defaults used to scale Bar/Gauge fills.
+- [X] Real-vehicle validation of `SignalSpec::display_min/max` range defaults used to scale Bar/Gauge fills.
+- [ ] FT6236 reset timing and touch coordinate orientation vs. the display's rotation — current values (`platform/teensy/src/teensy_cap_touch.cpp`) are conservative/unverified guesses pending the new PCB being in hand.

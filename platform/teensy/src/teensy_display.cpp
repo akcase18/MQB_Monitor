@@ -48,7 +48,7 @@ void TeensyDisplay::begin()
 
     s_lcd.begin(12);
     s_lcd.setBitDepth(16);
-    s_lcd.setRotation(1);
+    s_lcd.setRotation(3);
 }
 
 void TeensyDisplay::get_resolution(uint16_t &width, uint16_t &height) const

@@ -3,10 +3,12 @@
 MQB Monitor is split into four layers with a strict, one-way dependency rule:
 
 ```
-platform/  →  core/         →  gui/bindings  →  gui/screens, gui/widgets
-           →  remote/server ↗                ↑
-                                           gui/theme
+gui/bindings  →  core/, remote/server, gui/screens, gui/widgets
+core/, remote/server  →  platform/           (remote/server also → core/config)
+gui/screens, gui/widgets  →  gui/theme
 ```
+
+(read `A → B` as "A depends on / includes B")
 
 - **`platform/`** knows nothing above it. It's the only place that touches Arduino, FlexCAN_T4, SDL2, EEPROM.h, or a raw serial port directly.
 - **`core/`** only includes `platform/platform.hpp` (the interfaces, never a concrete `teensy_*`/`simulator_*` class) plus the standard library. It has zero LVGL, zero Arduino, zero SDL — it builds and unit-tests on a plain host compiler.
@@ -21,8 +23,8 @@ This means a given `.cpp` file's `#include`s tell you which layer it belongs to,
 
 | Folder | What it is | README |
 |---|---|---|
-| `platform/` | Hardware abstraction interfaces (`ICanBus`, `IDisplay`, `ITouch`, `IConfigStore`, `IClock`) and one implementation per board. | [platform/README.md](platform/README.md) |
-| `platform/teensy/` | Real hardware: FlexCAN_T4, ILI948x_t4_mm, SPI touch, EEPROM. | [platform/teensy/README.md](platform/teensy/README.md) |
+| `platform/` | Hardware abstraction interfaces (`ICanBus`, `IDisplay`, `ITouch`, `IConfigStore`, `ISerialLink`, `IStorage`, `IClock`) and one implementation per board. | [platform/README.md](platform/README.md) |
+| `platform/teensy/` | Real hardware: FlexCAN_T4, ILI948x_t4_mm, EEPROM, a spare hardware `Serial`, and (switchable) I2C capacitive/SPI resistive touch and onboard-flash/Micro-SD storage. | [platform/teensy/README.md](platform/teensy/README.md) |
 | `platform/simulator/` | Desktop stand-in: raw SDL2 window/mouse, a file-backed config store, and a synthetic CAN bus that echoes fabricated responses. | [platform/simulator/README.md](platform/simulator/README.md) |
 | `core/` | Platform-agnostic vehicle domain logic — scheduling, UDS protocol, the signal catalog/store, and the config schema. Zero LVGL/Arduino/SDL. | [core/README.md](core/README.md) |
 | `core/time/` | `Scheduler` — fixed-capacity periodic task runner, the CAN polling heartbeat. | [core/time/README.md](core/time/README.md) |
