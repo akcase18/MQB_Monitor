@@ -548,7 +548,7 @@ void setup()
     platform.touch.begin();
     platform.can.begin(CAN_TX_ID, CAN_RX_ID, CAN_BAUD);
     platform.serial.begin(REMOTE_SERIAL_BAUD);
-    platform.sd_card.begin();
+    platform.storage.begin();
 
     lv_init();
     lv_tick_set_cb(tick_cb);

@@ -1,10 +1,9 @@
 /**
  * @file teensy_sd_card.cpp
- * @brief ISdCard over SdFat, on the SPI1 bus shared with the touch
+ * @brief IStorage over SdFat, on the SPI1 bus shared with the touch
  * controller (teensy_touch.cpp). Raw card detection (cardBegin()) and
  * filesystem mounting (volumeBegin()) are kept as separate steps so a
- * blank/corrupted card can be told apart from no card at all -- see
- * platform.hpp's ISdCard doc comment.
+ * blank/corrupted card can be told apart from no card at all.
  */
 
 #include "teensy_sd_card.hpp"
@@ -72,7 +71,7 @@ bool TeensySdCard::format()
     return mounted_;
 }
 
-bool TeensySdCard::open(const char *path, SdFileMode mode)
+bool TeensySdCard::open(const char *path, StorageFileMode mode)
 {
     if (file_.isOpen() || !mounted_)
     {
@@ -82,15 +81,15 @@ bool TeensySdCard::open(const char *path, SdFileMode mode)
     oflag_t oflag = O_RDONLY;
     switch (mode)
     {
-        case SdFileMode::Read:
+        case StorageFileMode::Read:
             oflag = O_RDONLY;
             break;
 
-        case SdFileMode::Write:
+        case StorageFileMode::Write:
             oflag = O_WRONLY | O_CREAT | O_TRUNC;
             break;
 
-        case SdFileMode::Append:
+        case StorageFileMode::Append:
             oflag = O_WRONLY | O_CREAT | O_APPEND;
             break;
     }
@@ -116,7 +115,7 @@ void TeensySdCard::close()
 
 size_t TeensySdCard::read(void *buf, size_t len)
 {
-    if (!file_.isOpen() || file_mode_ != SdFileMode::Read)
+    if (!file_.isOpen() || file_mode_ != StorageFileMode::Read)
     {
         return 0;
     }
@@ -132,7 +131,7 @@ size_t TeensySdCard::read(void *buf, size_t len)
 
 size_t TeensySdCard::write(const void *buf, size_t len)
 {
-    if (!file_.isOpen() || file_mode_ == SdFileMode::Read)
+    if (!file_.isOpen() || file_mode_ == StorageFileMode::Read)
     {
         return 0;
     }

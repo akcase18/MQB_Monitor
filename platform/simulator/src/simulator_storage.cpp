@@ -1,56 +1,55 @@
 /**
- * @file simulator_sd_card.cpp
- * @brief ISdCard backed by a host directory, standing in for a Micro-SD
- * card. Always present once the directory exists -- the simulator has no
- * removable-media concept to fake, so unlike the real card's
- * present-but-unmounted state (see platform.hpp's ISdCard doc comment),
+ * @file simulator_storage.cpp
+ * @brief IStorage backed by a host directory, standing in for whichever
+ * real backend is active. Always present once the directory exists -- the
+ * simulator has no removable-media or blank-chip concept to fake, so
  * there's nothing here for is_present() to retry.
  */
 
-#include "simulator_sd_card.hpp"
+#include "simulator_storage.hpp"
 
 #include <dirent.h>
 #include <sys/stat.h>
 
 namespace
 {
-    constexpr const char *SD_CARD_DIR = "sim_sdcard";
+    constexpr const char *STORAGE_DIR = "sim_storage";
 } // namespace
 
-SimulatorSdCard &SimulatorSdCard::instance()
+SimulatorStorage &SimulatorStorage::instance()
 {
-    static SimulatorSdCard s_instance;
+    static SimulatorStorage s_instance;
     return s_instance;
 }
 
-std::string SimulatorSdCard::full_path(const char *path) const
+std::string SimulatorStorage::full_path(const char *path) const
 {
-    std::string result = SD_CARD_DIR;
+    std::string result = STORAGE_DIR;
     result += "/";
     result += path;
     return result;
 }
 
-bool SimulatorSdCard::begin()
+bool SimulatorStorage::begin()
 {
-    mkdir(SD_CARD_DIR, 0755);
+    mkdir(STORAGE_DIR, 0755);
     present_ = true;
     return present_;
 }
 
-bool SimulatorSdCard::is_present()
+bool SimulatorStorage::is_present()
 {
     return present_;
 }
 
-bool SimulatorSdCard::format()
+bool SimulatorStorage::format()
 {
     if (file_ || !present_)
     {
         return false;
     }
 
-    DIR *dir = opendir(SD_CARD_DIR);
+    DIR *dir = opendir(STORAGE_DIR);
     if (!dir)
     {
         return false;
@@ -70,7 +69,7 @@ bool SimulatorSdCard::format()
     return true;
 }
 
-bool SimulatorSdCard::open(const char *path, SdFileMode mode)
+bool SimulatorStorage::open(const char *path, StorageFileMode mode)
 {
     if (file_ || !present_)
     {
@@ -80,15 +79,15 @@ bool SimulatorSdCard::open(const char *path, SdFileMode mode)
     const char *fmode = "rb";
     switch (mode)
     {
-        case SdFileMode::Read:
+        case StorageFileMode::Read:
             fmode = "rb";
             break;
 
-        case SdFileMode::Write:
+        case StorageFileMode::Write:
             fmode = "wb";
             break;
 
-        case SdFileMode::Append:
+        case StorageFileMode::Append:
             fmode = "ab";
             break;
     }
@@ -103,12 +102,12 @@ bool SimulatorSdCard::open(const char *path, SdFileMode mode)
     return true;
 }
 
-bool SimulatorSdCard::is_open() const
+bool SimulatorStorage::is_open() const
 {
     return file_ != nullptr;
 }
 
-void SimulatorSdCard::close()
+void SimulatorStorage::close()
 {
     if (file_)
     {
@@ -117,31 +116,31 @@ void SimulatorSdCard::close()
     }
 }
 
-size_t SimulatorSdCard::read(void *buf, size_t len)
+size_t SimulatorStorage::read(void *buf, size_t len)
 {
-    if (!file_ || file_mode_ != SdFileMode::Read)
+    if (!file_ || file_mode_ != StorageFileMode::Read)
     {
         return 0;
     }
     return fread(buf, 1, len, file_);
 }
 
-size_t SimulatorSdCard::write(const void *buf, size_t len)
+size_t SimulatorStorage::write(const void *buf, size_t len)
 {
-    if (!file_ || file_mode_ == SdFileMode::Read)
+    if (!file_ || file_mode_ == StorageFileMode::Read)
     {
         return 0;
     }
     return fwrite(buf, 1, len, file_);
 }
 
-bool SimulatorSdCard::exists(const char *path) const
+bool SimulatorStorage::exists(const char *path) const
 {
     struct stat st;
     return stat(full_path(path).c_str(), &st) == 0;
 }
 
-bool SimulatorSdCard::remove(const char *path)
+bool SimulatorStorage::remove(const char *path)
 {
     return ::remove(full_path(path).c_str()) == 0;
 }

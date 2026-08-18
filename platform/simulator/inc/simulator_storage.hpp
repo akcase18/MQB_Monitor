@@ -1,7 +1,8 @@
 /**
- * @file simulator_sd_card.hpp
- * @brief Simulator ISdCard implementation, backed by a host directory
- * standing in for the card.
+ * @file simulator_storage.hpp
+ * @brief Simulator IStorage implementation, backed by a host directory
+ * standing in for whichever real backend (Micro-SD, onboard flash) is
+ * active on the Teensy build.
  */
 #pragma once
 
@@ -10,15 +11,15 @@
 #include <stdio.h>
 #include <string>
 
-class SimulatorSdCard : public ISdCard
+class SimulatorStorage : public IStorage
 {
     public:
-        static SimulatorSdCard &instance();
+        static SimulatorStorage &instance();
 
         bool   begin() override;
         bool   is_present() override;
         bool   format() override;
-        bool   open(const char *path, SdFileMode mode) override;
+        bool   open(const char *path, StorageFileMode mode) override;
         bool   is_open() const override;
         void   close() override;
         size_t read(void *buf, size_t len) override;
@@ -27,11 +28,11 @@ class SimulatorSdCard : public ISdCard
         bool   remove(const char *path) override;
 
     private:
-        SimulatorSdCard() = default;
+        SimulatorStorage() = default;
 
         std::string full_path(const char *path) const;
 
-        FILE      *file_      = nullptr;
-        bool       present_   = false;
-        SdFileMode file_mode_ = SdFileMode::Read;
+        FILE           *file_      = nullptr;
+        bool            present_   = false;
+        StorageFileMode file_mode_ = StorageFileMode::Read;
 };
