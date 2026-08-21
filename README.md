@@ -13,7 +13,7 @@ Built on a Teensy MicroMod, [LVGL](https://lvgl.io/) for the UI, and a from-scra
   - **Gauge** — number plus a radial arc.
   
   A graphic is never shown without its number — Bar/Gauge add a fast-glance visual, they don't replace the reading.
-- **1–6 panel layouts** — each panel count (1, 2, 3, 4, 5, 6) gets its own screen shape rather than a generic grid, tuned for readability at arm's length in a car. Horizontal orientation is fully shaped per-count; vertical currently falls back to a generic transpose.
+- **1–6 panel layouts** — each panel count (1, 2, 3, 4, 5, 6) gets its own screen shape rather than a generic grid, tuned for readability at arm's length in a car. Both Horizontal and Vertical (portrait) orientations are fully shaped per-count — every screen, not just the panel grid, has its own portrait layout. Switching orientation (Settings) rotates the physical display/touch on the next restart, not live.
 - **Per-signal warning thresholds** — set independent low/high warning bounds per signal; a panel showing a signal outside its bounds highlights immediately.
 - **Day/Night brightness** — a single toggle switches between two independently-set backlight levels (defaults: 100% day / 20% night) and applies instantly, so it's usable mid-drive. There's no automatic (clock- or sensor-based) switching yet — see [TODO.md](TODO.md).
 - **Theming** — accent color is user-selectable from a preset swatch grid and persists across restarts; the whole app can be reskinned by editing one file ([gui/theme](gui/theme/README.md)), which the codebase proves out with two distinct built-in themes.

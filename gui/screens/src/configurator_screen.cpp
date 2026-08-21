@@ -25,6 +25,26 @@ namespace gui
         constexpr lv_coord_t DIVIDER3_Y       = 230;
         constexpr lv_coord_t WARN_ROW_Y       = 244;
 
+        /* Portrait (320 wide) doesn't have the width for units_matrix_
+         * (240px) or mode_matrix_ (360px, wider than the whole row) to sit
+         * beside their row's label the way Landscape does -- mode_matrix_
+         * would overflow off the left edge entirely. Portrait has plenty
+         * of *height* to spare (480 vs 320) instead, so those two rows
+         * stack their label above a full-row-width matrix rather than
+         * shrinking the matrix to fit -- and since that height is going
+         * spare anyway, the matrix itself gets taller too
+         * (PORTRAIT_MATRIX_HEIGHT, vs Landscape's ROW_HEIGHT+8), rather
+         * than reusing Landscape's compact button height and just leaving
+         * the extra room empty below Warning Thresholds. */
+        constexpr lv_coord_t PORTRAIT_UNITS_LABEL_Y  = 124;
+        constexpr lv_coord_t PORTRAIT_UNITS_MATRIX_Y = 154;
+        constexpr lv_coord_t PORTRAIT_MATRIX_HEIGHT   = 48;
+        constexpr lv_coord_t PORTRAIT_DIVIDER2_Y      = 232;
+        constexpr lv_coord_t PORTRAIT_DISPLAY_LABEL_Y  = 246;
+        constexpr lv_coord_t PORTRAIT_DISPLAY_MATRIX_Y = 276;
+        constexpr lv_coord_t PORTRAIT_DIVIDER3_Y       = 354;
+        constexpr lv_coord_t PORTRAIT_WARN_ROW_Y       = 368;
+
         /* Restyles a checkable lv_buttonmatrix away from LVGL's default
          * light-mode card+shadow look to match the flat, bordered,
          * accent-on-checked treatment used everywhere else in this app. */
@@ -140,46 +160,74 @@ namespace gui
 
         create_divider(screen_, theme, DIVIDER1_Y);
 
-        /* Units section — a single row, label left / segmented control
-         * right, rather than a second stacked sub-row: Imperial vs Metric
-         * doesn't need the extra room a +/- control would. Label and
-         * matrix are both LEFT_MID/RIGHT_MID children of one row
+        bool portrait = theme.metrics.screen_height > theme.metrics.screen_width;
+        lv_coord_t row_width = theme.metrics.screen_width - 40;
+
+        /* Units section — Landscape: a single row, label left / segmented
+         * control right, rather than a second stacked sub-row (Imperial
+         * vs Metric doesn't need the extra room a +/- control would).
+         * Portrait: label above a full-row-width matrix instead (see
+         * PORTRAIT_UNITS_LABEL_Y's comment above) — units_matrix_'s fixed
+         * 240px width doesn't leave enough of a 280px-ish portrait row for
+         * the label beside it. Label and matrix are both LEFT_MID/
+         * RIGHT_MID (or TOP_LEFT/below, in Portrait) children of one row
          * container so they vertically center against each other
          * regardless of font size or matrix height — a fixed TOP_LEFT
          * label offset tuned for one font looked visibly off-center
          * against the (taller) matrix once the label's font changed. */
         lv_obj_t *units_row = lv_obj_create(screen_);
         lv_obj_remove_style_all(units_row);
-        lv_obj_set_size(
-            units_row, theme.metrics.screen_width - 40, ROW_HEIGHT + 8);
-        lv_obj_align(units_row, LV_ALIGN_TOP_MID, 0, UNITS_ROW_Y - 6);
+        lv_obj_set_size(units_row,
+                        row_width,
+                        portrait ? (PORTRAIT_DIVIDER2_Y - PORTRAIT_UNITS_LABEL_Y)
+                                 : ROW_HEIGHT + 8);
+        lv_obj_align(units_row,
+                     LV_ALIGN_TOP_MID,
+                     0,
+                     portrait ? PORTRAIT_UNITS_LABEL_Y : UNITS_ROW_Y - 6);
 
         lv_obj_t *units_label = lv_label_create(units_row);
         lv_label_set_text(units_label, "Units");
         lv_obj_set_style_text_color(units_label, theme.palette.fg, 0);
         lv_obj_set_style_text_font(units_label, theme.typography.label_lg, 0);
-        lv_obj_align(units_label, LV_ALIGN_LEFT_MID, 0, 0);
+        lv_obj_align(units_label,
+                     portrait ? LV_ALIGN_TOP_LEFT : LV_ALIGN_LEFT_MID,
+                     0,
+                     0);
 
         static const char *const units_map[] = { "Imperial", "Metric", "" };
         units_matrix_ = lv_buttonmatrix_create(units_row);
         lv_obj_set_style_text_font(units_matrix_, theme.typography.label_lg, 0);
-        lv_obj_set_size(units_matrix_, 240, ROW_HEIGHT + 8);
-        lv_obj_align(units_matrix_, LV_ALIGN_RIGHT_MID, 0, 0);
+        lv_obj_set_size(units_matrix_,
+                        portrait ? row_width : 240,
+                        portrait ? PORTRAIT_MATRIX_HEIGHT : ROW_HEIGHT + 8);
+        lv_obj_align(units_matrix_,
+                     portrait ? LV_ALIGN_TOP_LEFT : LV_ALIGN_RIGHT_MID,
+                     0,
+                     portrait ? PORTRAIT_UNITS_MATRIX_Y - PORTRAIT_UNITS_LABEL_Y
+                              : 0);
         lv_buttonmatrix_set_map(units_matrix_, units_map);
         lv_buttonmatrix_set_one_checked(units_matrix_, true);
         lv_buttonmatrix_set_button_ctrl_all(units_matrix_,
                                             LV_BUTTONMATRIX_CTRL_CHECKABLE);
         style_flat_matrix(units_matrix_, theme);
 
-        create_divider(screen_, theme, DIVIDER2_Y);
+        create_divider(
+            screen_, theme, portrait ? PORTRAIT_DIVIDER2_Y : DIVIDER2_Y);
 
-        /* Display section — same single-row shape as Units, just with a
-         * 3rd segment. */
+        /* Display section — same shape as Units above (single row in
+         * Landscape, stacked in Portrait), just with a 3rd segment. */
         lv_obj_t *display_row = lv_obj_create(screen_);
         lv_obj_remove_style_all(display_row);
         lv_obj_set_size(
-            display_row, theme.metrics.screen_width - 40, ROW_HEIGHT + 8);
-        lv_obj_align(display_row, LV_ALIGN_TOP_MID, 0, DISPLAY_ROW_Y - 6);
+            display_row,
+            row_width,
+            portrait ? (PORTRAIT_DIVIDER3_Y - PORTRAIT_DISPLAY_LABEL_Y)
+                     : ROW_HEIGHT + 8);
+        lv_obj_align(display_row,
+                     LV_ALIGN_TOP_MID,
+                     0,
+                     portrait ? PORTRAIT_DISPLAY_LABEL_Y : DISPLAY_ROW_Y - 6);
 
         lv_obj_t *display_label = lv_label_create(display_row);
         /* "Mode", not "Display" — the shorter label leaves the 3-segment
@@ -189,28 +237,40 @@ namespace gui
         lv_label_set_text(display_label, "Mode");
         lv_obj_set_style_text_color(display_label, theme.palette.fg, 0);
         lv_obj_set_style_text_font(display_label, theme.typography.label_lg, 0);
-        lv_obj_align(display_label, LV_ALIGN_LEFT_MID, 0, 0);
+        lv_obj_align(display_label,
+                     portrait ? LV_ALIGN_TOP_LEFT : LV_ALIGN_LEFT_MID,
+                     0,
+                     0);
 
         static const char *const mode_map[] = { "Digital", "Bar", "Gauge", "" };
         mode_matrix_ = lv_buttonmatrix_create(display_row);
         lv_obj_set_style_text_font(mode_matrix_, theme.typography.label_lg, 0);
-        lv_obj_set_size(mode_matrix_, 360, ROW_HEIGHT + 8);
-        lv_obj_align(mode_matrix_, LV_ALIGN_RIGHT_MID, 0, 0);
+        lv_obj_set_size(mode_matrix_,
+                        portrait ? row_width : 360,
+                        portrait ? PORTRAIT_MATRIX_HEIGHT : ROW_HEIGHT + 8);
+        lv_obj_align(
+            mode_matrix_,
+            portrait ? LV_ALIGN_TOP_LEFT : LV_ALIGN_RIGHT_MID,
+            0,
+            portrait ? PORTRAIT_DISPLAY_MATRIX_Y - PORTRAIT_DISPLAY_LABEL_Y : 0);
         lv_buttonmatrix_set_map(mode_matrix_, mode_map);
         lv_buttonmatrix_set_one_checked(mode_matrix_, true);
         lv_buttonmatrix_set_button_ctrl_all(mode_matrix_,
                                             LV_BUTTONMATRIX_CTRL_CHECKABLE);
         style_flat_matrix(mode_matrix_, theme);
 
-        create_divider(screen_, theme, DIVIDER3_Y);
+        create_divider(
+            screen_, theme, portrait ? PORTRAIT_DIVIDER3_Y : DIVIDER3_Y);
 
         /* Warning Thresholds row: the whole row is the tap target (not
          * just a small corner icon), label left / chevron right — a
          * settings-list-style row instead of a floating gear button. */
         lv_obj_t *warn_row_btn = lv_btn_create(screen_);
-        lv_obj_set_size(
-            warn_row_btn, theme.metrics.screen_width - 40, ROW_HEIGHT);
-        lv_obj_align(warn_row_btn, LV_ALIGN_TOP_MID, 0, WARN_ROW_Y);
+        lv_obj_set_size(warn_row_btn, row_width, ROW_HEIGHT);
+        lv_obj_align(warn_row_btn,
+                     LV_ALIGN_TOP_MID,
+                     0,
+                     portrait ? PORTRAIT_WARN_ROW_Y : WARN_ROW_Y);
         lv_obj_set_style_bg_opa(warn_row_btn, LV_OPA_TRANSP, 0);
         lv_obj_set_style_border_width(warn_row_btn, 0, 0);
         lv_obj_set_style_shadow_width(warn_row_btn, 0, 0);

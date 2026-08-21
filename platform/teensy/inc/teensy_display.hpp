@@ -12,6 +12,7 @@ class TeensyDisplay : public IDisplay
         static TeensyDisplay &instance();
 
         void begin() override;
+        void set_orientation(DisplayOrientation orientation) override;
         void get_resolution(uint16_t &width, uint16_t &height) const override;
         void flush(int32_t         x1,
                    int32_t         y1,
@@ -23,4 +24,7 @@ class TeensyDisplay : public IDisplay
 
     private:
         TeensyDisplay() = default;
+
+        uint16_t width_  = 480;
+        uint16_t height_ = 320;
 };

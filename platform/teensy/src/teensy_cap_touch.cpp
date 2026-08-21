@@ -23,12 +23,25 @@ namespace
                                                       * 5ms low, not the
                                                       * post-release
                                                       * settle time */
+
+    /* Must track teensy_display.cpp's LCD_HORZ/LCD_VERT -- duplicated
+     * here rather than shared since ITouch::set_orientation() only passes
+     * the orientation enum, not a resolution, same as the dormant
+     * resistive driver (teensy_touch.hpp) already does. */
+    constexpr uint16_t LCD_HORZ = 480;
+    constexpr uint16_t LCD_VERT = 320;
 } // namespace
 
 TeensyCapTouch &TeensyCapTouch::instance()
 {
     static TeensyCapTouch s_instance;
     return s_instance;
+}
+
+void TeensyCapTouch::set_orientation(DisplayOrientation orientation)
+{
+    orientation_ = orientation;
+    height_ = orientation == DisplayOrientation::Portrait ? LCD_HORZ : LCD_VERT;
 }
 
 void TeensyCapTouch::begin()
@@ -72,11 +85,22 @@ bool TeensyCapTouch::read(TouchPoint &out)
      * exact point). */
     out.pressed = pressed;
     out.x       = x_val_;
-    out.y       = y_val_;
 
-    /* No rotation transform applied -- raw X/Y as the chip reports them.
-     * Still unverified against the display's actual orientation
-     * (setRotation(3), see teensy_display.cpp) on real hardware -- see
-     * the storage/touch abstraction plan for why. */
+    /* Not yet verified on real hardware -- this driver is currently
+     * dormant (TEENSY_TOUCH_USE_RESISTIVE=1 in teensy_platform.cpp), so
+     * this is inferred by analogy with teensy_touch.cpp's resistive
+     * driver, which had the exact same symptom confirmed on real
+     * hardware (bottom-right registers as top-right, top-left as
+     * bottom-left, etc. -- raw X already correct, raw Y mirrored) once
+     * the display's own Portrait rotation was corrected. Needs its own
+     * hardware confirmation once this driver is switched active --
+     * see TODO.md. Landscape is untouched here (zero-transform) and is
+     * equally unverified on this driver -- the resistive driver's own
+     * Landscape mapping is confirmed good, but that doesn't carry over
+     * to this dormant driver. */
+    out.y = orientation_ == DisplayOrientation::Portrait
+                ? (height_ - 1) - y_val_
+                : y_val_;
+
     return pressed;
 }

@@ -64,6 +64,12 @@ class ICanBus
  * DISPLAY
  =============================================================================*/
 
+enum class DisplayOrientation
+{
+    Landscape,
+    Portrait
+};
+
 class IDisplay
 {
     public:
@@ -75,7 +81,15 @@ class IDisplay
         virtual void begin() = 0;
 
         /**
-         * Reports the panel's native resolution.
+         * Rotates the panel to match the given orientation. Changes what
+         * get_resolution() reports (width/height swap). Called once at
+         * boot, right after begin() -- orientation changes take effect
+         * on next boot, not live.
+         */
+        virtual void set_orientation(DisplayOrientation orientation) = 0;
+
+        /**
+         * Reports the panel's current resolution (post-rotation).
          */
         virtual void get_resolution(uint16_t &width, uint16_t &height) const
             = 0;
@@ -129,6 +143,14 @@ class ITouch
         virtual ~ITouch() = default;
 
         virtual void begin() = 0;
+
+        /**
+         * Tells the touch driver which way the panel is currently
+         * rotated, so raw controller coordinates can be remapped to
+         * match. Called once at boot, right after begin() -- orientation
+         * changes take effect on next boot, not live.
+         */
+        virtual void set_orientation(DisplayOrientation orientation) = 0;
 
         /**
          * Polls touch controller. Fills `out` if data is available.

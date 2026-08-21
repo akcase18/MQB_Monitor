@@ -1,12 +1,25 @@
 /**
  * @file teensy_storage.cpp
- * @brief IStorage over LittleFS on the Teensy's onboard QSPI NOR flash.
- * Unlike a removable card, a blank/corrupted chip self-heals: LittleFS's
- * own begin() falls back to formatting when mounting fails, so there's no
- * separate present-but-unmounted recovery path to design around here.
+ * @brief IStorage over LittleFS_Program, a region carved out of the
+ * Teensy's own internal program flash (see teensy_storage.hpp's doc
+ * comment for why this replaced LittleFS_QSPIFlash). Unlike a removable
+ * card, a blank/corrupted region self-heals: LittleFS's own begin() falls
+ * back to formatting when mounting fails, so there's no separate
+ * present-but-unmounted recovery path to design around here.
  */
 
 #include "teensy_storage.hpp"
+
+namespace
+{
+    /* This board's flash is ~16MB and current firmware uses well under
+     * 1MB, so 2MB leaves generous headroom for firmware growth while
+     * still being enough for the signal-logging feature this storage
+     * layer exists for (see TODO.md). Must stay the same across
+     * begin()/is_present() calls -- LittleFS_Program carves this region
+     * out of flash by size, not by a persisted offset. */
+    constexpr uint32_t STORAGE_SIZE_BYTES = 2 * 1024 * 1024;
+} // namespace
 
 TeensyStorage &TeensyStorage::instance()
 {
@@ -16,12 +29,12 @@ TeensyStorage &TeensyStorage::instance()
 
 bool TeensyStorage::begin()
 {
-    return fs_.begin();
+    return fs_.begin(STORAGE_SIZE_BYTES);
 }
 
 bool TeensyStorage::is_present()
 {
-    return fs_.mediaPresent() || fs_.begin();
+    return fs_.mediaPresent() || fs_.begin(STORAGE_SIZE_BYTES);
 }
 
 bool TeensyStorage::format()

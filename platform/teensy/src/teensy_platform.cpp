@@ -22,11 +22,11 @@
 #define TEENSY_STORAGE_USE_SD 0
 
 #if TEENSY_STORAGE_USE_SD
-#include "teensy_sd_card.hpp"
-#define TEENSY_ACTIVE_STORAGE TeensySdCard::instance()
+    #include "teensy_sd_card.hpp"
+    #define TEENSY_ACTIVE_STORAGE TeensySdCard::instance()
 #else
-#include "teensy_storage.hpp"
-#define TEENSY_ACTIVE_STORAGE TeensyStorage::instance()
+    #include "teensy_storage.hpp"
+    #define TEENSY_ACTIVE_STORAGE TeensyStorage::instance()
 #endif
 
 /* Which ITouch backend is active. The new PCB uses a capacitive FT6236
@@ -36,22 +36,22 @@
  * and keeps the pattern consistent with TEENSY_STORAGE_USE_SD). Both
  * teensy_touch.cpp and teensy_cap_touch.cpp still compile unconditionally
  * either way, so the inactive one can't silently bit-rot. */
-#define TEENSY_TOUCH_USE_RESISTIVE 0
+#define TEENSY_TOUCH_USE_RESISTIVE 1
 
 #if TEENSY_TOUCH_USE_RESISTIVE
-#include "teensy_touch.hpp"
-#define TEENSY_ACTIVE_TOUCH TeensyTouch::instance()
+    #include "teensy_touch.hpp"
+    #define TEENSY_ACTIVE_TOUCH TeensyTouch::instance()
 #else
-#include "teensy_cap_touch.hpp"
-#define TEENSY_ACTIVE_TOUCH TeensyCapTouch::instance()
+    #include "teensy_cap_touch.hpp"
+    #define TEENSY_ACTIVE_TOUCH TeensyCapTouch::instance()
 #endif
 
 Platform &platform_get()
 {
     static Platform s_platform {
-        TeensyCanBus::instance(),    TeensyDisplay::instance(),
-        TEENSY_ACTIVE_TOUCH,         TeensyConfigStore::instance(),
-        TeensyClock::instance(),     TeensySerialLink::instance(),
+        TeensyCanBus::instance(), TeensyDisplay::instance(),
+        TEENSY_ACTIVE_TOUCH,      TeensyConfigStore::instance(),
+        TeensyClock::instance(),  TeensySerialLink::instance(),
         TEENSY_ACTIVE_STORAGE,
     };
     return s_platform;

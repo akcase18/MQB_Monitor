@@ -8,12 +8,12 @@ namespace gui
     namespace
     {
         constexpr lv_coord_t HEADER_DIVIDER_Y = 50;
-        constexpr lv_coord_t GRID_START_Y     = 62;
         /* 3x3 for ACCENT_PRESET_COUNT=9 — smaller than the original 4x2's
          * swatches since a 3rd row has to fit in the same screen height. */
         constexpr lv_coord_t SWATCH_SIZE = 76;
         constexpr lv_coord_t GRID_GAP    = 12;
         constexpr uint8_t    GRID_COLS   = 3;
+        constexpr uint8_t    GRID_ROWS   = 3;
         /* Thicker than the unselected outline so the current pick reads
          * clearly at a glance against 8 otherwise-identical swatches. */
         constexpr lv_coord_t SELECTED_BORDER_WIDTH = 4;
@@ -45,6 +45,18 @@ namespace gui
             = GRID_COLS * SWATCH_SIZE + (GRID_COLS - 1) * GRID_GAP;
         lv_coord_t start_x = (theme.metrics.screen_width - grid_width) / 2;
 
+        /* Vertically center the grid within whatever height is actually
+         * available below the header divider, rather than a fixed
+         * GRID_START_Y tuned only for Landscape's 270px — Portrait's 430px
+         * left the grid stranded near the top with a large dead zone
+         * below it. */
+        lv_coord_t grid_height
+            = GRID_ROWS * SWATCH_SIZE + (GRID_ROWS - 1) * GRID_GAP;
+        lv_coord_t available_height
+            = theme.metrics.screen_height - HEADER_DIVIDER_Y;
+        lv_coord_t grid_start_y
+            = HEADER_DIVIDER_Y + (available_height - grid_height) / 2;
+
         for (uint8_t i = 0; i < ACCENT_PRESET_COUNT; i++)
         {
             uint8_t col = i % GRID_COLS;
@@ -55,7 +67,7 @@ namespace gui
             lv_obj_set_size(swatch, SWATCH_SIZE, SWATCH_SIZE);
             lv_obj_set_pos(swatch,
                            start_x + col * (SWATCH_SIZE + GRID_GAP),
-                           GRID_START_Y + row * (SWATCH_SIZE + GRID_GAP));
+                           grid_start_y + row * (SWATCH_SIZE + GRID_GAP));
             lv_obj_set_style_bg_color(
                 swatch, lv_color_hex(ACCENT_PRESETS[i]), 0);
             lv_obj_set_style_bg_opa(swatch, LV_OPA_COVER, 0);

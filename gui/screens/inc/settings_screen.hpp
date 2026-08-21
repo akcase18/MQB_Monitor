@@ -7,24 +7,41 @@
  * close) and PreviewBrightnessCallback (fired immediately on every slider
  * move or Day/Night toggle, so the composition root can push it straight
  * to platform.display.set_backlight() for live feedback without waiting
- * for Done). Orientation isn't exposed here yet — vertical layouts are out
- * of scope for now (see the layout plan).
+ * for Done). Orientation has no live preview target the way brightness
+ * does (InfoScreen, where it actually matters, isn't on screen while
+ * Settings is open) — it's captured locally and only delivered through
+ * DoneCallback, same as num_panels.
  *
  * Layout follows WarningConfigScreen's pattern: a top nav bar (title + X
  * close, instead of the bottom-right checkmark other screens use) over two
  * equal-height sections (Brightness, Panels) separated by full-width
- * dividers, plus two compact tappable rows (matching ConfiguratorScreen's
- * Signal/Warning Thresholds rows) — Theme, which hands off to
- * ThemePickerScreen, and Wireless Setup, which hands off to
- * WirelessSetupScreen — rather than embedding either's controls here. The
- * Brightness section's one slider edits whichever of day/night the toggle
- * currently selects, rather than showing two sliders — day and night are
- * rarely tuned side by side.
+ * dividers, plus a compact tappable-row footer (matching ConfiguratorScreen's
+ * Signal/Warning Thresholds rows) — Theme (half-width, hands off to
+ * ThemePickerScreen) and Orientation (the other half, a tap toggle, not a
+ * navigation row) share one row, then Wireless Setup (full width, hands
+ * off to WirelessSetupScreen) — rather than embedding any of their
+ * controls here. The Brightness section's one slider edits whichever of
+ * day/night the toggle currently selects, rather than showing two sliders
+ * — day and night are rarely tuned side by side. A tap on the Orientation
+ * toggle doesn't flip orientation_ directly — it opens an lv_msgbox asking
+ * the user to confirm, since physically rotating the panel is a boot-
+ * time-only change (see platform.hpp's DisplayOrientation) that won't
+ * visibly do anything until a restart, and a silent flip with no visible
+ * effect would look broken. That popup is what guards against an
+ * accidental tap actually changing anything, so the button itself no
+ * longer needs a long-press to do the same job. Confirm fires
+ * OrientationConfirmCallback immediately — persisted right then, the same
+ * way ThemePickerScreen's own pick is persisted the moment it's chosen
+ * rather than waiting for this screen's own Done — since the popup itself
+ * already reads as the commit step; saving it again only on Done (and
+ * losing it on a power-cycle before Done was ever pressed) would
+ * contradict what the popup just told the user.
  */
 #pragma once
 
 #include <lvgl.h>
 
+#include "layout.hpp"
 #include "theme.hpp"
 
 namespace gui
@@ -46,12 +63,18 @@ namespace gui
             using PickThemeCallback = void (*)(void *ctx);
             /** Fired when the Wireless Setup row is tapped. */
             using PickWirelessCallback = void (*)(void *ctx);
+            /** Fired when Confirm is pressed on the orientation popup —
+             * the caller should persist this immediately, not wait for
+             * Done (see the file doc comment above). */
+            using OrientationConfirmCallback
+                = void (*)(void *ctx, LayoutOrientation orientation);
 
             void init(const Theme              &theme,
                       uint8_t                   initial_day_brightness_pct,
                       uint8_t                   initial_night_brightness_pct,
                       uint8_t                   initial_num_panels,
                       uint32_t                  initial_accent_color,
+                      LayoutOrientation         initial_orientation,
                       DoneCallback              done_cb,
                       void                     *done_ctx,
                       PreviewBrightnessCallback preview_cb,
@@ -59,7 +82,9 @@ namespace gui
                       PickThemeCallback         pick_theme_cb,
                       void                     *pick_theme_ctx,
                       PickWirelessCallback      pick_wireless_cb,
-                      void                     *pick_wireless_ctx);
+                      void                     *pick_wireless_ctx,
+                      OrientationConfirmCallback orientation_confirm_cb,
+                      void                       *orientation_confirm_ctx);
 
             void open();
 
@@ -79,10 +104,16 @@ namespace gui
             static void day_night_clicked_cb(lv_event_t *e);
             static void pick_theme_cb_handler(lv_event_t *e);
             static void pick_wireless_cb_handler(lv_event_t *e);
+            static void orientation_clicked_cb(lv_event_t *e);
+            static void orientation_confirm_cb(lv_event_t *e);
+            static void orientation_cancel_cb(lv_event_t *e);
 
             void refresh_theme_swatch();
             /** Sets the toggle button's glyph to match showing_night_. */
             void refresh_day_night_icon();
+            /** Sets the toggle button's "H"/"V" letter to match
+             * orientation_. */
+            void refresh_orientation_label();
             /** Stores the slider's current value into whichever of day_
              * brightness_pct_/night_brightness_pct_ the toggle currently
              * selects — called before every read of those two members, so
@@ -90,18 +121,34 @@ namespace gui
              * lost. */
             void capture_slider_value();
 
+            /* Stashed only so orientation_clicked_cb() (fired well
+             * after init()) can style the confirm popup consistently
+             * with the rest of the app rather than leaving it in LVGL's
+             * default light-mode look. */
+            const Theme *theme_           = nullptr;
+
             lv_obj_t *screen_             = nullptr;
             lv_obj_t *brightness_slider_  = nullptr;
             lv_obj_t *day_night_btn_      = nullptr;
             lv_obj_t *day_night_icon_lbl_ = nullptr;
             lv_obj_t *panel_count_matrix_ = nullptr;
             lv_obj_t *theme_swatch_       = nullptr;
+            lv_obj_t *orientation_btn_            = nullptr;
+            lv_obj_t *orientation_lbl_            = nullptr;
+            /* Transient -- created in orientation_clicked_cb(),
+             * destroyed by whichever of orientation_confirm_cb()/
+             * orientation_cancel_cb() fires next. Only valid while the
+             * popup is on screen. */
+            lv_obj_t *orientation_confirm_mbox_   = nullptr;
+            LayoutOrientation pending_orientation_
+                = LayoutOrientation::Horizontal;
 
-            uint8_t  day_brightness_pct_   = 100;
-            uint8_t  night_brightness_pct_ = 20;
-            bool     showing_night_        = false;
-            uint8_t  num_panels_           = 5;
-            uint32_t accent_color_         = 0;
+            uint8_t           day_brightness_pct_   = 100;
+            uint8_t           night_brightness_pct_ = 20;
+            bool              showing_night_        = false;
+            uint8_t           num_panels_           = 5;
+            uint32_t          accent_color_         = 0;
+            LayoutOrientation orientation_ = LayoutOrientation::Horizontal;
 
             DoneCallback              done_cb_           = nullptr;
             void                     *done_ctx_          = nullptr;
@@ -111,6 +158,8 @@ namespace gui
             void                     *pick_theme_ctx_    = nullptr;
             PickWirelessCallback      pick_wireless_cb_  = nullptr;
             void                     *pick_wireless_ctx_ = nullptr;
+            OrientationConfirmCallback orientation_confirm_cb_  = nullptr;
+            void                       *orientation_confirm_ctx_ = nullptr;
     };
 
 } // namespace gui

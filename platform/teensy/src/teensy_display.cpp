@@ -21,6 +21,15 @@ namespace
     constexpr uint16_t LCD_HORZ = 480;
     constexpr uint16_t LCD_VERT = 320;
 
+    /* ILI948x_t4_mm::setRotation() rotation values: 1/3 are landscape
+     * (480x320, mirror pair), 0/2 are portrait (320x480, mirror pair).
+     * Rotation 3 is the confirmed-correct landscape mounting (an earlier
+     * 180-degree-flip fix). Rotation 0 for Portrait was an unverified
+     * guess -- confirmed on real hardware to be 180 degrees off, so 2 (the
+     * other half of the portrait mirror pair) is the corrected value. */
+    constexpr uint8_t ROTATION_LANDSCAPE = 3;
+    constexpr uint8_t ROTATION_PORTRAIT  = 2;
+
     constexpr uint8_t PWM_PIN = 3;
 
     ILI948x_t4_mm s_lcd(LCD_DC, LCD_CS, LCD_RST);
@@ -48,13 +57,28 @@ void TeensyDisplay::begin()
 
     s_lcd.begin(12);
     s_lcd.setBitDepth(16);
-    s_lcd.setRotation(3);
+}
+
+void TeensyDisplay::set_orientation(DisplayOrientation orientation)
+{
+    if (orientation == DisplayOrientation::Portrait)
+    {
+        s_lcd.setRotation(ROTATION_PORTRAIT);
+        width_  = LCD_VERT;
+        height_ = LCD_HORZ;
+    }
+    else
+    {
+        s_lcd.setRotation(ROTATION_LANDSCAPE);
+        width_  = LCD_HORZ;
+        height_ = LCD_VERT;
+    }
 }
 
 void TeensyDisplay::get_resolution(uint16_t &width, uint16_t &height) const
 {
-    width  = LCD_HORZ;
-    height = LCD_VERT;
+    width  = width_;
+    height = height_;
 }
 
 void TeensyDisplay::flush(

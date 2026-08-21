@@ -2,8 +2,10 @@
  * @file test_main.cpp
  * @brief Host-buildable coverage for gui/screens::compute_layout(): full
  * coverage/no-overlap of the band grid for every panel count (1-6) in
- * both orientations, plus the exact old fixed-5-panel split. Run with
- * `pio test -e simulator`.
+ * both orientations, the exact old fixed-5-panel split (Horizontal), and
+ * Vertical's own bespoke 5-panel shape (not a transpose of Horizontal's —
+ * see test_five_panels_vertical_is_2x2_plus_wide_row()). Run with `pio
+ * test -e simulator`.
  */
 #include <unity.h>
 
@@ -178,6 +180,14 @@ void test_vertical_is_a_transpose_of_horizontal()
 {
     for (uint8_t count = 1; count <= gui::MAX_PANELS; count++)
     {
+        /* 5 is the one exception — see
+         * test_five_panels_vertical_is_2x2_plus_wide_row() below for why a
+         * straight transpose doesn't apply to it. */
+        if (count == 5)
+        {
+            continue;
+        }
+
         gui::PanelSlot h_slots[gui::MAX_PANELS];
         gui::PanelSlot v_slots[gui::MAX_PANELS];
         gui::compute_layout(count, gui::LayoutOrientation::Horizontal, h_slots);
@@ -192,6 +202,51 @@ void test_vertical_is_a_transpose_of_horizontal()
             TEST_ASSERT_EQUAL(h_slots[i].large, v_slots[i].large);
         }
     }
+}
+
+void test_five_panels_vertical_is_2x2_plus_wide_row()
+{
+    gui::PanelSlot slots[gui::MAX_PANELS];
+    uint8_t        n
+        = gui::compute_layout(5, gui::LayoutOrientation::Vertical, slots);
+
+    TEST_ASSERT_EQUAL_UINT8(5, n);
+
+    /* A straight transpose of Horizontal's 5 (3 small over 2 large) would
+     * stack 3 skinny panels in one column and 2 in the other — instead,
+     * Vertical's 5 gets its own shape: a 2x2 of small panels over one
+     * wider, higher-priority panel (see layout.cpp's compute_layout()). */
+    TEST_ASSERT_EQUAL_UINT8(0, slots[0].col);
+    TEST_ASSERT_EQUAL_UINT8(0, slots[0].row);
+    TEST_ASSERT_EQUAL_UINT8(1, slots[0].colspan);
+    TEST_ASSERT_EQUAL_UINT8(1, slots[0].rowspan);
+    TEST_ASSERT_FALSE(slots[0].large);
+
+    TEST_ASSERT_EQUAL_UINT8(1, slots[1].col);
+    TEST_ASSERT_EQUAL_UINT8(0, slots[1].row);
+    TEST_ASSERT_EQUAL_UINT8(1, slots[1].colspan);
+    TEST_ASSERT_EQUAL_UINT8(1, slots[1].rowspan);
+    TEST_ASSERT_FALSE(slots[1].large);
+
+    TEST_ASSERT_EQUAL_UINT8(0, slots[2].col);
+    TEST_ASSERT_EQUAL_UINT8(1, slots[2].row);
+    TEST_ASSERT_EQUAL_UINT8(1, slots[2].colspan);
+    TEST_ASSERT_EQUAL_UINT8(1, slots[2].rowspan);
+    TEST_ASSERT_FALSE(slots[2].large);
+
+    TEST_ASSERT_EQUAL_UINT8(1, slots[3].col);
+    TEST_ASSERT_EQUAL_UINT8(1, slots[3].row);
+    TEST_ASSERT_EQUAL_UINT8(1, slots[3].colspan);
+    TEST_ASSERT_EQUAL_UINT8(1, slots[3].rowspan);
+    TEST_ASSERT_FALSE(slots[3].large);
+
+    /* The wide, higher-priority bottom panel — full width (colspan 2),
+     * one row tall. */
+    TEST_ASSERT_EQUAL_UINT8(0, slots[4].col);
+    TEST_ASSERT_EQUAL_UINT8(2, slots[4].row);
+    TEST_ASSERT_EQUAL_UINT8(2, slots[4].colspan);
+    TEST_ASSERT_EQUAL_UINT8(1, slots[4].rowspan);
+    TEST_ASSERT_TRUE(slots[4].large);
 }
 
 void test_hero_slot_extraction_matches_table()
@@ -310,6 +365,15 @@ void test_prominence_rank_matches_horizontal_under_vertical_transpose()
 {
     for (uint8_t count = 1; count <= gui::MAX_PANELS; count++)
     {
+        /* 5's Vertical shape isn't a transpose of Horizontal's (see
+         * test_five_panels_vertical_is_2x2_plus_wide_row()), so there's no
+         * reason its prominence ranks would match either — covered
+         * separately by test_prominence_rank_count5_vertical(). */
+        if (count == 5)
+        {
+            continue;
+        }
+
         gui::PanelSlot h_slots[gui::MAX_PANELS];
         gui::PanelSlot v_slots[gui::MAX_PANELS];
         gui::compute_layout(count, gui::LayoutOrientation::Horizontal, h_slots);
@@ -325,6 +389,22 @@ void test_prominence_rank_matches_horizontal_under_vertical_transpose()
             TEST_ASSERT_EQUAL_UINT8(h_rank[i], v_rank[i]);
         }
     }
+}
+
+void test_prominence_rank_count5_vertical()
+{
+    gui::PanelSlot slots[gui::MAX_PANELS];
+    uint8_t        rank_of_slot[gui::MAX_PANELS];
+    gui::compute_layout(5, gui::LayoutOrientation::Vertical, slots);
+    gui::compute_prominence_ranks(slots, 5, rank_of_slot);
+
+    /* Slot 4 (the wide bottom panel, large) outranks slots 0-3 (the 2x2 of
+     * small panels) despite being the last index. */
+    TEST_ASSERT_EQUAL_UINT8(1, rank_of_slot[0]);
+    TEST_ASSERT_EQUAL_UINT8(2, rank_of_slot[1]);
+    TEST_ASSERT_EQUAL_UINT8(3, rank_of_slot[2]);
+    TEST_ASSERT_EQUAL_UINT8(4, rank_of_slot[3]);
+    TEST_ASSERT_EQUAL_UINT8(0, rank_of_slot[4]);
 }
 
 void test_count_is_clamped_to_valid_range()
@@ -352,6 +432,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_six_panels_are_equal_2x3);
     RUN_TEST(test_horizontal_full_coverage_for_every_count);
     RUN_TEST(test_vertical_is_a_transpose_of_horizontal);
+    RUN_TEST(test_five_panels_vertical_is_2x2_plus_wide_row);
     RUN_TEST(test_count_is_clamped_to_valid_range);
     RUN_TEST(test_hero_slot_extraction_matches_table);
     RUN_TEST(test_prominence_rank_count1);
@@ -361,5 +442,6 @@ int main(int argc, char **argv)
     RUN_TEST(test_prominence_rank_count5);
     RUN_TEST(test_prominence_rank_count6);
     RUN_TEST(test_prominence_rank_matches_horizontal_under_vertical_transpose);
+    RUN_TEST(test_prominence_rank_count5_vertical);
     return UNITY_END();
 }

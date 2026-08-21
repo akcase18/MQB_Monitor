@@ -117,6 +117,17 @@ namespace gui
         },
     };
 
+    const Metrics METRICS_PORTRAIT = {
+        320,
+        480,
+        THEME_DEFAULT.metrics.panel_radius,
+        THEME_DEFAULT.metrics.panel_border_width,
+        THEME_DEFAULT.metrics.panel_gap,
+        THEME_DEFAULT.metrics.screen_margin,
+        THEME_DEFAULT.metrics.panel_height_sm_pct,
+        THEME_DEFAULT.metrics.panel_height_lg_pct,
+    };
+
     /* Values match LVGL's built-in palette mains (lv_palette_main()) so a
      * preset reads as the same color it would if picked via that API —
      * plain hex here rather than calling lv_palette_main() at static-init

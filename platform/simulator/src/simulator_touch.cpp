@@ -28,6 +28,15 @@ void SimulatorTouch::begin()
     SDL_InitSubSystem(SDL_INIT_VIDEO);
 }
 
+void SimulatorTouch::set_orientation(DisplayOrientation orientation)
+{
+    /* No-op -- SDL mouse events already report coordinates in the live
+     * window's pixel space, and SimulatorDisplay::set_orientation()
+     * resizes that window before it's ever created (see
+     * simulator_display.cpp), so there's nothing left to remap here. */
+    (void)orientation;
+}
+
 bool SimulatorTouch::read(TouchPoint &out)
 {
     SDL_Event event;

@@ -52,34 +52,58 @@ namespace gui
         uint8_t rank_of_slot[MAX_PANELS];
         compute_prominence_ranks(slots, count, rank_of_slot);
 
-        bool    horizontal    = orientation == LayoutOrientation::Horizontal;
-        uint8_t band_axis_len = horizontal ? BAND_UNITS : 2;
+        bool horizontal = orientation == LayoutOrientation::Horizontal;
 
-        lv_coord_t *band_dsc  = horizontal ? col_dsc_ : row_dsc_;
-        lv_coord_t *split_dsc = horizontal ? row_dsc_ : col_dsc_;
-
-        for (uint8_t i = 0; i < band_axis_len; i++)
+        /* Vertical's 5-panel layout (see layout.cpp) is a plain 2-col x
+         * 3-row grid, not the fine-6-unit-axis/2-band-split scheme every
+         * other count uses -- its grid descriptors are set up directly
+         * rather than through band_dsc/split_dsc below. */
+        if (count == 5 && orientation == LayoutOrientation::Vertical)
         {
-            band_dsc[i] = LV_GRID_FR(1);
-        }
-        band_dsc[band_axis_len] = LV_GRID_TEMPLATE_LAST;
+            col_dsc_[0] = LV_GRID_FR(1);
+            col_dsc_[1] = LV_GRID_FR(1);
+            col_dsc_[2] = LV_GRID_TEMPLATE_LAST;
 
-        /* Only the fixed 5-panel layout keeps the small/large band split —
-         * every other count either has no meaningful row split (1/2, both
-         * rows fully spanned) or wants equal-sized cells (3/4/6), so it
-         * splits 50/50 instead of pulling the theme's legacy sm/lg
-         * fractions. */
-        float sm_pct = 0.5f;
-        float lg_pct = 0.5f;
-        if (count == 5)
+            row_dsc_[0] = LV_GRID_FR(1);
+            row_dsc_[1] = LV_GRID_FR(1);
+            row_dsc_[2] = LV_GRID_FR(1);
+            row_dsc_[3] = LV_GRID_TEMPLATE_LAST;
+        }
+        else
         {
-            sm_pct = theme_->metrics.panel_height_sm_pct;
-            lg_pct = theme_->metrics.panel_height_lg_pct;
-        }
+            /* The fine 6-unit axis always has 6 divisions and the
+             * band-split axis always has 2 -- transpose() (see
+             * layout.cpp) swaps which physical axis (row vs col) carries
+             * which range, not the ranges themselves, so band_axis_len
+             * must stay BAND_UNITS regardless of orientation. */
+            uint8_t band_axis_len = BAND_UNITS;
 
-        split_dsc[0] = LV_GRID_FR(static_cast<int32_t>(sm_pct * 100.0f));
-        split_dsc[1] = LV_GRID_FR(static_cast<int32_t>(lg_pct * 100.0f));
-        split_dsc[2] = LV_GRID_TEMPLATE_LAST;
+            lv_coord_t *band_dsc  = horizontal ? col_dsc_ : row_dsc_;
+            lv_coord_t *split_dsc = horizontal ? row_dsc_ : col_dsc_;
+
+            for (uint8_t i = 0; i < band_axis_len; i++)
+            {
+                band_dsc[i] = LV_GRID_FR(1);
+            }
+            band_dsc[band_axis_len] = LV_GRID_TEMPLATE_LAST;
+
+            /* Only the fixed Horizontal 5-panel layout keeps the
+             * small/large band split — every other count either has no
+             * meaningful row split (1/2, both rows fully spanned) or
+             * wants equal-sized cells (3/4/6), so it splits 50/50
+             * instead of pulling the theme's legacy sm/lg fractions. */
+            float sm_pct = 0.5f;
+            float lg_pct = 0.5f;
+            if (count == 5)
+            {
+                sm_pct = theme_->metrics.panel_height_sm_pct;
+                lg_pct = theme_->metrics.panel_height_lg_pct;
+            }
+
+            split_dsc[0] = LV_GRID_FR(static_cast<int32_t>(sm_pct * 100.0f));
+            split_dsc[1] = LV_GRID_FR(static_cast<int32_t>(lg_pct * 100.0f));
+            split_dsc[2] = LV_GRID_TEMPLATE_LAST;
+        }
 
         lv_obj_set_grid_dsc_array(screen_, col_dsc_, row_dsc_);
 

@@ -12,6 +12,7 @@ class SimulatorTouch : public ITouch
         static SimulatorTouch &instance();
 
         void begin() override;
+        void set_orientation(DisplayOrientation orientation) override;
         bool read(TouchPoint &out) override;
 
     private:
