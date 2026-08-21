@@ -12,6 +12,7 @@
 #include "theme.hpp"
 
 #include "config_store.hpp"
+#include "logger.hpp"
 #include "scheduler.hpp"
 #include "signal_catalog.hpp"
 #include "signal_store.hpp"
@@ -33,6 +34,7 @@
 
 #include <lvgl.h>
 #include <stdint.h>
+#include <string.h>
 
 #ifdef ARDUINO
     #include <Arduino.h>
@@ -57,6 +59,18 @@ namespace
     constexpr uint32_t INFO_SCREEN_REFRESH_MS     = 200;
     constexpr uint32_t WIRELESS_SCREEN_REFRESH_MS = 500;
 
+    /* How often the logger *looks*, not how often it writes -- the write
+     * rate per signal is floored at core::LOG_MIN_INTERVAL_MS (40ms)
+     * inside Logger::sample() itself. Matching the catalog's fastest
+     * cadence (20ms, see signal_catalog.generated.inc) means a 20ms
+     * signal is seen on the tick it actually arrives, so that floor
+     * produces clean 40ms spacing rather than the ragged 40/60ms a
+     * coarser tick would give once scheduler jitter is in play. Slower
+     * signals (100ms and up) are unaffected either way -- they're logged
+     * at their own arrival cadence. Sampling twice as often costs
+     * essentially nothing: each tick walks at most MAX_PANELS entries. */
+    constexpr uint32_t LOG_SAMPLE_PERIOD_MS = 20;
+
     lv_color_t s_draw_buf_1[(LCD_HORZ * LCD_VERT) / 10];
     lv_color_t s_draw_buf_2[(LCD_HORZ * LCD_VERT) / 10];
 
@@ -74,6 +88,7 @@ namespace
             core::SignalStore signal_store;
             core::UdsClient   uds_client;
             core::Scheduler   scheduler;
+            core::Logger      logger;
 
             remote::server::RemoteConfigServer remote_server;
             remote::server::RemoteConfigLink   remote_link;
@@ -97,6 +112,7 @@ namespace
                 : config_store(platform.config_store)
                 , uds_client(platform.can, CAN_TX_ID, CAN_RX_ID)
                 , scheduler(platform.clock)
+                , logger(platform.storage)
                 , remote_server(config_store, signal_store)
                 , remote_link(platform.serial, remote_server)
                 , remote_ap(remote_link, platform.clock)
@@ -242,6 +258,21 @@ namespace
     {
         (void)ctx;
         composition().info_screen.refresh();
+    }
+
+    /* Single shared task rather than one per signal (unlike
+     * send_signal_requests_task above) -- core::Scheduler::MAX_TASKS is a
+     * fixed 32-slot table already carrying 22 signal-poll tasks plus a
+     * handful more, so a second one-per-signal registration isn't an
+     * option even before considering that Logger::sample() already walks
+     * the displayed set itself each call. */
+    void logging_sample_task(void *ctx)
+    {
+        (void)ctx;
+        Composition &app = composition();
+        app.logger.sample(app.signal_store,
+                          app.config_store.get(),
+                          platform_get().clock.millis());
     }
 
     void on_uds_response(void *ctx, uint8_t byte1, uint8_t byte2, float raw)
@@ -423,6 +454,84 @@ namespace
         composition().config_store.save();
     }
 
+#ifdef ARDUINO
+    /* USB-serial log retrieval -- a small bespoke line command set (not
+     * SLCAN; that's can_sniffer.cpp's separate, unrelated firmware/
+     * protocol for a different Teensy board entirely), modeled on the same
+     * "line assembly, dispatch on CR/LF" shape can_sniffer.cpp already
+     * uses for its own USB-CDC command parsing. Deliberately blocking --
+     * this is meant to run as its own dedicated offload action (park,
+     * plug in, dump), not interleaved with driving, so freezing
+     * everything else (CAN polling, GUI) for the duration is fine. */
+    void handle_log_command(const char *cmd, size_t len)
+    {
+        if (len == 7 && memcmp(cmd, "LOGDUMP", 7) == 0)
+        {
+            IStorage &storage = platform_get().storage;
+            for (uint16_t i = 0; i < core::CHUNK_COUNT; i++)
+            {
+                char path[core::CHUNK_PATH_LEN];
+                core::chunk_path(i, path);
+                if (!storage.open(path, StorageFileMode::Read))
+                {
+                    continue; /* never written -- nothing to stream */
+                }
+
+                uint8_t buf[256];
+                size_t  n;
+                while ((n = storage.read(buf, sizeof(buf))) > 0)
+                {
+                    Serial.write(buf, n);
+                }
+                storage.close();
+            }
+        }
+        else if (len == 8 && memcmp(cmd, "LOGCLEAR", 8) == 0)
+        {
+            /* Exactly what IStorage::format()'s own doc comment describes
+             * this for -- reclaim space once logs are offloaded. */
+            platform_get().storage.format();
+        }
+        else if (len == 9 && memcmp(cmd, "LOGSTATUS", 9) == 0)
+        {
+            core::Logger &logger = composition().logger;
+            Serial.print("ready=");
+            Serial.print(logger.is_ready() ? 1 : 0);
+            Serial.print(" session=");
+            Serial.print(logger.session_id());
+            Serial.print(" chunk=");
+            Serial.println(logger.current_chunk_index());
+        }
+    }
+
+    void poll_log_serial()
+    {
+        static char   cmd[16];
+        static size_t cmd_len = 0;
+
+        while (Serial.available() > 0)
+        {
+            char c = static_cast<char>(Serial.read());
+            if (c == '\r' || c == '\n')
+            {
+                if (cmd_len > 0)
+                {
+                    handle_log_command(cmd, cmd_len);
+                    cmd_len = 0;
+                }
+            }
+            else if (cmd_len < sizeof(cmd) - 1)
+            {
+                cmd[cmd_len++] = c;
+            }
+            else
+            {
+                cmd_len = 0; /* overflow -- drop the line */
+            }
+        }
+    }
+#endif
+
     void rebuild_screens_for_theme_change(void *user_data);
 
     void settings_pick_theme_cb(void *ctx)
@@ -510,6 +619,7 @@ namespace
                              &app.vehicle_binding,
                              panel_pressed_cb,
                              nullptr);
+        app.info_screen.set_logging_active(app.logger.is_ready());
         app.configurator_screen.init(theme,
                                      app.signal_names,
                                      app.signal_ids,
@@ -635,6 +745,7 @@ void setup()
     platform.can.begin(CAN_TX_ID, CAN_RX_ID, CAN_BAUD);
     platform.serial.begin(REMOTE_SERIAL_BAUD);
     platform.storage.begin();
+    app.logger.begin();
 
     lv_init();
     lv_tick_set_cb(tick_cb);
@@ -700,6 +811,7 @@ void setup()
                         nullptr);
     app.scheduler.every(
         WIRELESS_SCREEN_REFRESH_MS, refresh_wireless_screen_task, nullptr);
+    app.scheduler.every(LOG_SAMPLE_PERIOD_MS, logging_sample_task, nullptr);
 
     lv_screen_load(app.info_screen.screen());
 }
@@ -707,6 +819,10 @@ void setup()
 void loop()
 {
     Composition &app = composition();
+
+#ifdef ARDUINO
+    poll_log_serial();
+#endif
 
     app.scheduler.tick();
     app.uds_client.poll(on_uds_response, nullptr);

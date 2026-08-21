@@ -33,6 +33,21 @@ namespace gui
                                 LV_EVENT_CLICKED,
                                 &click_ctx_[i]);
         }
+
+        /* LV_OBJ_FLAG_IGNORE_LAYOUT excludes this from screen_'s grid
+         * layout (see rebuild() below) -- without it, the grid would try
+         * to place this as a normal cell child and collide with panel 0.
+         * Hidden until set_logging_active(true) — muted (grey, not fg
+         * white) so it reads as a passive status glyph, not something
+         * needing attention. */
+        logging_icon_ = lv_label_create(screen_);
+        lv_obj_add_flag(logging_icon_, LV_OBJ_FLAG_IGNORE_LAYOUT);
+        lv_label_set_text(logging_icon_, LV_SYMBOL_SD_CARD);
+        lv_obj_set_style_text_font(logging_icon_, theme.typography.icon_status, 0);
+        lv_obj_set_style_text_color(
+            logging_icon_, theme.palette.panel_border, 0);
+        lv_obj_align(logging_icon_, LV_ALIGN_TOP_RIGHT, 0, 0);
+        lv_obj_add_flag(logging_icon_, LV_OBJ_FLAG_HIDDEN);
     }
 
     void InfoScreen::rebuild(uint8_t count, LayoutOrientation orientation)
@@ -150,6 +165,18 @@ namespace gui
                                          panel_large_[i],
                                          panel_hero_[i]);
             panels_[i].set_view_model(vm);
+        }
+    }
+
+    void InfoScreen::set_logging_active(bool active)
+    {
+        if (active)
+        {
+            lv_obj_remove_flag(logging_icon_, LV_OBJ_FLAG_HIDDEN);
+        }
+        else
+        {
+            lv_obj_add_flag(logging_icon_, LV_OBJ_FLAG_HIDDEN);
         }
     }
 

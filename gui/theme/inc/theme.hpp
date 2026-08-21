@@ -66,6 +66,12 @@ namespace gui
                                               * built-in symbol font has
                                               * nothing celestial in its
                                               * curated icon subset */
+            const lv_font_t *icon_status; /* small corner status glyphs on
+                                           * InfoScreen (e.g. logging
+                                           * active) — its own smaller size
+                                           * since symbol_lg (32px) reads
+                                           * as too large/intrusive sitting
+                                           * over the dense panel grid */
     };
 
     struct Metrics

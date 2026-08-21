@@ -16,7 +16,7 @@ Hardware abstraction: seven interfaces that everything in [core/](../core/README
 
 ## Boards
 
-- **[teensy/](teensy/README.md)** — the real hardware: FlexCAN_T4, ILI948x_t4_mm, Teensy `EEPROM.h`, and (uniquely) two switchable implementations each of `ITouch` (capacitive FT6236 over I2C, or resistive XPT2046 over SPI) and `IStorage` (onboard QSPI flash via LittleFS, or Micro-SD via SdFat).
+- **[teensy/](teensy/README.md)** — the real hardware: FlexCAN_T4, ILI948x_t4_mm, Teensy `EEPROM.h`, and (uniquely) two switchable implementations each of `ITouch` (capacitive FT6236 over I2C, or resistive XPT2046 over SPI) and `IStorage` (internal MCU program flash via `LittleFS_Program`, or Micro-SD via SdFat).
 - **[simulator/](simulator/README.md)** — a desktop stand-in over raw SDL2, with a file-backed config store and a synthetic CAN bus, used as the primary GUI development loop.
 - **[esp32/](esp32/README.md)** — the companion ESP32-C3 relay firmware for wireless configuration. Not another `Platform` implementation (no display/touch/CAN on that board) — see its own README for what it actually is.
 

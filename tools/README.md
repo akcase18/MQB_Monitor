@@ -29,6 +29,13 @@ support firmware development but don't ship on any board.
   Registry/Learn/WIP tabs read and write the registry directly. See its
   [README](monitor/README.md).
 
+- **[`log_export/`](log_export/)** — pulls the dashboard firmware's
+  black-box signal log (see [core/logging](../core/logging/README.md)) over
+  USB serial and decodes it to CSV. A separate board/firmware/protocol from
+  `monitor/`'s SLCAN sniffer above — talks to the dashboard firmware
+  (`env:teensymm`) itself, not a standalone sniffer. See its
+  [README](log_export/README.md).
+
 ## The two-stage registry loop
 
 ```

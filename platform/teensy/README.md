@@ -11,7 +11,7 @@ The real-hardware implementation of every [platform](../README.md) interface, fo
 - **`inc/teensy_clock.hpp`** / **`src/teensy_clock.cpp`** — `TeensyClock`, wrapping Arduino's `millis()`.
 - **`inc/teensy_config_store.hpp`** / **`src/teensy_config_store.cpp`** — `TeensyConfigStore`, wrapping Teensy's `EEPROM.h` for persisted config storage.
 - **`inc/teensy_serial_link.hpp`** / **`src/teensy_serial_link.cpp`** — `TeensySerialLink`, a spare hardware `Serial` (Serial4) carrying the `remote/protocol` framed byte stream to/from the companion ESP32-C3.
-- **`inc/teensy_storage.hpp`** / **`src/teensy_storage.cpp`** — `TeensyStorage`, backed by LittleFS on the board's onboard 16MB QSPI NOR flash (currently active — see below).
+- **`inc/teensy_storage.hpp`** / **`src/teensy_storage.cpp`** — `TeensyStorage`, backed by `LittleFS_Program` on a 14MB region of the board's internal MCU program flash (currently active — see below; not the external QSPI chip, which hung on real hardware and was abandoned). Sized against [core/logging](../../core/logging/README.md)'s `CHUNK_COUNT * CHUNK_SIZE_BYTES` (13MiB) plus headroom for LittleFS's own block metadata and firmware growth. `core::Config` is *not* in here — `TeensyConfigStore` keeps that in EEPROM; this region is the log ring and nothing else. `teensy_size` reports ~16.02MB free for files after the current firmware, so ~15.3MiB is the hard ceiling on this constant.
 - **`inc/teensy_sd_card.hpp`** / **`src/teensy_sd_card.cpp`** — `TeensySdCard`, backed by SdFat over SPI1 for a Micro-SD slot. No slot exists on the current PCB; kept for whenever one is added back.
 - **`src/teensy_platform.cpp`** — `platform_get()` for this board: builds the `Platform` struct from the singletons above.
 

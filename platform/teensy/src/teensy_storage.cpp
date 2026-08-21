@@ -12,13 +12,18 @@
 
 namespace
 {
-    /* This board's flash is ~16MB and current firmware uses well under
-     * 1MB, so 2MB leaves generous headroom for firmware growth while
-     * still being enough for the signal-logging feature this storage
-     * layer exists for (see TODO.md). Must stay the same across
-     * begin()/is_present() calls -- LittleFS_Program carves this region
-     * out of flash by size, not by a persisted offset. */
-    constexpr uint32_t STORAGE_SIZE_BYTES = 2 * 1024 * 1024;
+    /* This board's flash is 16MB; after firmware, teensy_size reports
+     * ~16.02MB actually free for files. Sized against
+     * core::CHUNK_COUNT * core::CHUNK_SIZE_BYTES (13MiB, see
+     * core/logging/inc/logger.hpp) plus headroom for LittleFS's own
+     * block metadata and for firmware growth. (core::Config is *not* in
+     * here -- TeensyConfigStore keeps that in EEPROM; this region is the
+     * log ring and nothing else.) Raising this is the only lever left on
+     * retention short of a bigger chip, and it's a small one: the ~15.3MB
+     * ceiling is only ~18% above today's 14MB. Must stay the same
+     * across begin()/is_present() calls -- LittleFS_Program carves this
+     * region out of flash by size, not by a persisted offset. */
+    constexpr uint32_t STORAGE_SIZE_BYTES = 14u * 1024u * 1024u;
 } // namespace
 
 TeensyStorage &TeensyStorage::instance()

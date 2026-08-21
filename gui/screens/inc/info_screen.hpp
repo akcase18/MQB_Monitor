@@ -46,6 +46,13 @@ namespace gui
              * to keep values "live". */
             void refresh();
 
+            /** Shows/hides the small top-right "logging active" glyph —
+             * call whenever the caller's logging subsystem's ready state
+             * might have changed (e.g. once at boot). InfoScreen has no
+             * core:: dependency, so this takes a plain bool rather than
+             * reading core::Logger itself. */
+            void set_logging_active(bool active);
+
             lv_obj_t *screen() const
             {
                 return screen_;
@@ -60,8 +67,9 @@ namespace gui
 
             static void panel_clicked_cb(lv_event_t *e);
 
-            lv_obj_t    *screen_ = nullptr;
-            const Theme *theme_  = nullptr;
+            lv_obj_t    *screen_        = nullptr;
+            lv_obj_t    *logging_icon_  = nullptr;
+            const Theme *theme_         = nullptr;
 
             PanelWidget panels_[MAX_PANELS];
             bool        panel_large_[MAX_PANELS] = {};

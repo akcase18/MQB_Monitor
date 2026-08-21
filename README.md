@@ -17,16 +17,17 @@ Built on a Teensy MicroMod, [LVGL](https://lvgl.io/) for the UI, and a from-scra
 - **Per-signal warning thresholds** — set independent low/high warning bounds per signal; a panel showing a signal outside its bounds highlights immediately.
 - **Day/Night brightness** — a single toggle switches between two independently-set backlight levels (defaults: 100% day / 20% night) and applies instantly, so it's usable mid-drive. There's no automatic (clock- or sensor-based) switching yet — see [TODO.md](TODO.md).
 - **Theming** — accent color is user-selectable from a preset swatch grid and persists across restarts; the whole app can be reskinned by editing one file ([gui/theme](gui/theme/README.md)), which the codebase proves out with two distinct built-in themes.
+- **Signal history logging** — continuous on-change black-box recording of whatever signals are currently on screen (up to 6) to onboard flash (rotating chunk files, oldest overwritten once full — at least ~2.5 hours of retention in the worst case, more in typical use), retrievable over USB via [tools/log_export](tools/log_export/README.md). See [core/logging](core/logging/README.md). Wireless (phone) and Micro-SD export are planned follow-ons, not yet built.
 - **Desktop simulator** — the entire GUI runs on a laptop (SDL2 window, mouse-as-touch, fabricated CAN responses), so screen/layout work doesn't require the car or the physical board. See [platform/simulator](platform/simulator/README.md).
 
 ## Hardware
 
 - **MCUs**: Teensy MicroMod (`teensymm`) for general processing. ESP32-C3 for wireless connectivity.
 - **Display**: ILI948x-family 480x320 TFT via the `ILI948x_t4_mm` library, mounted directly to the PCB.
-- **Touch**: capacitive touch panel over I2C (FT6236). A resistive SPI (XPT2046-style) driver is also kept and switchable in code — see [platform/teensy](platform/teensy/README.md) — for whenever a resistive panel is back in the design.
+- **Touch**: resistive SPI touch panel (XPT2046-style), currently active. A capacitive I2C (FT6236) driver is also kept and switchable in code — see [platform/teensy](platform/teensy/README.md) — for the newer PCB revision's panel.
 - **CAN**: `FlexCAN_T4`, polling the vehicle's OBD2 UDS enhanced-diagnostic-session service.
 - **Config storage**: onboard EEPROM for persisted settings/panel/warning configuration.
-- **Log storage**: onboard 16MB QSPI NOR flash via LittleFS, in place ahead of the data-logging feature itself (see [TODO.md](TODO.md)). A Micro-SD implementation is also kept and switchable in code for whenever a card slot is back in the design.
+- **Log storage**: a 14MB region of the board's internal MCU program flash via `LittleFS_Program`, backing the signal history logging feature above. A Micro-SD implementation is also kept and switchable in code for whenever a card slot is back in the design.
 - **PCB**: custom board (v2), designed in-house.
 
 ## Current State

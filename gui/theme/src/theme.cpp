@@ -58,6 +58,7 @@ namespace gui
             &lv_font_montserrat_32,
             &jetbrains_mono_bold_24,
             &icon_day_night_28,
+            &lv_font_montserrat_18,
         },
         /* metrics */
         {
@@ -103,6 +104,7 @@ namespace gui
             &lv_font_montserrat_32,
             &jetbrains_mono_bold_24,
             &icon_day_night_28,
+            &lv_font_montserrat_18,
         },
         /* metrics */
         {
