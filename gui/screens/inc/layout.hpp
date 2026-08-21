@@ -55,7 +55,9 @@ namespace gui
      * 3: a wide hero (large) plus two stacked minors (small) — not three
      *    narrow columns.
      * 4: an even 2x2, all panels the same size (large).
-     * 5: 3 small panels over 2 large ones, matching the old fixed layout.
+     * 5: Horizontal — 3 small panels over 2 large ones, matching the old
+     *    fixed layout. Vertical — its own 2x2 of small panels over one
+     *    wider, higher-priority panel (not a transpose of Horizontal's).
      * 6: an even 2x3, all panels the same size (small).
      *
      * @returns The number of slots written to `out` (the clamped count).

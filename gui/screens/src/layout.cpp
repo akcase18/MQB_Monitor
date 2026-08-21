@@ -51,6 +51,24 @@ namespace gui
             count = MAX_PANELS;
         }
 
+        if (count == 5 && orientation == LayoutOrientation::Vertical)
+        {
+            /* A straight transpose of Horizontal's 5 (3 small over 2
+             * large) stacks 3 skinny panels in one column and 2 in the
+             * other -- reads poorly on a narrow portrait screen. Instead:
+             * Vertical's 6-panel 3-row x 2-col grid (see below) with the
+             * bottom row's two cells merged into one wider, higher-
+             * priority panel. Units here are a plain 2-wide x 3-tall
+             * grid, not BAND_UNITS -- InfoScreen::rebuild() special-cases
+             * its grid descriptors to match. */
+            out[0] = { 0, 0, 1, 1, false };
+            out[1] = { 1, 0, 1, 1, false };
+            out[2] = { 0, 1, 1, 1, false };
+            out[3] = { 1, 1, 1, 1, false };
+            out[4] = { 0, 2, 2, 1, true };
+            return count;
+        }
+
         if (count <= 2)
         {
             uint8_t colspan = static_cast<uint8_t>(BAND_UNITS / count);
@@ -110,7 +128,16 @@ namespace gui
 
     bool is_hero_slot(const PanelSlot &slot)
     {
-        return slot.rowspan == 2 && slot.colspan >= 4;
+        /* transpose() (above) swaps colspan/rowspan wholesale for Vertical
+         * orientation, so a check pinned to one field (e.g. "rowspan ==
+         * 2") only recognizes hero slots in Horizontal. The unordered
+         * pair {colspan, rowspan} is transpose-invariant, so compare by
+         * min/max instead of by axis. */
+        uint8_t span_max = slot.colspan > slot.rowspan ? slot.colspan
+                                                        : slot.rowspan;
+        uint8_t span_min = slot.colspan > slot.rowspan ? slot.rowspan
+                                                        : slot.colspan;
+        return span_min == 2 && span_max >= 4;
     }
 
     void compute_prominence_ranks(const PanelSlot slots[MAX_PANELS],

@@ -74,8 +74,8 @@ void SimulatorDisplay::begin()
     SDL_Window *window = SDL_CreateWindow("MQB Monitor Simulator",
                                           win_x,
                                           win_y,
-                                          SIM_HOR_RES,
-                                          SIM_VER_RES,
+                                          width_,
+                                          height_,
                                           SDL_WINDOW_SHOWN);
 
     SDL_Renderer *renderer
@@ -84,8 +84,8 @@ void SimulatorDisplay::begin()
     SDL_Texture *texture = SDL_CreateTexture(renderer,
                                              SDL_PIXELFORMAT_RGB565,
                                              SDL_TEXTUREACCESS_STREAMING,
-                                             SIM_HOR_RES,
-                                             SIM_VER_RES);
+                                             width_,
+                                             height_);
 
     window_   = window;
     renderer_ = renderer;
@@ -94,6 +94,40 @@ void SimulatorDisplay::begin()
     atexit(atexit_save_position);
     signal(SIGTERM, handle_terminating_signal);
     signal(SIGINT, handle_terminating_signal);
+}
+
+void SimulatorDisplay::set_orientation(DisplayOrientation orientation)
+{
+    if (orientation == DisplayOrientation::Portrait)
+    {
+        width_  = SIM_VER_RES;
+        height_ = SIM_HOR_RES;
+    }
+    else
+    {
+        width_  = SIM_HOR_RES;
+        height_ = SIM_VER_RES;
+    }
+
+    /* src/main.cpp calls begin() before this (TeensyDisplay needs its
+     * SPI/panel init done first, so that's the shared call order) -- the
+     * window/texture begin() already created at the old size need to be
+     * resized/recreated here to match, rather than just updating
+     * width_/height_ for a future begin() to read. */
+    SDL_Window *window = static_cast<SDL_Window *>(window_);
+    if (window == nullptr)
+    {
+        return;
+    }
+
+    SDL_SetWindowSize(window, width_, height_);
+
+    SDL_DestroyTexture(static_cast<SDL_Texture *>(texture_));
+    texture_ = SDL_CreateTexture(static_cast<SDL_Renderer *>(renderer_),
+                                 SDL_PIXELFORMAT_RGB565,
+                                 SDL_TEXTUREACCESS_STREAMING,
+                                 width_,
+                                 height_);
 }
 
 void SimulatorDisplay::save_position() const
@@ -118,8 +152,8 @@ void SimulatorDisplay::save_position() const
 
 void SimulatorDisplay::get_resolution(uint16_t &width, uint16_t &height) const
 {
-    width  = SIM_HOR_RES;
-    height = SIM_VER_RES;
+    width  = width_;
+    height = height_;
 }
 
 void SimulatorDisplay::flush(

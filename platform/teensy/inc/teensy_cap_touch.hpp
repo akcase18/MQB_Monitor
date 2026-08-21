@@ -14,11 +14,14 @@ class TeensyCapTouch : public ITouch
         static TeensyCapTouch &instance();
 
         void begin() override;
+        void set_orientation(DisplayOrientation orientation) override;
         bool read(TouchPoint &out) override;
 
     private:
         TeensyCapTouch() = default;
 
-        int16_t x_val_ = 0;
-        int16_t y_val_ = 0;
+        int16_t            x_val_       = 0;
+        int16_t            y_val_       = 0;
+        DisplayOrientation orientation_ = DisplayOrientation::Landscape;
+        uint16_t           height_      = 320;
 };

@@ -94,6 +94,15 @@ namespace gui
      * gui::* screens touches nothing outside gui/theme. */
     extern const Theme THEME_ALT;
 
+    /** THEME_DEFAULT.metrics with screen_width/screen_height swapped for a
+     * portrait-mounted panel (320x480, see platform::DisplayOrientation).
+     * The composition root (src/main.cpp) assigns this into
+     * runtime_theme().metrics once at boot, matching whichever orientation
+     * core::Settings::orientation says is active — gui/theme can't depend
+     * on gui/screens (where LayoutOrientation lives), so the selection
+     * itself stays in main.cpp. */
+    extern const Metrics METRICS_PORTRAIT;
+
     /** User-selectable accent-color presets (ThemePickerScreen), packed
      * 0xRRGGBB — plain hex rather than lv_color_t so this list, and the
      * uint32_t core::Settings::accent_color persisted from it, both stay

@@ -31,9 +31,6 @@ namespace
     constexpr int16_t  Z_CONFIDENT_THRESHOLD = 1000;
     constexpr uint32_t MIN_CYCLE_TIME        = 3;
 
-    constexpr uint16_t LCD_HORZ = 480;
-    constexpr uint16_t LCD_VERT = 320;
-
     uint32_t s_last_poll_tick = 0;
 } // namespace
 
@@ -48,6 +45,21 @@ void TeensyTouch::begin()
     pinMode(CS_PIN, OUTPUT);
     digitalWrite(CS_PIN, HIGH);
     SPI1.begin();
+}
+
+void TeensyTouch::set_orientation(DisplayOrientation orientation)
+{
+    orientation_ = orientation;
+    if (orientation == DisplayOrientation::Portrait)
+    {
+        width_  = 320;
+        height_ = 480;
+    }
+    else
+    {
+        width_  = 480;
+        height_ = 320;
+    }
 }
 
 void TeensyTouch::poll()
@@ -109,12 +121,28 @@ void TeensyTouch::poll()
      * low-confidence zone. */
     if (!was_pressed_ || z > Z_CONFIDENT_THRESHOLD)
     {
-        /* rotation 2, matching the old driver's unchanged default, then
-         * flipped 180 -- x_val_/y_val_ each negated relative to their
-         * 0-4095 range -- to track the display's setRotation(3) (see
-         * teensy_display.cpp). */
-        x_val_ = 4095 - y;
-        y_val_ = x;
+        if (orientation_ == DisplayOrientation::Portrait)
+        {
+            /* Confirmed on real hardware: touching the bottom-right
+             * corner registered as top-right, bottom-left as top-left,
+             * top-left as bottom-left -- X was already correct, Y came
+             * out mirrored. This also lines up with teensy_display.cpp's
+             * own Portrait fix (setRotation() corrected from the guessed
+             * 0 to the confirmed-correct 2, a 180-degree difference) --
+             * x_val_ is unchanged from the original guess since it was
+             * already right, y_val_ is now inverted to match. */
+            x_val_ = 4095 - x;
+            y_val_ = 4095 - y;
+        }
+        else
+        {
+            /* rotation 2, matching the old driver's unchanged default,
+             * then flipped 180 -- x_val_/y_val_ each negated relative to
+             * their 0-4095 range -- to track the display's
+             * setRotation(3) (see teensy_display.cpp). */
+            x_val_ = 4095 - y;
+            y_val_ = x;
+        }
     }
     was_pressed_ = true;
 
@@ -135,8 +163,8 @@ bool TeensyTouch::read(TouchPoint &out)
      * wherever the finger actually was, so the last valid touch position
      * is reported regardless of pressed state; `out.pressed` is what
      * actually communicates press/release to LVGL. */
-    out.x = (x_val_ * LCD_HORZ) / 4095;
-    out.y = (y_val_ * LCD_VERT) / 4095;
+    out.x = (x_val_ * width_) / 4095;
+    out.y = (y_val_ * height_) / 4095;
 
     return pressed;
 }

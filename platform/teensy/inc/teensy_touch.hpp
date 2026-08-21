@@ -13,6 +13,7 @@ class TeensyTouch : public ITouch
         static TeensyTouch &instance();
 
         void begin() override;
+        void set_orientation(DisplayOrientation orientation) override;
         bool read(TouchPoint &out) override;
 
     private:
@@ -22,8 +23,11 @@ class TeensyTouch : public ITouch
         int16_t get_best_avg(int16_t x, int16_t y, int16_t z);
         void    poll();
 
-        int16_t x_val_       = 0;
-        int16_t y_val_       = 0;
-        int16_t z_val_       = 0;
-        bool    was_pressed_ = false;
+        int16_t            x_val_       = 0;
+        int16_t            y_val_       = 0;
+        int16_t            z_val_       = 0;
+        bool               was_pressed_ = false;
+        DisplayOrientation orientation_ = DisplayOrientation::Landscape;
+        uint16_t           width_       = 480;
+        uint16_t           height_      = 320;
 };

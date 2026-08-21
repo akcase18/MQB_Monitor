@@ -132,12 +132,48 @@ namespace
         return instance;
     }
 
+    /**
+     * The panel-grid orientation actually in effect on the physical
+     * display right now -- set once in setup() from whatever
+     * settings.orientation held at boot, and never touched again for the
+     * life of the process. settings.orientation, by contrast, gets
+     * overwritten the moment Done is pressed after a toggle (see
+     * settings_done_cb()) even though the physical panel hasn't rotated
+     * yet (orientation is boot-time-only, see platform.hpp's
+     * DisplayOrientation) -- anywhere InfoScreen gets rebuilt live must
+     * read this, not settings.orientation, or a second toggle in the
+     * same session would reflow against tomorrow's orientation on
+     * today's still-unrotated canvas.
+     */
+    core::LayoutOrientation &active_orientation()
+    {
+        static core::LayoutOrientation instance
+            = core::LayoutOrientation::Horizontal;
+        return instance;
+    }
+
     gui::LayoutOrientation to_gui_orientation(
         core::LayoutOrientation orientation)
     {
         return orientation == core::LayoutOrientation::Vertical
                    ? gui::LayoutOrientation::Vertical
                    : gui::LayoutOrientation::Horizontal;
+    }
+
+    core::LayoutOrientation to_core_orientation(
+        gui::LayoutOrientation orientation)
+    {
+        return orientation == gui::LayoutOrientation::Vertical
+                   ? core::LayoutOrientation::Vertical
+                   : core::LayoutOrientation::Horizontal;
+    }
+
+    DisplayOrientation to_display_orientation(
+        gui::LayoutOrientation orientation)
+    {
+        return orientation == gui::LayoutOrientation::Vertical
+                   ? DisplayOrientation::Portrait
+                   : DisplayOrientation::Landscape;
     }
 
     void display_flush_cb(lv_display_t    *disp,
@@ -349,15 +385,42 @@ namespace
          * over a Night-mode edit with the (usually untouched, 100%) Day
          * value on every exit. */
 
-        core::Settings &settings  = composition().config_store.get().settings;
+        core::Settings &settings = composition().config_store.get().settings;
+
+        /* Orientation isn't touched here — it's persisted immediately by
+         * settings_orientation_confirm_cb() the moment Confirm is pressed
+         * on the popup, not deferred to Done (see SettingsScreen's file
+         * doc comment for why: the popup itself already reads as the
+         * commit step). InfoScreen keeps reflowing against
+         * active_orientation() (set once at boot, never touched again)
+         * rather than settings.orientation, since orientation is a boot-
+         * time-only setting (see platform.hpp's DisplayOrientation/
+         * set_orientation() doc comments) -- the physical panel hasn't
+         * rotated just because Done was pressed. */
         settings.day_brightness   = day_brightness_pct;
         settings.night_brightness = night_brightness_pct;
         settings.num_panels       = num_panels;
         composition().config_store.save();
 
         composition().info_screen.rebuild(
-            num_panels, to_gui_orientation(settings.orientation));
+            num_panels, to_gui_orientation(active_orientation()));
         lv_screen_load(composition().info_screen.screen());
+    }
+
+    /* Fired the moment Confirm is pressed on SettingsScreen's orientation
+     * popup — persisted right away rather than waiting for Settings'
+     * own Done, so a power-cycle before Done is ever pressed doesn't lose
+     * the change the popup just told the user was committed. Mirrors
+     * theme_picker_done_cb()'s same immediate-persist pattern for accent
+     * color. Still boot-time-only to actually apply — see
+     * settings_done_cb()'s comment on active_orientation(). */
+    void settings_orientation_confirm_cb(void                  *ctx,
+                                         gui::LayoutOrientation orientation)
+    {
+        (void)ctx;
+        core::Settings &settings = composition().config_store.get().settings;
+        settings.orientation     = to_core_orientation(orientation);
+        composition().config_store.save();
     }
 
     void rebuild_screens_for_theme_change(void *user_data);
@@ -469,6 +532,7 @@ namespace
                                  settings.night_brightness,
                                  settings.num_panels,
                                  settings.accent_color,
+                                 to_gui_orientation(settings.orientation),
                                  settings_done_cb,
                                  nullptr,
                                  settings_preview_brightness_cb,
@@ -476,6 +540,8 @@ namespace
                                  settings_pick_theme_cb,
                                  nullptr,
                                  settings_pick_wireless_cb,
+                                 nullptr,
+                                 settings_orientation_confirm_cb,
                                  nullptr);
         app.theme_picker_screen.init(theme, theme_picker_done_cb, nullptr);
         app.wireless_setup_screen.init(theme, wireless_deactivate_cb, nullptr);
@@ -485,8 +551,12 @@ namespace
                             LV_EVENT_GESTURE,
                             nullptr);
 
+        /* active_orientation(), not settings.orientation -- this runs
+         * again from rebuild_screens_for_theme_change() mid-session, by
+         * which point settings.orientation may already hold a staged
+         * pick that hasn't taken effect yet (see settings_done_cb()). */
         app.info_screen.rebuild(settings.num_panels,
-                                to_gui_orientation(settings.orientation));
+                                to_gui_orientation(active_orientation()));
     }
 
     /**
@@ -544,8 +614,24 @@ void setup()
 
     Platform &platform = platform_get();
 
+    /* Loaded before display/touch begin() so settings.orientation is
+     * known up front -- orientation is a boot-time-only choice (see
+     * platform.hpp's DisplayOrientation doc comments), and the one
+     * lv_display_t created below has to be sized correctly from the
+     * start since nothing resizes it live. */
+    Composition     &app      = composition();
+    core::Settings  &settings = app.config_store.get().settings;
+    app.config_store.load();
+
+    active_orientation() = settings.orientation;
+
+    DisplayOrientation orientation
+        = to_display_orientation(to_gui_orientation(settings.orientation));
+
     platform.display.begin();
+    platform.display.set_orientation(orientation);
     platform.touch.begin();
+    platform.touch.set_orientation(orientation);
     platform.can.begin(CAN_TX_ID, CAN_RX_ID, CAN_BAUD);
     platform.serial.begin(REMOTE_SERIAL_BAUD);
     platform.storage.begin();
@@ -569,16 +655,12 @@ void setup()
     lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(indev, touch_read_cb);
 
-    Composition &app = composition();
-    app.config_store.load();
-
     /* Guard against an accent_color that isn't one of gui::ACCENT_PRESETS
      * (e.g. 0 from a config saved before this field existed) — silently
      * building every screen against black-on-black accent styling is a
      * much worse failure mode than just falling back to a real default,
      * and this also self-heals the saved value so it doesn't recur. */
-    core::Settings &settings     = app.config_store.get().settings;
-    bool            valid_accent = false;
+    bool valid_accent = false;
     for (uint8_t i = 0; i < gui::ACCENT_PRESET_COUNT; i++)
     {
         if (settings.accent_color == gui::ACCENT_PRESETS[i])
@@ -593,11 +675,15 @@ void setup()
         app.config_store.save();
     }
 
-    /* Seed runtime_theme()'s accent from whatever was last saved, before
-     * the first build_screens() call — otherwise every screen would
-     * briefly be built against THEME_DEFAULT's hardcoded green instead of
-     * the user's actual saved preference. */
+    /* Seed runtime_theme()'s accent and metrics from whatever was last
+     * saved, before the first build_screens() call — otherwise every
+     * screen would briefly be built against THEME_DEFAULT's hardcoded
+     * green/landscape-metrics instead of the user's actual saved
+     * preference. */
     runtime_theme().palette.accent = lv_color_hex(settings.accent_color);
+    runtime_theme().metrics = orientation == DisplayOrientation::Portrait
+                                  ? gui::METRICS_PORTRAIT
+                                  : gui::THEME_DEFAULT.metrics;
     build_screens();
 
     for (uint16_t i = 0; i < core::SIGNAL_CATALOG_COUNT; i++)

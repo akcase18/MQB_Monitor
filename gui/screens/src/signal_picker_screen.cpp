@@ -12,7 +12,6 @@ namespace gui
         constexpr size_t OPTIONS_BUF_LEN = 1024;
 
         constexpr lv_coord_t HEADER_DIVIDER_Y = 50;
-        constexpr lv_coord_t ROLLER_Y         = 66;
     } // namespace
 
     void SignalPickerScreen::init(const Theme             &theme,
@@ -40,10 +39,23 @@ namespace gui
 
         create_divider(screen_, theme, HEADER_DIVIDER_Y);
 
-        roller_ = lv_roller_create(screen_);
+        /* A plain content_group (full width/height below the header
+         * divider) purely so the roller — self-sized from its row count,
+         * see the comment below — can be lv_obj_center()'d within
+         * whatever space is actually available instead of pinned to a
+         * fixed Y that leaves a growing dead zone below it as the screen
+         * gets taller (Portrait's 430px vs Landscape's 270px). */
+        lv_obj_t *content_group = lv_obj_create(screen_);
+        lv_obj_remove_style_all(content_group);
+        lv_obj_set_size(content_group,
+                        theme.metrics.screen_width,
+                        theme.metrics.screen_height - HEADER_DIVIDER_Y);
+        lv_obj_set_pos(content_group, 0, HEADER_DIVIDER_Y);
+
+        roller_ = lv_roller_create(content_group);
         lv_obj_set_style_text_font(roller_, theme.typography.ui, 0);
         lv_obj_set_width(roller_, theme.metrics.screen_width - 40);
-        lv_obj_align(roller_, LV_ALIGN_TOP_MID, 0, ROLLER_Y);
+        lv_obj_center(roller_);
         /* An even row count reads more clearly as "a scrollable strip"
          * than an odd one — with an odd count the selected row falls
          * exactly in the visual center, which can look like a fixed list
@@ -51,8 +63,12 @@ namespace gui
          * — this screen (unlike the cramped inline roller this replaced,
          * see the file doc comment) has plenty of room, so just let this
          * size itself from the row count instead of fighting it with a
-         * fixed height that ignores how many rows were asked for. */
-        lv_roller_set_visible_row_count(roller_, 4);
+         * fixed height that ignores how many rows were asked for. Portrait
+         * gets more rows than Landscape (430px of available height below
+         * the header divider vs 270px) — 4 rows looked lost/out of place
+         * in all that extra room. */
+        bool portrait = theme.metrics.screen_height > theme.metrics.screen_width;
+        lv_roller_set_visible_row_count(roller_, portrait ? 8 : 4);
 
         /* Default LVGL theming is a light-mode card — restyle to match
          * this app's dark, flat, bordered treatment. */
