@@ -6,7 +6,7 @@ Hardware abstraction: seven interfaces that everything in [core/](../core/README
 
 - **`platform.hpp`** — the interfaces:
   - `ICanBus` — `begin(tx_id, rx_id, baud)`, non-blocking `send(frame)`/`receive(out)`.
-  - `IDisplay` — `begin()`, `get_resolution()`, `flush()` (push an RGB565 pixel rect), `flush_ready()`, `set_backlight(pct)`.
+  - `IDisplay` — `begin()`, `get_resolution()`, `flush()` (push an RGB565 pixel rect), `set_backlight(pct)`.
   - `ITouch` — `begin()`, non-blocking `read(out)`.
   - `IConfigStore` — raw byte-blob `read(offset, buf, len)`/`write(offset, buf, len)`/`capacity()`. [core/config](../core/config/README.md) owns the actual schema and versioning on top of this; this interface only knows about bytes.
   - `ISerialLink` — `begin(baud)`, non-blocking `read(buf, len)`/`write(buf, len)`. Raw byte transport to a companion board (the ESP32-C3 relay); `remote/protocol` owns framing/CRC on top of this.

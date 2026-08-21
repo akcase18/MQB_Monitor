@@ -1,11 +1,12 @@
 #include "info_screen.hpp"
+#include "mem_placement.hpp"
 
 #include "screen_helpers.hpp"
 
 namespace gui
 {
 
-    void InfoScreen::init(const Theme       &theme,
+    FLASHMEM void InfoScreen::init(const Theme       &theme,
                           ViewModelBuilder   builder,
                           void              *builder_ctx,
                           PanelPressCallback press_cb,

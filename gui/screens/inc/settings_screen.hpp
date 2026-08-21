@@ -88,11 +88,6 @@ namespace gui
 
             void open();
 
-            /** Updates the Theme row's swatch preview — called after
-             * ThemePickerScreen returns, before this screen is shown
-             * again. */
-            void set_accent_color(uint32_t accent_color);
-
             lv_obj_t *screen() const
             {
                 return screen_;

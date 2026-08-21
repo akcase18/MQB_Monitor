@@ -1,4 +1,5 @@
 #include "settings_screen.hpp"
+#include "mem_placement.hpp"
 
 #include <stdio.h>
 
@@ -27,10 +28,11 @@ namespace gui
         constexpr lv_coord_t PANELS_ROW_Y      = 136;
         constexpr lv_coord_t PANELS_ROW_HEIGHT = 40;
         constexpr lv_coord_t PANELS_LABEL_GAP  = 10;
-        /* Matches style_flat_matrix()'s pad_gap below — used to compute a
-         * single panel-count button's width so the Day/Night button
-         * (built first, in the Brightness row above this one) can match
-         * it exactly rather than being an arbitrary square. */
+        /* Matches style_flat_matrix()'s pad_gap (see screen_helpers.hpp)
+         * — used to compute a single panel-count button's width so the
+         * Day/Night button (built first, in the Brightness row above this
+         * one) can match it exactly rather than being an arbitrary
+         * square. */
         constexpr uint8_t    PANEL_BTN_COUNT = 6;
         constexpr lv_coord_t PANEL_BTN_GAP   = 8;
         constexpr lv_coord_t DIVIDER2_Y      = 186;
@@ -94,43 +96,15 @@ namespace gui
 
         constexpr int32_t BRIGHTNESS_STEP = 5;
 
-        /* Restyles a checkable lv_buttonmatrix away from LVGL's default
-         * light-mode card+shadow look to match the flat, bordered,
-         * accent-on-checked treatment used everywhere else in this app —
-         * used by the Panels matrix below. */
-        void style_flat_matrix(lv_obj_t *matrix, const Theme &theme)
-        {
-            lv_obj_set_style_bg_opa(matrix, LV_OPA_TRANSP, 0);
-            lv_obj_set_style_border_width(matrix, 0, 0);
-            lv_obj_set_style_shadow_width(matrix, 0, 0);
-            lv_obj_set_style_pad_all(matrix, 0, 0);
-            lv_obj_set_style_pad_gap(matrix, 8, 0);
-
-            lv_obj_set_style_bg_color(matrix, theme.palette.bg, LV_PART_ITEMS);
-            lv_obj_set_style_bg_opa(matrix, LV_OPA_COVER, LV_PART_ITEMS);
-            lv_obj_set_style_text_color(
-                matrix, theme.palette.fg, LV_PART_ITEMS);
-            lv_obj_set_style_radius(matrix, 8, LV_PART_ITEMS);
-            lv_obj_set_style_border_width(
-                matrix, theme.metrics.panel_border_width, LV_PART_ITEMS);
-            lv_obj_set_style_border_color(
-                matrix, theme.palette.panel_border, LV_PART_ITEMS);
-            lv_obj_set_style_shadow_width(matrix, 0, LV_PART_ITEMS);
-            lv_obj_set_style_bg_color(
-                matrix, theme.palette.accent, LV_PART_ITEMS | LV_STATE_CHECKED);
-            lv_obj_set_style_bg_color(
-                matrix, theme.palette.accent, LV_PART_ITEMS | LV_STATE_PRESSED);
-        }
-
         /* Matches day_night_btn_/orientation_btn_'s styling — used by the
          * orientation-change confirm popup's footer buttons so they don't
          * end up in LVGL's default light-mode look. `primary` (the
          * popup's Confirm button) sits solid-accent at rest, the same
          * color every other button here only shows on press — marking it
          * as the button that actually commits the change, matching the
-         * button-matrix's own checked-state treatment (style_flat_matrix
-         * above). */
-        void style_flat_footer_button(lv_obj_t   *btn,
+         * button-matrix's own checked-state treatment (screen_helpers.hpp's
+         * style_flat_matrix()). */
+        FLASHMEM void style_flat_footer_button(lv_obj_t   *btn,
                                       const Theme &theme,
                                       bool         primary = false)
         {
@@ -152,7 +126,7 @@ namespace gui
          * Orientation row instead of separating stacked rows. Kept local to
          * this screen rather than promoted to screen_helpers.hpp since
          * nothing else needs a vertical split yet. */
-        lv_obj_t *create_vertical_divider(lv_obj_t    *parent,
+        FLASHMEM lv_obj_t *create_vertical_divider(lv_obj_t    *parent,
                                           const Theme &theme,
                                           lv_coord_t   x,
                                           lv_coord_t   y,
@@ -168,7 +142,7 @@ namespace gui
         }
     } // namespace
 
-    void SettingsScreen::init(const Theme &theme,
+    FLASHMEM void SettingsScreen::init(const Theme &theme,
                               uint8_t      initial_day_brightness_pct,
                               uint8_t      initial_night_brightness_pct,
                               uint8_t      initial_num_panels,
@@ -208,11 +182,7 @@ namespace gui
 
         /* Nav bar: title + close, standing in for the bottom-right
          * checkmark other screens use (see the file doc comment). */
-        lv_obj_t *title_lbl = lv_label_create(screen_);
-        lv_label_set_text(title_lbl, "Settings");
-        lv_obj_align(title_lbl, LV_ALIGN_TOP_LEFT, 20, 12);
-        lv_obj_set_style_text_color(title_lbl, theme.palette.fg, 0);
-        lv_obj_set_style_text_font(title_lbl, theme.typography.title, 0);
+        create_nav_title(screen_, theme, "Settings");
 
         DoneButton close = create_close_button(screen_, theme);
         lv_obj_add_event_cb(close.btn, done_cb_handler, LV_EVENT_CLICKED, this);
@@ -405,7 +375,7 @@ namespace gui
         lv_buttonmatrix_set_one_checked(panel_count_matrix_, true);
         lv_buttonmatrix_set_button_ctrl_all(panel_count_matrix_,
                                             LV_BUTTONMATRIX_CTRL_CHECKABLE);
-        style_flat_matrix(panel_count_matrix_, theme);
+        style_flat_matrix(panel_count_matrix_, theme, MATRIX_ITEM_PAD_KEEP);
 
         create_divider(
             screen_, theme, portrait ? PORTRAIT_DIVIDER2_Y : DIVIDER2_Y);
@@ -442,39 +412,19 @@ namespace gui
         lv_coord_t compact_row_height
             = portrait ? PORTRAIT_ROW_HEIGHT : COMPACT_ROW_HEIGHT;
 
-        lv_obj_t *theme_row_btn = lv_btn_create(screen_);
-        lv_obj_set_size(theme_row_btn, theme_row_width, compact_row_height);
-        lv_obj_align(theme_row_btn,
+        ListRow theme_row = create_list_row(screen_, theme, "Theme");
+        lv_obj_set_size(theme_row.btn, theme_row_width, compact_row_height);
+        lv_obj_align(theme_row.btn,
                      LV_ALIGN_TOP_LEFT,
                      SCREEN_MARGIN,
                      portrait ? PORTRAIT_THEME_ROW_Y : THEME_ROW_Y);
-        lv_obj_set_style_bg_opa(theme_row_btn, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_border_width(theme_row_btn, 0, 0);
-        lv_obj_set_style_shadow_width(theme_row_btn, 0, 0);
-        lv_obj_set_style_pad_all(theme_row_btn, 0, 0);
-        lv_obj_set_style_bg_color(
-            theme_row_btn, theme.palette.accent, LV_STATE_PRESSED);
-        lv_obj_set_style_bg_opa(theme_row_btn, LV_OPA_30, LV_STATE_PRESSED);
         lv_obj_add_event_cb(
-            theme_row_btn, pick_theme_cb_handler, LV_EVENT_CLICKED, this);
-
-        lv_obj_t *theme_label = lv_label_create(theme_row_btn);
-        lv_label_set_text(theme_label, "Theme");
-        lv_obj_set_style_text_color(theme_label, theme.palette.fg, 0);
-        lv_obj_set_style_text_font(theme_label, theme.typography.label_lg, 0);
-        lv_obj_align(theme_label, LV_ALIGN_LEFT_MID, 0, 0);
-
-        lv_obj_t *theme_chevron = lv_label_create(theme_row_btn);
-        lv_obj_set_style_text_font(
-            theme_chevron, theme.typography.symbol_lg, 0);
-        lv_label_set_text(theme_chevron, LV_SYMBOL_RIGHT);
-        lv_obj_set_style_text_color(theme_chevron, theme.palette.fg, 0);
-        lv_obj_align(theme_chevron, LV_ALIGN_RIGHT_MID, 0, 0);
+            theme_row.btn, pick_theme_cb_handler, LV_EVENT_CLICKED, this);
 
         /* Current-accent preview — a plain colored square rather than a
          * text swatch name, since the presets don't have user-facing
          * names beyond their appearance. */
-        theme_swatch_ = lv_obj_create(theme_row_btn);
+        theme_swatch_ = lv_obj_create(theme_row.btn);
         lv_obj_set_size(theme_swatch_, THEME_SWATCH_SIZE, THEME_SWATCH_SIZE);
         lv_obj_set_style_radius(theme_swatch_, 6, 0);
         lv_obj_set_style_border_width(
@@ -483,7 +433,7 @@ namespace gui
             theme_swatch_, theme.palette.panel_border, 0);
         lv_obj_set_style_shadow_width(theme_swatch_, 0, 0);
         lv_obj_align_to(
-            theme_swatch_, theme_chevron, LV_ALIGN_OUT_LEFT_MID, -12, 0);
+            theme_swatch_, theme_row.chevron, LV_ALIGN_OUT_LEFT_MID, -12, 0);
 
         /* Orientation row: a label plus a compact toggle button (matching
          * the Day/Night button's styling), not a navigation row — there's
@@ -551,37 +501,17 @@ namespace gui
         /* Wireless Setup row: tappable, hands off to WirelessSetupScreen —
          * same shape as the Theme row above it, just without a preview
          * swatch (there's no "current value" to show at a glance). */
-        lv_obj_t *wireless_row_btn = lv_btn_create(screen_);
-        lv_obj_set_size(wireless_row_btn,
+        ListRow wireless_row
+            = create_list_row(screen_, theme, "Wireless Setup");
+        lv_obj_set_size(wireless_row.btn,
                         theme.metrics.screen_width - 40,
                         compact_row_height);
-        lv_obj_align(wireless_row_btn,
+        lv_obj_align(wireless_row.btn,
                      LV_ALIGN_TOP_MID,
                      0,
                      portrait ? PORTRAIT_WIRELESS_ROW_Y : WIRELESS_ROW_Y);
-        lv_obj_set_style_bg_opa(wireless_row_btn, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_border_width(wireless_row_btn, 0, 0);
-        lv_obj_set_style_shadow_width(wireless_row_btn, 0, 0);
-        lv_obj_set_style_pad_all(wireless_row_btn, 0, 0);
-        lv_obj_set_style_bg_color(
-            wireless_row_btn, theme.palette.accent, LV_STATE_PRESSED);
-        lv_obj_set_style_bg_opa(wireless_row_btn, LV_OPA_30, LV_STATE_PRESSED);
         lv_obj_add_event_cb(
-            wireless_row_btn, pick_wireless_cb_handler, LV_EVENT_CLICKED, this);
-
-        lv_obj_t *wireless_label = lv_label_create(wireless_row_btn);
-        lv_label_set_text(wireless_label, "Wireless Setup");
-        lv_obj_set_style_text_color(wireless_label, theme.palette.fg, 0);
-        lv_obj_set_style_text_font(
-            wireless_label, theme.typography.label_lg, 0);
-        lv_obj_align(wireless_label, LV_ALIGN_LEFT_MID, 0, 0);
-
-        lv_obj_t *wireless_chevron = lv_label_create(wireless_row_btn);
-        lv_obj_set_style_text_font(
-            wireless_chevron, theme.typography.symbol_lg, 0);
-        lv_label_set_text(wireless_chevron, LV_SYMBOL_RIGHT);
-        lv_obj_set_style_text_color(wireless_chevron, theme.palette.fg, 0);
-        lv_obj_align(wireless_chevron, LV_ALIGN_RIGHT_MID, 0, 0);
+            wireless_row.btn, pick_wireless_cb_handler, LV_EVENT_CLICKED, this);
     }
 
     void SettingsScreen::open()
@@ -606,12 +536,6 @@ namespace gui
 
         lv_screen_load_anim(
             screen_, LV_SCR_LOAD_ANIM_OVER_BOTTOM, 220, 0, false);
-    }
-
-    void SettingsScreen::set_accent_color(uint32_t accent_color)
-    {
-        accent_color_ = accent_color;
-        refresh_theme_swatch();
     }
 
     void SettingsScreen::refresh_theme_swatch()

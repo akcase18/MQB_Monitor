@@ -116,7 +116,10 @@ namespace core
 
             now_displayed[idx] = true;
 
-            const SignalValue &v = signals.get(SIGNAL_CATALOG[idx].id);
+            /* Index-keyed: get(id) would re-scan the whole catalog to
+             * recover the index signal_catalog_find() just produced, and
+             * this runs for every panel on every sample tick. */
+            const SignalValue &v = signals.get_at(idx);
 
             if (!in_display_set_[idx])
             {

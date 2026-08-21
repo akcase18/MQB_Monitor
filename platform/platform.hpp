@@ -111,14 +111,6 @@ class IDisplay
                            const uint16_t *pixels) = 0;
 
         /**
-         * Used to determine when the transfer started by flush() has
-         * completed.
-         *
-         * @returns True when transfer is complete. Otherwise false.
-         */
-        virtual bool flush_ready() const = 0;
-
-        /**
          * Sets backlight brightness.
          *
          * @param pct Brightness, 0-100.

@@ -29,6 +29,8 @@ That's a hard floor on retention, and a pessimistic one. Only 5 catalog signals 
 
 **RAM note**: `Logger::BUFFER_CAPACITY` was originally sized for several seconds' worth of records, but on real hardware this pushed `teensymm`'s RAM1 "free for local variables" (effectively stack headroom) from ~63KB down under 15KB — most of that drop turned out to be a ~30KB fixed linker-layout cost from this module existing at all (present even with an 8-record buffer), not something that scales with `BUFFER_CAPACITY` itself. `BUFFER_CAPACITY` was shrunk to 512 (~3.5s worth at the worst case above) to recover real headroom (~25KB) without materially hurting flush batching, since the buffer filling up is now the usual flush trigger rather than `FLUSH_INTERVAL_MS`'s timer. Worth re-checking real hardware stack behavior if this area changes again.
 
+That headroom figure is no longer the binding constraint it was: a later pass took `teensymm`'s "free for local variables" to ~87KB by fixing the LVGL draw buffers' element type (they were declared `lv_color_t`, a 3-byte struct, for a 2-byte-per-pixel RGB565 render buffer — see `src/main.cpp`) and by moving cold code out of RAM1 with `FLASHMEM` (see `platform/mem_placement.hpp`). Raising `BUFFER_CAPACITY` again is therefore affordable now if flush batching ever turns out to matter more than the RAM.
+
 ## Retrieval (Phase 1: USB only)
 
 `src/main.cpp`'s `handle_log_command()` (Arduino/USB-CDC only, guarded by `#ifdef ARDUINO`) implements a small bespoke line command set over the same `Serial` the dashboard firmware already begins in `setup()`:

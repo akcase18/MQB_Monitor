@@ -7,34 +7,50 @@
 namespace gui
 {
 
+    DisplayMode to_gui_display_mode(core::DisplayMode mode)
+    {
+        switch (mode)
+        {
+            case core::DisplayMode::Bar:
+                return DisplayMode::Bar;
+            case core::DisplayMode::Gauge:
+                return DisplayMode::Gauge;
+            case core::DisplayMode::Digital:
+            default:
+                return DisplayMode::Digital;
+        }
+    }
+
+    core::DisplayMode to_core_display_mode(DisplayMode mode)
+    {
+        switch (mode)
+        {
+            case DisplayMode::Bar:
+                return core::DisplayMode::Bar;
+            case DisplayMode::Gauge:
+                return core::DisplayMode::Gauge;
+            case DisplayMode::Digital:
+            default:
+                return core::DisplayMode::Digital;
+        }
+    }
+
     namespace
     {
-        DisplayMode to_gui_display_mode(core::DisplayMode mode)
+        /* A bounded, always-terminating string copy. build_view_model()
+         * runs for every panel on every InfoScreen refresh, and this used
+         * to be snprintf(dst, cap, "%s", src) -- dragging the whole
+         * printf format-parsing machinery in to do what amounts to a
+         * strncpy. The float formatting below genuinely needs snprintf;
+         * these plain copies never did. */
+        void copy_str(char *dst, size_t cap, const char *src)
         {
-            switch (mode)
+            size_t i = 0;
+            for (; i + 1 < cap && src[i] != '\0'; i++)
             {
-                case core::DisplayMode::Bar:
-                    return DisplayMode::Bar;
-                case core::DisplayMode::Gauge:
-                    return DisplayMode::Gauge;
-                case core::DisplayMode::Digital:
-                default:
-                    return DisplayMode::Digital;
+                dst[i] = src[i];
             }
-        }
-
-        core::DisplayMode to_core_display_mode(DisplayMode mode)
-        {
-            switch (mode)
-            {
-                case DisplayMode::Bar:
-                    return core::DisplayMode::Bar;
-                case DisplayMode::Gauge:
-                    return core::DisplayMode::Gauge;
-                case DisplayMode::Digital:
-                default:
-                    return core::DisplayMode::Digital;
-            }
+            dst[i] = '\0';
         }
     } // namespace
 
@@ -70,16 +86,19 @@ namespace gui
         const core::SignalSpec &spec = core::SIGNAL_CATALOG[catalog_idx];
         bool is_metric               = panel.units == core::UnitSystem::Metric;
 
-        snprintf(vm.name, sizeof(vm.name), "%s", spec.name);
-        snprintf(vm.unit_label,
+        copy_str(vm.name, sizeof(vm.name), spec.name);
+        copy_str(vm.unit_label,
                  sizeof(vm.unit_label),
-                 "%s",
                  core::unit_label(spec.unit_type, is_metric));
 
-        const core::SignalValue &value = signals_.get(spec.id);
+        /* Index-keyed, not id-keyed: catalog_idx is already resolved
+         * above, and the id-keyed accessors would each re-scan the whole
+         * catalog to arrive back at it. */
+        const core::SignalValue &value = signals_.get_at(catalog_idx);
         if (value.has_data)
         {
-            float display = signals_.get_display_value(spec.id, is_metric);
+            float display
+                = signals_.get_display_value_at(catalog_idx, is_metric);
             snprintf(vm.value_str,
                      sizeof(vm.value_str),
                      "%.*f",
@@ -88,7 +107,7 @@ namespace gui
         }
         else
         {
-            snprintf(vm.value_str, sizeof(vm.value_str), "--");
+            copy_str(vm.value_str, sizeof(vm.value_str), "--");
         }
 
         core::WarningState warn
@@ -181,10 +200,9 @@ namespace gui
         vm.step      = step;
         vm.decimals  = core::unit_decimals(spec.unit_type, is_metric);
         vm.is_metric = is_metric;
-        snprintf(vm.name, sizeof(vm.name), "%s", spec.name);
-        snprintf(vm.unit_label,
+        copy_str(vm.name, sizeof(vm.name), spec.name);
+        copy_str(vm.unit_label,
                  sizeof(vm.unit_label),
-                 "%s",
                  core::unit_label(spec.unit_type, is_metric));
         return vm;
     }

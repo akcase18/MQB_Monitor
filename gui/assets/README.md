@@ -11,4 +11,4 @@ Font source files (as LVGL C font descriptors) and their licenses.
 
 ## Adding a new font size or icon
 
-Fonts are converted via [LVGL's online font converter](https://lvgl.io/tools/fontconverter) (or the equivalent CLI) into a `.c` file in `fonts/`, declared `extern const lv_font_t <name>` in [gui/theme/src/theme.cpp](../theme/src/theme.cpp), and assigned to the relevant `Typography` field in `THEME_DEFAULT`/`THEME_ALT`. Remember to add `+<../gui/assets/fonts>` coverage in `platformio.ini`'s `build_src_filter` for any new environment (both `teensymm` and `simulator` already include the whole directory).
+Fonts are converted via [LVGL's online font converter](https://lvgl.io/tools/fontconverter) (or the equivalent CLI) into a `.c` file in `fonts/`, declared `extern const lv_font_t <name>` in [gui/theme/src/theme.cpp](../theme/src/theme.cpp), and assigned to the relevant `Typography` field in `THEME_DEFAULT`. Remember to add `+<../gui/assets/fonts>` coverage in `platformio.ini`'s `build_src_filter` for any new environment (both `teensymm` and `simulator` already include the whole directory).

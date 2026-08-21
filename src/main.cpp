@@ -8,6 +8,7 @@
  * core:: and gui:: directly outside of gui/bindings.
  */
 
+#include "mem_placement.hpp"
 #include "platform.hpp"
 #include "theme.hpp"
 
@@ -71,8 +72,18 @@ namespace
      * essentially nothing: each tick walks at most MAX_PANELS entries. */
     constexpr uint32_t LOG_SAMPLE_PERIOD_MS = 20;
 
-    lv_color_t s_draw_buf_1[(LCD_HORZ * LCD_VERT) / 10];
-    lv_color_t s_draw_buf_2[(LCD_HORZ * LCD_VERT) / 10];
+    /* RGB565 (2 bytes/pixel), NOT lv_color_t: with LV_COLOR_DEPTH 16 LVGL
+     * renders into the draw buffer in the display's own color format,
+     * which is what display_flush_cb() below already reinterprets these
+     * as. lv_color_t is a 3-byte {b,g,r} struct regardless of
+     * LV_COLOR_DEPTH, so declaring them as an array of it over-allocated
+     * every buffer by 50% (46080 bytes each for 15360 pixels' worth of
+     * RGB565) without LVGL ever using the extra byte per pixel.
+     * Deliberately one tenth of the panel, not a full framebuffer --
+     * LV_DISPLAY_RENDER_MODE_PARTIAL renders and flushes in bands.
+     * 4-byte aligned for the DMA push in TeensyDisplay::flush(). */
+    alignas(4) uint16_t s_draw_buf_1[(LCD_HORZ * LCD_VERT) / 10];
+    alignas(4) uint16_t s_draw_buf_2[(LCD_HORZ * LCD_VERT) / 10];
 
     /**
      * Every long-lived object the app needs, wired together once. Lazily
@@ -313,20 +324,6 @@ namespace
         return binding->build_view_model(rank, large, hero);
     }
 
-    gui::DisplayMode to_gui_display_mode(core::DisplayMode mode)
-    {
-        switch (mode)
-        {
-            case core::DisplayMode::Bar:
-                return gui::DisplayMode::Bar;
-            case core::DisplayMode::Gauge:
-                return gui::DisplayMode::Gauge;
-            case core::DisplayMode::Digital:
-            default:
-                return gui::DisplayMode::Digital;
-        }
-    }
-
     void panel_pressed_cb(void *ctx, uint8_t rank)
     {
         (void)ctx;
@@ -337,7 +334,7 @@ namespace
             rank,
             panel.signal_id,
             panel.units == core::UnitSystem::Metric,
-            to_gui_display_mode(panel.display_mode));
+            gui::to_gui_display_mode(panel.display_mode));
     }
 
     void configurator_done_cb(void            *ctx,
@@ -463,7 +460,7 @@ namespace
      * this is meant to run as its own dedicated offload action (park,
      * plug in, dump), not interleaved with driving, so freezing
      * everything else (CAN polling, GUI) for the duration is fine. */
-    void handle_log_command(const char *cmd, size_t len)
+    FLASHMEM void handle_log_command(const char *cmd, size_t len)
     {
         if (len == 7 && memcmp(cmd, "LOGDUMP", 7) == 0)
         {
@@ -608,7 +605,7 @@ namespace
      * indicator, etc.) don't re-read the Theme live, so picking up a new
      * accent means every screen has to be rebuilt from scratch against it.
      */
-    void build_screens()
+    FLASHMEM void build_screens()
     {
         Composition          &app      = composition();
         const gui::Theme     &theme    = runtime_theme();
@@ -678,7 +675,7 @@ namespace
      * it, so deleting the currently-loaded screen directly (without
      * switching away first) would leave that pointer dangling.
      */
-    lv_obj_t *destroy_screens()
+    FLASHMEM lv_obj_t *destroy_screens()
     {
         Composition &app = composition();
 
@@ -706,7 +703,7 @@ namespace
      * exists to avoid. By the time this runs, that call stack has fully
      * unwound.
      */
-    void rebuild_screens_for_theme_change(void *user_data)
+    FLASHMEM void rebuild_screens_for_theme_change(void *user_data)
     {
         (void)user_data;
         lv_obj_t *transition = destroy_screens();
@@ -716,7 +713,7 @@ namespace
     }
 } // namespace
 
-void setup()
+FLASHMEM void setup()
 {
 #ifdef ARDUINO
     Serial.begin(115200);

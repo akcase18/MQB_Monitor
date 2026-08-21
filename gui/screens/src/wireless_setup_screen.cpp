@@ -1,4 +1,5 @@
 #include "wireless_setup_screen.hpp"
+#include "mem_placement.hpp"
 
 #include <stdio.h>
 #include <string.h>
@@ -32,7 +33,7 @@ namespace gui
         constexpr lv_coord_t QR_BLOCK_HEIGHT = 186;
     } // namespace
 
-    void WirelessSetupScreen::init(const Theme       &theme,
+    FLASHMEM void WirelessSetupScreen::init(const Theme       &theme,
                                    DeactivateCallback deactivate_cb,
                                    void              *deactivate_ctx)
     {
@@ -41,11 +42,7 @@ namespace gui
 
         screen_ = create_screen(theme);
 
-        lv_obj_t *title_lbl = lv_label_create(screen_);
-        lv_label_set_text(title_lbl, "Wireless Setup");
-        lv_obj_align(title_lbl, LV_ALIGN_TOP_LEFT, 20, 12);
-        lv_obj_set_style_text_color(title_lbl, theme.palette.fg, 0);
-        lv_obj_set_style_text_font(title_lbl, theme.typography.title, 0);
+        create_nav_title(screen_, theme, "Wireless Setup");
 
         DoneButton close = create_close_button(screen_, theme);
         lv_obj_add_event_cb(

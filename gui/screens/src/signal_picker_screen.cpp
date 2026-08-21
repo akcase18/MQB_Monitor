@@ -1,4 +1,5 @@
 #include "signal_picker_screen.hpp"
+#include "mem_placement.hpp"
 
 #include <string.h>
 
@@ -14,7 +15,7 @@ namespace gui
         constexpr lv_coord_t HEADER_DIVIDER_Y = 50;
     } // namespace
 
-    void SignalPickerScreen::init(const Theme             &theme,
+    FLASHMEM void SignalPickerScreen::init(const Theme             &theme,
                                   const char *const *const signal_names,
                                   const uint16_t          *signal_ids,
                                   uint16_t                 num_signals,
@@ -28,11 +29,7 @@ namespace gui
 
         screen_ = create_screen(theme);
 
-        lv_obj_t *title_lbl = lv_label_create(screen_);
-        lv_label_set_text(title_lbl, "Select Signal");
-        lv_obj_align(title_lbl, LV_ALIGN_TOP_LEFT, 20, 12);
-        lv_obj_set_style_text_color(title_lbl, theme.palette.fg, 0);
-        lv_obj_set_style_text_font(title_lbl, theme.typography.title, 0);
+        create_nav_title(screen_, theme, "Select Signal");
 
         DoneButton close = create_close_button(screen_, theme);
         lv_obj_add_event_cb(close.btn, done_cb_handler, LV_EVENT_CLICKED, this);

@@ -19,7 +19,6 @@ class TeensyDisplay : public IDisplay
                    int32_t         x2,
                    int32_t         y2,
                    const uint16_t *pixels) override;
-        bool flush_ready() const override;
         void set_backlight(uint8_t pct) override;
 
     private:

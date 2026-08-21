@@ -1,6 +1,6 @@
 # gui/theme/
 
-Palette, typography, and metrics tokens for every screen and widget — the one place a full reskin touches. Nothing in [gui/widgets](../widgets/README.md) or [gui/screens](../screens/README.md) references `THEME_DEFAULT`/`THEME_ALT` by name; they only ever see a `const Theme &` passed in at `init()`.
+Palette, typography, and metrics tokens for every screen and widget — the one place a full reskin touches. Nothing in [gui/widgets](../widgets/README.md) or [gui/screens](../screens/README.md) references `THEME_DEFAULT` by name; they only ever see a `const Theme &` passed in at `init()`.
 
 ## Files
 
@@ -10,12 +10,11 @@ Palette, typography, and metrics tokens for every screen and widget — the one 
   - `Metrics` — screen resolution, panel corner radius/border width/gap/margin, and the legacy small/large panel height fractions (`panel_height_sm_pct`/`panel_height_lg_pct`, used only by the 5-panel layout — see [gui/screens](../screens/README.md)).
   - `Theme { Palette, Typography, Metrics }` — the full bundle passed to every screen's `init()`.
   - `THEME_DEFAULT` — black background, white text, green accent, blue/red low/high warnings.
-  - `THEME_ALT` — a cooler, higher-contrast variant (dark blue-grey background, cyan accent, roomier spacing) that exists specifically to prove a reskin only touches this file.
   - `ACCENT_PRESETS[ACCENT_PRESET_COUNT]` — 9 packed `0xRRGGBB` accent color choices shown in the Theme Picker screen, stored as plain `uint32_t` (matching LVGL's built-in palette mains) rather than `lv_color_t` so the same values are usable from `core::Settings::accent_color`, which has no LVGL dependency.
   - `ICON_SUN`/`ICON_MOON` — UTF-8 string literals for the Day/Night toggle's glyphs (Font Awesome Free Solid's fa-sun/fa-moon), the same pattern LVGL's own `LV_SYMBOL_*` macros use.
 
-- **`src/theme.cpp`** — `THEME_DEFAULT`/`THEME_ALT`/`ACCENT_PRESETS`' actual values, plus `extern "C"` declarations pulling in the font data from [gui/assets/fonts](../assets/README.md).
+- **`src/theme.cpp`** — `THEME_DEFAULT`/`ACCENT_PRESETS`' actual values, plus `extern "C"` declarations pulling in the font data from [gui/assets/fonts](../assets/README.md).
 
 ## Adding a new theme variant
 
-Add another `const Theme` (see `THEME_ALT` for the pattern) and pass it wherever `THEME_DEFAULT` is currently passed in `src/main.cpp`'s `build_screens()` — nothing in `gui/widgets` or `gui/screens` needs to change.
+Add another `const Theme` alongside `THEME_DEFAULT` and pass it wherever `THEME_DEFAULT` is currently passed in `src/main.cpp`'s `build_screens()` — nothing in `gui/widgets` or `gui/screens` needs to change.

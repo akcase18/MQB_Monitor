@@ -22,20 +22,9 @@ namespace core
         task.ctx         = ctx;
         task.period_ms   = period_ms;
         task.last_run_ms = clock_.millis();
-        task.active      = true;
         count_++;
 
         return id;
-    }
-
-    void Scheduler::set_period(TaskId id, uint32_t period_ms)
-    {
-        if (id >= count_)
-        {
-            return;
-        }
-
-        tasks_[id].period_ms = period_ms;
     }
 
     void Scheduler::tick()
@@ -45,10 +34,6 @@ namespace core
         for (uint16_t i = 0; i < count_; i++)
         {
             Task &task = tasks_[i];
-            if (!task.active)
-            {
-                continue;
-            }
 
             /* Unsigned subtraction wraps correctly across millis() overflow. */
             if ((now - task.last_run_ms) >= task.period_ms)

@@ -73,52 +73,6 @@ namespace gui
         },
     };
 
-    /**
-     * Cooler, higher-contrast variant of THEME_DEFAULT — same fonts and
-     * layout fractions, different palette and slightly roomier spacing.
-     * Exists to prove a reskin only touches this file: nothing in
-     * gui/widgets or gui/screens references THEME_ALT or THEME_DEFAULT by
-     * name, only through the `const Theme &` passed in at init().
-     */
-    const Theme THEME_ALT = {
-        /* palette */
-        {
-            lv_palette_darken(LV_PALETTE_BLUE_GREY, 4),  /* bg */
-            lv_color_white(),                            /* fg */
-            lv_palette_main(LV_PALETTE_CYAN),            /* accent */
-            lv_palette_main(LV_PALETTE_LIGHT_BLUE),      /* warn_lo */
-            lv_palette_main(LV_PALETTE_ORANGE),          /* warn_hi */
-            lv_palette_lighten(LV_PALETTE_BLUE_GREY, 2), /* panel_border */
-            lv_palette_main(LV_PALETTE_YELLOW),          /* range_overflow */
-        },
-        /* typography */
-        {
-            &jetbrains_mono_bold_30,
-            &jetbrains_mono_bold_46,
-            &jetbrains_mono_bold_56,
-            &jetbrains_mono_bold_96,
-            &jetbrains_mono_14,
-            &jetbrains_mono_16,
-            &jetbrains_mono_11,
-            &jetbrains_mono_24,
-            &lv_font_montserrat_32,
-            &jetbrains_mono_bold_24,
-            &icon_day_night_28,
-            &lv_font_montserrat_18,
-        },
-        /* metrics */
-        {
-            480,
-            320,
-            16,
-            2,
-            10,
-            10,
-            0.45f,
-            0.55f,
-        },
-    };
-
     const Metrics METRICS_PORTRAIT = {
         320,
         480,

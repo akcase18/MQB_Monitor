@@ -85,14 +85,9 @@ void TeensyDisplay::flush(
     int32_t x1, int32_t y1, int32_t x2, int32_t y2, const uint16_t *pixels)
 {
     /* pushPixels16bitDMA blocks internally until any prior transfer has
-     * completed before issuing this one, so flush_ready() can just report
-     * true unconditionally. */
+     * completed before issuing this one, so there's nothing for the caller
+     * to poll -- returning from here means the flush is committed. */
     s_lcd.pushPixels16bitDMA(pixels, x1, y1, x2, y2);
-}
-
-bool TeensyDisplay::flush_ready() const
-{
-    return true;
 }
 
 void TeensyDisplay::set_backlight(uint8_t pct)

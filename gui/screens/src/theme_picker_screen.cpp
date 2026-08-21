@@ -1,4 +1,5 @@
 #include "theme_picker_screen.hpp"
+#include "mem_placement.hpp"
 
 #include "screen_helpers.hpp"
 
@@ -19,7 +20,7 @@ namespace gui
         constexpr lv_coord_t SELECTED_BORDER_WIDTH = 4;
     } // namespace
 
-    void ThemePickerScreen::init(const Theme &theme,
+    FLASHMEM void ThemePickerScreen::init(const Theme &theme,
                                  DoneCallback done_cb,
                                  void        *ctx)
     {
@@ -29,11 +30,7 @@ namespace gui
 
         screen_ = create_screen(theme);
 
-        lv_obj_t *title_lbl = lv_label_create(screen_);
-        lv_label_set_text(title_lbl, "Accent Color");
-        lv_obj_align(title_lbl, LV_ALIGN_TOP_LEFT, 20, 12);
-        lv_obj_set_style_text_color(title_lbl, theme.palette.fg, 0);
-        lv_obj_set_style_text_font(title_lbl, theme.typography.title, 0);
+        create_nav_title(screen_, theme, "Accent Color");
 
         DoneButton close = create_close_button(screen_, theme);
         lv_obj_add_event_cb(

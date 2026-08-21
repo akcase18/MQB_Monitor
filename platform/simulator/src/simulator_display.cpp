@@ -171,11 +171,6 @@ void SimulatorDisplay::flush(
     SDL_RenderPresent(renderer);
 }
 
-bool SimulatorDisplay::flush_ready() const
-{
-    return true;
-}
-
 void SimulatorDisplay::set_backlight(uint8_t pct)
 {
     /* No real backlight to dim on a dev host. */

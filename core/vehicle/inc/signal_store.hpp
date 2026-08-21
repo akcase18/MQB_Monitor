@@ -39,6 +39,20 @@ namespace core
              */
             float get_display_value(uint16_t id, bool is_metric) const;
 
+            /* Catalog-index overloads of the three accessors above, for
+             * callers that already hold an index (gui::VehicleBinding,
+             * core::Logger, on_uds_response() below). The id-keyed forms
+             * are just signal_catalog_find() -- a linear scan of the whole
+             * catalog -- in front of these, and the hot paths were paying
+             * for it two or three times per panel per refresh to look up
+             * an index they had already computed. Out-of-range indices
+             * behave like an unknown id: no-op / s_invalid / 0.0f. */
+            void set_at(int idx, float value, uint32_t now_ms);
+
+            const SignalValue &get_at(int idx) const;
+
+            float get_display_value_at(int idx, bool is_metric) const;
+
             /**
              * Feeds one decoded UDS response into the store: finds every
              * catalog request matching (byte1, byte2), decodes `raw` with that
@@ -51,7 +65,9 @@ namespace core
                                  uint32_t now_ms);
 
         private:
-            static SignalValue s_invalid;
+            /* const, so it lands in flash rather than costing a
+             * SignalValue's worth of RAM for a value that never changes. */
+            static const SignalValue s_invalid;
 
             SignalValue values_[SIGNAL_CATALOG_COUNT];
             float request_raw_[SIGNAL_CATALOG_COUNT][MAX_REQUESTS_PER_SIGNAL]
