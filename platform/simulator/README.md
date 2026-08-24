@@ -19,4 +19,4 @@ A desktop stand-in for every [platform](../README.md) interface, built on raw SD
 pio run -e simulator -t exec
 ```
 
-Needs SDL2 installed on the host — see [support/README.md](../../support/README.md) for how the build locates it. `sim_config.bin` persists across runs the same way EEPROM does on real hardware; delete it to reset to defaults. `sim_storage/` similarly stands in for whichever real storage backend is active and persists the same way; delete it to reset.
+Needs SDL2 installed on the host — see [support/README.md](../../support/README.md) for how the build locates it. `sim_config.bin` persists across runs the same way EEPROM does on real hardware; delete it to reset to defaults. `sim_storage/` similarly stands in for whichever real storage backend is active and persists the same way; delete it to reset. `sim_storage/`'s contents are git-ignored (`sim_config.bin` is still tracked) — see [sim_storage/README.md](../../sim_storage/README.md) for what the log chunk files in there are and how to decode them without hardware.
