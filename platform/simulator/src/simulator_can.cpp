@@ -2,8 +2,9 @@
  * @file simulator_can.cpp
  * @brief Synthetic ICanBus: any UDS enhanced-data-service request placed
  * via send() gets an immediate fabricated response queued for the next
- * receive(). Fake values are deterministic (derived from byte1/byte2)
- * rather than random, so decode/store round trips are reproducible.
+ * receive(). Fake values are deterministic -- a per-signal base derived
+ * from byte1/byte2 plus a slow triangular drift off a monotonic response
+ * counter, never a RNG -- so a given run still reproduces exactly.
  */
 #include "simulator_can.hpp"
 
@@ -36,10 +37,33 @@ bool SimulatorCanBus::send(const CanFrame &frame)
         return false;
     }
 
-    uint8_t  byte1 = frame.data[2];
-    uint8_t  byte2 = frame.data[3];
-    uint16_t fake_raw
-        = static_cast<uint16_t>((byte1 * 173u + byte2 * 37u) % 4096u);
+    uint8_t byte1 = frame.data[2];
+    uint8_t byte2 = frame.data[3];
+
+    /* A per-signal base, plus a slow triangular sweep so values actually
+     * move over time. The sweep is not cosmetic: with a constant response
+     * per signal, core::Logger's on-change recording correctly writes
+     * nothing at all, which left the entire logging path impossible to
+     * exercise in the simulator (and every panel reading frozen). The
+     * phase is offset per signal so they don't sweep in lockstep. */
+    int32_t base = static_cast<int32_t>((byte1 * 173u + byte2 * 37u) % 4096u);
+
+    uint32_t phase = ((tick_++ / 8u) + byte1 + byte2) % 512u;
+    int32_t  ramp  = phase < 256u ? static_cast<int32_t>(phase)
+                                  : static_cast<int32_t>(512u - phase);
+    int32_t  drift = (ramp - 128) * 2; /* -256 .. +256 */
+
+    int32_t drifted = base + drift;
+    if (drifted < 0)
+    {
+        drifted = 0;
+    }
+    else if (drifted > 4095)
+    {
+        drifted = 4095;
+    }
+    uint16_t fake_raw = static_cast<uint16_t>(drifted);
+    last_fake_raw_    = fake_raw;
 
     CanFrame &response = queue_[head_];
     response.id        = rx_id_;

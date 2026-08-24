@@ -39,7 +39,7 @@ Since the relay link rides the same USB-CDC connection used to flash the board, 
 1. Flash it: `pio run -e esp32c3 -t upload`.
 2. Find its device path: `ls /dev/tty.usbmodem*` (macOS).
 3. Point the simulator's serial link at it and run: `MQB_REMOTE_SERIAL_PORT=/dev/tty.usbmodemXXXX pio run -e simulator -t exec` (see [`platform/simulator/src/simulator_serial_link.cpp`](../simulator/src/simulator_serial_link.cpp) — unset, this env var defaults to a no-op).
-4. In the simulator, navigate Settings → Wireless Setup. This sends a real `CMD_AP_ENABLE` frame to the C3; the C3 actually stands up a SoftAP; the simulator only shows the QR code once a real `EVT_AP_READY` comes back over the wire.
+4. In the simulator, navigate Settings → WiFi. This sends a real `CMD_AP_ENABLE` frame to the C3; the C3 actually stands up a SoftAP; the simulator only shows the QR code once a real `EVT_AP_READY` comes back over the wire.
 5. Join the AP from a phone (or a laptop — anything that can join an open Wi-Fi network) and hit `http://192.168.4.1/`. The form should show whatever's currently saved in the simulator's config file. Change something on-device first (e.g. a warning threshold) so you're editing real values, not just defaults.
 
 This is a full round trip through real firmware — not just a build check.

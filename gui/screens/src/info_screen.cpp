@@ -6,6 +6,22 @@
 namespace gui
 {
 
+    namespace
+    {
+        /* Small enough to sit unobtrusively over the panel grid's top-
+         * right corner without covering a reading, large enough to catch
+         * the eye when it blinks. */
+        constexpr lv_coord_t LOGGING_LED_SIZE   = 12;
+        /* Inset from the top-right corner, applied on both axes (so it
+         * moves the LED left and down together). Sits on top of
+         * screen_'s own small pad_all, so the visible gap is a little
+         * larger than this alone. */
+        constexpr lv_coord_t LOGGING_LED_MARGIN = 8;
+        /* Half-period: lit this long, dark this long. Slow enough to
+         * read as a deliberate recording light rather than an alarm. */
+        constexpr uint32_t LOGGING_LED_BLINK_MS = 700;
+    } // namespace
+
     FLASHMEM void InfoScreen::init(const Theme       &theme,
                           ViewModelBuilder   builder,
                           void              *builder_ctx,
@@ -35,20 +51,25 @@ namespace gui
                                 &click_ctx_[i]);
         }
 
-        /* LV_OBJ_FLAG_IGNORE_LAYOUT excludes this from screen_'s grid
+        /* Capture indicator: a small blinking red LED, the convention
+         * every recording device uses, rather than the static SD-card
+         * glyph this started as -- that one sat muted grey over a dense
+         * panel grid and was easy to miss entirely, which is the one
+         * thing a "you are recording" cue must not be.
+         *
+         * LV_OBJ_FLAG_IGNORE_LAYOUT excludes it from screen_'s grid
          * layout (see rebuild() below) -- without it, the grid would try
          * to place this as a normal cell child and collide with panel 0.
-         * Hidden until set_logging_active(true) — muted (grey, not fg
-         * white) so it reads as a passive status glyph, not something
-         * needing attention. */
-        logging_icon_ = lv_label_create(screen_);
-        lv_obj_add_flag(logging_icon_, LV_OBJ_FLAG_IGNORE_LAYOUT);
-        lv_label_set_text(logging_icon_, LV_SYMBOL_SD_CARD);
-        lv_obj_set_style_text_font(logging_icon_, theme.typography.icon_status, 0);
-        lv_obj_set_style_text_color(
-            logging_icon_, theme.palette.panel_border, 0);
-        lv_obj_align(logging_icon_, LV_ALIGN_TOP_RIGHT, 0, 0);
-        lv_obj_add_flag(logging_icon_, LV_OBJ_FLAG_HIDDEN);
+         * Hidden until set_logging_active(true). */
+        logging_led_ = lv_led_create(screen_);
+        lv_obj_add_flag(logging_led_, LV_OBJ_FLAG_IGNORE_LAYOUT);
+        lv_obj_set_size(logging_led_, LOGGING_LED_SIZE, LOGGING_LED_SIZE);
+        lv_led_set_color(logging_led_, theme.palette.rec_indicator);
+        lv_obj_align(logging_led_,
+                     LV_ALIGN_TOP_RIGHT,
+                     -LOGGING_LED_MARGIN,
+                     LOGGING_LED_MARGIN);
+        lv_obj_add_flag(logging_led_, LV_OBJ_FLAG_HIDDEN);
     }
 
     void InfoScreen::rebuild(uint8_t count, LayoutOrientation orientation)
@@ -173,11 +194,35 @@ namespace gui
     {
         if (active)
         {
-            lv_obj_remove_flag(logging_icon_, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(logging_led_, LV_OBJ_FLAG_HIDDEN);
+
+            /* A hard on/off blink, not a fade: lv_anim_path_step holds
+             * the start value for the whole duration then jumps, so the
+             * LED sits lit for BLINK_PERIOD_MS and dark for the same,
+             * forever. Driven by an animation rather than an lv_timer so
+             * its lifetime is tied to the object -- lv_obj_delete()
+             * calls lv_anim_delete() on its target, so a screen rebuild
+             * (see main.cpp's destroy_screens()) can't leave a timer
+             * pointing at freed memory. */
+            lv_anim_t anim;
+            lv_anim_init(&anim);
+            lv_anim_set_var(&anim, logging_led_);
+            lv_anim_set_exec_cb(
+                &anim,
+                reinterpret_cast<lv_anim_exec_xcb_t>(lv_led_set_brightness));
+            lv_anim_set_values(&anim, LV_LED_BRIGHT_MAX, LV_LED_BRIGHT_MIN);
+            lv_anim_set_duration(&anim, LOGGING_LED_BLINK_MS);
+            lv_anim_set_reverse_duration(&anim, LOGGING_LED_BLINK_MS);
+            lv_anim_set_path_cb(&anim, lv_anim_path_step);
+            lv_anim_set_repeat_count(&anim, LV_ANIM_REPEAT_INFINITE);
+            lv_anim_start(&anim);
         }
         else
         {
-            lv_obj_add_flag(logging_icon_, LV_OBJ_FLAG_HIDDEN);
+            /* Stop the blink before hiding, so re-enabling starts a
+             * fresh animation rather than stacking a second one. */
+            lv_anim_delete(logging_led_, nullptr);
+            lv_obj_add_flag(logging_led_, LV_OBJ_FLAG_HIDDEN);
         }
     }
 

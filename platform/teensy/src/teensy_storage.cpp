@@ -109,3 +109,8 @@ bool TeensyStorage::remove(const char *path)
 {
     return fs_.remove(path);
 }
+
+StorageMedium TeensyStorage::medium() const
+{
+    return StorageMedium::Flash;
+}

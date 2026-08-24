@@ -94,6 +94,7 @@ namespace core
         config_.settings.night_brightness = 20;
         config_.settings.num_panels       = 5;
         config_.settings.orientation      = LayoutOrientation::Horizontal;
+        config_.settings.logging_enabled  = false; /* opt-in, see config.hpp */
         config_.settings.accent_color
             = 0x4CAF50; /* green, gui::ACCENT_PRESETS[0] */
 

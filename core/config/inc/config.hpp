@@ -57,6 +57,11 @@ namespace core
             uint8_t night_brightness;
             uint8_t num_panels; /* 1-6, active count within MAX_PANELS */
             LayoutOrientation orientation;
+            /* Whether core::Logger records anything. Opt-in: logging is
+             * a deliberate "capture this drive" action, not something
+             * that should burn flash write-cycles on every commute, so
+             * this defaults off and is toggled from SettingsScreen. */
+            bool logging_enabled;
             /* Packed 0xRRGGBB — one of gui::ACCENT_PRESETS, picked via
              * SettingsScreen's Theme row. Stored as a raw value rather than
              * an lv_color_t so core:: stays LVGL-free; gui/bindings

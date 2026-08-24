@@ -47,9 +47,17 @@ namespace core
      * derivation) once the fastest signals are logged at
      * LOG_SAMPLE_PERIOD_MS (see src/main.cpp) rather than their raw 20ms
      * display cadence. Total budget: CHUNK_COUNT * CHUNK_SIZE_BYTES ==
-     * ~13MB, comfortably inside the ~14MB now reserved for IStorage on the
-     * Teensy backend (see teensy_storage.cpp's STORAGE_SIZE_BYTES) with
-     * headroom left for core::Config and filesystem overhead. */
+     * 13MiB, inside the 14MiB reserved for IStorage on the Teensy backend
+     *
+     * Fixed at compile time and never derived from the backing store,
+     * which is right for onboard flash but leaves a Micro-SD card almost
+     * entirely unused -- see TODO.md. Both sizing parameters are already
+     * constructor arguments, so deriving them at boot from a capacity
+     * query on IStorage is the intended fix.
+     *
+     * (see teensy_storage.cpp's STORAGE_SIZE_BYTES), leaving headroom for
+     * LittleFS's own block metadata and firmware growth. core::Config is
+     * not in that region -- TeensyConfigStore keeps it in EEPROM. */
     constexpr uint32_t CHUNK_SIZE_BYTES = 256u * 1024u;
     constexpr uint16_t CHUNK_COUNT      = 52;
 
@@ -128,6 +136,12 @@ namespace core
              * sitting in SignalStore since before it was displayed never
              * lands in the log. The first record for it is the first
              * genuinely new value to arrive afterwards.
+             *
+             * Does nothing at all unless Settings::logging_enabled is
+             * set -- logging is opt-in (see config.hpp). Switching it off
+             * flushes whatever was buffered and drops every primed
+             * baseline, so resuming re-primes rather than bridging the
+             * pause with a pre-pause value.
              */
             void sample(const SignalStore &signals,
                         const Config      &config,
@@ -149,6 +163,58 @@ namespace core
                 return current_chunk_index_;
             }
 
+            /*==========================================================
+             * Log-index status, for LoggingScreen. All in-RAM reads --
+             * the index is loaded once by begin() and kept current from
+             * there, so a screen can poll these every refresh without
+             * touching storage.
+             *=========================================================*/
+
+            /** How many captures still have at least some data in the
+             * ring. Drops as the ring laps past old captures -- see
+             * log_record.hpp's LogIndexEntry. A capture whose earliest
+             * chunks have been overwritten but whose later ones survive
+             * still counts: part of it is still readable. */
+            uint16_t log_count() const
+            {
+                return entry_count_;
+            }
+
+            /** Summed duration of every capture still counted above.
+             * Excludes captures already evicted, so it tracks what's
+             * actually retrievable rather than what was ever recorded. */
+            uint32_t total_logged_ms() const;
+
+            /** True between the tick that saw logging switch on and the
+             * one that saw it switch off -- i.e. a capture is open and
+             * accruing into the newest index entry. */
+            bool is_capturing() const
+            {
+                return was_enabled_;
+            }
+
+            /** Total bytes the chunk ring can hold, this Logger's actual
+             * configured sizing rather than the CHUNK_* defaults (tests
+             * override them). */
+            uint64_t ring_capacity_bytes() const
+            {
+                return static_cast<uint64_t>(chunk_size_bytes_)
+                       * static_cast<uint64_t>(chunk_count_);
+            }
+
+            /**
+             * Bytes of the ring currently holding log data.
+             *
+             * Rises toward ring_capacity_bytes() and then stays pinned
+             * there: once the ring has lapped, every slot holds data
+             * forever after, because rotation overwrites rather than
+             * frees. So this answers "how much of the ring is in use",
+             * never "how much room is left" -- past the first lap there
+             * is no room left and recording continues anyway, dropping
+             * the oldest chunk each time around.
+             */
+            uint64_t used_bytes() const;
+
         private:
             /* ~3.5s worth of records at worst-case write rate -- in
              * practice the buffer filling up is the usual flush trigger
@@ -168,6 +234,19 @@ namespace core
 
             void flush();
             void start_new_chunk();
+
+            /** Reads `/log_index.bin` into entries_, or starts an empty
+             * index if it's missing/corrupt. */
+            void load_index();
+            void save_index();
+            /** Drops entries the ring has already lapped past. Called
+             * after begin()'s scan and again on every rotation, since
+             * eviction happens as chunks are reused, not only at boot. */
+            void prune_index();
+            /** chunk_seq of the oldest chunk still in the ring. */
+            uint32_t oldest_live_chunk_seq() const;
+            void     begin_capture(uint32_t now_ms);
+            void     end_capture(uint32_t now_ms);
 
             IStorage &backing_;
             uint32_t  chunk_size_bytes_;
@@ -197,10 +276,40 @@ namespace core
             float    last_value_[SIGNAL_CATALOG_COUNT];
             bool     in_display_set_[SIGNAL_CATALOG_COUNT] = {};
 
+            /* Whether Settings::logging_enabled was set on the previous
+             * sample() call -- lets the off-transition be caught once
+             * (flush what's buffered, drop the primed baselines) instead
+             * of every tick while logging stays off. */
+            bool was_enabled_ = false;
+
+            /* Log index -- see log_record.hpp. entries_ is ordered oldest
+             * capture first, so pruning is always a front-truncation. */
+            LogIndexEntry entries_[MAX_LOG_ENTRIES] = {};
+            uint16_t      entry_count_              = 0;
+            uint32_t      next_log_id_              = 1;
+            /* Boot-relative start of the capture currently open, so its
+             * duration can be recomputed each tick rather than
+             * accumulated (which would drift). */
+            uint32_t active_capture_start_ms_ = 0;
+            uint32_t last_index_save_ms_      = 0;
+
+            /* The index is rewritten whole (it's only ~2.5KB), so it's
+             * saved on capture start/stop and otherwise only this often
+             * -- a power cut mid-capture then costs at most this much
+             * accuracy in that capture's recorded duration, never any
+             * actual log data, which lives in the chunks. */
+            static constexpr uint32_t INDEX_SAVE_INTERVAL_MS = 30000;
+
             uint32_t session_id_          = 1;
             uint32_t next_chunk_seq_      = 0;
             uint16_t current_chunk_index_ = 0;
             uint32_t chunk_bytes_written_ = 0;
+            /* Whether the chunk at current_chunk_index_ has actually been
+             * created on disk yet. Chunks are created lazily, on the
+             * first flush that has something to put in them, so that
+             * neither booting nor stopping a capture on a chunk boundary
+             * costs a ring slot -- see begin(). */
+            bool     chunk_open_          = false;
             uint32_t last_flush_ms_       = 0;
     };
 

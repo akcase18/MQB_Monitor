@@ -61,11 +61,14 @@ void test_single_request_round_trip()
     const core::SignalValue &value = store.get(spec.id);
     TEST_ASSERT_TRUE(value.has_data);
 
-    /* SimulatorCanBus's fake_raw = (byte1*173 + byte2*37) % 4096. */
-    uint16_t fake_raw = static_cast<uint16_t>(
-        (spec.requests[0].byte1 * 173u + spec.requests[0].byte2 * 37u) % 4096u);
-    float expected = (static_cast<float>(fake_raw) + spec.requests[0].offset)
-                     * spec.requests[0].scale;
+    /* Asserted against the raw value the bus actually fabricated rather
+     * than a copy of its formula here -- fabricated values carry a slow
+     * drift (see simulator_can.cpp), so a duplicated formula would both
+     * be wrong and silently rot. What's under test is that the decode
+     * round-trips whatever was sent, not the specific number. */
+    float expected
+        = (static_cast<float>(bus.last_fake_raw()) + spec.requests[0].offset)
+          * spec.requests[0].scale;
     TEST_ASSERT_EQUAL_FLOAT(expected, value.value);
 }
 
@@ -103,21 +106,24 @@ void test_multi_request_signal_waits_for_all_requests()
     const core::SignalSpec &spec = core::SIGNAL_CATALOG[6];
     TEST_ASSERT_EQUAL_UINT8(2, spec.num_requests);
 
+    auto decode = [](uint16_t raw, const core::UdsRequestSpec &req) {
+        return (static_cast<float>(raw) + req.offset) * req.scale;
+    };
+
+    /* Each raw value is captured right after its own send(), since the
+     * bus's drift means the two requests don't fabricate from the same
+     * base -- see last_fake_raw()'s doc comment. */
     client.send(spec.requests[0]);
+    float ambient = decode(bus.last_fake_raw(), spec.requests[0]);
     client.poll(on_response, &store);
     TEST_ASSERT_FALSE(store.get(spec.id).has_data);
 
     client.send(spec.requests[1]);
+    float intake = decode(bus.last_fake_raw(), spec.requests[1]);
     client.poll(on_response, &store);
     TEST_ASSERT_TRUE(store.get(spec.id).has_data);
 
-    auto decode = [](const core::UdsRequestSpec &req) {
-        uint16_t fake_raw = static_cast<uint16_t>(
-            (req.byte1 * 173u + req.byte2 * 37u) % 4096u);
-        return (static_cast<float>(fake_raw) + req.offset) * req.scale;
-    };
-
-    float expected = decode(spec.requests[1]) - decode(spec.requests[0]);
+    float expected = intake - ambient;
     TEST_ASSERT_EQUAL_FLOAT(expected, store.get(spec.id).value);
 }
 

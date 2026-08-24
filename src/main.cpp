@@ -25,6 +25,7 @@
 
 #include "configurator_screen.hpp"
 #include "info_screen.hpp"
+#include "logging_screen.hpp"
 #include "remote_binding.hpp"
 #include "settings_screen.hpp"
 #include "signal_picker_screen.hpp"
@@ -59,6 +60,10 @@ namespace
 
     constexpr uint32_t INFO_SCREEN_REFRESH_MS     = 200;
     constexpr uint32_t WIRELESS_SCREEN_REFRESH_MS = 500;
+    /* Slower than the info screen's: nothing here changes faster than
+     * once a minute except the capture toggle, which repaints itself on
+     * press rather than waiting for this. */
+    constexpr uint32_t LOGGING_SCREEN_REFRESH_MS  = 1000;
 
     /* How often the logger *looks*, not how often it writes -- the write
      * rate per signal is floored at core::LOG_MIN_INTERVAL_MS (40ms)
@@ -109,6 +114,7 @@ namespace
             gui::RemoteBinding  remote_binding;
 
             gui::InfoScreen          info_screen;
+            gui::LoggingScreen       logging_screen;
             gui::ConfiguratorScreen  configurator_screen;
             gui::SignalPickerScreen  signal_picker_screen;
             gui::WarningConfigScreen warning_screen;
@@ -451,6 +457,80 @@ namespace
         composition().config_store.save();
     }
 
+    /** Snapshot of everything LoggingScreen shows, assembled from the
+     * Logger and the active IStorage. Rebuilt per open/refresh rather
+     * than cached -- all of it is in-RAM reads (see Logger's status
+     * accessors -- and IStorage::medium(), a compile-time constant). */
+    gui::LoggingViewModel build_logging_view_model()
+    {
+        Composition &app     = composition();
+        IStorage    &storage = platform_get().storage;
+
+        gui::LoggingViewModel vm;
+        vm.recording     = app.config_store.get().settings.logging_enabled;
+        vm.storage_ready = app.logger.is_ready();
+        vm.log_count     = app.logger.log_count();
+        vm.total_logged_min
+            = app.logger.total_logged_ms() / 60000u; /* whole minutes,
+                                                      * no hour rollover
+                                                      * -- see the view
+                                                      * model */
+        vm.ring_capacity_bytes = app.logger.ring_capacity_bytes();
+        vm.used_bytes          = app.logger.used_bytes();
+
+        /* The one place platform::StorageMedium is translated for gui/,
+         * which has no platform:: dependency of its own. */
+        const char *label = "Unknown";
+        switch (storage.medium())
+        {
+            case StorageMedium::Flash:
+                label = "Flash";
+                break;
+            case StorageMedium::SdCard:
+                label = "SD Card";
+                break;
+            case StorageMedium::HostDirectory:
+                label = "Simulated";
+                break;
+        }
+        strncpy(vm.storage_label, label, gui::LOGGING_STORAGE_LABEL_LEN - 1);
+        vm.storage_label[gui::LOGGING_STORAGE_LABEL_LEN - 1] = '\0';
+
+        return vm;
+    }
+
+    /* Fired the moment LoggingScreen's toggle is tapped. Persisted right
+     * away (same immediate-commit pattern as
+     * settings_orientation_confirm_cb/theme_picker_done_cb) and pushed
+     * straight to InfoScreen's status glyph, which is where the user sees
+     * whether capture is running once this screen is closed.
+     * core::Logger itself needs no notification -- it reads
+     * Settings::logging_enabled live on its next sample() tick, which is
+     * also what opens/closes the capture in its log index. */
+    void logging_toggle_cb(void *ctx, bool enabled)
+    {
+        (void)ctx;
+        Composition &app = composition();
+
+        app.config_store.get().settings.logging_enabled = enabled;
+        app.config_store.save();
+        app.info_screen.set_logging_active(enabled && app.logger.is_ready());
+    }
+
+    /* Keeps the capture count and recorded-minutes readouts advancing
+     * while the screen is up. Cheap enough to run unconditionally: like
+     * refresh_wireless_screen_task, it only does real work when its
+     * screen is actually loaded. */
+    void refresh_logging_screen_task(void *ctx)
+    {
+        (void)ctx;
+        Composition &app = composition();
+        if (lv_screen_active() == app.logging_screen.screen())
+        {
+            app.logging_screen.refresh(build_logging_view_model());
+        }
+    }
+
 #ifdef ARDUINO
     /* USB-serial log retrieval -- a small bespoke line command set (not
      * SLCAN; that's can_sniffer.cpp's separate, unrelated firmware/
@@ -488,6 +568,13 @@ namespace
             /* Exactly what IStorage::format()'s own doc comment describes
              * this for -- reclaim space once logs are offloaded. */
             platform_get().storage.format();
+
+            /* format() took the log index with it, so the Logger's
+             * in-RAM copy is now describing captures that no longer
+             * exist. Re-running begin() rebuilds rotation state and the
+             * index against the (now empty) store, leaving the capture
+             * count honestly at zero. */
+            composition().logger.begin();
         }
         else if (len == 9 && memcmp(cmd, "LOGSTATUS", 9) == 0)
         {
@@ -497,7 +584,13 @@ namespace
             Serial.print(" session=");
             Serial.print(logger.session_id());
             Serial.print(" chunk=");
-            Serial.println(logger.current_chunk_index());
+            Serial.print(logger.current_chunk_index());
+            Serial.print(" capturing=");
+            Serial.print(logger.is_capturing() ? 1 : 0);
+            Serial.print(" logs=");
+            Serial.print(logger.log_count());
+            Serial.print(" recorded_ms=");
+            Serial.println(logger.total_logged_ms());
         }
     }
 
@@ -591,9 +684,17 @@ namespace
             return;
         }
 
-        if (lv_indev_get_gesture_dir(lv_indev_active()) == LV_DIR_BOTTOM)
+        lv_dir_t dir = lv_indev_get_gesture_dir(lv_indev_active());
+
+        if (dir == LV_DIR_BOTTOM)
         {
             composition().settings_screen.open();
+        }
+        else if (dir == LV_DIR_TOP)
+        {
+            Composition &app = composition();
+            app.logging_screen.open(build_logging_view_model(),
+                                    app.info_screen.screen());
         }
     }
 
@@ -616,7 +717,8 @@ namespace
                              &app.vehicle_binding,
                              panel_pressed_cb,
                              nullptr);
-        app.info_screen.set_logging_active(app.logger.is_ready());
+        app.info_screen.set_logging_active(settings.logging_enabled
+                                           && app.logger.is_ready());
         app.configurator_screen.init(theme,
                                      app.signal_names,
                                      app.signal_ids,
@@ -650,6 +752,7 @@ namespace
                                  nullptr,
                                  settings_orientation_confirm_cb,
                                  nullptr);
+        app.logging_screen.init(theme, logging_toggle_cb, nullptr);
         app.theme_picker_screen.init(theme, theme_picker_done_cb, nullptr);
         app.wireless_setup_screen.init(theme, wireless_deactivate_cb, nullptr);
 
@@ -686,6 +789,7 @@ namespace
         lv_obj_delete(app.configurator_screen.screen());
         lv_obj_delete(app.signal_picker_screen.screen());
         lv_obj_delete(app.warning_screen.screen());
+        lv_obj_delete(app.logging_screen.screen());
         lv_obj_delete(app.settings_screen.screen());
         lv_obj_delete(app.theme_picker_screen.screen());
         lv_obj_delete(app.wireless_setup_screen.screen());
@@ -809,6 +913,8 @@ FLASHMEM void setup()
     app.scheduler.every(
         WIRELESS_SCREEN_REFRESH_MS, refresh_wireless_screen_task, nullptr);
     app.scheduler.every(LOG_SAMPLE_PERIOD_MS, logging_sample_task, nullptr);
+    app.scheduler.every(
+        LOGGING_SCREEN_REFRESH_MS, refresh_logging_screen_task, nullptr);
 
     lv_screen_load(app.info_screen.screen());
 }

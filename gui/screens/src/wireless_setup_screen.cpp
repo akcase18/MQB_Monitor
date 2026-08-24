@@ -42,7 +42,7 @@ namespace gui
 
         screen_ = create_screen(theme);
 
-        create_nav_title(screen_, theme, "Wireless Setup");
+        create_nav_title(screen_, theme, "WiFi");
 
         DoneButton close = create_close_button(screen_, theme);
         lv_obj_add_event_cb(

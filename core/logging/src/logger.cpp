@@ -81,10 +81,196 @@ namespace core
         current_chunk_index_
             = static_cast<uint16_t>(next_chunk_seq_ % chunk_count_);
 
-        start_new_chunk();
+        /* Deliberately does NOT create a chunk here. Creating one costs
+         * a ring slot (start_new_chunk() truncates whatever occupied it),
+         * and booting is not recording -- now that logging is opt-in, a
+         * run of ignition cycles with the recorder off would otherwise
+         * chew through the whole ring and destroy captures the user never
+         * touched. The first flush() of the first capture creates it. */
+        chunk_open_ = false;
+
+        /* After rotation state is known, so prune_index() can tell which
+         * captures the ring has already lapped past. */
+        load_index();
+        prune_index();
+        save_index();
 
         ready_ = true;
         return true;
+    }
+
+    uint32_t Logger::oldest_live_chunk_seq() const
+    {
+        if (!chunk_open_ && next_chunk_seq_ == 0)
+        {
+            return 0; /* nothing has ever been written */
+        }
+
+        /* next_chunk_seq_ is the open chunk's seq while one is open, and
+         * the seq the *next* one will take otherwise -- so the newest
+         * chunk actually on disk is one back in the latter case. */
+        uint32_t newest = chunk_open_ ? next_chunk_seq_ : next_chunk_seq_ - 1;
+
+        /* The ring holds the chunk_count_ most recent seqs ending there.
+         * Before the first full lap nothing has been evicted yet. */
+        if (newest + 1 < chunk_count_)
+        {
+            return 0;
+        }
+        return newest - (chunk_count_ - 1);
+    }
+
+    void Logger::prune_index()
+    {
+        uint32_t oldest = oldest_live_chunk_seq();
+
+        /* entries_ is oldest-first, so everything evicted is a prefix --
+         * find how much and shift the rest down. */
+        uint16_t drop = 0;
+        while (drop < entry_count_ && entries_[drop].last_chunk_seq < oldest)
+        {
+            drop++;
+        }
+        if (drop == 0)
+        {
+            return;
+        }
+
+        for (uint16_t i = drop; i < entry_count_; i++)
+        {
+            entries_[i - drop] = entries_[i];
+        }
+        entry_count_ = static_cast<uint16_t>(entry_count_ - drop);
+    }
+
+    void Logger::load_index()
+    {
+        entry_count_ = 0;
+        next_log_id_ = 1;
+
+        if (!backing_.open(LOG_INDEX_PATH, StorageFileMode::Read))
+        {
+            return; /* never written -- start empty */
+        }
+
+        LogIndexHeader header {};
+        size_t         n = backing_.read(&header, sizeof(header));
+        if (n != sizeof(header) || header.magic != LOG_INDEX_MAGIC
+            || header.version != LOG_INDEX_VERSION
+            || header.entry_count > MAX_LOG_ENTRIES)
+        {
+            backing_.close();
+            return; /* corrupt/foreign -- same self-healing treatment a
+                     * bad chunk header gets: treat as never-written */
+        }
+
+        for (uint16_t i = 0; i < header.entry_count; i++)
+        {
+            LogIndexEntry entry {};
+            if (backing_.read(&entry, sizeof(entry)) != sizeof(entry))
+            {
+                break; /* truncated (power cut mid-save) -- keep what
+                        * parsed cleanly and drop the rest */
+            }
+            entries_[entry_count_++] = entry;
+        }
+        backing_.close();
+
+        next_log_id_ = header.next_log_id;
+        if (next_log_id_ == 0)
+        {
+            next_log_id_ = 1;
+        }
+    }
+
+    void Logger::save_index()
+    {
+        if (!backing_.open(LOG_INDEX_PATH, StorageFileMode::Write))
+        {
+            return;
+        }
+
+        LogIndexHeader header { LOG_INDEX_MAGIC,
+                                LOG_INDEX_VERSION,
+                                next_log_id_,
+                                entry_count_ };
+        backing_.write(&header, sizeof(header));
+        if (entry_count_ > 0)
+        {
+            backing_.write(entries_,
+                           static_cast<size_t>(entry_count_)
+                               * sizeof(LogIndexEntry));
+        }
+        backing_.close();
+    }
+
+    void Logger::begin_capture(uint32_t now_ms)
+    {
+        if (entry_count_ == MAX_LOG_ENTRIES)
+        {
+            /* Full -- drop the oldest, which is the next one the ring
+             * would have evicted anyway. */
+            for (uint16_t i = 1; i < entry_count_; i++)
+            {
+                entries_[i - 1] = entries_[i];
+            }
+            entry_count_--;
+        }
+
+        entries_[entry_count_++] = { next_log_id_++,
+                                     session_id_,
+                                     next_chunk_seq_,
+                                     next_chunk_seq_,
+                                     0 };
+        active_capture_start_ms_ = now_ms;
+        last_index_save_ms_      = now_ms;
+        save_index();
+    }
+
+    void Logger::end_capture(uint32_t now_ms)
+    {
+        if (entry_count_ > 0)
+        {
+            LogIndexEntry &active = entries_[entry_count_ - 1];
+            active.last_chunk_seq = next_chunk_seq_;
+            active.duration_ms    = now_ms - active_capture_start_ms_;
+        }
+        save_index();
+    }
+
+    uint64_t Logger::used_bytes() const
+    {
+        uint64_t capacity = ring_capacity_bytes();
+
+        /* next_chunk_seq_ is also the count of chunks completed before
+         * the current one, since seqs run 0,1,2,... without gaps. Once
+         * that reaches chunk_count_ every slot has been written at least
+         * once and the ring is full for good. */
+        uint64_t completed = next_chunk_seq_;
+        if (completed >= chunk_count_)
+        {
+            return capacity;
+        }
+
+        uint64_t used = completed * static_cast<uint64_t>(chunk_size_bytes_);
+        if (chunk_open_)
+        {
+            used += chunk_bytes_written_;
+        }
+
+        /* A chunk rotates at >= chunk_size_bytes_, so the last one can
+         * overshoot slightly; don't report more than the ring holds. */
+        return used > capacity ? capacity : used;
+    }
+
+    uint32_t Logger::total_logged_ms() const
+    {
+        uint32_t total = 0;
+        for (uint16_t i = 0; i < entry_count_; i++)
+        {
+            total += entries_[i].duration_ms;
+        }
+        return total;
     }
 
     void Logger::sample(const SignalStore &signals,
@@ -94,6 +280,42 @@ namespace core
         if (!ready_)
         {
             return;
+        }
+
+        /* Logging is opt-in (see Settings::logging_enabled). Read live
+         * from config for the same reason the displayed set is -- the
+         * toggle takes effect on the next tick with nothing to keep in
+         * sync -- and checked before anything else so the cost while off
+         * is one bool test per tick. */
+        if (!config.settings.logging_enabled)
+        {
+            if (was_enabled_)
+            {
+                /* Don't strand whatever was buffered when the user
+                 * switched off. Clearing in_display_set_ makes every
+                 * signal re-prime when logging resumes, so the gap
+                 * doesn't get bridged by a stale pre-pause value.
+                 * flush() first, so end_capture() records the chunk the
+                 * last records actually landed in. */
+                flush();
+                for (uint16_t i = 0; i < SIGNAL_CATALOG_COUNT; i++)
+                {
+                    in_display_set_[i] = false;
+                }
+                was_enabled_ = false;
+                end_capture(now_ms);
+            }
+            return;
+        }
+
+        if (!was_enabled_)
+        {
+            /* Switching on opens a new capture -- a new "log" in the
+             * user's sense, independent of session_id (which only counts
+             * power cycles). Several captures per boot is the normal
+             * case. */
+            was_enabled_ = true;
+            begin_capture(now_ms);
         }
 
         uint8_t panels = config.settings.num_panels;
@@ -184,6 +406,22 @@ namespace core
             flush();
             last_flush_ms_ = now_ms;
         }
+
+        /* Extend the open capture to wherever writing has reached.
+         * Recomputed from its start rather than accumulated, so it can't
+         * drift. */
+        if (entry_count_ > 0)
+        {
+            LogIndexEntry &active  = entries_[entry_count_ - 1];
+            active.last_chunk_seq  = next_chunk_seq_;
+            active.duration_ms     = now_ms - active_capture_start_ms_;
+        }
+
+        if ((now_ms - last_index_save_ms_) >= INDEX_SAVE_INTERVAL_MS)
+        {
+            save_index();
+            last_index_save_ms_ = now_ms;
+        }
     }
 
     void Logger::flush()
@@ -191,6 +429,11 @@ namespace core
         if (buffer_count_ == 0)
         {
             return;
+        }
+
+        if (!chunk_open_)
+        {
+            start_new_chunk(); /* first write of this chunk's life */
         }
 
         char path[CHUNK_PATH_LEN];
@@ -209,10 +452,14 @@ namespace core
 
         if (chunk_bytes_written_ >= chunk_size_bytes_)
         {
+            /* Advance, but leave the next chunk uncreated until there's
+             * something to put in it -- same reasoning as begin(). A
+             * capture that stops right on a chunk boundary shouldn't
+             * evict anything on its way out. */
             next_chunk_seq_++;
             current_chunk_index_
                 = static_cast<uint16_t>(next_chunk_seq_ % chunk_count_);
-            start_new_chunk();
+            chunk_open_ = false;
         }
     }
 
@@ -231,6 +478,13 @@ namespace core
         }
 
         chunk_bytes_written_ = sizeof(ChunkHeader);
+        chunk_open_          = true;
+
+        /* StorageFileMode::Write truncated this slot, so whatever chunk
+         * previously occupied it is gone -- along with any capture whose
+         * last chunk that was. This is the one and only point at which
+         * data is actually evicted, so it's where pruning belongs. */
+        prune_index();
     }
 
 } // namespace core

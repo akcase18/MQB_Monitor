@@ -127,6 +127,11 @@ namespace
                 return files_.erase(path) > 0;
             }
 
+            StorageMedium medium() const override
+            {
+                return StorageMedium::HostDirectory;
+            }
+
             /** Test-only helper: raw contents of `path`, or an empty vector
              * if it was never written. Reads via the map directly rather
              * than the open/read/close API, purely so tests can assert on
@@ -154,13 +159,14 @@ namespace
         return path;
     }
 
-    /** A Config with `ids` assigned to panels, in order -- the only part of
-     * Config Logger::sample() reads (see its doc comment). Everything else
-     * is left zeroed. */
+    /** A Config with `ids` assigned to panels, in order, and logging
+     * switched on -- the only parts of Config Logger::sample() reads (see
+     * its doc comment). Everything else is left zeroed. */
     core::Config displaying(std::initializer_list<uint16_t> ids)
     {
         core::Config cfg {};
-        cfg.settings.num_panels = static_cast<uint8_t>(ids.size());
+        cfg.settings.num_panels      = static_cast<uint8_t>(ids.size());
+        cfg.settings.logging_enabled = true;
 
         uint8_t i = 0;
         for (uint16_t id : ids)
@@ -178,7 +184,7 @@ void tearDown()
 {
 }
 
-void test_begin_starts_fresh_chunk_on_blank_storage()
+void test_begin_writes_nothing_until_there_is_something_to_record()
 {
     FakeStorage storage;
     storage.begin();
@@ -189,8 +195,25 @@ void test_begin_starts_fresh_chunk_on_blank_storage()
     TEST_ASSERT_EQUAL_UINT32(1, logger.session_id());
     TEST_ASSERT_EQUAL_UINT16(0, logger.current_chunk_index());
 
+    /* No chunk yet. Creating one truncates a ring slot, and booting isn't
+     * recording -- with logging opt-in, a run of ignition cycles must not
+     * eat the ring. */
+    TEST_ASSERT_FALSE(storage.exists(chunk_path_str(0).c_str()));
+
+    /* The first flush with real content is what creates it, header and
+     * all. */
+    core::SignalStore signals;
+    uint16_t           id  = core::SIGNAL_CATALOG[0].id;
+    core::Config       cfg = displaying({ id });
+    signals.set(id, 1.0f, 100);
+    logger.sample(signals, cfg, 100);
+    signals.set(id, 2.0f, 200);
+    logger.sample(signals, cfg, 200);
+    logger.sample(signals, cfg, 5200); // flush
+
     std::vector<uint8_t> bytes = storage.file_bytes(chunk_path_str(0));
-    TEST_ASSERT_EQUAL_size_t(sizeof(core::ChunkHeader), bytes.size());
+    TEST_ASSERT_EQUAL_size_t(
+        sizeof(core::ChunkHeader) + sizeof(core::LogRecord), bytes.size());
 
     core::ChunkHeader header;
     memcpy(&header, bytes.data(), sizeof(header));
@@ -198,6 +221,41 @@ void test_begin_starts_fresh_chunk_on_blank_storage()
     TEST_ASSERT_EQUAL_UINT8(core::LOG_VERSION, header.version);
     TEST_ASSERT_EQUAL_UINT32(1, header.session_id);
     TEST_ASSERT_EQUAL_UINT32(0, header.chunk_seq);
+}
+
+void test_repeated_boots_without_recording_do_not_evict_anything()
+{
+    FakeStorage storage;
+    storage.begin();
+
+    core::SignalStore signals;
+    uint16_t           id  = core::SIGNAL_CATALOG[0].id;
+    core::Config       cfg = displaying({ id });
+
+    /* One capture into a 3-slot ring... */
+    {
+        core::Logger logger(
+            storage, sizeof(core::ChunkHeader) + sizeof(core::LogRecord), 3);
+        logger.begin();
+        signals.set(id, 1.0f, 1000);
+        logger.sample(signals, cfg, 1000);
+        signals.set(id, 2.0f, 61000);
+        logger.sample(signals, cfg, 61000);
+        cfg.settings.logging_enabled = false;
+        logger.sample(signals, cfg, 61000);
+        TEST_ASSERT_EQUAL_UINT16(1, logger.log_count());
+    }
+
+    /* ...then ten power cycles with the recorder left off. Far more than
+     * the ring has slots: if booting created a chunk, the capture would
+     * be long gone. */
+    for (int i = 0; i < 10; i++)
+    {
+        core::Logger logger(
+            storage, sizeof(core::ChunkHeader) + sizeof(core::LogRecord), 3);
+        logger.begin();
+        TEST_ASSERT_EQUAL_UINT16(1, logger.log_count());
+    }
 }
 
 void test_sample_records_a_changed_value_but_not_a_repeated_one()
@@ -425,6 +483,254 @@ void test_a_reassigned_panels_new_signal_is_primed_not_logged_stale()
     TEST_ASSERT_EQUAL_FLOAT(33.0f, records[1].value);
 }
 
+void test_sample_records_nothing_while_logging_is_disabled()
+{
+    FakeStorage storage;
+    storage.begin();
+    core::Logger logger(storage);
+    logger.begin();
+
+    core::SignalStore signals;
+    uint16_t           id  = core::SIGNAL_CATALOG[0].id;
+    core::Config       cfg = displaying({ id });
+    cfg.settings.logging_enabled = false;
+
+    signals.set(id, 11.0f, 100);
+    logger.sample(signals, cfg, 100);
+    signals.set(id, 22.0f, 200);
+    logger.sample(signals, cfg, 200);
+    logger.sample(signals, cfg, 5200); // would flush, if anything were buffered
+
+    /* Not even a chunk header: chunks are created by the first flush that
+     * has content, and there was none. */
+    TEST_ASSERT_FALSE(storage.exists(chunk_path_str(0).c_str()));
+}
+
+void test_turning_logging_off_flushes_and_back_on_reprimes()
+{
+    FakeStorage storage;
+    storage.begin();
+    core::Logger logger(storage);
+    logger.begin();
+
+    core::SignalStore signals;
+    uint16_t           id  = core::SIGNAL_CATALOG[0].id;
+    core::Config       cfg = displaying({ id });
+
+    signals.set(id, 11.0f, 100);
+    logger.sample(signals, cfg, 100); // primes
+    signals.set(id, 22.0f, 200);
+    logger.sample(signals, cfg, 200); // buffers a record, not yet flushed
+
+    /* Switching off must not strand that buffered record waiting for a
+     * flush interval that will never come while logging is off. */
+    cfg.settings.logging_enabled = false;
+    logger.sample(signals, cfg, 240);
+
+    std::vector<uint8_t> after_off = storage.file_bytes(chunk_path_str(0));
+    TEST_ASSERT_EQUAL_size_t(
+        sizeof(core::ChunkHeader) + sizeof(core::LogRecord),
+        after_off.size());
+
+    /* Values keep moving while logging is off -- none of that may appear
+     * once it resumes. */
+    signals.set(id, 99.0f, 300);
+    logger.sample(signals, cfg, 300);
+
+    cfg.settings.logging_enabled = true;
+    logger.sample(signals, cfg, 340); // re-primes on 99.0, writes nothing
+
+    signals.set(id, 77.0f, 400); // first genuinely new value since resuming
+    logger.sample(signals, cfg, 400);
+    logger.sample(signals, cfg, 5400); // flush
+
+    std::vector<uint8_t> bytes = storage.file_bytes(chunk_path_str(0));
+    TEST_ASSERT_EQUAL_size_t(
+        sizeof(core::ChunkHeader) + 2 * sizeof(core::LogRecord),
+        bytes.size());
+
+    core::LogRecord records[2];
+    memcpy(records, bytes.data() + sizeof(core::ChunkHeader),
+           sizeof(records));
+    TEST_ASSERT_EQUAL_FLOAT(22.0f, records[0].value);
+    /* 99.0 -- the value that arrived while off -- is absent. */
+    TEST_ASSERT_EQUAL_FLOAT(77.0f, records[1].value);
+}
+
+void test_each_on_off_cycle_counts_as_its_own_log()
+{
+    FakeStorage storage;
+    storage.begin();
+    core::Logger logger(storage);
+    logger.begin();
+
+    TEST_ASSERT_EQUAL_UINT16(0, logger.log_count());
+
+    core::SignalStore signals;
+    uint16_t           id  = core::SIGNAL_CATALOG[0].id;
+    core::Config       cfg = displaying({ id });
+
+    /* Three captures, all within one "power cycle" (one Logger, one
+     * session_id) -- the count must follow the toggle, not the boot. */
+    for (uint32_t i = 0; i < 3; i++)
+    {
+        uint32_t t = 1000 + i * 100000;
+
+        cfg.settings.logging_enabled = true;
+        signals.set(id, static_cast<float>(i), t);
+        logger.sample(signals, cfg, t);          // opens capture i
+        signals.set(id, static_cast<float>(i) + 0.5f, t + 60000);
+        logger.sample(signals, cfg, t + 60000);  // 60s of recording
+
+        cfg.settings.logging_enabled = false;
+        logger.sample(signals, cfg, t + 60000);  // closes capture i
+    }
+
+    TEST_ASSERT_EQUAL_UINT16(3, logger.log_count());
+    TEST_ASSERT_EQUAL_UINT32(1, logger.session_id()); /* still one boot */
+
+    /* 3 x 60s. main.cpp divides this to whole minutes for display. */
+    TEST_ASSERT_EQUAL_UINT32(180000, logger.total_logged_ms());
+}
+
+void test_log_count_survives_a_reboot()
+{
+    FakeStorage storage;
+    storage.begin();
+
+    core::SignalStore signals;
+    uint16_t           id  = core::SIGNAL_CATALOG[0].id;
+    core::Config       cfg = displaying({ id });
+
+    {
+        core::Logger logger(storage);
+        logger.begin();
+        signals.set(id, 1.0f, 1000);
+        logger.sample(signals, cfg, 1000);
+        signals.set(id, 2.0f, 61000);
+        logger.sample(signals, cfg, 61000);
+        cfg.settings.logging_enabled = false;
+        logger.sample(signals, cfg, 61000);
+        TEST_ASSERT_EQUAL_UINT16(1, logger.log_count());
+    }
+
+    /* New Logger over the same storage == a power cycle. The index file
+     * is what carries the capture across it; the chunk headers alone
+     * couldn't. */
+    core::Logger rebooted(storage);
+    rebooted.begin();
+    TEST_ASSERT_EQUAL_UINT16(1, rebooted.log_count());
+    TEST_ASSERT_EQUAL_UINT32(60000, rebooted.total_logged_ms());
+    TEST_ASSERT_EQUAL_UINT32(2, rebooted.session_id()); /* second boot */
+}
+
+void test_logs_drop_out_of_the_count_once_the_ring_laps_past_them()
+{
+    FakeStorage storage;
+    storage.begin();
+
+    /* One record per chunk, three chunks -- so the ring laps quickly and
+     * eviction is reachable in a handful of writes. */
+    core::Logger logger(
+        storage, sizeof(core::ChunkHeader) + sizeof(core::LogRecord), 3);
+    logger.begin();
+
+    core::SignalStore signals;
+    uint16_t           id  = core::SIGNAL_CATALOG[0].id;
+    core::Config       cfg = displaying({ id });
+
+    /* Five short captures. Each writes one record, filling its chunk and
+     * rotating -- so each capture lands in its own chunk_seq, and the
+     * 3-slot ring can only hold the newest few. */
+    for (uint32_t i = 0; i < 5; i++)
+    {
+        uint32_t t = 1000 + i * 100000;
+
+        cfg.settings.logging_enabled = true;
+        signals.set(id, static_cast<float>(i + 1), t);
+        logger.sample(signals, cfg, t);
+        signals.set(id, static_cast<float>(i + 1) * 10.0f, t + 10000);
+        logger.sample(signals, cfg, t + 10000);
+
+        cfg.settings.logging_enabled = false;
+        logger.sample(signals, cfg, t + 10000); /* flush -> rotate */
+    }
+
+    /* The count is bounded by what the ring can still hold, not by how
+     * many captures were ever taken -- which is the whole point of
+     * pruning against oldest_live_chunk_seq(). */
+    TEST_ASSERT_TRUE(logger.log_count() > 0);
+    TEST_ASSERT_TRUE(logger.log_count() < 5);
+
+    /* And it stays pruned across a reboot rather than the index
+     * resurrecting captures whose chunks are gone -- nor does the reboot
+     * itself evict anything further, since it creates no chunk. */
+    uint16_t before = logger.log_count();
+
+    core::Logger rebooted(
+        storage, sizeof(core::ChunkHeader) + sizeof(core::LogRecord), 3);
+    rebooted.begin();
+    TEST_ASSERT_EQUAL_UINT16(before, rebooted.log_count());
+}
+
+void test_a_corrupt_index_self_heals_to_an_empty_one()
+{
+    FakeStorage storage;
+    storage.begin();
+
+    storage.open(core::LOG_INDEX_PATH, StorageFileMode::Write);
+    uint8_t garbage[9] = { 0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0x02, 0x03, 0x04, 0x05 };
+    storage.write(garbage, sizeof(garbage));
+    storage.close();
+
+    /* Same treatment a corrupt chunk header gets: start clean rather
+     * than refusing to run or reporting nonsense. */
+    core::Logger logger(storage);
+    TEST_ASSERT_TRUE(logger.begin());
+    TEST_ASSERT_EQUAL_UINT16(0, logger.log_count());
+    TEST_ASSERT_EQUAL_UINT32(0, logger.total_logged_ms());
+}
+
+void test_used_bytes_climbs_to_capacity_and_pins_there()
+{
+    FakeStorage storage;
+    storage.begin();
+
+    /* One record per chunk, three chunks -- a 3-record ring. */
+    const uint32_t chunk_size
+        = sizeof(core::ChunkHeader) + sizeof(core::LogRecord);
+    core::Logger logger(storage, chunk_size, 3);
+    logger.begin();
+
+    TEST_ASSERT_EQUAL_UINT64(3 * chunk_size, logger.ring_capacity_bytes());
+    /* Nothing written yet -- and begin() creates no chunk. */
+    TEST_ASSERT_EQUAL_UINT64(0, logger.used_bytes());
+
+    core::SignalStore signals;
+    uint16_t           id  = core::SIGNAL_CATALOG[0].id;
+    core::Config       cfg = displaying({ id });
+
+    /* Fill the ring one chunk at a time, then keep going well past it.
+     * used_bytes() must climb and then stop at capacity rather than
+     * running away -- rotation overwrites, it doesn't add space. */
+    uint64_t previous = 0;
+    for (uint32_t i = 0; i < 8; i++)
+    {
+        uint32_t t = 1000 + i * 10000;
+        signals.set(id, static_cast<float>(i + 1), t);
+        logger.sample(signals, cfg, t);
+        logger.sample(signals, cfg, t + 6000); // due -> flush -> rotate
+
+        uint64_t used = logger.used_bytes();
+        TEST_ASSERT_TRUE(used >= previous);                      /* monotonic */
+        TEST_ASSERT_TRUE(used <= logger.ring_capacity_bytes());  /* capped   */
+        previous = used;
+    }
+
+    TEST_ASSERT_EQUAL_UINT64(logger.ring_capacity_bytes(),
+                             logger.used_bytes());
+}
+
 void test_chunk_rotation_advances_through_all_slots_then_wraps()
 {
     FakeStorage  storage;
@@ -490,9 +796,19 @@ void test_begin_self_heals_from_corrupt_chunk_and_recovers_max_seq()
 
     /* Slot 0: a valid header (chunk_seq=0, session_id=1) -- large
      * chunk_size_bytes so this never rotates, keeping the scenario to
-     * exactly one real chunk. */
-    core::Logger seed(storage, 4096, 4);
+     * exactly one real chunk. It takes an actual capture to produce that
+     * chunk; begin() alone writes nothing. */
+    core::Logger      seed(storage, 4096, 4);
+    core::SignalStore signals;
+    uint16_t          id  = core::SIGNAL_CATALOG[0].id;
+    core::Config      cfg = displaying({ id });
     TEST_ASSERT_TRUE(seed.begin());
+    signals.set(id, 1.0f, 100);
+    seed.sample(signals, cfg, 100);
+    signals.set(id, 2.0f, 200);
+    seed.sample(signals, cfg, 200);
+    cfg.settings.logging_enabled = false;
+    seed.sample(signals, cfg, 200); // flush -> chunk_seq 0 exists
 
     /* Slot 3 gets garbage instead of a real header -- begin() must skip
      * it (wrong/missing magic) rather than misreading it as a
@@ -518,13 +834,21 @@ int main(int argc, char **argv)
     (void)argv;
 
     UNITY_BEGIN();
-    RUN_TEST(test_begin_starts_fresh_chunk_on_blank_storage);
+    RUN_TEST(test_begin_writes_nothing_until_there_is_something_to_record);
+    RUN_TEST(test_repeated_boots_without_recording_do_not_evict_anything);
     RUN_TEST(test_sample_records_a_changed_value_but_not_a_repeated_one);
     RUN_TEST(test_a_fast_signal_is_rate_floored_to_the_minimum_interval);
     RUN_TEST(test_a_slower_signal_is_logged_at_its_own_arrival_cadence);
     RUN_TEST(test_sample_before_begin_or_without_data_is_a_no_op);
     RUN_TEST(test_sample_records_only_the_signals_currently_on_screen);
     RUN_TEST(test_a_reassigned_panels_new_signal_is_primed_not_logged_stale);
+    RUN_TEST(test_sample_records_nothing_while_logging_is_disabled);
+    RUN_TEST(test_turning_logging_off_flushes_and_back_on_reprimes);
+    RUN_TEST(test_each_on_off_cycle_counts_as_its_own_log);
+    RUN_TEST(test_log_count_survives_a_reboot);
+    RUN_TEST(test_logs_drop_out_of_the_count_once_the_ring_laps_past_them);
+    RUN_TEST(test_a_corrupt_index_self_heals_to_an_empty_one);
+    RUN_TEST(test_used_bytes_climbs_to_capacity_and_pins_there);
     RUN_TEST(test_chunk_rotation_advances_through_all_slots_then_wraps);
     RUN_TEST(test_begin_self_heals_from_corrupt_chunk_and_recovers_max_seq);
     return UNITY_END();

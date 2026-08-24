@@ -44,6 +44,7 @@ namespace gui
             lv_palette_darken(LV_PALETTE_RED, 2),  /* warn_hi */
             lv_palette_darken(LV_PALETTE_GREY, 1), /* panel_border */
             lv_palette_main(LV_PALETTE_AMBER),     /* range_overflow */
+            lv_palette_main(LV_PALETTE_RED),       /* rec_indicator */
         },
         /* typography */
         {
@@ -58,7 +59,6 @@ namespace gui
             &lv_font_montserrat_32,
             &jetbrains_mono_bold_24,
             &icon_day_night_28,
-            &lv_font_montserrat_18,
         },
         /* metrics */
         {

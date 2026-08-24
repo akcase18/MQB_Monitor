@@ -14,7 +14,7 @@ namespace gui
         /* Nav bar, then Brightness and Panels as single label+control rows
          * (not label-above-control — that cost a whole extra line each,
          * and this screen doesn't have room to spare), then a footer of
-         * two compact tappable rows (Theme, Wireless Setup). Every row is
+         * two compact tappable rows (Theme|Orientation, WiFi). Every row is
          * separated from its neighbor by a divider so each reads as its
          * own distinct row instead of blurring into the next one. */
         constexpr lv_coord_t HEADER_DIVIDER_Y = 50;
@@ -57,7 +57,7 @@ namespace gui
          * reusing Landscape's — Landscape's rhythm is tuned tight to fit
          * everything in 320px of height, and just reusing it in Portrait's
          * 480px canvas left every row clustered at the top with ~250px of
-         * dead space below Wireless Setup. There's enough spare height
+         * dead space below the last row. There's enough spare height
          * (480 vs 320) that Brightness and Panels each get a label line of
          * their own above their control, instead of sharing a row with it
          * — freeing the control (slider, panel-count buttons) to use the
@@ -157,7 +157,7 @@ namespace gui
                               PickWirelessCallback      pick_wireless_cb,
                               void                     *pick_wireless_ctx,
                               OrientationConfirmCallback orientation_confirm_cb,
-                              void                       *orientation_confirm_ctx)
+                              void                      *orientation_confirm_ctx)
     {
         theme_                = &theme;
         day_brightness_pct_   = initial_day_brightness_pct;
@@ -498,11 +498,13 @@ namespace gui
         create_divider(
             screen_, theme, portrait ? PORTRAIT_DIVIDER3_Y : DIVIDER3_Y);
 
-        /* Wireless Setup row: tappable, hands off to WirelessSetupScreen —
-         * same shape as the Theme row above it, just without a preview
-         * swatch (there's no "current value" to show at a glance). */
-        ListRow wireless_row
-            = create_list_row(screen_, theme, "Wireless Setup");
+        /* WiFi row: tappable, hands off to WirelessSetupScreen — same
+         * shape as the Theme row above it, just without a preview swatch
+         * (there's no "current value" to show at a glance). Full width:
+         * logging used to share this row, but it moved to its own
+         * LoggingScreen (swipe up from InfoScreen) once it grew past what
+         * a checkbox could usefully say. */
+        ListRow wireless_row = create_list_row(screen_, theme, "WiFi");
         lv_obj_set_size(wireless_row.btn,
                         theme.metrics.screen_width - 40,
                         compact_row_height);

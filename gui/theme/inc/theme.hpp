@@ -30,6 +30,12 @@ namespace gui
              * configured "this is bad" threshold) since a value can peg
              * a graphic at 100%/0% without ever crossing a warning. */
             lv_color_t range_overflow;
+            /* InfoScreen's blinking capture indicator. Its own token
+             * rather than reusing warn_hi: both are red by convention,
+             * but a warning means "something is wrong" and this means
+             * "recording", and a reskin should be free to keep the
+             * recording light red while moving warnings elsewhere. */
+            lv_color_t rec_indicator;
     };
 
     /**
@@ -68,12 +74,6 @@ namespace gui
                                               * built-in symbol font has
                                               * nothing celestial in its
                                               * curated icon subset */
-            const lv_font_t *icon_status; /* small corner status glyphs on
-                                           * InfoScreen (e.g. logging
-                                           * active) — its own smaller size
-                                           * since symbol_lg (32px) reads
-                                           * as too large/intrusive sitting
-                                           * over the dense panel grid */
     };
 
     struct Metrics
