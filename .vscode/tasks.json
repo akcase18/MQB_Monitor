@@ -1,8 +1,12 @@
 {
-  // Tasks for the MQB Monitor Mac tool (tools/monitor). Run with
-  // "Terminal > Run Task…" (or ⇧⌘B for the default build task = Demo).
-  // All monitor tasks run from tools/monitor so the mqb_monitor package
-  // resolves, using that folder's virtualenv interpreter.
+  // Tasks for this repo's Python tooling. Run with "Terminal > Run Task…"
+  // (or ⇧⌘B for the default build task = Monitor Demo).
+  //
+  // Monitor tasks (tools/monitor) run from that folder so the mqb_monitor
+  // package resolves. Logs tasks (tools/log_export) run from the repo root
+  // so a relative CSV path lands somewhere findable — but they borrow the
+  // *monitor's* virtualenv, since pyserial is all dump_log.py needs and
+  // that venv already has it. Run "Monitor: Set up venv" once first.
   "version": "2.0.0",
   "tasks": [
     {
@@ -53,6 +57,60 @@
       "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
     },
     {
+      "label": "Logs: Status (is the device recording?)",
+      "detail": "LOGSTATUS — ready flag, session, capture count, recorded ms",
+      "type": "shell",
+      "command": "${workspaceFolder}/tools/monitor/.venv/bin/python",
+      "args": ["tools/log_export/dump_log.py", "--status"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "Logs: Download to CSV…",
+      "detail": "Stop recording on the device first, or the last few seconds are still buffered",
+      "type": "shell",
+      "command": "${workspaceFolder}/tools/monitor/.venv/bin/python",
+      "args": ["tools/log_export/dump_log.py", "${input:logCsvPath}"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "Logs: Download to CSV (choose port…)",
+      "detail": "Same, but for when auto-detect picks the wrong serial device",
+      "type": "shell",
+      "command": "${workspaceFolder}/tools/monitor/.venv/bin/python",
+      "args": [
+        "tools/log_export/dump_log.py",
+        "--port",
+        "${input:logSerialPort}",
+        "${input:logCsvPath}"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "Logs: List serial ports",
+      "type": "shell",
+      "command": "${workspaceFolder}/tools/monitor/.venv/bin/python",
+      "args": ["tools/log_export/dump_log.py", "--list-ports"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "Logs: Erase device log storage (destructive)",
+      "detail": "LOGCLEAR — formats the log store and resets the capture count. Download first!",
+      "type": "shell",
+      "command": "${workspaceFolder}/tools/monitor/.venv/bin/python",
+      "args": ["tools/log_export/dump_log.py", "--clear"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
       "label": "Catalog: Regenerate from signals.json",
       "detail": "Run tools/gen_catalog.py after editing the signal catalog",
       "type": "shell",
@@ -64,6 +122,18 @@
     }
   ],
   "inputs": [
+    {
+      "id": "logCsvPath",
+      "type": "promptString",
+      "description": "Where to write the decoded CSV (relative to the repo root)",
+      "default": "log_export_out.csv"
+    },
+    {
+      "id": "logSerialPort",
+      "type": "promptString",
+      "description": "Serial port of the dashboard Teensy (not the CAN sniffer)",
+      "default": "/dev/cu.usbmodem"
+    },
     {
       "id": "serialPort",
       "type": "promptString",

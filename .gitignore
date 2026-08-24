@@ -14,3 +14,7 @@ sim_storage/*
 !sim_storage/README.md
 sim_sdcard/*
 !sim_sdcard/README.md
+
+# Default output path of the "Logs: Download to CSV…" VS Code task
+# (.vscode/tasks.json). Any other name you type is yours to manage.
+/log_export_out.csv
