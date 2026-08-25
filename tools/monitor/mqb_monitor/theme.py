@@ -182,6 +182,30 @@ QScrollBar::handle:horizontal {{
 QScrollBar::handle:horizontal:hover {{ background: {ACCENT}; }}
 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{ width: 0; }}
 
+/* Shared with tools/log_export (see its mqb_logs/theme.py, which imports
+   this module rather than keeping a second palette). Unused by the monitor
+   itself; kept here so there is still exactly one place styling lives. */
+QFrame#Card {{
+    background: {PANEL};
+    border: 1px solid {BORDER};
+    border-radius: 8px;
+}}
+QLabel#CardLabel {{ color: {TEXT_DIM}; font-size: 10px; font-weight: 600; }}
+QLabel#CardValue {{ color: {TEXT}; font-size: 15px; }}
+QFrame#Banner {{
+    background: rgba(245, 166, 35, 0.13);
+    border: 1px solid {AMBER};
+    border-radius: 6px;
+}}
+QLabel#BannerText {{ color: {AMBER}; font-size: 11px; }}
+QPlainTextEdit {{
+    background: {PANEL};
+    border: 1px solid {BORDER};
+    border-radius: 6px;
+    color: {TEXT_DIM};
+    selection-background-color: {ACCENT};
+}}
+
 QToolTip {{
     background: {PANEL_ALT};
     color: {TEXT};

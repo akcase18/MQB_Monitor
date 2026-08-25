@@ -47,12 +47,6 @@ namespace gui
         constexpr lv_coord_t COMPACT_ROW_HEIGHT   = 38;
         constexpr lv_coord_t THEME_SWATCH_SIZE    = 22;
 
-        /** Cancel/Confirm button height in the orientation-change confirm
-         * popup (see orientation_clicked_cb) — taller than lv_msgbox's
-         * cramped ~43px default footer, same rationale as this screen's
-         * own control rows wanting an easy tap target. */
-        constexpr lv_coord_t CONFIRM_POPUP_FOOTER_HEIGHT = 60;
-
         /* Portrait gets its own full set of row Y-positions rather than
          * reusing Landscape's — Landscape's rhythm is tuned tight to fit
          * everything in 320px of height, and just reusing it in Portrait's
@@ -95,31 +89,6 @@ namespace gui
         constexpr lv_coord_t SCREEN_MARGIN = 20;
 
         constexpr int32_t BRIGHTNESS_STEP = 5;
-
-        /* Matches day_night_btn_/orientation_btn_'s styling — used by the
-         * orientation-change confirm popup's footer buttons so they don't
-         * end up in LVGL's default light-mode look. `primary` (the
-         * popup's Confirm button) sits solid-accent at rest, the same
-         * color every other button here only shows on press — marking it
-         * as the button that actually commits the change, matching the
-         * button-matrix's own checked-state treatment (screen_helpers.hpp's
-         * style_flat_matrix()). */
-        FLASHMEM void style_flat_footer_button(lv_obj_t   *btn,
-                                      const Theme &theme,
-                                      bool         primary = false)
-        {
-            lv_obj_set_style_bg_color(
-                btn, primary ? theme.palette.accent : theme.palette.bg, 0);
-            lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
-            lv_obj_set_style_radius(btn, 8, 0);
-            lv_obj_set_style_border_width(
-                btn, theme.metrics.panel_border_width, 0);
-            lv_obj_set_style_border_color(btn, theme.palette.panel_border, 0);
-            lv_obj_set_style_shadow_width(btn, 0, 0);
-            lv_obj_set_style_text_color(btn, theme.palette.fg, 0);
-            lv_obj_set_style_bg_color(
-                btn, theme.palette.accent, LV_STATE_PRESSED);
-        }
 
         /* A vertical counterpart to screen_helpers.hpp's create_divider() —
          * same color/thickness, just rotated, for splitting the Theme/
@@ -647,57 +616,20 @@ namespace gui
          * platform.hpp's DisplayOrientation) -- a silent flip with no
          * visible effect until some future restart would look broken, so
          * this asks first rather than applying it immediately. */
-        lv_obj_t *mbox = lv_msgbox_create(nullptr);
-        lv_obj_set_style_bg_color(mbox, theme.palette.bg, 0);
-        lv_obj_set_style_bg_opa(mbox, LV_OPA_COVER, 0);
-        lv_obj_set_style_border_width(mbox, theme.metrics.panel_border_width, 0);
-        lv_obj_set_style_border_color(mbox, theme.palette.panel_border, 0);
-        lv_obj_set_style_radius(mbox, 10, 0);
-
-        /* Short, single-line title/body — the earlier "Switch
-         * Orientation?" title plus a full sentence of body text wrapped
-         * onto multiple lines each, which read as cluttered at the
-         * popup's ~260px width in both orientations. */
-        lv_obj_t *title = lv_msgbox_add_title(
-            mbox,
+        ConfirmPopup popup = create_confirm_popup(
+            theme,
             self->pending_orientation_ == LayoutOrientation::Vertical
                 ? "Switch to Vertical?"
-                : "Switch to Horizontal?");
-        lv_obj_set_style_text_color(title, theme.palette.fg, 0);
-        lv_obj_set_style_text_font(title, theme.typography.label_lg, 0);
-
-        /* lv_msgbox_add_title() is what actually creates the header
-         * container (get_header() would return null before this point) —
-         * it picks up LVGL's default (light-mode) theme styling on its
-         * own bg, so override it explicitly to match everything else
-         * here being dark. */
-        lv_obj_t *header = lv_msgbox_get_header(mbox);
-        lv_obj_set_style_bg_color(header, theme.palette.bg, 0);
-        lv_obj_set_style_bg_opa(header, LV_OPA_COVER, 0);
-
-        lv_obj_t *text
-            = lv_msgbox_add_text(mbox, "Restart required to apply.");
-        lv_obj_set_style_text_color(text, theme.palette.fg, 0);
-        lv_obj_set_style_text_font(text, theme.typography.label_lg, 0);
-
-        /* Cancel added first, Confirm second — lv_msgbox's footer is a
-         * left-to-right flex row, so this puts Confirm on the right. */
-        lv_obj_t *cancel_btn  = lv_msgbox_add_footer_button(mbox, "Cancel");
-        lv_obj_t *confirm_btn = lv_msgbox_add_footer_button(mbox, "Confirm");
-        style_flat_footer_button(cancel_btn, theme);
-        style_flat_footer_button(confirm_btn, theme, /* primary */ true);
-
-        /* lv_msgbox's default footer height (LV_DPI_DEF/3, ~43px) makes
-         * for a cramped tap target -- the buttons are LV_PCT(100) of the
-         * footer, so growing the footer grows them too. */
-        lv_obj_set_height(lv_msgbox_get_footer(mbox), CONFIRM_POPUP_FOOTER_HEIGHT);
+                : "Switch to Horizontal?",
+            "Restart required to apply.",
+            "Confirm");
 
         lv_obj_add_event_cb(
-            confirm_btn, orientation_confirm_cb, LV_EVENT_CLICKED, self);
+            popup.confirm_btn, orientation_confirm_cb, LV_EVENT_CLICKED, self);
         lv_obj_add_event_cb(
-            cancel_btn, orientation_cancel_cb, LV_EVENT_CLICKED, self);
+            popup.cancel_btn, orientation_cancel_cb, LV_EVENT_CLICKED, self);
 
-        self->orientation_confirm_mbox_ = mbox;
+        self->orientation_confirm_mbox_ = popup.mbox;
     }
 
     void SettingsScreen::orientation_confirm_cb(lv_event_t *e)

@@ -593,6 +593,126 @@ void test_each_on_off_cycle_counts_as_its_own_log()
     TEST_ASSERT_EQUAL_UINT32(180000, logger.total_logged_ms());
 }
 
+void test_erase_clears_the_store_and_the_capture_count()
+{
+    FakeStorage storage;
+    storage.begin();
+    core::Logger logger(storage);
+    logger.begin();
+
+    core::SignalStore signals;
+    uint16_t          id  = core::SIGNAL_CATALOG[0].id;
+    core::Config      cfg = displaying({ id });
+
+    /* One complete capture, so there's both a chunk and an index entry
+     * to destroy. */
+    signals.set(id, 1.0f, 1000);
+    logger.sample(signals, cfg, 1000);
+    signals.set(id, 2.0f, 61000);
+    logger.sample(signals, cfg, 61000);
+    cfg.settings.logging_enabled = false;
+    logger.sample(signals, cfg, 61000);
+
+    TEST_ASSERT_EQUAL_UINT16(1, logger.log_count());
+    TEST_ASSERT_TRUE(storage.exists(chunk_path_str(0).c_str()));
+    TEST_ASSERT_TRUE(storage.exists(core::LOG_INDEX_PATH));
+
+    TEST_ASSERT_TRUE(logger.erase());
+
+    TEST_ASSERT_TRUE(logger.is_ready());
+    TEST_ASSERT_EQUAL_UINT16(0, logger.log_count());
+    TEST_ASSERT_EQUAL_UINT32(0, logger.total_logged_ms());
+    TEST_ASSERT_EQUAL_UINT64(0, logger.used_bytes());
+    TEST_ASSERT_FALSE(storage.exists(chunk_path_str(0).c_str()));
+
+    /* Rotation starts over from the empty store, exactly as begin()
+     * derives it at boot -- no chunk is created until something is
+     * actually recorded again. */
+    TEST_ASSERT_EQUAL_UINT16(0, logger.current_chunk_index());
+}
+
+void test_erase_mid_capture_does_not_let_buffered_records_survive()
+{
+    FakeStorage storage;
+    storage.begin();
+    core::Logger logger(storage);
+    logger.begin();
+
+    core::SignalStore signals;
+    uint16_t          id  = core::SIGNAL_CATALOG[0].id;
+    core::Config      cfg = displaying({ id });
+
+    /* A capture left running, with records buffered in RAM and not yet
+     * flushed -- the state the on-screen Erase button can be pressed in
+     * (main.cpp's logging_erase_cb clears logging_enabled, but the
+     * Logger's own tick hasn't run yet). */
+    signals.set(id, 1.0f, 1000);
+    logger.sample(signals, cfg, 1000);
+    signals.set(id, 2.0f, 1100);
+    logger.sample(signals, cfg, 1100);
+
+    TEST_ASSERT_TRUE(logger.is_capturing());
+
+    TEST_ASSERT_TRUE(logger.erase());
+
+    /* The buffer went with the wipe, so the next tick has nothing to
+     * strand in a fresh chunk, and no capture is left half-open to be
+     * closed against an index that no longer holds it. */
+    TEST_ASSERT_FALSE(logger.is_capturing());
+    TEST_ASSERT_EQUAL_UINT16(0, logger.log_count());
+
+    cfg.settings.logging_enabled = false;
+    logger.sample(signals, cfg, 1200);
+
+    TEST_ASSERT_EQUAL_UINT16(0, logger.log_count());
+    TEST_ASSERT_FALSE(storage.exists(chunk_path_str(0).c_str()));
+}
+
+void test_recording_after_an_erase_starts_a_fresh_capture()
+{
+    FakeStorage storage;
+    storage.begin();
+    core::Logger logger(storage);
+    logger.begin();
+
+    core::SignalStore signals;
+    uint16_t          id  = core::SIGNAL_CATALOG[0].id;
+    core::Config      cfg = displaying({ id });
+
+    signals.set(id, 1.0f, 1000);
+    logger.sample(signals, cfg, 1000);
+    cfg.settings.logging_enabled = false;
+    logger.sample(signals, cfg, 2000);
+
+    TEST_ASSERT_TRUE(logger.erase());
+
+    /* Every signal re-primes after an erase, the same as it does after
+     * logging is switched off and back on -- so the first tick back on
+     * writes nothing, and the first record is the next genuinely new
+     * value. */
+    cfg.settings.logging_enabled = true;
+    logger.sample(signals, cfg, 3000);
+    TEST_ASSERT_EQUAL_UINT16(1, logger.log_count()); /* capture opened */
+
+    signals.set(id, 9.0f, 4000);
+    logger.sample(signals, cfg, 4000);
+    cfg.settings.logging_enabled = false;
+    logger.sample(signals, cfg, 5000);
+
+    TEST_ASSERT_EQUAL_UINT16(1, logger.log_count());
+    TEST_ASSERT_EQUAL_UINT32(1, logger.session_id()); /* no reboot involved */
+}
+
+void test_erase_on_a_missing_store_leaves_the_logger_inert()
+{
+    FakeStorage storage; /* never begin()'d -- nothing mounted */
+    core::Logger logger(storage);
+
+    TEST_ASSERT_FALSE(logger.begin());
+    TEST_ASSERT_FALSE(logger.erase());
+    TEST_ASSERT_FALSE(logger.is_ready());
+}
+
 void test_log_count_survives_a_reboot()
 {
     FakeStorage storage;
@@ -845,6 +965,10 @@ int main(int argc, char **argv)
     RUN_TEST(test_sample_records_nothing_while_logging_is_disabled);
     RUN_TEST(test_turning_logging_off_flushes_and_back_on_reprimes);
     RUN_TEST(test_each_on_off_cycle_counts_as_its_own_log);
+    RUN_TEST(test_erase_clears_the_store_and_the_capture_count);
+    RUN_TEST(test_erase_mid_capture_does_not_let_buffered_records_survive);
+    RUN_TEST(test_recording_after_an_erase_starts_a_fresh_capture);
+    RUN_TEST(test_erase_on_a_missing_store_leaves_the_logger_inert);
     RUN_TEST(test_log_count_survives_a_reboot);
     RUN_TEST(test_logs_drop_out_of_the_count_once_the_ring_laps_past_them);
     RUN_TEST(test_a_corrupt_index_self_heals_to_an_empty_one);

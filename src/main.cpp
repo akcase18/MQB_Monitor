@@ -517,6 +517,37 @@ namespace
         app.info_screen.set_logging_active(enabled && app.logger.is_ready());
     }
 
+    /* Fired once LoggingScreen's erase popup is confirmed -- the GUI
+     * counterpart of the LOGCLEAR serial command below, and the same one
+     * call.
+     *
+     * Recording is stopped first (which is what the popup's "Stops
+     * recording" says): leaving it on would have sample() open a fresh
+     * capture into the store moments after wiping it, so the count the
+     * user just took to zero would start climbing again on its own.
+     * Logger::erase() drops the in-RAM tail of the stopped capture too,
+     * so nothing buffered before the wipe survives into the first chunk
+     * written after it.
+     *
+     * The screen is refreshed here rather than left to
+     * refresh_logging_screen_task's next tick -- this is a button press,
+     * and the readouts should be zero by the time the popup is gone. */
+    void logging_erase_cb(void *ctx)
+    {
+        (void)ctx;
+        Composition &app = composition();
+
+        if (app.config_store.get().settings.logging_enabled)
+        {
+            app.config_store.get().settings.logging_enabled = false;
+            app.config_store.save();
+            app.info_screen.set_logging_active(false);
+        }
+
+        app.logger.erase();
+        app.logging_screen.refresh(build_logging_view_model());
+    }
+
     /* Keeps the capture count and recorded-minutes readouts advancing
      * while the screen is up. Cheap enough to run unconditionally: like
      * refresh_wireless_screen_task, it only does real work when its
@@ -565,16 +596,16 @@ namespace
         }
         else if (len == 8 && memcmp(cmd, "LOGCLEAR", 8) == 0)
         {
-            /* Exactly what IStorage::format()'s own doc comment describes
-             * this for -- reclaim space once logs are offloaded. */
-            platform_get().storage.format();
-
-            /* format() took the log index with it, so the Logger's
-             * in-RAM copy is now describing captures that no longer
-             * exist. Re-running begin() rebuilds rotation state and the
-             * index against the (now empty) store, leaving the capture
-             * count honestly at zero. */
-            composition().logger.begin();
+            /* Same one call LoggingScreen's erase button makes (see
+             * logging_erase_cb): format the store, then rebuild rotation
+             * state and the index against the empty result, leaving the
+             * capture count honestly at zero. Recording is deliberately
+             * NOT stopped here the way the on-screen erase stops it --
+             * this command is issued from a host with the car parked, and
+             * silently changing a persisted setting out from under the
+             * user over a debug serial link is a surprise the GUI's own
+             * confirmation popup doesn't have to be. */
+            composition().logger.erase();
         }
         else if (len == 9 && memcmp(cmd, "LOGSTATUS", 9) == 0)
         {
@@ -752,7 +783,8 @@ namespace
                                  nullptr,
                                  settings_orientation_confirm_cb,
                                  nullptr);
-        app.logging_screen.init(theme, logging_toggle_cb, nullptr);
+        app.logging_screen.init(
+            theme, logging_toggle_cb, nullptr, logging_erase_cb, nullptr);
         app.theme_picker_screen.init(theme, theme_picker_done_cb, nullptr);
         app.wireless_setup_screen.init(theme, wireless_deactivate_cb, nullptr);
 

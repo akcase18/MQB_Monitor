@@ -5,8 +5,9 @@
   // Monitor tasks (tools/monitor) run from that folder so the mqb_monitor
   // package resolves. Logs tasks (tools/log_export) run from the repo root
   // so a relative CSV path lands somewhere findable — but they borrow the
-  // *monitor's* virtualenv, since pyserial is all dump_log.py needs and
-  // that venv already has it. Run "Monitor: Set up venv" once first.
+  // *monitor's* virtualenv, which already has both of what they need
+  // (pyserial for dump_log.py, PySide6 as well for the GUI). Run
+  // "Monitor: Set up venv" once first.
   "version": "2.0.0",
   "tasks": [
     {
@@ -53,6 +54,26 @@
       "type": "shell",
       "command": "python3 -m venv .venv && .venv/bin/pip install -r requirements.txt",
       "options": { "cwd": "${workspaceFolder}/tools/monitor" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "Logs: Open Log Export app",
+      "detail": "GUI: device status, download, preview, CSV export",
+      "type": "shell",
+      "command": "${workspaceFolder}/tools/monitor/.venv/bin/python",
+      "args": ["tools/log_export/run.py"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "Logs: Open Log Export app (simulator storage)",
+      "detail": "Same app, reading sim_storage/ instead of a device — no hardware needed",
+      "type": "shell",
+      "command": "${workspaceFolder}/tools/monitor/.venv/bin/python",
+      "args": ["tools/log_export/run.py", "--folder", "sim_storage"],
+      "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": [],
       "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
     },

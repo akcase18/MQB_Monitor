@@ -82,4 +82,39 @@ namespace gui
                            const Theme &theme,
                            lv_coord_t   item_pad);
 
+    /** The pieces of a confirm popup a caller has to wire up itself. The
+     * popup is modal and parentless (it floats over whatever screen is
+     * loaded), so closing it is the caller's job too --
+     * lv_msgbox_close_async() from both handlers. */
+    struct ConfirmPopup
+    {
+            lv_obj_t *mbox;
+            lv_obj_t *cancel_btn;
+            lv_obj_t *confirm_btn;
+    };
+
+    /**
+     * A Cancel/Confirm popup in this app's flat, dark styling rather than
+     * lv_msgbox's default light-mode look: one-line `title`, one-line
+     * `body`, and a footer tall enough to tap without looking.
+     *
+     * Used for the two changes that shouldn't happen on a single stray
+     * press -- rotating the display (which only takes effect on the next
+     * boot, so a silent flip looks broken) and erasing the log store
+     * (which isn't undoable at all).
+     *
+     * @param confirm_text What the committing button says. Naming the
+     *                     action ("Erase") rather than saying "Confirm"
+     *                     is what makes a mis-tap recoverable at a glance.
+     * @param destructive  Paints Confirm with the theme's warn_hi instead
+     *                     of its accent. The accent is this app's "yes,
+     *                     this one" color everywhere else; a wipe should
+     *                     not look like every other affirmative button.
+     */
+    ConfirmPopup create_confirm_popup(const Theme &theme,
+                                      const char  *title,
+                                      const char  *body,
+                                      const char  *confirm_text,
+                                      bool         destructive = false);
+
 } // namespace gui

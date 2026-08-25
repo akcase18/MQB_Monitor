@@ -99,6 +99,31 @@ namespace core
         return true;
     }
 
+    bool Logger::erase()
+    {
+        /* Dropped before the format, not after: begin() below rebuilds
+         * everything that describes what is *on disk*, but knows nothing
+         * about the in-RAM tail of a capture in progress. See the header
+         * comment for what each of these would otherwise survive into. */
+        buffer_count_ = 0;
+        chunk_open_   = false;
+        was_enabled_  = false;
+        for (uint16_t i = 0; i < SIGNAL_CATALOG_COUNT; i++)
+        {
+            in_display_set_[i] = false;
+        }
+
+        if (!backing_.format())
+        {
+            ready_ = false;
+            return false;
+        }
+
+        /* Rebuilds rotation state and the index against the empty store,
+         * which is what leaves log_count() honestly at zero. */
+        return begin();
+    }
+
     uint32_t Logger::oldest_live_chunk_seq() const
     {
         if (!chunk_open_ && next_chunk_seq_ == 0)

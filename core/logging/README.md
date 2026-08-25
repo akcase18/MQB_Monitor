@@ -58,10 +58,12 @@ That headroom figure is no longer the binding constraint it was: a later pass to
 `src/main.cpp`'s `handle_log_command()` (Arduino/USB-CDC only, guarded by `#ifdef ARDUINO`) implements a small bespoke line command set over the same `Serial` the dashboard firmware already begins in `setup()`:
 
 - `LOGDUMP` — streams every chunk (`open(Read)`, array-index order 0..`CHUNK_COUNT`-1, skipping ones that don't exist) as raw binary. The host tool reassembles true chronological order from each chunk's embedded `chunk_seq`/`session_id`, so the firmware doesn't need to replicate `begin()`'s ordering logic just to dump.
-- `LOGCLEAR` — calls `IStorage::format()`, exactly what its own doc comment describes it for: reclaiming space once logs have been offloaded.
+- `LOGCLEAR` — calls `Logger::erase()`: `IStorage::format()` (exactly what its own doc comment describes it for — reclaiming space once logs have been offloaded), then `begin()` against the empty result, plus dropping the in-RAM tail of any capture in progress so nothing buffered before the wipe survives into the first chunk after it. `LoggingScreen`'s Erase button makes the same call; the difference is that the on-screen one stops recording first, which this deliberately doesn't (see `handle_log_command()`).
 - `LOGSTATUS` — a short text status line (ready/session/current chunk).
 
 Deliberately blocking — this is meant to run as its own dedicated offload action (park, plug in, dump), not interleaved with driving.
+
+Host side, [`tools/log_export`](../../tools/log_export/README.md) drives all three: `run.py` is a GUI (device status, download with a live byte count, session browse/preview, CSV export, erase) and `dump_log.py` the scriptable CLI, both decoding through one shared `mqb_logs/logfile.py`. Note what a dump *can't* carry: `/log_index.bin` isn't part of the `LOGDUMP` stream, so the host can group records by session but not by capture.
 
 Wireless export (a dedicated device mode over the existing ESP32-C3 SoftAP link) and SD card (blocked on a Micro-SD slot that doesn't exist on the current PCB) are sequenced as later phases — see `.claude/plans` history for the fuller roadmap discussion. Both would reuse this same `LogRecord`/`ChunkHeader` on-disk format, just over a different transport.
 

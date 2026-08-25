@@ -118,6 +118,32 @@ namespace core
             bool begin();
 
             /**
+             * Throws away every recorded log and starts over: formats the
+             * backing store, then re-derives rotation state from the (now
+             * empty) result exactly as begin() does at boot.
+             *
+             * Also drops the in-RAM side of a capture -- the unflushed
+             * record buffer, the primed baselines, and the was-enabled
+             * latch. Without that, a still-buffered record from before
+             * the erase would land in the first chunk written after it
+             * (surviving the wipe), and the next sample() tick would
+             * close a capture that no longer has an index entry. Every
+             * signal therefore re-primes, the same as it does when
+             * logging is switched off and back on.
+             *
+             * Recording itself is not stopped -- Settings::logging_enabled
+             * lives in core::Config, which this class deliberately doesn't
+             * own. A caller that wants recording off (both retrieval paths
+             * do) clears it first; if it doesn't, sample() simply opens a
+             * fresh capture on its next tick.
+             *
+             * @returns True on success. False on a store that won't
+             * format, leaving the logger inert exactly as a failed
+             * begin() does.
+             */
+            bool erase();
+
+            /**
              * Call once per sample tick (see LOG_SAMPLE_PERIOD_MS in
              * src/main.cpp). Buffers a record for each currently-displayed
              * signal (`config.priorities[0..settings.num_panels-1]`, so at
