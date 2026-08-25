@@ -21,6 +21,7 @@ class SimulatorDisplay : public IDisplay
                    int32_t         y2,
                    const uint16_t *pixels) override;
         void set_backlight(uint8_t pct) override;
+        void set_backlight_off() override;
 
         /* Writes the window's current on-screen position to disk so the
          * next launch can reopen there instead of recentering — see

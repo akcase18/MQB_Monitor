@@ -84,9 +84,14 @@ void TeensyDisplay::get_resolution(uint16_t &width, uint16_t &height) const
 void TeensyDisplay::flush(
     int32_t x1, int32_t y1, int32_t x2, int32_t y2, const uint16_t *pixels)
 {
-    /* pushPixels16bitDMA blocks internally until any prior transfer has
-     * completed before issuing this one, so there's nothing for the caller
-     * to poll -- returning from here means the flush is committed. */
+    /* pushPixels16bitDMA blocks internally until any *prior* transfer has
+     * completed, then starts this one and returns -- so returning from
+     * here means the flush is issued, not that its pixels have landed.
+     * For every flush but a frame's last that's invisible: the next
+     * flush's own entry-wait covers it. The last one is genuinely still
+     * in flight, which is why src/main.cpp waits for the display to go
+     * quiet before lighting the backlight rather than trusting
+     * lv_display_flush_is_last(). */
     s_lcd.pushPixels16bitDMA(pixels, x1, y1, x2, y2);
 }
 
@@ -107,4 +112,13 @@ void TeensyDisplay::set_backlight(uint8_t pct)
           + (static_cast<uint32_t>(pct) * (100 - MIN_BACKLIGHT_PCT)) / 100;
 
     analogWrite(PWM_PIN, (effective_pct * 255) / 100);
+}
+
+void TeensyDisplay::set_backlight_off()
+{
+    /* Deliberately not set_backlight(0), which floors at
+     * MIN_BACKLIGHT_PCT and would leave the panel dimly lit -- still
+     * bright enough to show the transition this is meant to hide. Drives
+     * the pin the same way begin() does, for the same reason. */
+    analogWrite(PWM_PIN, 0);
 }

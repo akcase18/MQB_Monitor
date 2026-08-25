@@ -116,6 +116,20 @@ class IDisplay
          * @param pct Brightness, 0-100.
          */
         virtual void set_backlight(uint8_t pct) = 0;
+
+        /**
+         * Kills the backlight entirely -- a true off, which
+         * set_backlight(0) deliberately is not: the user-facing 0-100%
+         * brightness scale floors at a minimum duty because "0%" there
+         * means "as dim as it gets", not "blank the dashboard".
+         *
+         * For hiding a transition the panel shouldn't be showing at all
+         * (boot, before the first frame has landed in GRAM; an accent
+         * change, which tears every screen down and rebuilds it). Undone
+         * by calling set_backlight() again -- there is no
+         * remembered-brightness state down here, the caller owns that.
+         */
+        virtual void set_backlight_off() = 0;
 };
 
 /*==============================================================================
