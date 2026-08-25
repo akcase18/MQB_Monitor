@@ -41,6 +41,29 @@ TeensyDisplay &TeensyDisplay::instance()
     return s_instance;
 }
 
+/* FlexIO bus speed in MHz. The driver turns this into a shift-clock
+ * divider off its 240MHz FlexIO clock (480MHz source / 2, see
+ * ILI948x_t4_mm::FlexIO_Init): 40 -> _buad_div 6 -> 240/6 = 40MHz. The
+ * bus is 8 bits wide and setBitDepth(16) makes a pixel two beats, so
+ * this is also the byte rate -- a full 480x320 frame is 307,200 bytes,
+ * i.e. 7.7ms of DMA at 40MHz against 15.4ms at 20 and 25.6ms at 12.
+ *
+ * ONLY these values work: 2, 4, 8, 12, 20, 24, 30, 40. ILI948x_t4_mm::
+ * begin() switches on the argument and its default case silently falls
+ * back to 12MHz -- so a plausible-looking 16 or 25 here would quietly
+ * run the bus slower than a 12 would, with nothing to indicate it.
+ *
+ * 40 is deliberately past what the panel is specified for: ILI9488's
+ * 8080 parallel write cycle is typically quoted at ~50ns minimum, i.e.
+ * about 20MHz, and 40MHz halves that to 25ns. It is being tried anyway
+ * to find where this particular board and ribbon actually fall over.
+ * The failure mode is corrupted or torn pixels rather than a clean
+ * error, and it may well be temperature- and cable-dependent rather
+ * than reproducible -- so judge it on a warm panel over a few minutes,
+ * not on one boot. Step back down (30, 24, 20) if anything looks wrong;
+ * 20 is the fastest in-spec value. */
+constexpr uint8_t LCD_BUS_MHZ = 40;
+
 void TeensyDisplay::begin()
 {
     /* Drive the backlight pin low before touching the panel at all —
@@ -55,7 +78,20 @@ void TeensyDisplay::begin()
     pinMode(PWM_PIN, OUTPUT);
     digitalWrite(PWM_PIN, LOW);
 
-    s_lcd.begin(12);
+    /* Argument is the FlexIO bus speed in MHz, which the driver turns
+     * into a shift-clock divider off its 240MHz FlexIO clock (480MHz
+     * source / 2, see ILI948x_t4_mm::FlexIO_Init) -- begin(20) selects
+     * _buad_div = 12, i.e. 240/12 = 20MHz. The bus is 8 bits wide and
+     * setBitDepth(16) makes a pixel two beats, so this is also the byte
+     * rate: 20MB/s, against 12MB/s at the driver's begin(12) default.
+     * A full 480x320 frame is 307,200 bytes, so worst case that is
+     * 15.4ms of DMA rather than 25.6ms.
+     *
+     * Raise further (the driver's table goes to 40MHz) only with the
+     * panel in hand -- this is an unterminated parallel bus over ribbon,
+     * and the failure mode for too-fast is corrupted pixels, not a clean
+     * error. */
+    s_lcd.begin(20);
     s_lcd.setBitDepth(16);
 }
 

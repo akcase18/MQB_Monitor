@@ -45,7 +45,7 @@ namespace core
      * them genuinely changing every sample -- against the dashboard's
      * real per-signal cadences (see core/logging/README.md for the
      * derivation) once the fastest signals are logged at
-     * LOG_SAMPLE_PERIOD_MS (see src/main.cpp) rather than their raw 20ms
+     * LOG_SAMPLE_PERIOD_MS (see src/main.cpp) rather than their raw 50ms
      * display cadence. Total budget: CHUNK_COUNT * CHUNK_SIZE_BYTES ==
      * 13MiB, inside the 14MiB reserved for IStorage on the Teensy backend
      *
@@ -73,7 +73,9 @@ namespace core
      * Nothing in the catalog sits between 20ms and 100ms
      * (signal_catalog.generated.inc), so this coarsens exactly the 20ms
      * group it's meant to and leaves every other signal alone. */
-    constexpr uint32_t LOG_MIN_INTERVAL_MS = 40;
+    constexpr uint32_t LOG_MIN_INTERVAL_MS = 50;  /* was 40 before the
+                                                   * 2026-08-25 cadence
+                                                   * floor -- see below */
 
     /** Writes `path` as `/log_%03u.bin` for `chunk_index` (0..CHUNK_COUNT-1)
      * into `out` (must be at least CHUNK_PATH_LEN bytes) -- shared between

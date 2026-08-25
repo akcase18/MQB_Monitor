@@ -307,13 +307,23 @@ void test_a_fast_signal_is_rate_floored_to_the_minimum_interval()
     uint16_t           id  = core::SIGNAL_CATALOG[0].id;
     core::Config       cfg = displaying({ id });
 
-    /* A 20ms-cadence signal with a genuinely new value every arrival --
-     * the case LOG_MIN_INTERVAL_MS exists for. Sampled every 20ms too, so
-     * nothing but the floor itself is limiting the rate. */
+    /* A signal arriving twice as fast as the floor allows, with a
+     * genuinely new value every time -- the case LOG_MIN_INTERVAL_MS
+     * exists for. Sampled on every arrival too, so nothing but the floor
+     * itself is limiting the rate.
+     *
+     * Expressed in terms of the constant rather than the literal cadence
+     * it was written against (20ms arrivals under a 40ms floor): the
+     * catalog's fastest cadence and the floor have both moved once
+     * already, and hardcoding either just means editing this test again
+     * next time. */
+    constexpr uint32_t arrival = core::LOG_MIN_INTERVAL_MS / 2;
+    constexpr uint32_t expected_records = 5;
+
     signals.set(id, 0.0f, 0);
     logger.sample(signals, cfg, 0); // primes
 
-    for (uint32_t t = 20; t <= 200; t += 20)
+    for (uint32_t t = arrival; t <= arrival * expected_records * 2; t += arrival)
     {
         signals.set(id, static_cast<float>(t), t);
         logger.sample(signals, cfg, t);
@@ -323,17 +333,19 @@ void test_a_fast_signal_is_rate_floored_to_the_minimum_interval()
 
     std::vector<uint8_t> bytes = storage.file_bytes(chunk_path_str(0));
     TEST_ASSERT_EQUAL_size_t(
-        sizeof(core::ChunkHeader) + 5 * sizeof(core::LogRecord),
+        sizeof(core::ChunkHeader)
+            + expected_records * sizeof(core::LogRecord),
         bytes.size());
 
-    /* Every other arrival, i.e. 40ms apart -- not the 20ms it arrived at,
-     * and not coarser. */
-    core::LogRecord records[5];
+    /* Every other arrival, i.e. exactly LOG_MIN_INTERVAL_MS apart -- not
+     * the rate it arrived at, and not coarser. */
+    core::LogRecord records[expected_records];
     memcpy(records, bytes.data() + sizeof(core::ChunkHeader),
            sizeof(records));
-    for (uint32_t i = 0; i < 5; i++)
+    for (uint32_t i = 0; i < expected_records; i++)
     {
-        TEST_ASSERT_EQUAL_UINT32(40 * (i + 1), records[i].timestamp_ms);
+        TEST_ASSERT_EQUAL_UINT32(core::LOG_MIN_INTERVAL_MS * (i + 1),
+                                 records[i].timestamp_ms);
     }
 }
 

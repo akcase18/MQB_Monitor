@@ -58,7 +58,14 @@ namespace
      * for the framing this carries. */
     constexpr uint32_t REMOTE_SERIAL_BAUD = 115200;
 
-    constexpr uint32_t INFO_SCREEN_REFRESH_MS     = 100;
+    /* 20Hz. Was 200ms (5Hz) from the Phase 6 rework until 2026-08-25 --
+     * an architectural default carried over when the old "update the
+     * screen every loop iteration" model became a scheduled task, not a
+     * measured choice. 5Hz did not read as smooth on real hardware. The
+     * pre-rework code invalidated every panel label on every loop pass
+     * and let LVGL coalesce it to its own 20ms tick, so 50Hz redraws are
+     * known to have run on this panel; 20Hz is well inside that. */
+    constexpr uint32_t INFO_SCREEN_REFRESH_MS     = 50;
     constexpr uint32_t WIRELESS_SCREEN_REFRESH_MS = 500;
     /* Slower than the info screen's: nothing here changes faster than
      * once a minute except the capture toggle, which repaints itself on
@@ -66,7 +73,7 @@ namespace
     constexpr uint32_t LOGGING_SCREEN_REFRESH_MS  = 1000;
 
     /* How often the logger *looks*, not how often it writes -- the write
-     * rate per signal is floored at core::LOG_MIN_INTERVAL_MS (40ms)
+     * rate per signal is floored at core::LOG_MIN_INTERVAL_MS (50ms)
      * inside Logger::sample() itself. Matching the catalog's fastest
      * cadence (20ms, see signal_catalog.generated.inc) means a 20ms
      * signal is seen on the tick it actually arrives, so that floor
@@ -75,7 +82,12 @@ namespace
      * signals (100ms and up) are unaffected either way -- they're logged
      * at their own arrival cadence. Sampling twice as often costs
      * essentially nothing: each tick walks at most MAX_PANELS entries. */
-    constexpr uint32_t LOG_SAMPLE_PERIOD_MS = 20;
+    /* Half core::LOG_MIN_INTERVAL_MS, preserving the relationship the
+     * original 20/40 pair had: the tick has to be finer than the floor,
+     * or a signal arriving exactly on the floor gets skipped whenever
+     * jitter puts its arrival a hair inside the window and the next tick
+     * a hair outside. Was 20 while the floor was 40. */
+    constexpr uint32_t LOG_SAMPLE_PERIOD_MS = 25;
 
     /* RGB565 (2 bytes/pixel), NOT lv_color_t: with LV_COLOR_DEPTH 16 LVGL
      * renders into the draw buffer in the display's own color format,
