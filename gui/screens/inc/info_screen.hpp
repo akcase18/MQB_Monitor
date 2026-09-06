@@ -46,6 +46,15 @@ namespace gui
              * to keep values "live". */
             void refresh();
 
+            /** Starts/stops the small blinking red capture LED in the
+             * top-right corner — call whenever recording starts or stops
+             * (see LoggingScreen's toggle, wired in main.cpp). InfoScreen
+             * has no core:: dependency, so this takes a plain bool rather
+             * than reading core::Logger itself. Safe to call repeatedly
+             * with the same value: enabling restarts the blink from a
+             * clean state rather than stacking animations. */
+            void set_logging_active(bool active);
+
             lv_obj_t *screen() const
             {
                 return screen_;
@@ -60,8 +69,9 @@ namespace gui
 
             static void panel_clicked_cb(lv_event_t *e);
 
-            lv_obj_t    *screen_ = nullptr;
-            const Theme *theme_  = nullptr;
+            lv_obj_t    *screen_        = nullptr;
+            lv_obj_t    *logging_led_   = nullptr;
+            const Theme *theme_         = nullptr;
 
             PanelWidget panels_[MAX_PANELS];
             bool        panel_large_[MAX_PANELS] = {};

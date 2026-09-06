@@ -18,6 +18,14 @@
 namespace gui
 {
 
+    /* The core::DisplayMode <-> gui::DisplayMode translation. gui/bindings
+     * is the declared core::/gui:: boundary (see the file doc comment), so
+     * these live here rather than being re-implemented by each caller --
+     * the composition root needs the gui:: direction too, to hand
+     * ConfiguratorScreen the mode a tapped panel is currently in. */
+    DisplayMode       to_gui_display_mode(core::DisplayMode mode);
+    core::DisplayMode to_core_display_mode(DisplayMode mode);
+
     class VehicleBinding
     {
         public:

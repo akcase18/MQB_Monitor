@@ -7,6 +7,8 @@
 
 #include "teensy_can.hpp"
 
+#include <string.h>
+
 #include <FlexCAN_T4.h>
 
 namespace
@@ -31,15 +33,23 @@ bool TeensyCanBus::begin(uint32_t tx_id, uint32_t rx_id, uint32_t baud)
     return true;
 }
 
+namespace
+{
+    /* Both payload arrays are 8 bytes (CanFrame::data, CAN_message_t::buf),
+     * so this only ever clamps a frame claiming a length longer than a
+     * classic CAN frame can hold. */
+    uint8_t clamped_len(uint8_t len)
+    {
+        return len > 8 ? 8 : len;
+    }
+} // namespace
+
 bool TeensyCanBus::send(const CanFrame &frame)
 {
     CAN_message_t msg;
     msg.id  = frame.id;
-    msg.len = frame.len;
-    for (uint8_t i = 0; i < frame.len && i < sizeof(msg.buf); i++)
-    {
-        msg.buf[i] = frame.data[i];
-    }
+    msg.len = clamped_len(frame.len);
+    memcpy(msg.buf, frame.data, msg.len);
 
     return s_bus.write(msg) > 0;
 }
@@ -53,11 +63,8 @@ bool TeensyCanBus::receive(CanFrame &out)
     }
 
     out.id  = msg.id;
-    out.len = msg.len;
-    for (uint8_t i = 0; i < msg.len && i < sizeof(out.data); i++)
-    {
-        out.data[i] = msg.buf[i];
-    }
+    out.len = clamped_len(msg.len);
+    memcpy(out.data, msg.buf, out.len);
 
     return true;
 }

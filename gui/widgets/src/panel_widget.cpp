@@ -1,4 +1,7 @@
 #include "panel_widget.hpp"
+#include "mem_placement.hpp"
+
+#include <string.h>
 
 namespace gui
 {
@@ -116,7 +119,7 @@ namespace gui
         }
     } // namespace
 
-    void PanelWidget::init(lv_obj_t *parent, const Theme &theme)
+    FLASHMEM void PanelWidget::init(lv_obj_t *parent, const Theme &theme)
     {
         theme_ = &theme;
 
@@ -173,6 +176,10 @@ namespace gui
         unit_ = lv_label_create(btn_);
         lv_obj_set_style_text_color(unit_, theme.palette.fg, 0);
         lv_obj_set_style_bg_opa(unit_, LV_OPA_TRANSP, 0);
+        /* Typography::unit is the same font at every tier and mode (see
+         * theme.hpp), so it belongs here rather than being re-set on
+         * every set_view_model() call. */
+        lv_obj_set_style_text_font(unit_, theme.typography.unit, 0);
 
         bar_ = lv_bar_create(btn_);
         lv_bar_set_range(bar_, 0, 100);
@@ -198,101 +205,191 @@ namespace gui
     {
         const Typography &type = theme_->typography;
 
-        lv_obj_set_style_text_font(data_, value_font(type, vm), 0);
-        lv_label_set_text(data_, vm.value_str);
-        lv_obj_set_style_bg_opa(data_, LV_OPA_TRANSP, 0);
+        /* Everything below is gated on what actually moved since the last
+         * call. This runs for every visible panel several times a second,
+         * and LVGL's setters do no such check of their own -- each one
+         * invalidates the style cache and marks the panel dirty for
+         * redraw even when handed the value it already holds. In the
+         * steady state only value_str changes, so the common path is now
+         * one label update plus the geometry that depends on its width,
+         * instead of the whole ~20-call rebuild. */
+        const bool first = !applied_valid_;
+        const bool mode_changed = first || vm.mode != applied_.mode;
+        const bool tier_changed
+            = first || vm.large != applied_.large || vm.hero != applied_.hero;
+        const bool value_changed
+            = first || strcmp(vm.value_str, applied_.value_str) != 0;
+        const bool name_changed
+            = first || strcmp(vm.name, applied_.name) != 0;
+        const bool unit_changed
+            = first || strcmp(vm.unit_label, applied_.unit_label) != 0;
+        const bool warn_changed
+            = first || vm.warn_lo_active != applied_.warn_lo_active
+              || vm.warn_hi_active != applied_.warn_hi_active;
+        const bool pct_changed = first || vm.range_pct != applied_.range_pct;
+
+        if (mode_changed || tier_changed)
+        {
+            lv_obj_set_style_text_font(data_, value_font(type, vm), 0);
+        }
+        if (value_changed)
+        {
+            lv_label_set_text(data_, vm.value_str);
+        }
 
         const lv_font_t *caption_font
             = vm.large ? type.label_lg : type.label_sm;
-        lv_obj_set_style_text_font(label_, caption_font, 0);
-        lv_label_set_text(label_, vm.name);
-
-        lv_obj_set_style_text_font(unit_, type.unit, 0);
-        lv_label_set_text(unit_, vm.unit_label);
-
-        lv_obj_set_hidden(arc_, true);
-        lv_obj_set_hidden(bar_, true);
-        /* Gauge hides the unit outright rather than risk it — the ring's
-         * size already only has room for the bare value (see ARC_SIZE_*
-         * above). Digital/Bar have the horizontal room to spare. */
-        lv_obj_set_hidden(
-            unit_, vm.mode == DisplayMode::Gauge || vm.unit_label[0] == '\0');
-
-        uint8_t    pct    = range_pct_to_100(vm.range_pct);
-        lv_coord_t offset = content_center_offset(caption_font);
-
-        switch (vm.mode)
+        if (tier_changed)
         {
-            case DisplayMode::Bar: {
-                lv_coord_t bar_h = vm.hero ? BAR_HEIGHT_HERO : BAR_HEIGHT;
-                lv_obj_set_size(bar_, LV_PCT(80), bar_h);
-                lv_obj_set_hidden(bar_, false);
+            lv_obj_set_style_text_font(label_, caption_font, 0);
+        }
+        if (name_changed)
+        {
+            lv_label_set_text(label_, vm.name);
+        }
+        if (unit_changed)
+        {
+            lv_label_set_text(unit_, vm.unit_label);
+        }
+
+        if (mode_changed || unit_changed)
+        {
+            /* Gauge hides the unit outright rather than risk it — the
+             * ring's size already only has room for the bare value (see
+             * ARC_SIZE_* above). Digital/Bar have the horizontal room to
+             * spare. */
+            lv_obj_set_hidden(unit_,
+                              vm.mode == DisplayMode::Gauge
+                                  || vm.unit_label[0] == '\0');
+        }
+
+        /* The graphic's own placement depends only on mode/tier, but
+         * data_ and unit_ are positioned with lv_obj_align_to(), which
+         * resolves to a fixed offset against the base's size at the
+         * moment it's called rather than tracking it — so a value_str
+         * whose rendered width changed has to re-run this too, or the
+         * unit tag drifts away from (or into) the number. */
+        if (mode_changed || tier_changed || value_changed)
+        {
+            uint8_t    pct    = range_pct_to_100(vm.range_pct);
+            lv_coord_t offset = content_center_offset(caption_font);
+
+            lv_obj_set_hidden(arc_, vm.mode != DisplayMode::Gauge);
+            lv_obj_set_hidden(bar_, vm.mode != DisplayMode::Bar);
+
+            switch (vm.mode)
+            {
+                case DisplayMode::Bar: {
+                    lv_coord_t bar_h = vm.hero ? BAR_HEIGHT_HERO : BAR_HEIGHT;
+                    lv_obj_set_size(bar_, LV_PCT(80), bar_h);
+                    lv_bar_set_value(bar_, pct, LV_ANIM_OFF);
+
+                    /* The value sits above the bar, so centering the bar
+                     * alone at `offset` would leave the (value + bar)
+                     * pair sitting higher than intended — shift the bar
+                     * down by half the pair's combined height so the pair
+                     * as a whole lands at `offset`, matching Digital/
+                     * Gauge's single-element look. */
+                    lv_coord_t data_h
+                        = lv_font_get_line_height(value_font(type, vm));
+                    lv_coord_t pair_shift = (data_h + BAR_DATA_GAP) / 2;
+                    lv_obj_align(bar_, LV_ALIGN_CENTER, 0, offset + pair_shift);
+
+                    lv_obj_align_to(
+                        data_, bar_, LV_ALIGN_OUT_TOP_MID, 0, -BAR_DATA_GAP);
+                    lv_obj_align_to(unit_, data_, LV_ALIGN_OUT_RIGHT_TOP, 3, 2);
+                    break;
+                }
+
+                case DisplayMode::Gauge: {
+                    lv_coord_t size = vm.hero    ? ARC_SIZE_HERO
+                                      : vm.large ? ARC_SIZE_LARGE
+                                                 : ARC_SIZE_SMALL;
+                    lv_obj_set_size(arc_, size, size);
+                    lv_obj_align(arc_, LV_ALIGN_CENTER, 0, offset);
+                    lv_arc_set_value(arc_, pct);
+
+                    /* The value sits inside the ring rather than beside
+                     * it — centering it directly on the arc keeps the
+                     * "graphic + number together" rule from adding a
+                     * third vertical element to position. */
+                    lv_obj_align_to(data_, arc_, LV_ALIGN_CENTER, 0, 0);
+                    break;
+                }
+
+                case DisplayMode::Digital:
+                default:
+                    lv_obj_align(data_, LV_ALIGN_CENTER, 0, offset);
+                    lv_obj_align_to(unit_, data_, LV_ALIGN_OUT_RIGHT_TOP, 3, 2);
+                    break;
+            }
+        }
+        else if (pct_changed)
+        {
+            /* Same mode and tier, only the fill moved — update the
+             * graphic's value without redoing any of the geometry above. */
+            uint8_t pct = range_pct_to_100(vm.range_pct);
+            if (vm.mode == DisplayMode::Bar)
+            {
                 lv_bar_set_value(bar_, pct, LV_ANIM_OFF);
-                lv_obj_set_style_bg_color(
-                    bar_, indicator_color(*theme_, vm), LV_PART_INDICATOR);
-
-                /* The value sits above the bar, so centering the bar alone
-                 * at `offset` would leave the (value + bar) pair sitting
-                 * higher than intended — shift the bar down by half the
-                 * pair's combined height so the pair as a whole lands at
-                 * `offset`, matching Digital/Gauge's single-element look. */
-                lv_coord_t data_h
-                    = lv_font_get_line_height(value_font(type, vm));
-                lv_coord_t pair_shift = (data_h + BAR_DATA_GAP) / 2;
-                lv_obj_align(bar_, LV_ALIGN_CENTER, 0, offset + pair_shift);
-
-                lv_obj_align_to(
-                    data_, bar_, LV_ALIGN_OUT_TOP_MID, 0, -BAR_DATA_GAP);
-                lv_obj_align_to(unit_, data_, LV_ALIGN_OUT_RIGHT_TOP, 3, 2);
-                break;
             }
-
-            case DisplayMode::Gauge: {
-                lv_coord_t size = vm.hero    ? ARC_SIZE_HERO
-                                  : vm.large ? ARC_SIZE_LARGE
-                                             : ARC_SIZE_SMALL;
-                lv_obj_set_size(arc_, size, size);
-                lv_obj_align(arc_, LV_ALIGN_CENTER, 0, offset);
-                lv_obj_set_hidden(arc_, false);
+            else if (vm.mode == DisplayMode::Gauge)
+            {
                 lv_arc_set_value(arc_, pct);
-                lv_obj_set_style_arc_color(
-                    arc_, indicator_color(*theme_, vm), LV_PART_INDICATOR);
-
-                /* The value sits inside the ring rather than beside it —
-                 * centering it directly on the arc keeps the "graphic +
-                 * number together" rule from adding a third vertical
-                 * element to position. */
-                lv_obj_align_to(data_, arc_, LV_ALIGN_CENTER, 0, 0);
-                break;
             }
-
-            case DisplayMode::Digital:
-            default:
-                lv_obj_align(data_, LV_ALIGN_CENTER, 0, offset);
-                lv_obj_align_to(unit_, data_, LV_ALIGN_OUT_RIGHT_TOP, 3, 2);
-                break;
         }
 
-        /* A warning shades the whole panel rather than just tinting the
-         * active visual — a bare colored number/bar/arc is easy to miss at
-         * a glance next to five other panels; the panel's entire card
-         * flipping to blue/red isn't. Digital has no separate indicator to
-         * color at all, so this is its only warning signal. */
-        lv_color_t panel_bg = theme_->palette.bg;
-        if (vm.warn_hi_active)
+        /* indicator_color() reads the warning flags and whether range_pct
+         * has pegged outside [0,1], so either moving can change it. */
+        if (mode_changed || warn_changed || pct_changed)
         {
-            panel_bg = theme_->palette.warn_hi;
+            lv_color_t indicator = indicator_color(*theme_, vm);
+            if (vm.mode == DisplayMode::Bar)
+            {
+                lv_obj_set_style_bg_color(bar_, indicator, LV_PART_INDICATOR);
+            }
+            else if (vm.mode == DisplayMode::Gauge)
+            {
+                lv_obj_set_style_arc_color(arc_, indicator, LV_PART_INDICATOR);
+            }
         }
-        else if (vm.warn_lo_active)
+
+        if (warn_changed)
         {
-            panel_bg = theme_->palette.warn_lo;
+            /* A warning shades the whole panel rather than just tinting
+             * the active visual — a bare colored number/bar/arc is easy
+             * to miss at a glance next to five other panels; the panel's
+             * entire card flipping to blue/red isn't. Digital has no
+             * separate indicator to color at all, so this is its only
+             * warning signal. */
+            lv_color_t panel_bg = theme_->palette.bg;
+            if (vm.warn_hi_active)
+            {
+                panel_bg = theme_->palette.warn_hi;
+            }
+            else if (vm.warn_lo_active)
+            {
+                panel_bg = theme_->palette.warn_lo;
+            }
+            lv_obj_set_style_bg_color(btn_, panel_bg, 0);
         }
-        lv_obj_set_style_bg_color(btn_, panel_bg, 0);
+
+        applied_       = vm;
+        applied_valid_ = true;
     }
 
     void PanelWidget::set_visible(bool visible)
     {
         lv_obj_set_hidden(btn_, !visible);
+
+        /* This is only ever called from InfoScreen::init()/rebuild(), i.e.
+         * exactly when the panel is about to be given a new grid cell (and
+         * therefore a new size). The lv_obj_align_to() placements in
+         * set_view_model() are resolved against the sizes in effect when
+         * they run, so they don't survive a resize — drop the cached
+         * view-model to force the next refresh to re-apply everything
+         * against the new geometry. */
+        applied_valid_ = false;
     }
 
 } // namespace gui

@@ -161,3 +161,8 @@ bool TeensySdCard::remove(const char *path)
     }
     return sd_.remove(path);
 }
+
+StorageMedium TeensySdCard::medium() const
+{
+    return StorageMedium::SdCard;
+}

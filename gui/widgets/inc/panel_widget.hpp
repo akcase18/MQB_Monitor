@@ -89,6 +89,20 @@ namespace gui
             lv_obj_t    *bar_   = nullptr;
             lv_obj_t    *label_ = nullptr;
             const Theme *theme_ = nullptr;
+
+            /** The last view-model actually applied, so set_view_model()
+             * can skip the LVGL work for whatever didn't change. On the
+             * refresh path (every panel, several times a second) the
+             * usual case is that only value_str moved -- name, unit,
+             * fonts, mode, geometry and warning state all stay put for
+             * minutes at a time -- yet every lv_label_set_text /
+             * lv_obj_set_style_* / lv_obj_align call re-runs the style
+             * cache invalidation and marks the panel's area dirty for
+             * redraw whether or not the value it's setting differs.
+             * `applied_valid_` starts false so the first call after
+             * init() always writes everything. */
+            PanelViewModel applied_ {};
+            bool           applied_valid_ = false;
     };
 
 } // namespace gui

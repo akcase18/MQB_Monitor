@@ -1,9 +1,10 @@
 #include "screen_helpers.hpp"
+#include "mem_placement.hpp"
 
 namespace gui
 {
 
-    lv_obj_t *create_screen(const Theme &theme)
+    FLASHMEM lv_obj_t *create_screen(const Theme &theme)
     {
         lv_obj_t *screen = lv_obj_create(nullptr);
         lv_obj_set_size(
@@ -24,28 +25,8 @@ namespace gui
         return screen;
     }
 
-    DoneButton create_done_button(lv_obj_t *parent, const Theme &theme)
-    {
-        DoneButton done {};
-
-        done.btn = lv_btn_create(parent);
-        lv_obj_set_style_bg_color(done.btn, theme.palette.bg, 0);
-        lv_obj_set_style_text_color(done.btn, theme.palette.fg, 0);
-        lv_obj_set_style_radius(done.btn, 5, 0);
-        lv_obj_set_style_bg_color(
-            done.btn, theme.palette.accent, LV_STATE_PRESSED);
-        lv_obj_set_style_shadow_width(done.btn, 0, 0);
-        lv_obj_align(done.btn, LV_ALIGN_BOTTOM_RIGHT, -20, -20);
-
-        done.label = lv_label_create(done.btn);
-        lv_obj_set_style_text_font(done.label, theme.typography.symbol_lg, 0);
-        lv_label_set_text(done.label, LV_SYMBOL_OK);
-        lv_obj_center(done.label);
-
-        return done;
-    }
-
-    DoneButton create_close_button(lv_obj_t *parent, const Theme &theme)
+    FLASHMEM DoneButton create_close_button(lv_obj_t    *parent,
+                                           const Theme &theme)
     {
         DoneButton close {};
 
@@ -67,7 +48,9 @@ namespace gui
         return close;
     }
 
-    lv_obj_t *create_divider(lv_obj_t *parent, const Theme &theme, lv_coord_t y)
+    FLASHMEM lv_obj_t *create_divider(lv_obj_t    *parent,
+                                      const Theme &theme,
+                                      lv_coord_t   y)
     {
         lv_obj_t *div = lv_obj_create(parent);
         lv_obj_remove_style_all(div);
@@ -76,6 +59,174 @@ namespace gui
         lv_obj_set_style_bg_opa(div, LV_OPA_COVER, 0);
         lv_obj_align(div, LV_ALIGN_TOP_MID, 0, y);
         return div;
+    }
+
+    FLASHMEM lv_obj_t *create_nav_title(lv_obj_t    *parent,
+                                        const Theme &theme,
+                                        const char  *text)
+    {
+        lv_obj_t *title = lv_label_create(parent);
+        if (text != nullptr)
+        {
+            lv_label_set_text(title, text);
+        }
+        lv_obj_align(title, LV_ALIGN_TOP_LEFT, 20, 12);
+        lv_obj_set_style_text_color(title, theme.palette.fg, 0);
+        lv_obj_set_style_text_font(title, theme.typography.title, 0);
+        return title;
+    }
+
+    FLASHMEM ListRow create_list_row(lv_obj_t    *parent,
+                                     const Theme &theme,
+                                     const char  *label_text)
+    {
+        ListRow row {};
+
+        row.btn = lv_btn_create(parent);
+        lv_obj_set_style_bg_opa(row.btn, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(row.btn, 0, 0);
+        lv_obj_set_style_shadow_width(row.btn, 0, 0);
+        /* lv_btn's default theme pads its content in from the button's own
+         * edges — without zeroing that, LEFT_MID-aligned children sit
+         * further right than the plain labels elsewhere on the same
+         * screen, which aren't buttons and so have no such padding. */
+        lv_obj_set_style_pad_all(row.btn, 0, 0);
+        lv_obj_set_style_bg_color(
+            row.btn, theme.palette.accent, LV_STATE_PRESSED);
+        lv_obj_set_style_bg_opa(row.btn, LV_OPA_30, LV_STATE_PRESSED);
+
+        row.label = lv_label_create(row.btn);
+        lv_label_set_text(row.label, label_text);
+        lv_obj_set_style_text_color(row.label, theme.palette.fg, 0);
+        lv_obj_set_style_text_font(row.label, theme.typography.label_lg, 0);
+        lv_obj_align(row.label, LV_ALIGN_LEFT_MID, 0, 0);
+
+        row.chevron = lv_label_create(row.btn);
+        lv_obj_set_style_text_font(row.chevron, theme.typography.symbol_lg, 0);
+        lv_label_set_text(row.chevron, LV_SYMBOL_RIGHT);
+        lv_obj_set_style_text_color(row.chevron, theme.palette.fg, 0);
+        lv_obj_align(row.chevron, LV_ALIGN_RIGHT_MID, 0, 0);
+
+        return row;
+    }
+
+    FLASHMEM void style_flat_matrix(lv_obj_t    *matrix,
+                                    const Theme &theme,
+                                    lv_coord_t   item_pad)
+    {
+        lv_obj_set_style_bg_opa(matrix, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(matrix, 0, 0);
+        lv_obj_set_style_shadow_width(matrix, 0, 0);
+        lv_obj_set_style_pad_all(matrix, 0, 0);
+        lv_obj_set_style_pad_gap(matrix, 8, 0);
+
+        lv_obj_set_style_bg_color(matrix, theme.palette.bg, LV_PART_ITEMS);
+        lv_obj_set_style_bg_opa(matrix, LV_OPA_COVER, LV_PART_ITEMS);
+        lv_obj_set_style_text_color(matrix, theme.palette.fg, LV_PART_ITEMS);
+        if (item_pad != MATRIX_ITEM_PAD_KEEP)
+        {
+            lv_obj_set_style_pad_all(matrix, item_pad, LV_PART_ITEMS);
+        }
+        lv_obj_set_style_radius(matrix, 8, LV_PART_ITEMS);
+        lv_obj_set_style_border_width(
+            matrix, theme.metrics.panel_border_width, LV_PART_ITEMS);
+        lv_obj_set_style_border_color(
+            matrix, theme.palette.panel_border, LV_PART_ITEMS);
+        lv_obj_set_style_shadow_width(matrix, 0, LV_PART_ITEMS);
+        lv_obj_set_style_bg_color(
+            matrix, theme.palette.accent, LV_PART_ITEMS | LV_STATE_CHECKED);
+        lv_obj_set_style_bg_color(
+            matrix, theme.palette.accent, LV_PART_ITEMS | LV_STATE_PRESSED);
+    }
+
+    namespace
+    {
+        /** Cancel/Confirm button height in a confirm popup -- taller than
+         * lv_msgbox's cramped ~43px default footer, same rationale as the
+         * screens' own control rows wanting an easy tap target. */
+        constexpr lv_coord_t CONFIRM_POPUP_FOOTER_HEIGHT = 60;
+
+        /* Matches the flat, bordered look of the screens' own buttons, so
+         * the footer doesn't end up in LVGL's default light-mode styling.
+         * `fill` (the Confirm button) sits solid at rest in the color that
+         * every other button here only shows on press -- marking the one
+         * that actually commits, matching the button matrix's own
+         * checked-state treatment (style_flat_matrix() above). */
+        FLASHMEM void style_flat_footer_button(lv_obj_t    *btn,
+                                               const Theme &theme,
+                                               const lv_color_t *fill
+                                               = nullptr)
+        {
+            lv_obj_set_style_bg_color(
+                btn, fill != nullptr ? *fill : theme.palette.bg, 0);
+            lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
+            lv_obj_set_style_radius(btn, 8, 0);
+            lv_obj_set_style_border_width(
+                btn, theme.metrics.panel_border_width, 0);
+            lv_obj_set_style_border_color(btn, theme.palette.panel_border, 0);
+            lv_obj_set_style_shadow_width(btn, 0, 0);
+            lv_obj_set_style_text_color(btn, theme.palette.fg, 0);
+            lv_obj_set_style_bg_color(
+                btn,
+                fill != nullptr ? *fill : theme.palette.accent,
+                LV_STATE_PRESSED);
+        }
+    } // namespace
+
+    FLASHMEM ConfirmPopup create_confirm_popup(const Theme &theme,
+                                               const char  *title_text,
+                                               const char  *body_text,
+                                               const char  *confirm_text,
+                                               bool         destructive)
+    {
+        ConfirmPopup popup {};
+
+        popup.mbox = lv_msgbox_create(nullptr);
+        lv_obj_set_style_bg_color(popup.mbox, theme.palette.bg, 0);
+        lv_obj_set_style_bg_opa(popup.mbox, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(
+            popup.mbox, theme.metrics.panel_border_width, 0);
+        lv_obj_set_style_border_color(
+            popup.mbox, theme.palette.panel_border, 0);
+        lv_obj_set_style_radius(popup.mbox, 10, 0);
+
+        /* Both strings stay short and single-line on purpose: a full
+         * sentence of each wrapped onto several lines apiece, which read
+         * as cluttered at the popup's ~260px width in both orientations. */
+        lv_obj_t *title = lv_msgbox_add_title(popup.mbox, title_text);
+        lv_obj_set_style_text_color(title, theme.palette.fg, 0);
+        lv_obj_set_style_text_font(title, theme.typography.label_lg, 0);
+
+        /* lv_msgbox_add_title() is what actually creates the header
+         * container (get_header() would return null before this point) --
+         * it picks up LVGL's default (light-mode) theme styling on its own
+         * bg, so override it explicitly to match everything else here
+         * being dark. */
+        lv_obj_t *header = lv_msgbox_get_header(popup.mbox);
+        lv_obj_set_style_bg_color(header, theme.palette.bg, 0);
+        lv_obj_set_style_bg_opa(header, LV_OPA_COVER, 0);
+
+        lv_obj_t *body = lv_msgbox_add_text(popup.mbox, body_text);
+        lv_obj_set_style_text_color(body, theme.palette.fg, 0);
+        lv_obj_set_style_text_font(body, theme.typography.label_lg, 0);
+
+        /* Cancel added first, Confirm second -- lv_msgbox's footer is a
+         * left-to-right flex row, so this puts Confirm on the right. */
+        popup.cancel_btn = lv_msgbox_add_footer_button(popup.mbox, "Cancel");
+        popup.confirm_btn
+            = lv_msgbox_add_footer_button(popup.mbox, confirm_text);
+
+        lv_color_t fill
+            = destructive ? theme.palette.warn_hi : theme.palette.accent;
+        style_flat_footer_button(popup.cancel_btn, theme);
+        style_flat_footer_button(popup.confirm_btn, theme, &fill);
+
+        /* The buttons are LV_PCT(100) of the footer, so growing the footer
+         * grows them too. */
+        lv_obj_set_height(lv_msgbox_get_footer(popup.mbox),
+                          CONFIRM_POPUP_FOOTER_HEIGHT);
+
+        return popup;
     }
 
 } // namespace gui

@@ -1,4 +1,5 @@
 #include "settings_screen.hpp"
+#include "mem_placement.hpp"
 
 #include <stdio.h>
 
@@ -13,7 +14,7 @@ namespace gui
         /* Nav bar, then Brightness and Panels as single label+control rows
          * (not label-above-control — that cost a whole extra line each,
          * and this screen doesn't have room to spare), then a footer of
-         * two compact tappable rows (Theme, Wireless Setup). Every row is
+         * two compact tappable rows (Theme|Orientation, WiFi). Every row is
          * separated from its neighbor by a divider so each reads as its
          * own distinct row instead of blurring into the next one. */
         constexpr lv_coord_t HEADER_DIVIDER_Y = 50;
@@ -27,10 +28,11 @@ namespace gui
         constexpr lv_coord_t PANELS_ROW_Y      = 136;
         constexpr lv_coord_t PANELS_ROW_HEIGHT = 40;
         constexpr lv_coord_t PANELS_LABEL_GAP  = 10;
-        /* Matches style_flat_matrix()'s pad_gap below — used to compute a
-         * single panel-count button's width so the Day/Night button
-         * (built first, in the Brightness row above this one) can match
-         * it exactly rather than being an arbitrary square. */
+        /* Matches style_flat_matrix()'s pad_gap (see screen_helpers.hpp)
+         * — used to compute a single panel-count button's width so the
+         * Day/Night button (built first, in the Brightness row above this
+         * one) can match it exactly rather than being an arbitrary
+         * square. */
         constexpr uint8_t    PANEL_BTN_COUNT = 6;
         constexpr lv_coord_t PANEL_BTN_GAP   = 8;
         constexpr lv_coord_t DIVIDER2_Y      = 186;
@@ -45,17 +47,11 @@ namespace gui
         constexpr lv_coord_t COMPACT_ROW_HEIGHT   = 38;
         constexpr lv_coord_t THEME_SWATCH_SIZE    = 22;
 
-        /** Cancel/Confirm button height in the orientation-change confirm
-         * popup (see orientation_clicked_cb) — taller than lv_msgbox's
-         * cramped ~43px default footer, same rationale as this screen's
-         * own control rows wanting an easy tap target. */
-        constexpr lv_coord_t CONFIRM_POPUP_FOOTER_HEIGHT = 60;
-
         /* Portrait gets its own full set of row Y-positions rather than
          * reusing Landscape's — Landscape's rhythm is tuned tight to fit
          * everything in 320px of height, and just reusing it in Portrait's
          * 480px canvas left every row clustered at the top with ~250px of
-         * dead space below Wireless Setup. There's enough spare height
+         * dead space below the last row. There's enough spare height
          * (480 vs 320) that Brightness and Panels each get a label line of
          * their own above their control, instead of sharing a row with it
          * — freeing the control (slider, panel-count buttons) to use the
@@ -94,65 +90,12 @@ namespace gui
 
         constexpr int32_t BRIGHTNESS_STEP = 5;
 
-        /* Restyles a checkable lv_buttonmatrix away from LVGL's default
-         * light-mode card+shadow look to match the flat, bordered,
-         * accent-on-checked treatment used everywhere else in this app —
-         * used by the Panels matrix below. */
-        void style_flat_matrix(lv_obj_t *matrix, const Theme &theme)
-        {
-            lv_obj_set_style_bg_opa(matrix, LV_OPA_TRANSP, 0);
-            lv_obj_set_style_border_width(matrix, 0, 0);
-            lv_obj_set_style_shadow_width(matrix, 0, 0);
-            lv_obj_set_style_pad_all(matrix, 0, 0);
-            lv_obj_set_style_pad_gap(matrix, 8, 0);
-
-            lv_obj_set_style_bg_color(matrix, theme.palette.bg, LV_PART_ITEMS);
-            lv_obj_set_style_bg_opa(matrix, LV_OPA_COVER, LV_PART_ITEMS);
-            lv_obj_set_style_text_color(
-                matrix, theme.palette.fg, LV_PART_ITEMS);
-            lv_obj_set_style_radius(matrix, 8, LV_PART_ITEMS);
-            lv_obj_set_style_border_width(
-                matrix, theme.metrics.panel_border_width, LV_PART_ITEMS);
-            lv_obj_set_style_border_color(
-                matrix, theme.palette.panel_border, LV_PART_ITEMS);
-            lv_obj_set_style_shadow_width(matrix, 0, LV_PART_ITEMS);
-            lv_obj_set_style_bg_color(
-                matrix, theme.palette.accent, LV_PART_ITEMS | LV_STATE_CHECKED);
-            lv_obj_set_style_bg_color(
-                matrix, theme.palette.accent, LV_PART_ITEMS | LV_STATE_PRESSED);
-        }
-
-        /* Matches day_night_btn_/orientation_btn_'s styling — used by the
-         * orientation-change confirm popup's footer buttons so they don't
-         * end up in LVGL's default light-mode look. `primary` (the
-         * popup's Confirm button) sits solid-accent at rest, the same
-         * color every other button here only shows on press — marking it
-         * as the button that actually commits the change, matching the
-         * button-matrix's own checked-state treatment (style_flat_matrix
-         * above). */
-        void style_flat_footer_button(lv_obj_t   *btn,
-                                      const Theme &theme,
-                                      bool         primary = false)
-        {
-            lv_obj_set_style_bg_color(
-                btn, primary ? theme.palette.accent : theme.palette.bg, 0);
-            lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
-            lv_obj_set_style_radius(btn, 8, 0);
-            lv_obj_set_style_border_width(
-                btn, theme.metrics.panel_border_width, 0);
-            lv_obj_set_style_border_color(btn, theme.palette.panel_border, 0);
-            lv_obj_set_style_shadow_width(btn, 0, 0);
-            lv_obj_set_style_text_color(btn, theme.palette.fg, 0);
-            lv_obj_set_style_bg_color(
-                btn, theme.palette.accent, LV_STATE_PRESSED);
-        }
-
         /* A vertical counterpart to screen_helpers.hpp's create_divider() —
          * same color/thickness, just rotated, for splitting the Theme/
          * Orientation row instead of separating stacked rows. Kept local to
          * this screen rather than promoted to screen_helpers.hpp since
          * nothing else needs a vertical split yet. */
-        lv_obj_t *create_vertical_divider(lv_obj_t    *parent,
+        FLASHMEM lv_obj_t *create_vertical_divider(lv_obj_t    *parent,
                                           const Theme &theme,
                                           lv_coord_t   x,
                                           lv_coord_t   y,
@@ -168,7 +111,7 @@ namespace gui
         }
     } // namespace
 
-    void SettingsScreen::init(const Theme &theme,
+    FLASHMEM void SettingsScreen::init(const Theme &theme,
                               uint8_t      initial_day_brightness_pct,
                               uint8_t      initial_night_brightness_pct,
                               uint8_t      initial_num_panels,
@@ -183,7 +126,7 @@ namespace gui
                               PickWirelessCallback      pick_wireless_cb,
                               void                     *pick_wireless_ctx,
                               OrientationConfirmCallback orientation_confirm_cb,
-                              void                       *orientation_confirm_ctx)
+                              void                      *orientation_confirm_ctx)
     {
         theme_                = &theme;
         day_brightness_pct_   = initial_day_brightness_pct;
@@ -208,11 +151,7 @@ namespace gui
 
         /* Nav bar: title + close, standing in for the bottom-right
          * checkmark other screens use (see the file doc comment). */
-        lv_obj_t *title_lbl = lv_label_create(screen_);
-        lv_label_set_text(title_lbl, "Settings");
-        lv_obj_align(title_lbl, LV_ALIGN_TOP_LEFT, 20, 12);
-        lv_obj_set_style_text_color(title_lbl, theme.palette.fg, 0);
-        lv_obj_set_style_text_font(title_lbl, theme.typography.title, 0);
+        create_nav_title(screen_, theme, "Settings");
 
         DoneButton close = create_close_button(screen_, theme);
         lv_obj_add_event_cb(close.btn, done_cb_handler, LV_EVENT_CLICKED, this);
@@ -405,7 +344,7 @@ namespace gui
         lv_buttonmatrix_set_one_checked(panel_count_matrix_, true);
         lv_buttonmatrix_set_button_ctrl_all(panel_count_matrix_,
                                             LV_BUTTONMATRIX_CTRL_CHECKABLE);
-        style_flat_matrix(panel_count_matrix_, theme);
+        style_flat_matrix(panel_count_matrix_, theme, MATRIX_ITEM_PAD_KEEP);
 
         create_divider(
             screen_, theme, portrait ? PORTRAIT_DIVIDER2_Y : DIVIDER2_Y);
@@ -442,39 +381,19 @@ namespace gui
         lv_coord_t compact_row_height
             = portrait ? PORTRAIT_ROW_HEIGHT : COMPACT_ROW_HEIGHT;
 
-        lv_obj_t *theme_row_btn = lv_btn_create(screen_);
-        lv_obj_set_size(theme_row_btn, theme_row_width, compact_row_height);
-        lv_obj_align(theme_row_btn,
+        ListRow theme_row = create_list_row(screen_, theme, "Theme");
+        lv_obj_set_size(theme_row.btn, theme_row_width, compact_row_height);
+        lv_obj_align(theme_row.btn,
                      LV_ALIGN_TOP_LEFT,
                      SCREEN_MARGIN,
                      portrait ? PORTRAIT_THEME_ROW_Y : THEME_ROW_Y);
-        lv_obj_set_style_bg_opa(theme_row_btn, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_border_width(theme_row_btn, 0, 0);
-        lv_obj_set_style_shadow_width(theme_row_btn, 0, 0);
-        lv_obj_set_style_pad_all(theme_row_btn, 0, 0);
-        lv_obj_set_style_bg_color(
-            theme_row_btn, theme.palette.accent, LV_STATE_PRESSED);
-        lv_obj_set_style_bg_opa(theme_row_btn, LV_OPA_30, LV_STATE_PRESSED);
         lv_obj_add_event_cb(
-            theme_row_btn, pick_theme_cb_handler, LV_EVENT_CLICKED, this);
-
-        lv_obj_t *theme_label = lv_label_create(theme_row_btn);
-        lv_label_set_text(theme_label, "Theme");
-        lv_obj_set_style_text_color(theme_label, theme.palette.fg, 0);
-        lv_obj_set_style_text_font(theme_label, theme.typography.label_lg, 0);
-        lv_obj_align(theme_label, LV_ALIGN_LEFT_MID, 0, 0);
-
-        lv_obj_t *theme_chevron = lv_label_create(theme_row_btn);
-        lv_obj_set_style_text_font(
-            theme_chevron, theme.typography.symbol_lg, 0);
-        lv_label_set_text(theme_chevron, LV_SYMBOL_RIGHT);
-        lv_obj_set_style_text_color(theme_chevron, theme.palette.fg, 0);
-        lv_obj_align(theme_chevron, LV_ALIGN_RIGHT_MID, 0, 0);
+            theme_row.btn, pick_theme_cb_handler, LV_EVENT_CLICKED, this);
 
         /* Current-accent preview — a plain colored square rather than a
          * text swatch name, since the presets don't have user-facing
          * names beyond their appearance. */
-        theme_swatch_ = lv_obj_create(theme_row_btn);
+        theme_swatch_ = lv_obj_create(theme_row.btn);
         lv_obj_set_size(theme_swatch_, THEME_SWATCH_SIZE, THEME_SWATCH_SIZE);
         lv_obj_set_style_radius(theme_swatch_, 6, 0);
         lv_obj_set_style_border_width(
@@ -483,7 +402,7 @@ namespace gui
             theme_swatch_, theme.palette.panel_border, 0);
         lv_obj_set_style_shadow_width(theme_swatch_, 0, 0);
         lv_obj_align_to(
-            theme_swatch_, theme_chevron, LV_ALIGN_OUT_LEFT_MID, -12, 0);
+            theme_swatch_, theme_row.chevron, LV_ALIGN_OUT_LEFT_MID, -12, 0);
 
         /* Orientation row: a label plus a compact toggle button (matching
          * the Day/Night button's styling), not a navigation row — there's
@@ -548,40 +467,22 @@ namespace gui
         create_divider(
             screen_, theme, portrait ? PORTRAIT_DIVIDER3_Y : DIVIDER3_Y);
 
-        /* Wireless Setup row: tappable, hands off to WirelessSetupScreen —
-         * same shape as the Theme row above it, just without a preview
-         * swatch (there's no "current value" to show at a glance). */
-        lv_obj_t *wireless_row_btn = lv_btn_create(screen_);
-        lv_obj_set_size(wireless_row_btn,
+        /* WiFi row: tappable, hands off to WirelessSetupScreen — same
+         * shape as the Theme row above it, just without a preview swatch
+         * (there's no "current value" to show at a glance). Full width:
+         * logging used to share this row, but it moved to its own
+         * LoggingScreen (swipe up from InfoScreen) once it grew past what
+         * a checkbox could usefully say. */
+        ListRow wireless_row = create_list_row(screen_, theme, "WiFi");
+        lv_obj_set_size(wireless_row.btn,
                         theme.metrics.screen_width - 40,
                         compact_row_height);
-        lv_obj_align(wireless_row_btn,
+        lv_obj_align(wireless_row.btn,
                      LV_ALIGN_TOP_MID,
                      0,
                      portrait ? PORTRAIT_WIRELESS_ROW_Y : WIRELESS_ROW_Y);
-        lv_obj_set_style_bg_opa(wireless_row_btn, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_border_width(wireless_row_btn, 0, 0);
-        lv_obj_set_style_shadow_width(wireless_row_btn, 0, 0);
-        lv_obj_set_style_pad_all(wireless_row_btn, 0, 0);
-        lv_obj_set_style_bg_color(
-            wireless_row_btn, theme.palette.accent, LV_STATE_PRESSED);
-        lv_obj_set_style_bg_opa(wireless_row_btn, LV_OPA_30, LV_STATE_PRESSED);
         lv_obj_add_event_cb(
-            wireless_row_btn, pick_wireless_cb_handler, LV_EVENT_CLICKED, this);
-
-        lv_obj_t *wireless_label = lv_label_create(wireless_row_btn);
-        lv_label_set_text(wireless_label, "Wireless Setup");
-        lv_obj_set_style_text_color(wireless_label, theme.palette.fg, 0);
-        lv_obj_set_style_text_font(
-            wireless_label, theme.typography.label_lg, 0);
-        lv_obj_align(wireless_label, LV_ALIGN_LEFT_MID, 0, 0);
-
-        lv_obj_t *wireless_chevron = lv_label_create(wireless_row_btn);
-        lv_obj_set_style_text_font(
-            wireless_chevron, theme.typography.symbol_lg, 0);
-        lv_label_set_text(wireless_chevron, LV_SYMBOL_RIGHT);
-        lv_obj_set_style_text_color(wireless_chevron, theme.palette.fg, 0);
-        lv_obj_align(wireless_chevron, LV_ALIGN_RIGHT_MID, 0, 0);
+            wireless_row.btn, pick_wireless_cb_handler, LV_EVENT_CLICKED, this);
     }
 
     void SettingsScreen::open()
@@ -606,12 +507,6 @@ namespace gui
 
         lv_screen_load_anim(
             screen_, LV_SCR_LOAD_ANIM_OVER_BOTTOM, 220, 0, false);
-    }
-
-    void SettingsScreen::set_accent_color(uint32_t accent_color)
-    {
-        accent_color_ = accent_color;
-        refresh_theme_swatch();
     }
 
     void SettingsScreen::refresh_theme_swatch()
@@ -721,57 +616,20 @@ namespace gui
          * platform.hpp's DisplayOrientation) -- a silent flip with no
          * visible effect until some future restart would look broken, so
          * this asks first rather than applying it immediately. */
-        lv_obj_t *mbox = lv_msgbox_create(nullptr);
-        lv_obj_set_style_bg_color(mbox, theme.palette.bg, 0);
-        lv_obj_set_style_bg_opa(mbox, LV_OPA_COVER, 0);
-        lv_obj_set_style_border_width(mbox, theme.metrics.panel_border_width, 0);
-        lv_obj_set_style_border_color(mbox, theme.palette.panel_border, 0);
-        lv_obj_set_style_radius(mbox, 10, 0);
-
-        /* Short, single-line title/body — the earlier "Switch
-         * Orientation?" title plus a full sentence of body text wrapped
-         * onto multiple lines each, which read as cluttered at the
-         * popup's ~260px width in both orientations. */
-        lv_obj_t *title = lv_msgbox_add_title(
-            mbox,
+        ConfirmPopup popup = create_confirm_popup(
+            theme,
             self->pending_orientation_ == LayoutOrientation::Vertical
                 ? "Switch to Vertical?"
-                : "Switch to Horizontal?");
-        lv_obj_set_style_text_color(title, theme.palette.fg, 0);
-        lv_obj_set_style_text_font(title, theme.typography.label_lg, 0);
-
-        /* lv_msgbox_add_title() is what actually creates the header
-         * container (get_header() would return null before this point) —
-         * it picks up LVGL's default (light-mode) theme styling on its
-         * own bg, so override it explicitly to match everything else
-         * here being dark. */
-        lv_obj_t *header = lv_msgbox_get_header(mbox);
-        lv_obj_set_style_bg_color(header, theme.palette.bg, 0);
-        lv_obj_set_style_bg_opa(header, LV_OPA_COVER, 0);
-
-        lv_obj_t *text
-            = lv_msgbox_add_text(mbox, "Restart required to apply.");
-        lv_obj_set_style_text_color(text, theme.palette.fg, 0);
-        lv_obj_set_style_text_font(text, theme.typography.label_lg, 0);
-
-        /* Cancel added first, Confirm second — lv_msgbox's footer is a
-         * left-to-right flex row, so this puts Confirm on the right. */
-        lv_obj_t *cancel_btn  = lv_msgbox_add_footer_button(mbox, "Cancel");
-        lv_obj_t *confirm_btn = lv_msgbox_add_footer_button(mbox, "Confirm");
-        style_flat_footer_button(cancel_btn, theme);
-        style_flat_footer_button(confirm_btn, theme, /* primary */ true);
-
-        /* lv_msgbox's default footer height (LV_DPI_DEF/3, ~43px) makes
-         * for a cramped tap target -- the buttons are LV_PCT(100) of the
-         * footer, so growing the footer grows them too. */
-        lv_obj_set_height(lv_msgbox_get_footer(mbox), CONFIRM_POPUP_FOOTER_HEIGHT);
+                : "Switch to Horizontal?",
+            "Restart required to apply.",
+            "Confirm");
 
         lv_obj_add_event_cb(
-            confirm_btn, orientation_confirm_cb, LV_EVENT_CLICKED, self);
+            popup.confirm_btn, orientation_confirm_cb, LV_EVENT_CLICKED, self);
         lv_obj_add_event_cb(
-            cancel_btn, orientation_cancel_cb, LV_EVENT_CLICKED, self);
+            popup.cancel_btn, orientation_cancel_cb, LV_EVENT_CLICKED, self);
 
-        self->orientation_confirm_mbox_ = mbox;
+        self->orientation_confirm_mbox_ = popup.mbox;
     }
 
     void SettingsScreen::orientation_confirm_cb(lv_event_t *e)

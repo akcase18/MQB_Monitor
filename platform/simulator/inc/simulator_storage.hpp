@@ -27,6 +27,8 @@ class SimulatorStorage : public IStorage
         bool   exists(const char *path) const override;
         bool   remove(const char *path) override;
 
+        StorageMedium medium() const override;
+
     private:
         SimulatorStorage() = default;
 

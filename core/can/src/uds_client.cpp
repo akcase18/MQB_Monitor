@@ -45,6 +45,20 @@ namespace core
             uint8_t byte1 = frame.data[2];
             uint8_t byte2 = frame.data[3];
 
+            /* Only the first `len` bytes of `frame` are written by
+             * ICanBus::receive(), so a payload byte past that is whatever
+             * the previous iteration left there. Real ECU responses are
+             * always full 8-byte frames, but a short one used to be
+             * decoded against a stale byte rather than dropped: a
+             * one-byte payload needs data[4], a two-byte payload
+             * data[4..5]. */
+            uint8_t needed
+                = (frame.data[0] == ONE_BYTE_PAYLOAD) ? 5 : 6;
+            if (frame.len < needed)
+            {
+                continue;
+            }
+
             int16_t raw_data;
             if (frame.data[0] == ONE_BYTE_PAYLOAD)
             {

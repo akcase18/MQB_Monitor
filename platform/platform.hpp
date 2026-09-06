@@ -111,19 +111,25 @@ class IDisplay
                            const uint16_t *pixels) = 0;
 
         /**
-         * Used to determine when the transfer started by flush() has
-         * completed.
-         *
-         * @returns True when transfer is complete. Otherwise false.
-         */
-        virtual bool flush_ready() const = 0;
-
-        /**
          * Sets backlight brightness.
          *
          * @param pct Brightness, 0-100.
          */
         virtual void set_backlight(uint8_t pct) = 0;
+
+        /**
+         * Kills the backlight entirely -- a true off, which
+         * set_backlight(0) deliberately is not: the user-facing 0-100%
+         * brightness scale floors at a minimum duty because "0%" there
+         * means "as dim as it gets", not "blank the dashboard".
+         *
+         * For hiding a transition the panel shouldn't be showing at all
+         * (boot, before the first frame has landed in GRAM; an accent
+         * change, which tears every screen down and rebuilds it). Undone
+         * by calling set_backlight() again -- there is no
+         * remembered-brightness state down here, the caller owns that.
+         */
+        virtual void set_backlight_off() = 0;
 };
 
 /*==============================================================================
@@ -235,6 +241,19 @@ enum class StorageFileMode
 };
 
 /**
+ * Which physical medium is behind an IStorage. Purely informational --
+ * nothing in core/ or gui/ branches on it; it exists so a status screen
+ * can tell the user where their logs are actually going, which differs
+ * per build and (on a board with a card slot) per boot.
+ */
+enum class StorageMedium
+{
+        Flash,        /* The MCU's own internal program flash. */
+        SdCard,       /* A removable Micro-SD card. */
+        HostDirectory /* A plain directory -- the desktop simulator. */
+};
+
+/**
  * Raw file I/O on the board's log storage. One file open at a time,
  * matching ICanBus/ISerialLink's single-stream style rather than a
  * multi-handle filesystem API. Deliberately medium-agnostic: the Teensy has
@@ -291,6 +310,10 @@ class IStorage
 
         virtual bool exists(const char *path) const = 0;
         virtual bool remove(const char *path)        = 0;
+
+        /** Which medium is behind this store. Compile-time constant per
+         * implementation; see StorageMedium. */
+        virtual StorageMedium medium() const = 0;
 };
 
 /*==============================================================================

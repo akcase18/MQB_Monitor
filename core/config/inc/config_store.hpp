@@ -26,7 +26,7 @@ namespace core
              * No device has shipped with saved config yet, so migrate()
              * still just falls through to defaults rather than preserving
              * old fields. */
-            static constexpr uint8_t CURRENT_VERSION = 5;
+            static constexpr uint8_t CURRENT_VERSION = 6;
 
             explicit ConfigStore(IConfigStore &backing);
 

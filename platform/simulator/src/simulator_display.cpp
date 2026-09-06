@@ -171,13 +171,16 @@ void SimulatorDisplay::flush(
     SDL_RenderPresent(renderer);
 }
 
-bool SimulatorDisplay::flush_ready() const
-{
-    return true;
-}
-
 void SimulatorDisplay::set_backlight(uint8_t pct)
 {
     /* No real backlight to dim on a dev host. */
     (void)pct;
+}
+
+void SimulatorDisplay::set_backlight_off()
+{
+    /* Nothing to switch off either -- which also means the transitions
+     * this hides on real hardware (see IDisplay::set_backlight_off) stay
+     * fully visible here. That's the useful behavior for a dev host:
+     * blanking the window would hide the very rebuild being worked on. */
 }

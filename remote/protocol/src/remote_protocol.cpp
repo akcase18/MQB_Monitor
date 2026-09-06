@@ -83,38 +83,31 @@ namespace remote::protocol
 
     namespace
     {
-        struct Crc16Table
-        {
-                uint16_t entries[256];
-
-                Crc16Table()
-                {
-                    for (uint16_t i = 0; i < 256; i++)
-                    {
-                        uint16_t crc = static_cast<uint16_t>(i << 8);
-                        for (uint8_t bit = 0; bit < 8; bit++)
-                        {
-                            crc = (crc & 0x8000)
-                                      ? static_cast<uint16_t>((crc << 1)
-                                                              ^ 0x1021)
-                                      : static_cast<uint16_t>(crc << 1);
-                        }
-                        entries[i] = crc;
-                    }
-                }
-        };
-
-        const Crc16Table CRC16_TABLE;
+        constexpr uint16_t CRC16_POLY = 0x1021;
     } // namespace
 
+    /* Bitwise rather than the usual 256-entry lookup table. The table
+     * would be 512 bytes of RAM (a static constructor's worth of boot
+     * work to fill, since the CRC polynomial loop isn't foldable at
+     * compile time under this file's oldest target standard) or 512 bytes
+     * of flash, to speed up a path that is explicitly not hot: this link
+     * carries a batch config load/save and an AP enable/disable, nothing
+     * per-frame -- which is exactly why every function in this file is
+     * FLASHMEM. Eight shifts per byte on a 600MHz M7 is microseconds
+     * across a whole maximum-sized frame. */
     FLASHMEM uint16_t crc16_ccitt_continue(uint16_t       crc,
                                            const uint8_t *data,
                                            size_t         len)
     {
         for (size_t i = 0; i < len; i++)
         {
-            uint8_t idx = static_cast<uint8_t>((crc >> 8) ^ data[i]);
-            crc = static_cast<uint16_t>((crc << 8) ^ CRC16_TABLE.entries[idx]);
+            crc = static_cast<uint16_t>(crc ^ (data[i] << 8));
+            for (uint8_t bit = 0; bit < 8; bit++)
+            {
+                crc = (crc & 0x8000)
+                          ? static_cast<uint16_t>((crc << 1) ^ CRC16_POLY)
+                          : static_cast<uint16_t>(crc << 1);
+            }
         }
         return crc;
     }

@@ -2,6 +2,8 @@
 
 #include <stddef.h>
 
+#include "mem_placement.hpp"
+
 namespace core
 {
 
@@ -29,7 +31,7 @@ namespace core
         return config_;
     }
 
-    void ConfigStore::load()
+    FLASHMEM void ConfigStore::load()
     {
         ConfigHeader header {};
         backing_.read(0, &header, sizeof(header));
@@ -51,14 +53,14 @@ namespace core
         backing_.read(0, &config_, sizeof(config_));
     }
 
-    void ConfigStore::save()
+    FLASHMEM void ConfigStore::save()
     {
         config_.header.magic   = MAGIC_NUMBER;
         config_.header.version = CURRENT_VERSION;
         backing_.write(0, &config_, sizeof(config_));
     }
 
-    void ConfigStore::save_priority(uint8_t rank)
+    FLASHMEM void ConfigStore::save_priority(uint8_t rank)
     {
         if (rank >= MAX_PANELS)
         {
@@ -70,7 +72,7 @@ namespace core
                        sizeof(PrioritizedSignal));
     }
 
-    void ConfigStore::save_signal(uint16_t signal_id)
+    FLASHMEM void ConfigStore::save_signal(uint16_t signal_id)
     {
         int idx = signal_catalog_find(signal_id);
         if (idx < 0)
@@ -83,7 +85,7 @@ namespace core
                        sizeof(SignalConfig));
     }
 
-    void ConfigStore::set_defaults()
+    FLASHMEM void ConfigStore::set_defaults()
     {
         config_.header.magic   = MAGIC_NUMBER;
         config_.header.version = CURRENT_VERSION;
@@ -92,6 +94,7 @@ namespace core
         config_.settings.night_brightness = 20;
         config_.settings.num_panels       = 5;
         config_.settings.orientation      = LayoutOrientation::Horizontal;
+        config_.settings.logging_enabled  = false; /* opt-in, see config.hpp */
         config_.settings.accent_color
             = 0x4CAF50; /* green, gui::ACCENT_PRESETS[0] */
 
@@ -109,13 +112,17 @@ namespace core
         config_.priorities[4] = { 22, UnitSystem::Imperial }; /* Int Pres Act. */
         config_.priorities[5] = { 8, UnitSystem::Imperial }; /* Engine Torque */
 
+        /* Whole SignalConfig, not just .warn -- this has to leave every
+         * field at its default rather than relying on config_ never
+         * having been loaded into, so migrate() can call it after a real
+         * field-by-field migration lands. */
         for (size_t i = 0; i < SIGNAL_CATALOG_COUNT; i++)
         {
-            config_.signals[i].warn = { 0.0f, 0.0f, false, false };
+            config_.signals[i] = SignalConfig {};
         }
     }
 
-    void ConfigStore::migrate(uint8_t old_version)
+    FLASHMEM void ConfigStore::migrate(uint8_t old_version)
     {
         /* No device has shipped with saved config yet, so every version
          * bump so far just resets to defaults rather than converting old

@@ -29,6 +29,19 @@ support firmware development but don't ship on any board.
   Registry/Learn/WIP tabs read and write the registry directly. See its
   [README](monitor/README.md).
 
+- **[`log_export/`](log_export/)** — pulls the dashboard firmware's
+  black-box signal log (see [core/logging](../core/logging/README.md)) over
+  USB serial and decodes it to CSV. A separate board/firmware/protocol from
+  `monitor/`'s SLCAN sniffer above — talks to the dashboard firmware
+  (`env:teensymm`) itself, not a standalone sniffer. Two front ends over one
+  decoder (`mqb_logs/`): **`run.py`**, the **MQB Log Export** app — the same
+  PySide6 shell and theme as `monitor/`, with a Device page (status,
+  download, erase) and a Logs page (sessions, preview, CSV export) — and
+  **`dump_log.py`**, the scriptable CLI the VS Code tasks run. Either can
+  read a storage *directory* instead of a device (`sim_storage/`), so the
+  whole path works with nothing plugged in. See its
+  [README](log_export/README.md).
+
 ## The two-stage registry loop
 
 ```

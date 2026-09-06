@@ -1,4 +1,5 @@
 #include "warning_config_screen.hpp"
+#include "mem_placement.hpp"
 
 #include <stdio.h>
 
@@ -63,7 +64,7 @@ namespace gui
         constexpr lv_coord_t PORTRAIT_VALUE_Y   = 60;
         constexpr lv_coord_t PORTRAIT_BUTTONS_Y = 112;
 
-        void style_step_button(lv_obj_t *btn, const Theme &theme, lv_coord_t width)
+        FLASHMEM void style_step_button(lv_obj_t *btn, const Theme &theme, lv_coord_t width)
         {
             lv_obj_set_size(btn, width, STEP_BTN_HEIGHT);
             lv_obj_set_style_bg_color(btn, theme.palette.bg, 0);
@@ -77,7 +78,7 @@ namespace gui
             lv_obj_set_style_shadow_width(btn, 0, 0);
         }
 
-        lv_obj_t *create_control_row(lv_obj_t  *parent,
+        FLASHMEM lv_obj_t *create_control_row(lv_obj_t  *parent,
                                      lv_coord_t y_offset,
                                      lv_coord_t gap)
         {
@@ -95,7 +96,7 @@ namespace gui
         }
     } // namespace
 
-    void WarningConfigScreen::init(const Theme &theme,
+    FLASHMEM void WarningConfigScreen::init(const Theme &theme,
                                    DoneCallback done_cb,
                                    void        *ctx)
     {
@@ -106,10 +107,7 @@ namespace gui
 
         /* Nav bar: signal name + close, standing in for the bottom-right
          * checkmark every other screen uses (see the file doc comment). */
-        name_lbl_ = lv_label_create(screen_);
-        lv_obj_align(name_lbl_, LV_ALIGN_TOP_LEFT, 20, 12);
-        lv_obj_set_style_text_color(name_lbl_, theme.palette.fg, 0);
-        lv_obj_set_style_text_font(name_lbl_, theme.typography.title, 0);
+        name_lbl_ = create_nav_title(screen_, theme, nullptr);
 
         DoneButton close = create_close_button(screen_, theme);
         close_btn_       = close.btn;

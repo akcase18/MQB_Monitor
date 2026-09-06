@@ -6,7 +6,6 @@
 
 - **`inc/scheduler.hpp`** / **`src/scheduler.cpp`** — `Scheduler`:
   - `every(period_ms, cb, ctx)` registers a task to run every `period_ms`, starting one period from now. Returns a `TaskId`, or `INVALID_TASK` if the fixed-size task table is full.
-  - `set_period(id, period_ms)` changes an existing task's cadence, taking effect on its next run.
   - `tick()` runs any due tasks — called once per main-loop iteration from `src/main.cpp`'s `loop()`.
 
 ## Usage

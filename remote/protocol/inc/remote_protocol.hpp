@@ -14,22 +14,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* FLASHMEM/DMAMEM (Teensyduino, from avr/pgmspace.h) place a function in
- * flash or a buffer in RAM2/OCRAM instead of the tight, shared RAM1 pool
- * core::/gui:: compete for — this link runs rarely (a batch config
- * load/save, an AP enable/disable), never on a hot path, so there's no
- * reason for any of it to sit in RAM1 at all. Apply both to every
- * function/large buffer in remote/ as a matter of course. A no-op off
- * Teensy (ARDUINO isn't defined for the native simulator build). */
-#if defined(ARDUINO_ARCH_ESP32)
-    #define FLASHMEM
-    #define DMAMEM
-#elif defined(ARDUINO)
-    #include <avr/pgmspace.h>
-#else
-    #define FLASHMEM
-    #define DMAMEM
-#endif
+/* This link runs rarely (a batch config load/save, an AP enable/disable)
+ * and never on a hot path, so every function and large buffer in remote/
+ * carries FLASHMEM/DMAMEM as a matter of course -- see
+ * platform/mem_placement.hpp for what they do and when not to use them. */
+#include "mem_placement.hpp"
 
 namespace remote::protocol
 {

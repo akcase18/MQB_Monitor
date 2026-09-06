@@ -1,4 +1,5 @@
 #include "configurator_screen.hpp"
+#include "mem_placement.hpp"
 
 #include <stdio.h>
 
@@ -45,36 +46,14 @@ namespace gui
         constexpr lv_coord_t PORTRAIT_DIVIDER3_Y       = 354;
         constexpr lv_coord_t PORTRAIT_WARN_ROW_Y       = 368;
 
-        /* Restyles a checkable lv_buttonmatrix away from LVGL's default
-         * light-mode card+shadow look to match the flat, bordered,
-         * accent-on-checked treatment used everywhere else in this app. */
-        void style_flat_matrix(lv_obj_t *matrix, const Theme &theme)
-        {
-            lv_obj_set_style_bg_opa(matrix, LV_OPA_TRANSP, 0);
-            lv_obj_set_style_border_width(matrix, 0, 0);
-            lv_obj_set_style_shadow_width(matrix, 0, 0);
-            lv_obj_set_style_pad_all(matrix, 0, 0);
-            lv_obj_set_style_pad_gap(matrix, 8, 0);
-
-            lv_obj_set_style_bg_color(matrix, theme.palette.bg, LV_PART_ITEMS);
-            lv_obj_set_style_bg_opa(matrix, LV_OPA_COVER, LV_PART_ITEMS);
-            lv_obj_set_style_text_color(
-                matrix, theme.palette.fg, LV_PART_ITEMS);
-            lv_obj_set_style_pad_all(matrix, 8, LV_PART_ITEMS);
-            lv_obj_set_style_radius(matrix, 8, LV_PART_ITEMS);
-            lv_obj_set_style_border_width(
-                matrix, theme.metrics.panel_border_width, LV_PART_ITEMS);
-            lv_obj_set_style_border_color(
-                matrix, theme.palette.panel_border, LV_PART_ITEMS);
-            lv_obj_set_style_shadow_width(matrix, 0, LV_PART_ITEMS);
-            lv_obj_set_style_bg_color(
-                matrix, theme.palette.accent, LV_PART_ITEMS | LV_STATE_CHECKED);
-            lv_obj_set_style_bg_color(
-                matrix, theme.palette.accent, LV_PART_ITEMS | LV_STATE_PRESSED);
-        }
+        /* ConfiguratorScreen's matrices carry word labels ("Imperial",
+         * "Digital"), so they set an explicit item padding rather than
+         * keeping LVGL's default -- see screen_helpers.hpp's
+         * style_flat_matrix(). */
+        constexpr lv_coord_t MATRIX_ITEM_PAD = 8;
     } // namespace
 
-    void ConfiguratorScreen::init(const Theme             &theme,
+    FLASHMEM void ConfiguratorScreen::init(const Theme             &theme,
                                   const char *const *const signal_names,
                                   const uint16_t          *signal_ids,
                                   uint16_t                 num_signals,
@@ -99,11 +78,7 @@ namespace gui
 
         /* Nav bar: title + close, standing in for the bottom-right
          * checkmark other screens use (see the file doc comment). */
-        lv_obj_t *title_lbl = lv_label_create(screen_);
-        lv_label_set_text(title_lbl, "Change Signal");
-        lv_obj_align(title_lbl, LV_ALIGN_TOP_LEFT, 20, 12);
-        lv_obj_set_style_text_color(title_lbl, theme.palette.fg, 0);
-        lv_obj_set_style_text_font(title_lbl, theme.typography.title, 0);
+        create_nav_title(screen_, theme, "Change Signal");
 
         DoneButton close = create_close_button(screen_, theme);
         lv_obj_add_event_cb(close.btn, done_cb_handler, LV_EVENT_CLICKED, this);
@@ -112,44 +87,20 @@ namespace gui
 
         /* Signal row: tappable, hands off to SignalPickerScreen rather
          * than embedding a roller here (see the file doc comment). */
-        lv_obj_t *signal_row_btn = lv_btn_create(screen_);
+        ListRow signal_row = create_list_row(screen_, theme, "Signal");
         lv_obj_set_size(
-            signal_row_btn, theme.metrics.screen_width - 40, ROW_HEIGHT);
-        lv_obj_align(signal_row_btn, LV_ALIGN_TOP_MID, 0, SIGNAL_ROW_Y);
-        lv_obj_set_style_bg_opa(signal_row_btn, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_border_width(signal_row_btn, 0, 0);
-        lv_obj_set_style_shadow_width(signal_row_btn, 0, 0);
-        /* lv_btn's default theme pads its content in from the button's own
-         * edges — without zeroing that, LEFT_MID-aligned children sit
-         * further right than the plain labels elsewhere on this screen
-         * ("Change Signal", "Units"), which aren't buttons and so have no
-         * such padding. */
-        lv_obj_set_style_pad_all(signal_row_btn, 0, 0);
-        lv_obj_set_style_bg_color(
-            signal_row_btn, theme.palette.accent, LV_STATE_PRESSED);
-        lv_obj_set_style_bg_opa(signal_row_btn, LV_OPA_30, LV_STATE_PRESSED);
+            signal_row.btn, theme.metrics.screen_width - 40, ROW_HEIGHT);
+        lv_obj_align(signal_row.btn, LV_ALIGN_TOP_MID, 0, SIGNAL_ROW_Y);
         lv_obj_add_event_cb(
-            signal_row_btn, pick_signal_cb_handler, LV_EVENT_CLICKED, this);
-
-        lv_obj_t *signal_label = lv_label_create(signal_row_btn);
-        lv_label_set_text(signal_label, "Signal");
-        lv_obj_set_style_text_color(signal_label, theme.palette.fg, 0);
-        lv_obj_set_style_text_font(signal_label, theme.typography.label_lg, 0);
-        lv_obj_align(signal_label, LV_ALIGN_LEFT_MID, 0, 0);
-
-        signal_chevron_ = lv_label_create(signal_row_btn);
-        lv_obj_set_style_text_font(
-            signal_chevron_, theme.typography.symbol_lg, 0);
-        lv_label_set_text(signal_chevron_, LV_SYMBOL_RIGHT);
-        lv_obj_set_style_text_color(signal_chevron_, theme.palette.fg, 0);
-        lv_obj_align(signal_chevron_, LV_ALIGN_RIGHT_MID, 0, 0);
+            signal_row.btn, pick_signal_cb_handler, LV_EVENT_CLICKED, this);
+        signal_chevron_ = signal_row.chevron;
 
         /* Text (and therefore width) isn't known until refresh_signal_row_
          * label() sets it in open()/set_selected_signal() — aligning here
          * with the label still empty bakes in a position that's wrong
          * once real text arrives, so alignment is redone there instead of
          * once here (see refresh_signal_row_label()). */
-        signal_value_lbl_ = lv_label_create(signal_row_btn);
+        signal_value_lbl_ = lv_label_create(signal_row.btn);
         /* Slightly darkened, not the plain fg every other label on this
          * screen uses — sets the current value apart from the row's
          * static "Signal" label at a glance. */
@@ -210,7 +161,7 @@ namespace gui
         lv_buttonmatrix_set_one_checked(units_matrix_, true);
         lv_buttonmatrix_set_button_ctrl_all(units_matrix_,
                                             LV_BUTTONMATRIX_CTRL_CHECKABLE);
-        style_flat_matrix(units_matrix_, theme);
+        style_flat_matrix(units_matrix_, theme, MATRIX_ITEM_PAD);
 
         create_divider(
             screen_, theme, portrait ? PORTRAIT_DIVIDER2_Y : DIVIDER2_Y);
@@ -257,7 +208,7 @@ namespace gui
         lv_buttonmatrix_set_one_checked(mode_matrix_, true);
         lv_buttonmatrix_set_button_ctrl_all(mode_matrix_,
                                             LV_BUTTONMATRIX_CTRL_CHECKABLE);
-        style_flat_matrix(mode_matrix_, theme);
+        style_flat_matrix(mode_matrix_, theme, MATRIX_ITEM_PAD);
 
         create_divider(
             screen_, theme, portrait ? PORTRAIT_DIVIDER3_Y : DIVIDER3_Y);
@@ -265,33 +216,15 @@ namespace gui
         /* Warning Thresholds row: the whole row is the tap target (not
          * just a small corner icon), label left / chevron right — a
          * settings-list-style row instead of a floating gear button. */
-        lv_obj_t *warn_row_btn = lv_btn_create(screen_);
-        lv_obj_set_size(warn_row_btn, row_width, ROW_HEIGHT);
-        lv_obj_align(warn_row_btn,
+        ListRow warn_row
+            = create_list_row(screen_, theme, "Warning Thresholds");
+        lv_obj_set_size(warn_row.btn, row_width, ROW_HEIGHT);
+        lv_obj_align(warn_row.btn,
                      LV_ALIGN_TOP_MID,
                      0,
                      portrait ? PORTRAIT_WARN_ROW_Y : WARN_ROW_Y);
-        lv_obj_set_style_bg_opa(warn_row_btn, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_border_width(warn_row_btn, 0, 0);
-        lv_obj_set_style_shadow_width(warn_row_btn, 0, 0);
-        lv_obj_set_style_pad_all(warn_row_btn, 0, 0);
-        lv_obj_set_style_bg_color(
-            warn_row_btn, theme.palette.accent, LV_STATE_PRESSED);
-        lv_obj_set_style_bg_opa(warn_row_btn, LV_OPA_30, LV_STATE_PRESSED);
         lv_obj_add_event_cb(
-            warn_row_btn, settings_cb_handler, LV_EVENT_CLICKED, this);
-
-        lv_obj_t *warn_label = lv_label_create(warn_row_btn);
-        lv_label_set_text(warn_label, "Warning Thresholds");
-        lv_obj_set_style_text_color(warn_label, theme.palette.fg, 0);
-        lv_obj_set_style_text_font(warn_label, theme.typography.label_lg, 0);
-        lv_obj_align(warn_label, LV_ALIGN_LEFT_MID, 0, 0);
-
-        lv_obj_t *warn_chevron = lv_label_create(warn_row_btn);
-        lv_obj_set_style_text_font(warn_chevron, theme.typography.symbol_lg, 0);
-        lv_label_set_text(warn_chevron, LV_SYMBOL_RIGHT);
-        lv_obj_set_style_text_color(warn_chevron, theme.palette.fg, 0);
-        lv_obj_align(warn_chevron, LV_ALIGN_RIGHT_MID, 0, 0);
+            warn_row.btn, settings_cb_handler, LV_EVENT_CLICKED, this);
     }
 
     void ConfiguratorScreen::open(uint8_t     rank,

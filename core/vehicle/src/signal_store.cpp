@@ -20,12 +20,26 @@ namespace core
         }
     } // namespace
 
-    SignalValue SignalStore::s_invalid {};
+    const SignalValue SignalStore::s_invalid {};
 
     void SignalStore::set(uint16_t id, float value, uint32_t now_ms)
     {
-        int idx = signal_catalog_find(id);
-        if (idx < 0)
+        set_at(signal_catalog_find(id), value, now_ms);
+    }
+
+    const SignalValue &SignalStore::get(uint16_t id) const
+    {
+        return get_at(signal_catalog_find(id));
+    }
+
+    float SignalStore::get_display_value(uint16_t id, bool is_metric) const
+    {
+        return get_display_value_at(signal_catalog_find(id), is_metric);
+    }
+
+    void SignalStore::set_at(int idx, float value, uint32_t now_ms)
+    {
+        if (idx < 0 || idx >= static_cast<int>(SIGNAL_CATALOG_COUNT))
         {
             return;
         }
@@ -36,20 +50,18 @@ namespace core
         v.last_update_ms = now_ms;
     }
 
-    const SignalValue &SignalStore::get(uint16_t id) const
+    const SignalValue &SignalStore::get_at(int idx) const
     {
-        int idx = signal_catalog_find(id);
-        if (idx < 0)
+        if (idx < 0 || idx >= static_cast<int>(SIGNAL_CATALOG_COUNT))
         {
             return s_invalid;
         }
         return values_[idx];
     }
 
-    float SignalStore::get_display_value(uint16_t id, bool is_metric) const
+    float SignalStore::get_display_value_at(int idx, bool is_metric) const
     {
-        int idx = signal_catalog_find(id);
-        if (idx < 0)
+        if (idx < 0 || idx >= static_cast<int>(SIGNAL_CATALOG_COUNT))
         {
             return 0.0f;
         }
@@ -91,6 +103,12 @@ namespace core
         {
             const SignalSpec &spec = SIGNAL_CATALOG[i];
 
+            /* A signal that owns none of this response's requests can't
+             * have changed state, so there's nothing to re-evaluate for
+             * it -- skipping straight past keeps the per-frame cost
+             * proportional to how many signals actually match rather
+             * than re-walking every catalog entry's requests twice. */
+            bool matched = false;
             for (uint8_t r = 0; r < spec.num_requests; r++)
             {
                 const UdsRequestSpec &req = spec.requests[r];
@@ -101,6 +119,12 @@ namespace core
 
                 request_raw_[i][r]  = (raw + req.offset) * req.scale;
                 request_recv_[i][r] = true;
+                matched             = true;
+            }
+
+            if (!matched)
+            {
+                continue;
             }
 
             bool all_received = true;
@@ -115,9 +139,12 @@ namespace core
 
             if (all_received)
             {
-                set(spec.id,
-                    spec.transform(request_raw_[i], spec.num_requests),
-                    now_ms);
+                /* set_at(i), not set(spec.id) -- the catalog index is
+                 * already in hand here, so re-deriving it from the id
+                 * would be a pointless second scan of the catalog. */
+                set_at(static_cast<int>(i),
+                       spec.transform(request_raw_[i], spec.num_requests),
+                       now_ms);
             }
         }
     }

@@ -144,3 +144,8 @@ bool SimulatorStorage::remove(const char *path)
 {
     return ::remove(full_path(path).c_str()) == 0;
 }
+
+StorageMedium SimulatorStorage::medium() const
+{
+    return StorageMedium::HostDirectory;
+}

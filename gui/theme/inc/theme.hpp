@@ -3,7 +3,9 @@
  * @brief Palette, typography, and metrics tokens for gui/widgets and
  * gui/screens. THEME_DEFAULT is the one reskin lever — a second theme
  * variant is just another `const Theme` with different values, touching
- * nothing outside gui/theme.
+ * nothing outside gui/theme. Nothing in gui/widgets or gui/screens names
+ * either constant; they only ever see the `const Theme &` passed to
+ * init().
  */
 #pragma once
 
@@ -28,6 +30,12 @@ namespace gui
              * configured "this is bad" threshold) since a value can peg
              * a graphic at 100%/0% without ever crossing a warning. */
             lv_color_t range_overflow;
+            /* InfoScreen's blinking capture indicator. Its own token
+             * rather than reusing warn_hi: both are red by convention,
+             * but a warning means "something is wrong" and this means
+             * "recording", and a reskin should be free to keep the
+             * recording light red while moving warnings elsewhere. */
+            lv_color_t rec_indicator;
     };
 
     /**
@@ -88,11 +96,6 @@ namespace gui
     };
 
     extern const Theme THEME_DEFAULT;
-
-    /** A second, visually distinct variant proving THEME_DEFAULT is the only
-     * lever a reskin needs to pull — swapping which of these is passed to
-     * gui::* screens touches nothing outside gui/theme. */
-    extern const Theme THEME_ALT;
 
     /** THEME_DEFAULT.metrics with screen_width/screen_height swapped for a
      * portrait-mounted panel (320x480, see platform::DisplayOrientation).

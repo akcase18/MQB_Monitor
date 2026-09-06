@@ -41,6 +41,29 @@ TeensyDisplay &TeensyDisplay::instance()
     return s_instance;
 }
 
+/* FlexIO bus speed in MHz. The driver turns this into a shift-clock
+ * divider off its 240MHz FlexIO clock (480MHz source / 2, see
+ * ILI948x_t4_mm::FlexIO_Init): 40 -> _buad_div 6 -> 240/6 = 40MHz. The
+ * bus is 8 bits wide and setBitDepth(16) makes a pixel two beats, so
+ * this is also the byte rate -- a full 480x320 frame is 307,200 bytes,
+ * i.e. 7.7ms of DMA at 40MHz against 15.4ms at 20 and 25.6ms at 12.
+ *
+ * ONLY these values work: 2, 4, 8, 12, 20, 24, 30, 40. ILI948x_t4_mm::
+ * begin() switches on the argument and its default case silently falls
+ * back to 12MHz -- so a plausible-looking 16 or 25 here would quietly
+ * run the bus slower than a 12 would, with nothing to indicate it.
+ *
+ * 40 is deliberately past what the panel is specified for: ILI9488's
+ * 8080 parallel write cycle is typically quoted at ~50ns minimum, i.e.
+ * about 20MHz, and 40MHz halves that to 25ns. It is being tried anyway
+ * to find where this particular board and ribbon actually fall over.
+ * The failure mode is corrupted or torn pixels rather than a clean
+ * error, and it may well be temperature- and cable-dependent rather
+ * than reproducible -- so judge it on a warm panel over a few minutes,
+ * not on one boot. Step back down (30, 24, 20) if anything looks wrong;
+ * 20 is the fastest in-spec value. */
+constexpr uint8_t LCD_BUS_MHZ = 40;
+
 void TeensyDisplay::begin()
 {
     /* Drive the backlight pin low before touching the panel at all —
@@ -55,7 +78,20 @@ void TeensyDisplay::begin()
     pinMode(PWM_PIN, OUTPUT);
     digitalWrite(PWM_PIN, LOW);
 
-    s_lcd.begin(12);
+    /* Argument is the FlexIO bus speed in MHz, which the driver turns
+     * into a shift-clock divider off its 240MHz FlexIO clock (480MHz
+     * source / 2, see ILI948x_t4_mm::FlexIO_Init) -- begin(20) selects
+     * _buad_div = 12, i.e. 240/12 = 20MHz. The bus is 8 bits wide and
+     * setBitDepth(16) makes a pixel two beats, so this is also the byte
+     * rate: 20MB/s, against 12MB/s at the driver's begin(12) default.
+     * A full 480x320 frame is 307,200 bytes, so worst case that is
+     * 15.4ms of DMA rather than 25.6ms.
+     *
+     * Raise further (the driver's table goes to 40MHz) only with the
+     * panel in hand -- this is an unterminated parallel bus over ribbon,
+     * and the failure mode for too-fast is corrupted pixels, not a clean
+     * error. */
+    s_lcd.begin(20);
     s_lcd.setBitDepth(16);
 }
 
@@ -84,15 +120,15 @@ void TeensyDisplay::get_resolution(uint16_t &width, uint16_t &height) const
 void TeensyDisplay::flush(
     int32_t x1, int32_t y1, int32_t x2, int32_t y2, const uint16_t *pixels)
 {
-    /* pushPixels16bitDMA blocks internally until any prior transfer has
-     * completed before issuing this one, so flush_ready() can just report
-     * true unconditionally. */
+    /* pushPixels16bitDMA blocks internally until any *prior* transfer has
+     * completed, then starts this one and returns -- so returning from
+     * here means the flush is issued, not that its pixels have landed.
+     * For every flush but a frame's last that's invisible: the next
+     * flush's own entry-wait covers it. The last one is genuinely still
+     * in flight, which is why src/main.cpp waits for the display to go
+     * quiet before lighting the backlight rather than trusting
+     * lv_display_flush_is_last(). */
     s_lcd.pushPixels16bitDMA(pixels, x1, y1, x2, y2);
-}
-
-bool TeensyDisplay::flush_ready() const
-{
-    return true;
 }
 
 void TeensyDisplay::set_backlight(uint8_t pct)
@@ -112,4 +148,13 @@ void TeensyDisplay::set_backlight(uint8_t pct)
           + (static_cast<uint32_t>(pct) * (100 - MIN_BACKLIGHT_PCT)) / 100;
 
     analogWrite(PWM_PIN, (effective_pct * 255) / 100);
+}
+
+void TeensyDisplay::set_backlight_off()
+{
+    /* Deliberately not set_backlight(0), which floors at
+     * MIN_BACKLIGHT_PCT and would leave the panel dimly lit -- still
+     * bright enough to show the transition this is meant to hide. Drives
+     * the pin the same way begin() does, for the same reason. */
+    analogWrite(PWM_PIN, 0);
 }

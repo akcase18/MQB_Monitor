@@ -36,25 +36,23 @@ namespace core
                          void        *ctx = nullptr);
 
             /**
-             * Changes an existing task's period. Takes effect on its next run
-             * (replaces the old per-Request stop/start-timer dance on panel
-             * reassignment).
-             */
-            void set_period(TaskId id, uint32_t period_ms);
-
-            /**
              * Runs any due tasks. Call once per main-loop iteration.
              */
             void tick();
 
         private:
+            /* No `active` flag: nothing can ever deregister a task (there
+             * is no cancel/remove entry point, by design -- every task
+             * here is registered once at boot and runs for the life of the
+             * process), so a per-task enabled bit was a byte of state and
+             * a branch in tick()'s inner loop that could only ever
+             * evaluate one way. `count_` alone bounds the live range. */
             struct Task
             {
                     TaskCallback cb          = nullptr;
                     void        *ctx         = nullptr;
                     uint32_t     period_ms   = 0;
                     uint32_t     last_run_ms = 0;
-                    bool         active      = false;
             };
 
             IClock  &clock_;

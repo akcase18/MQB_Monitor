@@ -18,9 +18,12 @@
  * dividers, plus a compact tappable-row footer (matching ConfiguratorScreen's
  * Signal/Warning Thresholds rows) — Theme (half-width, hands off to
  * ThemePickerScreen) and Orientation (the other half, a tap toggle, not a
- * navigation row) share one row, then Wireless Setup (full width, hands
- * off to WirelessSetupScreen) — rather than embedding any of their
- * controls here. The Brightness section's one slider edits whichever of
+ * navigation row) share one row, then WiFi (full width, hands off to
+ * WirelessSetupScreen) — rather than embedding any of their controls
+ * here. Logging is deliberately NOT here: it lives on its own
+ * LoggingScreen, reached by swiping up from InfoScreen, since burying a
+ * toggle three screens deep defeats the point of it being quick to
+ * flip. The Brightness section's one slider edits whichever of
  * day/night the toggle currently selects, rather than showing two sliders
  * — day and night are rarely tuned side by side. A tap on the Orientation
  * toggle doesn't flip orientation_ directly — it opens an lv_msgbox asking
@@ -61,7 +64,7 @@ namespace gui
                 = void (*)(void *ctx, uint8_t brightness_pct);
             /** Fired when the Theme row is tapped. */
             using PickThemeCallback = void (*)(void *ctx);
-            /** Fired when the Wireless Setup row is tapped. */
+            /** Fired when the WiFi row is tapped. */
             using PickWirelessCallback = void (*)(void *ctx);
             /** Fired when Confirm is pressed on the orientation popup —
              * the caller should persist this immediately, not wait for
@@ -84,14 +87,9 @@ namespace gui
                       PickWirelessCallback      pick_wireless_cb,
                       void                     *pick_wireless_ctx,
                       OrientationConfirmCallback orientation_confirm_cb,
-                      void                       *orientation_confirm_ctx);
+                      void                      *orientation_confirm_ctx);
 
             void open();
-
-            /** Updates the Theme row's swatch preview — called after
-             * ThemePickerScreen returns, before this screen is shown
-             * again. */
-            void set_accent_color(uint32_t accent_color);
 
             lv_obj_t *screen() const
             {
@@ -159,7 +157,7 @@ namespace gui
             PickWirelessCallback      pick_wireless_cb_  = nullptr;
             void                     *pick_wireless_ctx_ = nullptr;
             OrientationConfirmCallback orientation_confirm_cb_  = nullptr;
-            void                       *orientation_confirm_ctx_ = nullptr;
+            void                      *orientation_confirm_ctx_ = nullptr;
     };
 
 } // namespace gui
