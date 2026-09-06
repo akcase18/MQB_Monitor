@@ -29,7 +29,30 @@ bool TeensyCanBus::begin(uint32_t tx_id, uint32_t rx_id, uint32_t baud)
     s_bus.begin();
     s_bus.setBaudRate(baud);
     s_bus.setMBFilter(REJECT_ALL);
-    s_bus.setMBFilter(MB1, rx_id);
+
+    /* Four mailboxes on the response id, not one. FlexCAN mailboxes do
+     * not chain: a second matching frame arriving before the CPU has read
+     * the first overwrites it, so a single open mailbox could only ever
+     * hand up one frame per receive() cycle no matter how many arrived.
+     * core::SignalPoller keeps one request outstanding at a time now, but
+     * a single request can still answer in more than one frame -- an 0x78
+     * "response pending" NRC followed by the real reading is the ordinary
+     * case -- and read() walks the mailboxes in order, so the spares cost
+     * nothing but stop a burst collapsing into its last frame.
+     *
+     * setMBFilterRange(mb, id, id) rather than the obvious
+     * setMBFilter(mb, id): the two compute an identical mask and an
+     * identical exact-match software filter, but setMBFilter is FLASHMEM
+     * in the vendored library, and with four call sites the compiler
+     * stops inlining it and emits an out-of-line copy whose section
+     * collides with setBaudRate's ("causes a section type conflict ... in
+     * section '.flashmem'"). setMBFilterRange carries no such attribute.
+     * The REJECT_ALL call above is a different overload and still
+     * inlines. */
+    s_bus.setMBFilterRange(MB1, rx_id, rx_id);
+    s_bus.setMBFilterRange(MB2, rx_id, rx_id);
+    s_bus.setMBFilterRange(MB3, rx_id, rx_id);
+    s_bus.setMBFilterRange(MB4, rx_id, rx_id);
     return true;
 }
 

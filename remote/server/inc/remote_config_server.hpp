@@ -42,6 +42,23 @@ namespace remote::server
                                   size_t             resp_cap,
                                   protocol::MsgType &resp_type);
 
+            using AppliedCallback = void (*)(void *ctx);
+
+            /**
+             * Registers a callback fired after a REQ_APPLY_CONFIG has
+             * validated, committed to core::Config and been saved --
+             * i.e. only on ApplyResult::Ok, never on a rejected batch.
+             *
+             * Without this the config store changes underneath a UI that
+             * has no idea: every screen is built once against the values
+             * current at build time (see main.cpp's build_screens), so a
+             * phone-side Save would not show up until the next boot. The
+             * server itself stays free of any UI dependency -- it just
+             * says "the config changed" and lets the composition root
+             * decide what that costs.
+             */
+            void set_applied_callback(AppliedCallback cb, void *ctx);
+
         private:
             size_t handle_get_state(uint8_t *out, size_t cap);
             size_t handle_apply_config(const uint8_t     *payload,
@@ -52,6 +69,8 @@ namespace remote::server
 
             core::ConfigStore &config_;
             core::SignalStore &signals_;
+            AppliedCallback    applied_cb_  = nullptr;
+            void              *applied_ctx_ = nullptr;
     };
 
 } // namespace remote::server

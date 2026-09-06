@@ -28,8 +28,8 @@ This means a given `.cpp` file's `#include`s tell you which layer it belongs to,
 | `platform/simulator/` | Desktop stand-in: raw SDL2 window/mouse, a file-backed config store, and a synthetic CAN bus that echoes fabricated responses. | [platform/simulator/README.md](platform/simulator/README.md) |
 | `core/` | Platform-agnostic vehicle domain logic — scheduling, UDS protocol, the signal catalog/store, and the config schema. Zero LVGL/Arduino/SDL. | [core/README.md](core/README.md) |
 | `core/time/` | `Scheduler` — fixed-capacity periodic task runner, the CAN polling heartbeat. | [core/time/README.md](core/time/README.md) |
-| `core/can/` | `UdsClient` — UDS request/response protocol over `ICanBus`. | [core/can/README.md](core/can/README.md) |
-| `core/vehicle/` | The 22-signal catalog, the runtime value store, and warning-threshold evaluation. | [core/vehicle/README.md](core/vehicle/README.md) |
+| `core/can/` | `UdsClient` — UDS request/response protocol over `ICanBus`. Protocol only; `core/vehicle`'s `SignalPoller` decides what to send and when. | [core/can/README.md](core/can/README.md) |
+| `core/vehicle/` | The 22-signal catalog, the flow-controlled UDS request scheduler, the runtime value store, and warning-threshold evaluation. | [core/vehicle/README.md](core/vehicle/README.md) |
 | `core/config/` | Persisted config schema (`Config`/`Settings`/`PrioritizedSignal`/`SignalConfig`) and `ConfigStore`'s load/save/migrate logic over `IConfigStore`. | [core/config/README.md](core/config/README.md) |
 | `remote/protocol/` | Wire format for the Teensy↔ESP32-C3 link: message types, framing, CRC, per-record encode/decode. Zero deps — compiles into both firmwares. | — |
 | `remote/server/` | Teensy-side: `RemoteConfigServer` (batch-validates and applies a config over the wire), `RemoteConfigLink` (UART bytes ↔ frames), `RemoteApController` (AP lifecycle state machine). | — |
@@ -46,7 +46,7 @@ This means a given `.cpp` file's `#include`s tell you which layer it belongs to,
 
 ## `src/main.cpp` — the composition root
 
-`main.cpp` is deliberately the one file that's allowed to know about everything: it calls `platform_get()` to obtain the board's `Platform`, constructs the `core::` stack (`ConfigStore`, `SignalStore`, `UdsClient`, `Scheduler`) on top of it, builds `gui::VehicleBinding` on top of that, and then builds and wires every `gui::` screen. Its `setup()`/`loop()` functions are the actual Arduino-style entry points on both boards (the simulator env supplies its own `main()` that calls them in a loop — see the bottom of the file).
+`main.cpp` is deliberately the one file that's allowed to know about everything: it calls `platform_get()` to obtain the board's `Platform`, constructs the `core::` stack (`ConfigStore`, `SignalStore`, `UdsClient`, `SignalPoller`, `Scheduler`) on top of it, builds `gui::VehicleBinding` on top of that, and then builds and wires every `gui::` screen. Its `setup()`/`loop()` functions are the actual Arduino-style entry points on both boards (the simulator env supplies its own `main()` that calls them in a loop — see the bottom of the file).
 
 Two points worth knowing if you're changing wiring here:
 - **`runtime_theme()`** is a mutable *copy* of `gui::THEME_DEFAULT` that every screen is actually built against — not the `const` global directly — so a user-picked accent color has somewhere to write. Changing the accent rebuilds every screen from scratch against the updated copy (`rebuild_screens_for_theme_change()`), since LVGL styles don't re-read a `Theme` struct live.
@@ -72,7 +72,9 @@ The simulator environment also runs two build-time scripts from `support/` (SDL2
 | Add a new screen | `gui/screens/` (new file, follow an existing screen's pattern) + wire it into `src/main.cpp`'s `build_screens()`/`destroy_screens()` |
 | Change what happens when a panel is tapped, or how the Configurator/Warning/Settings screens hand data back to persistence | `gui/bindings/src/vehicle_binding.cpp` — [gui/bindings](gui/bindings/README.md), and the callback wiring in `src/main.cpp` |
 | Change the persisted config schema | `core/config/inc/config.hpp` (bump `ConfigStore::CURRENT_VERSION` in `config_store.hpp` when you do) — [core/config](core/config/README.md) |
-| Change CAN polling cadence or add a new periodic task | `core::Scheduler` calls in `src/main.cpp`'s `setup()` — [core/time](core/time/README.md) |
+| Change how often a signal is polled | that signal's `cycle_time_ms` in `core/vehicle/data/signals.json` (re-run `tools/gen_catalog.py`). It is a floor, not a guarantee — `core::SignalPoller` polls no *faster* than this and slower when the ECU can't keep up — [core/vehicle](core/vehicle/README.md) |
+| Change which signals get polled at all, or how requests are paced | `core::SignalPoller` — [core/vehicle](core/vehicle/README.md). Only displayed panels are polled; `src/main.cpp`'s `sync_active_signals()` is what tells it which those are |
+| Add a new periodic task | `core::Scheduler` calls in `src/main.cpp`'s `setup()` — [core/time](core/time/README.md) |
 | Add support for a new board | New `platform/<board>/` implementing every interface in `platform/platform.hpp`, plus a new `[env:<board>]` in `platformio.ini` — [platform](platform/README.md) |
 | Change what the desktop simulator's fabricated CAN data looks like | `platform/simulator/src/simulator_can.cpp` — [platform/simulator](platform/simulator/README.md) |
 

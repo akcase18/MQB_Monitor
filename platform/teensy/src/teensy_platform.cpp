@@ -36,7 +36,7 @@
  * and keeps the pattern consistent with TEENSY_STORAGE_USE_SD). Both
  * teensy_touch.cpp and teensy_cap_touch.cpp still compile unconditionally
  * either way, so the inactive one can't silently bit-rot. */
-#define TEENSY_TOUCH_USE_RESISTIVE 1
+#define TEENSY_TOUCH_USE_RESISTIVE 0
 
 #if TEENSY_TOUCH_USE_RESISTIVE
     #include "teensy_touch.hpp"

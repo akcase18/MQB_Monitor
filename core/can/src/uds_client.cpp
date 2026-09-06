@@ -8,6 +8,7 @@ namespace core
         constexpr uint8_t NUM_DATA_BYTES    = 0x03;
         constexpr uint8_t ENHANCE_DATA_REQ  = 0x22;
         constexpr uint8_t ENHANCE_DATA_RESP = 0x62;
+        constexpr uint8_t NEGATIVE_RESP     = 0x7F;
         constexpr uint8_t ONE_BYTE_PAYLOAD  = 0x04;
     } // namespace
 
@@ -31,13 +32,33 @@ namespace core
         bus_.send(frame);
     }
 
-    void UdsClient::poll(ResponseCallback cb, void *ctx)
+    void UdsClient::poll(ResponseCallback         cb,
+                         void                    *ctx,
+                         NegativeResponseCallback ncb,
+                         void                    *nctx)
     {
         CanFrame frame;
         while (bus_.receive(frame))
         {
-            if (frame.id != rx_id_ || frame.len < 4
-                || frame.data[1] != ENHANCE_DATA_RESP)
+            if (frame.id != rx_id_ || frame.len < 4)
+            {
+                continue;
+            }
+
+            /* `03 7F <service> <nrc>` -- a rejection, not a reading. It
+             * names no data identifier, so it is passed straight through
+             * for the caller to attribute to whatever it has outstanding
+             * (see NegativeResponseCallback). */
+            if (frame.data[1] == NEGATIVE_RESP)
+            {
+                if (ncb != nullptr)
+                {
+                    ncb(nctx, frame.data[2], frame.data[3]);
+                }
+                continue;
+            }
+
+            if (frame.data[1] != ENHANCE_DATA_RESP)
             {
                 continue;
             }
@@ -52,8 +73,7 @@ namespace core
              * decoded against a stale byte rather than dropped: a
              * one-byte payload needs data[4], a two-byte payload
              * data[4..5]. */
-            uint8_t needed
-                = (frame.data[0] == ONE_BYTE_PAYLOAD) ? 5 : 6;
+            uint8_t needed = (frame.data[0] == ONE_BYTE_PAYLOAD) ? 5 : 6;
             if (frame.len < needed)
             {
                 continue;

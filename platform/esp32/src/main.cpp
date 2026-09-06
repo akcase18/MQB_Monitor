@@ -9,10 +9,18 @@
  * link. See platform/esp32/README.md for how to test this against the
  * desktop simulator with no Teensy or display wiring at all.
  *
- * Serial is native USB-CDC on this board (no separate UART bridge chip) —
- * the same physical connection used to flash it doubles as the relay link
- * for now. Once wired to a real Teensy, swap `Serial` below for `Serial1`
- * on two GPIOs so native USB is free for flashing/debug logs only.
+ * The relay link runs on Serial1 (UART) wired to the Teensy's Serial4,
+ * leaving native USB-CDC free for flashing and debug logs. It used to run
+ * on `Serial` (USB-CDC) so the firmware could be driven from a laptop with
+ * no Teensy attached — convenient for bring-up, but on a board where both
+ * chips are soldered down it meant the two ends were on entirely different
+ * transports: the Teensy sent CMD_AP_ENABLE on Serial4 and nothing was
+ * listening, so WirelessSetupScreen span on its spinner forever waiting
+ * for an EVT_AP_READY that could not arrive.
+ *
+ * See platform/esp32/README.md for driving this from the desktop simulator,
+ * which now needs a USB-serial adapter on these pins rather than the
+ * flashing cable.
  */
 #include <Arduino.h>
 #include <WebServer.h>
@@ -25,6 +33,23 @@
 
 namespace
 {
+    /* Relay UART. Defaults are the XIAO ESP32-C3's Serial1 pins: GPIO21 is
+     * TX (silkscreen D6), GPIO20 is RX (D7). Change these if the board
+     * routes the link elsewhere.
+     *
+     * Crossover, since it is the easy thing to get backwards:
+     *     Teensy TX (MicroMod pin 17) -> ESP32 RX (GPIO20)
+     *     Teensy RX (MicroMod pin 16) <- ESP32 TX (GPIO21)
+     *
+     * The Teensy end is Serial2, not Serial4: MicroMod swaps those two
+     * relative to a Teensy 4.0, so 16/17 is Serial2 (LPUART3) here. See
+     * platform/teensy/src/teensy_serial_link.cpp. */
+    constexpr int      RELAY_RX_PIN = 20;
+    constexpr int      RELAY_TX_PIN = 21;
+    constexpr uint32_t RELAY_BAUD   = 115200; /* must match
+                                                 REMOTE_SERIAL_BAUD in
+                                                 src/main.cpp */
+
     esp32::ApManager  ap_manager;
     esp32::RelayLink *relay_link = nullptr;
     WebServer         server(80);
@@ -78,8 +103,17 @@ void setup()
      * out on every real REQ_GET_STATE round trip. Must be set before
      * begin() so it isn't immediately overwritten by that 256 default.
      */
-    Serial.setRxBufferSize(remote::protocol::FRAME_MAX_PAYLOAD + 8);
+    /* USB-CDC is debug output only now -- the relay moved to Serial1. */
     Serial.begin(115200);
+
+    /* The default RX ring is 256 bytes, but RESP_STATE's payload alone can
+     * exceed 1200, and RelayLink only drains the port once per loop() pass
+     * -- so a large frame overruns the buffer before it is read, which
+     * showed up as send_request_and_wait() timing out on every real
+     * REQ_GET_STATE round trip. Must be set before begin(), which would
+     * otherwise install the 256 default. */
+    Serial1.setRxBufferSize(remote::protocol::FRAME_MAX_PAYLOAD + 8);
+    Serial1.begin(RELAY_BAUD, SERIAL_8N1, RELAY_RX_PIN, RELAY_TX_PIN);
 
     /* Touching WiFi for the first time lazily inside on_relay_frame() (on
      * the first real CMD_AP_ENABLE, which could arrive at any point after
@@ -92,7 +126,7 @@ void setup()
     WiFi.mode(WIFI_AP);
     WiFi.softAPdisconnect(true);
 
-    static esp32::RelayLink link(Serial);
+    static esp32::RelayLink link(Serial1);
     relay_link = &link;
 
     static esp32::ConfigWebHandler config_web(link);

@@ -16,6 +16,7 @@
 #include "logger.hpp"
 #include "scheduler.hpp"
 #include "signal_catalog.hpp"
+#include "signal_poller.hpp"
 #include "signal_store.hpp"
 #include "uds_client.hpp"
 
@@ -65,12 +66,32 @@ namespace
      * pre-rework code invalidated every panel label on every loop pass
      * and let LVGL coalesce it to its own 20ms tick, so 50Hz redraws are
      * known to have run on this panel; 20Hz is well inside that. */
-    constexpr uint32_t INFO_SCREEN_REFRESH_MS     = 50;
+    constexpr uint32_t INFO_SCREEN_REFRESH_MS = 50;
+
+    /* Backstop cadence for re-pointing core::SignalPoller at the displayed
+     * panel set. Every path that can change that set calls
+     * sync_active_signals() directly, so this only ever catches a future
+     * one that forgets to -- half a second is imperceptible for a change
+     * the user just made by hand, and an unchanged list costs a six-entry
+     * comparison. */
+    constexpr uint32_t ACTIVE_SIGNAL_SYNC_MS = 500;
+
+    /* How often LVGL polls the touch driver. lv_indev_create() defaults
+     * this to LV_DEF_REFR_PERIOD (20ms, lib/lv_conf.h), which is the
+     * screen redraw cadence rather than anything chosen for input -- so a
+     * press could sit up to 20ms before LVGL saw it, and a drag sampled
+     * that coarsely tracks visibly behind the finger.
+     *
+     * 10ms halves the worst-case press latency and doubles the sample
+     * density along a drag, for one extra I2C transaction per 10ms
+     * (5 bytes off the FT6236). loop() calls lv_timer_handler() every
+     * pass with no rate limit, so there is headroom for it. */
+    constexpr uint32_t TOUCH_POLL_MS              = 10;
     constexpr uint32_t WIRELESS_SCREEN_REFRESH_MS = 500;
     /* Slower than the info screen's: nothing here changes faster than
      * once a minute except the capture toggle, which repaints itself on
      * press rather than waiting for this. */
-    constexpr uint32_t LOGGING_SCREEN_REFRESH_MS  = 1000;
+    constexpr uint32_t LOGGING_SCREEN_REFRESH_MS = 1000;
 
     /* How often the logger *looks*, not how often it writes -- the write
      * rate per signal is floored at core::LOG_MIN_INTERVAL_MS (50ms)
@@ -112,11 +133,12 @@ namespace
      */
     struct Composition
     {
-            core::ConfigStore config_store;
-            core::SignalStore signal_store;
-            core::UdsClient   uds_client;
-            core::Scheduler   scheduler;
-            core::Logger      logger;
+            core::ConfigStore  config_store;
+            core::SignalStore  signal_store;
+            core::UdsClient    uds_client;
+            core::SignalPoller uds_poller;
+            core::Scheduler    scheduler;
+            core::Logger       logger;
 
             remote::server::RemoteConfigServer remote_server;
             remote::server::RemoteConfigLink   remote_link;
@@ -140,6 +162,7 @@ namespace
             explicit Composition(Platform &platform)
                 : config_store(platform.config_store)
                 , uds_client(platform.can, CAN_TX_ID, CAN_RX_ID)
+                , uds_poller(uds_client, platform.clock)
                 , scheduler(platform.clock)
                 , logger(platform.storage)
                 , remote_server(config_store, signal_store)
@@ -473,18 +496,49 @@ namespace
         return platform_get().clock.millis();
     }
 
-    /** Fires every SIGNAL_CATALOG entry's own cycle_time_ms, sending all of
-     * that signal's UDS requests. `ctx` is the catalog index, encoded
-     * directly as a pointer value (no heap, no context struct needed). */
-    void send_signal_requests_task(void *ctx)
-    {
-        uint16_t idx = static_cast<uint16_t>(reinterpret_cast<uintptr_t>(ctx));
-        const core::SignalSpec &spec = core::SIGNAL_CATALOG[idx];
+    /* core::SignalPoller holds a full screen of panels' worth of signals,
+     * which is exactly what core::Config::priorities[] can describe. If
+     * one grows past the other, sync_active_signals() below would silently
+     * stop asking for the panels past the cut. */
+    static_assert(core::SignalPoller::MAX_ACTIVE_SIGNALS >= core::MAX_PANELS,
+                  "SignalPoller cannot hold every displayable panel");
 
-        for (uint8_t r = 0; r < spec.num_requests; r++)
+    /** Points the poller at the signals the dashboard is currently showing
+     * -- `priorities[0..num_panels-1]`, which is the complete set of live
+     * values anything reads (gui::VehicleBinding::build_view_model() for
+     * the panels, core::Logger::sample() for the log, and nothing else).
+     * Every other catalog entry is dead weight on the bus until the user
+     * puts it on a panel.
+     *
+     * Cheap and idempotent: core::SignalPoller::set_active() returns
+     * immediately when the list has not changed, so this is called both
+     * from the config-change callbacks (for immediacy) and from a periodic
+     * backstop task (so a future config path that forgets to call it still
+     * cannot leave the poller asking for the wrong signals). */
+    void sync_active_signals()
+    {
+        Composition        &app = composition();
+        const core::Config &cfg = app.config_store.get();
+
+        uint8_t count = cfg.settings.num_panels;
+        if (count > core::MAX_PANELS)
         {
-            composition().uds_client.send(spec.requests[r]);
+            count = core::MAX_PANELS;
         }
+
+        uint16_t ids[core::MAX_PANELS];
+        for (uint8_t i = 0; i < count; i++)
+        {
+            ids[i] = cfg.priorities[i].signal_id;
+        }
+
+        app.uds_poller.set_active(ids, count);
+    }
+
+    void sync_active_signals_task(void *ctx)
+    {
+        (void)ctx;
+        sync_active_signals();
     }
 
     void refresh_info_screen_task(void *ctx)
@@ -513,6 +567,19 @@ namespace
         (void)ctx;
         composition().signal_store.on_uds_response(
             byte1, byte2, raw, platform_get().clock.millis());
+
+        /* Closes the flow-control loop: this is what frees the poller's
+         * single in-flight slot so the next request can go out. */
+        composition().uds_poller.on_response(byte1, byte2);
+    }
+
+    /* A rejection still ends the request it rejects, so handing these to
+     * the poller is what stops a DID the ECU refuses from costing a full
+     * response timeout every time it comes due. */
+    void on_uds_negative_response(void *ctx, uint8_t service, uint8_t nrc)
+    {
+        (void)ctx;
+        composition().uds_poller.on_negative_response(service, nrc);
     }
 
     /* Request/response pairs are handled internally by
@@ -571,6 +638,7 @@ namespace
             signal_id,
             is_metric ? core::UnitSystem::Metric : core::UnitSystem::Imperial,
             mode);
+        sync_active_signals();
         composition().info_screen.refresh();
         lv_screen_load(composition().info_screen.screen());
     }
@@ -651,6 +719,7 @@ namespace
         settings.night_brightness = night_brightness_pct;
         settings.num_panels       = num_panels;
         composition().config_store.save();
+        sync_active_signals();
 
         composition().info_screen.rebuild(
             num_panels, to_gui_orientation(active_orientation()));
@@ -941,10 +1010,65 @@ namespace
                                        app.settings_screen.screen());
     }
 
+    /** Set when a phone-side Save commits, cleared when the resulting
+     * rebuild is kicked off. Deferred rather than acted on immediately
+     * because the apply lands while WirelessSetupScreen is on-screen, and
+     * rebuilding there would delete the screen the user is looking at
+     * mid-session. Coalescing also means several Saves in one sitting cost
+     * one rebuild, not one each. */
+    bool &remote_config_dirty()
+    {
+        static bool dirty = false;
+        return dirty;
+    }
+
+    /* Fired by RemoteConfigServer once a phone-side Save has validated,
+     * committed and persisted. The config store has already changed; every
+     * screen is still built against the values from the last
+     * build_screens(), so they have to be rebuilt before any of this shows.
+     *
+     * Brightness is the one thing pushed live here rather than deferred,
+     * since the local path (settings_preview_brightness_cb) applies it on
+     * every slider move and a remote change that did nothing until the
+     * screen closed would read as broken. Day is assumed: which of
+     * day/night is "current" lives in SettingsScreen::showing_night_ and
+     * isn't visible from here, and Day is what SettingsScreen opens in.
+     * Editing night brightness from the phone therefore stores correctly
+     * but won't be what the panel shows until night is selected locally.
+     *
+     * Orientation is NOT applied live and cannot be -- it is boot-time-only
+     * (see platform.hpp's DisplayOrientation). The rebuilt SettingsScreen
+     * shows the newly saved value; the panel rotates on the next restart,
+     * exactly as it does for a local orientation change. */
+    void remote_config_applied_cb(void *ctx)
+    {
+        (void)ctx;
+        apply_backlight(
+            composition().config_store.get().settings.day_brightness);
+
+        /* A remote apply can rewrite priorities[] and num_panels wholesale,
+         * so the poller's request table has to follow it. */
+        sync_active_signals();
+        remote_config_dirty() = true;
+    }
+
     void wireless_deactivate_cb(void *ctx)
     {
         (void)ctx;
         composition().remote_binding.deactivate();
+
+        if (!remote_config_dirty())
+        {
+            return;
+        }
+        remote_config_dirty() = false;
+
+        /* Same treatment as an accent change: the rebuild flashes a blank
+         * transition screen, so kill the backlight first and let
+         * settings_screen_loaded_cb bring it back once the rebuilt
+         * SettingsScreen has finished its slide-in. */
+        blank_backlight();
+        lv_async_call(rebuild_screens_for_theme_change, nullptr);
     }
 
     /* Registered at a modest cadence (see WIRELESS_SCREEN_REFRESH_MS) so
@@ -1098,6 +1222,15 @@ namespace
     FLASHMEM void rebuild_screens_for_theme_change(void *user_data)
     {
         (void)user_data;
+
+        /* Re-seed from the saved config rather than assuming the caller
+         * already set it. theme_picker_done_cb does set runtime_theme()'s
+         * accent before calling here, but the remote-apply path changes
+         * settings.accent_color in the config store without going anywhere
+         * near that function -- reading it back here covers both. */
+        runtime_theme().palette.accent = lv_color_hex(
+            composition().config_store.get().settings.accent_color);
+
         lv_obj_t *transition = destroy_screens();
         build_screens();
         composition().settings_screen.open();
@@ -1118,8 +1251,8 @@ FLASHMEM void setup()
      * platform.hpp's DisplayOrientation doc comments), and the one
      * lv_display_t created below has to be sized correctly from the
      * start since nothing resizes it live. */
-    Composition     &app      = composition();
-    core::Settings  &settings = app.config_store.get().settings;
+    Composition    &app      = composition();
+    core::Settings &settings = app.config_store.get().settings;
     app.config_store.load();
 
     active_orientation() = settings.orientation;
@@ -1154,6 +1287,7 @@ FLASHMEM void setup()
     lv_indev_t *indev = lv_indev_create();
     lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(indev, touch_read_cb);
+    lv_timer_set_period(lv_indev_get_read_timer(indev), TOUCH_POLL_MS);
 
     /* Guard against an accent_color that isn't one of gui::ACCENT_PRESETS
      * (e.g. 0 from a config saved before this field existed) — silently
@@ -1181,18 +1315,22 @@ FLASHMEM void setup()
      * green/landscape-metrics instead of the user's actual saved
      * preference. */
     runtime_theme().palette.accent = lv_color_hex(settings.accent_color);
-    runtime_theme().metrics = orientation == DisplayOrientation::Portrait
-                                  ? gui::METRICS_PORTRAIT
-                                  : gui::THEME_DEFAULT.metrics;
+    runtime_theme().metrics        = orientation == DisplayOrientation::Portrait
+                                         ? gui::METRICS_PORTRAIT
+                                         : gui::THEME_DEFAULT.metrics;
+
+    app.remote_server.set_applied_callback(remote_config_applied_cb, nullptr);
+
     build_screens();
 
-    for (uint16_t i = 0; i < core::SIGNAL_CATALOG_COUNT; i++)
-    {
-        app.scheduler.every(
-            core::SIGNAL_CATALOG[i].cycle_time_ms,
-            send_signal_requests_task,
-            reinterpret_cast<void *>(static_cast<uintptr_t>(i)));
-    }
+    /* No per-signal scheduler task any more -- core::SignalPoller paces
+     * itself from loop() off its own due times and its outstanding
+     * request, which a fixed-period task cannot express. This only has to
+     * tell it what to ask for. */
+    sync_active_signals();
+    app.scheduler.every(
+        ACTIVE_SIGNAL_SYNC_MS, sync_active_signals_task, nullptr);
+
     app.scheduler.every(
         INFO_SCREEN_REFRESH_MS, refresh_info_screen_task, nullptr);
     app.scheduler.every(remote::server::AP_IDLE_CHECK_PERIOD_MS,
@@ -1224,7 +1362,14 @@ void loop()
 #endif
 
     app.scheduler.tick();
-    app.uds_client.poll(on_uds_response, nullptr);
+
+    /* Drain first, send second: a response landing this iteration frees
+     * the poller's in-flight slot, so tick() can put the next request on
+     * the wire in the same pass instead of a loop later. */
+    app.uds_client.poll(
+        on_uds_response, nullptr, on_uds_negative_response, nullptr);
+    app.uds_poller.tick();
+
     app.remote_link.poll(remote_evt_cb, nullptr, platform_get().clock.millis());
 
     lv_timer_handler();

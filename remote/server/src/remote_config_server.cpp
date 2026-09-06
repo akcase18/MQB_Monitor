@@ -86,6 +86,13 @@ namespace remote::server
         }
     }
 
+    void RemoteConfigServer::set_applied_callback(AppliedCallback cb,
+                                                  void           *ctx)
+    {
+        applied_cb_  = cb;
+        applied_ctx_ = ctx;
+    }
+
     FLASHMEM size_t RemoteConfigServer::handle_get_state(uint8_t *out,
                                                          size_t   cap)
     {
@@ -277,6 +284,14 @@ namespace remote::server
         }
 
         config_.save();
+
+        /* Only on the success path -- a batch rejected above returns
+         * through fail() without ever reaching here, so the UI is never
+         * rebuilt against a config that was not committed. */
+        if (applied_cb_ != nullptr)
+        {
+            applied_cb_(applied_ctx_);
+        }
 
         (void)cap;
         return fail(ApplyResult::Ok);

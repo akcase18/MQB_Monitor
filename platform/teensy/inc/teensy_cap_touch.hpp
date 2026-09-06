@@ -20,8 +20,10 @@ class TeensyCapTouch : public ITouch
     private:
         TeensyCapTouch() = default;
 
+        static bool read_reg(uint8_t reg, uint8_t &val);
+        static void write_reg(uint8_t reg, uint8_t val);
+
         int16_t            x_val_       = 0;
         int16_t            y_val_       = 0;
         DisplayOrientation orientation_ = DisplayOrientation::Landscape;
-        uint16_t           height_      = 320;
 };

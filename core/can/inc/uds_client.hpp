@@ -1,10 +1,11 @@
 /**
  * @file uds_client.hpp
  * @brief UDS enhanced-diagnostic-session request/response protocol over
- * ICanBus. Owns no timers — a core::Scheduler task calls send() at each
- * signal's cycle time, and poll() is called once per main-loop iteration
- * to drain and decode any responses. Response-to-signal matching is left
- * to the caller (core/vehicle), not scanned here.
+ * ICanBus. Owns no timers and no request scheduling — core::SignalPoller
+ * decides what to ask for and when, calls send() for it, and poll() is
+ * called once per main-loop iteration to drain and decode any responses.
+ * Response-to-signal matching is left to the caller (core/vehicle), not
+ * scanned here.
  */
 #pragma once
 
@@ -38,6 +39,24 @@ namespace core
                 = void (*)(void *ctx, uint8_t byte1, uint8_t byte2, float raw);
 
             /**
+             * A negative response (service 0x7F). Carries no data
+             * identifier — the ECU only echoes which service it is
+             * rejecting — so only a caller tracking its own outstanding
+             * request can say which DID this belongs to. That is exactly
+             * what core::SignalPoller does with it: an NRC is a request
+             * finishing badly, and seeing it frees the in-flight slot
+             * immediately instead of waiting out a full timeout.
+             *
+             * @param service The rejected service id (0x22 for the
+             *                read-data-by-identifier requests send() makes).
+             * @param nrc     ISO 14229 negative response code. 0x78
+             *                (requestCorrectlyReceived-ResponsePending) is
+             *                the one that does NOT mean "done".
+             */
+            using NegativeResponseCallback
+                = void (*)(void *ctx, uint8_t service, uint8_t nrc);
+
+            /**
              * @param bus    CAN bus to send/receive on.
              * @param tx_id  CAN ID requests are sent on.
              * @param rx_id  CAN ID responses are expected on.
@@ -52,9 +71,13 @@ namespace core
 
             /**
              * Drains every pending response on the bus, decoding each one and
-             * invoking `cb` for it.
+             * invoking `cb` for it. Negative responses go to `ncb` when one
+             * is supplied, and are dropped when it is null.
              */
-            void poll(ResponseCallback cb, void *ctx);
+            void poll(ResponseCallback         cb,
+                      void                    *ctx,
+                      NegativeResponseCallback ncb  = nullptr,
+                      void                    *nctx = nullptr);
 
         private:
             ICanBus &bus_;

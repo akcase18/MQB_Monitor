@@ -1,6 +1,6 @@
 # core/vehicle/
 
-The vehicle-signal data model: a static, ROM-able catalog of every signal the dashboard can display, a runtime value store fed by decoded UDS responses, and signal-scoped warning-threshold evaluation.
+The vehicle-signal data model: a static, ROM-able catalog of every signal the dashboard can display, the request scheduler that decides which of them to ask the ECU for, a runtime value store fed by decoded UDS responses, and signal-scoped warning-threshold evaluation.
 
 ## Files
 
@@ -21,6 +21,13 @@ The vehicle-signal data model: a static, ROM-able catalog of every signal the da
 - **`inc/signal_store.hpp`** / **`src/signal_store.cpp`** — `SignalStore`, the runtime value cache:
   - `on_uds_response(byte1, byte2, raw, now_ms)` — the entry point fed by `UdsClient::poll()`. Finds every catalog request matching `(byte1, byte2)`, decodes it, and once *all* of a signal's requests have reported for this cycle, runs its `transform` and records the result.
   - `get(id)` / `get_display_value(id, is_metric)` — read a signal's current `SignalValue` (raw value, `has_data` flag, last-update timestamp) or its unit-converted, precision-rounded display value.
+
+- **`inc/signal_poller.hpp`** / **`src/signal_poller.cpp`** — `SignalPoller`, which owns *what to ask for and when*:
+  - `set_active(signal_ids, count)` — points it at the displayed panel set. **Only displayed signals are polled.** Everything else in the catalog is dead weight on the bus until the user puts it on a panel, and the displayed set is the complete demand: `gui::VehicleBinding::build_view_model()` and `core::Logger::sample()` are the only readers of live values, and both walk `Config::priorities[0..num_panels-1]`. Deduplicates DIDs across signals (Int Pres and Int Pres Act. both read `0x3E70`) at the faster of their cadences, since `SignalStore::on_uds_response()` already fans one response out to every catalog entry that owns the DID. Unchanged lists are a no-op, so `src/main.cpp` calls it both from each config-change callback and from a periodic backstop task.
+  - `tick()` — called every `loop()` iteration, sends **at most one request, and only when nothing is outstanding**. A UDS server handles one request at a time, so this is what stops the tail of a burst being silently dropped by the ECU. Picks the most-overdue entry rather than walking the table in order, which is what keeps a slow signal from starving behind always-due fast ones when the ECU can't serve full demand.
+  - `on_response()` / `on_negative_response()` — close the loop. A response frees the in-flight slot; so does a negative response, except NRC `0x78` (response-pending), which restarts the deadline instead. A DID that repeatedly times out or is rejected backs off to `BACKOFF_PERIOD_MS` so one unsupported identifier can't spend a response timeout every cycle forever.
+
+  Replaced a one-`core::Scheduler`-task-per-catalog-entry model that polled all 22 signals regardless of what was on screen and fired each one's requests the instant its cycle timer came due, with nothing tracking whether the previous request had been answered. See the file doc comment for the numbers that made that fail on real hardware.
 
 - **`inc/warning.hpp`** / **`src/warning.cpp`** — `evaluate_warning(value, thresholds)`: compares a `SignalValue` against a `WarningThresholds{lo, hi, use_lo, use_hi}`, gated by each bound's own on/off toggle and by `has_data` (so a signal can't false-trigger a warning before its first response). Lives here rather than in [core/config](../config/README.md) so this stays ignorant of how/where thresholds are persisted — config just stores a `WarningThresholds` per signal and hands it here.
 
