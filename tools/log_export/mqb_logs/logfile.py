@@ -23,6 +23,7 @@ position in the stream.
 """
 from __future__ import annotations
 
+import bisect
 import csv
 import json
 import re
@@ -235,14 +236,108 @@ def read_index(directory: Path) -> list[IndexEntry]:
         return []
 
 
+@dataclass(frozen=True)
+class SignalSpec:
+    """The registry metadata a log reader needs: what a signal_id is called
+    and what kind of quantity it holds. `unit` is the registry's *category*
+    string ("Temp", "Pressure", ...), not a display suffix -- turning that
+    into "degC"/"bar" is presentation, and lives with the code that presents
+    it (plot.py, via tools/monitor's unit_label)."""
+
+    signal_id: int
+    name: str
+    unit: str
+
+
+def load_signal_specs(signals_json: Path = SIGNALS_JSON) -> dict[int, SignalSpec]:
+    """id -> SignalSpec, from the same registry the firmware compiles from.
+    Best-effort -- an empty dict just means readers fall back to raw ids.
+
+    Deliberately does NOT filter on `status`: a WIP signal is never in the
+    firmware's catalog, so it can't have been logged, and if one somehow
+    appears in a dump it is far better to name it than to blank it."""
+    try:
+        data = json.loads(signals_json.read_text())
+        return {
+            s["id"]: SignalSpec(s["id"], s["name"], s.get("unit", "None"))
+            for s in data["signals"]
+        }
+    except (OSError, KeyError, json.JSONDecodeError):
+        return {}
+
+
 def load_signal_names(signals_json: Path = SIGNALS_JSON) -> dict[int, str]:
     """id -> name, for a friendlier CSV. Best-effort -- an empty dict just
     means output falls back to raw ids."""
-    try:
-        data = json.loads(signals_json.read_text())
-        return {s["id"]: s["name"] for s in data["signals"]}
-    except (OSError, KeyError, json.JSONDecodeError):
-        return {}
+    return {sid: spec.name for sid, spec in load_signal_specs(signals_json).items()}
+
+
+@dataclass
+class Trace:
+    """One signal's history within one session: two parallel arrays, sorted
+    ascending by time, in the order the device sampled them.
+
+    `times_s` is seconds from that session's *first* record, not from boot
+    and not from any wall clock -- the hardware has no RTC, so boot-relative
+    is all a record carries and it only means anything within one session.
+
+    Samples are irregular by construction: the firmware writes a record when
+    a value CHANGES, not on a fixed grid, so a steady signal contributes
+    almost nothing and a busy one contributes a lot. Anything consuming this
+    has to hold the last value until the next sample (a step), never
+    interpolate between two -- an interpolated point is a value the ECU
+    never reported."""
+
+    signal_id: int
+    name: str
+    unit: str
+    times_s: list[float]
+    values: list[float]
+
+    def __len__(self) -> int:
+        return len(self.times_s)
+
+    @property
+    def value_range(self) -> tuple[float, float]:
+        return (min(self.values), max(self.values)) if self.values else (0.0, 0.0)
+
+    def value_at(self, t_s: float) -> float | None:
+        """The value in effect at `t_s` -- the last sample at or before it,
+        which is what "the value then" means for on-change records. None
+        before the first sample, since nothing was reported yet."""
+        i = bisect.bisect_right(self.times_s, t_s) - 1
+        return self.values[i] if i >= 0 else None
+
+
+def build_traces(
+    session: Session, specs: dict[int, SignalSpec] | None = None
+) -> list[Trace]:
+    """Splits one session's records into a Trace per signal.
+
+    Chunks are walked in chunk_seq order and records within a chunk are
+    already in sample order, so each trace comes out sorted by time without
+    a sort. Ordered by name, which is also the order the plot assigns
+    colors in -- matching how LogsTab lists a session's signals."""
+    if specs is None:
+        specs = load_signal_specs()
+
+    start_ms, _ = session.timestamp_span_ms
+    by_id: dict[int, Trace] = {}
+    for chunk in sort_chunks(session.chunks):
+        for timestamp_ms, signal_id, value in chunk.records:
+            trace = by_id.get(signal_id)
+            if trace is None:
+                spec = specs.get(signal_id)
+                trace = by_id[signal_id] = Trace(
+                    signal_id=signal_id,
+                    name=spec.name if spec else f"#{signal_id}",
+                    unit=spec.unit if spec else "None",
+                    times_s=[],
+                    values=[],
+                )
+            trace.times_s.append((timestamp_ms - start_ms) / 1000.0)
+            trace.values.append(value)
+    return sorted(by_id.values(), key=lambda t: t.name)
 
 
 def csv_rows(chunks: list[Chunk], names: dict[int, str]):

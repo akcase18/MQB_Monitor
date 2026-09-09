@@ -30,6 +30,24 @@ GREEN = "#3ddc84"
 AMBER = "#f5a623"
 RED = "#ef4444"
 
+# Categorical series colors, for plotting several signals on one axis
+# (tools/log_export's Plot page). Ordered by how distinct consecutive pairs
+# are, since a plot assigns them in order: a session logs at most six
+# signals, so the first six carry almost every real case. Chosen to hold up
+# on the dark PANEL background and to stay apart from each other rather than
+# from RED/AMBER/GREEN above, which mean "bad/warn/good" in status readouts
+# and carry no such meaning here.
+SERIES_COLORS = [
+    "#4c8dff",  # blue (ACCENT)
+    "#3ddc84",  # green
+    "#f5a623",  # amber
+    "#c792ea",  # violet
+    "#4dd0e1",  # cyan
+    "#ff8a65",  # coral
+    "#d4e157",  # lime
+    "#f06292",  # pink
+]
+
 # Applied to table cells holding IDs/hex/numbers -- reads better tabular than
 # the UI's proportional font, and matches how the values line up with each
 # other. Menlo ships on every Mac; Qt silently falls back if it's ever absent.

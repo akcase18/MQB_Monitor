@@ -8,6 +8,10 @@ pulls a finite blob once and then lets you look at it.
               actions: download, save the raw dump, erase.
   * Logs   -- what came back, grouped into sessions, with a record preview
               and CSV export.
+  * Plot   -- one session's signals drawn against time (plot.py), for
+              reading a drive rather than exporting it. Independent of the
+              CSV path: neither needs the other, and the export writes the
+              same rows whether or not anything was ever plotted.
 
 Two sources feed the same decode path: the Teensy over USB, and a storage
 *directory* -- the simulator's sim_storage/, or a copy of one -- which is
@@ -29,6 +33,7 @@ import time
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QSettings, QTimer
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -46,6 +51,7 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
+    QScrollArea,
     QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
@@ -61,6 +67,7 @@ from .device import (
     guess_teensy_port,
 )
 from .logfile import Chunk, Session, format_bytes, format_duration
+from .plot import TracePlot
 from .theme import (
     ACCENT,
     AMBER,
@@ -413,6 +420,9 @@ class DeviceTab(QWidget):
             return
 
         self.window.logs_tab.set_chunks(chunks)
+        # Only the sessions that recorded something: an empty one has no
+        # records to draw and would just be a dead entry in the picker.
+        self.window.plot_tab.set_sessions(recorded)
         self.window.set_status(f"{records:,} records · {len(recorded)} sessions", GREEN)
         self.window.select_page(1)
 
@@ -508,6 +518,17 @@ class LogsTab(QWidget):
         self.show_empty.toggled.connect(self._rebuild)
         controls.addWidget(self.show_empty)
         controls.addStretch(1)
+
+        self.plot_btn = QPushButton("Plot Session")
+        self.plot_btn.setEnabled(False)
+        self.plot_btn.setToolTip(
+            "Draw this session's signals against time on the Plot page. "
+            "Needs exactly one session selected — boot-relative timestamps "
+            "give two sessions no common time axis."
+        )
+        self.plot_btn.clicked.connect(self._plot)
+        controls.addWidget(self.plot_btn)
+
         self.export_btn = QPushButton("Export CSV…")
         mark_primary(self.export_btn)
         self.export_btn.setEnabled(False)
@@ -609,6 +630,7 @@ class LogsTab(QWidget):
 
     def _on_selection(self) -> None:
         selected = self._selected_sessions()
+        self.plot_btn.setEnabled(len(selected) == 1)
         self.preview.setRowCount(0)
         if len(selected) != 1:
             self.preview_label.setText(
@@ -654,6 +676,11 @@ class LogsTab(QWidget):
                 f"seconds from session start."
             )
 
+    def _plot(self) -> None:
+        selected = self._selected_sessions()
+        if len(selected) == 1:
+            self.window.plot_tab.show_session(selected[0].session_id)
+
     def _export(self) -> None:
         selected = self._selected_sessions() or self.sessions
         if not selected:
@@ -679,8 +706,183 @@ class LogsTab(QWidget):
         )
 
 
+class PlotTab(QWidget):
+    """One session's signals against time.
+
+    Deliberately a separate page from Logs rather than a mode of it: the
+    Logs page picks *what to keep* (select sessions, export CSV) and can
+    select several at once, while a plot only means anything within a single
+    session -- timestamps are boot-relative, so two sessions share no time
+    axis to draw them on. The two paths are independent; exporting never
+    needs a plot to have been drawn, and vice versa.
+
+    Building the traces walks every record in the session, so it happens
+    when this page is actually shown (or the session changed while it is),
+    not on every download."""
+
+    LIST_WIDTH = 190
+
+    def __init__(self, window: "MainWindow") -> None:
+        super().__init__()
+        self.window = window
+        self.sessions: list[Session] = []
+        self.specs = logfile.load_signal_specs()
+        self._shown_session: int | None = None  # what the plot currently holds
+        self._pending: int | None = None  # what it should hold, once visible
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(18, 16, 18, 16)
+        layout.setSpacing(10)
+
+        controls = QHBoxLayout()
+        label = QLabel("Session")
+        label.setObjectName("FieldLabel")
+        controls.addWidget(label)
+
+        self.session_combo = QComboBox()
+        self.session_combo.setMinimumWidth(240)
+        self.session_combo.setToolTip(
+            "One power cycle of the device. Boot-relative timestamps don't "
+            "line up between sessions, so only one is plotted at a time."
+        )
+        self.session_combo.setEnabled(False)  # until a dump brings some in
+        self.session_combo.currentIndexChanged.connect(self._on_session_changed)
+        controls.addWidget(self.session_combo)
+
+        self.summary = QLabel("Nothing downloaded yet.")
+        self.summary.setObjectName("StatsLabel")
+        controls.addWidget(self.summary)
+        controls.addStretch(1)
+
+        hint = QLabel("scroll to zoom · drag to pan · double-click to reset")
+        hint.setObjectName("StatsLabel")
+        controls.addWidget(hint)
+        layout.addLayout(controls)
+
+        body = QHBoxLayout()
+        body.setSpacing(10)
+
+        self.signal_list = QListWidget()
+        self.signal_list.setFixedWidth(self.LIST_WIDTH)
+        self.signal_list.setToolTip(
+            "Which signals are drawn. Rows are grouped by unit, so hiding "
+            "the last signal of a kind drops its row and gives the height "
+            "to the others."
+        )
+        self.signal_list.itemChanged.connect(self._on_signal_toggled)
+        body.addWidget(self.signal_list)
+
+        self.plot = TracePlot()
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setWidget(self.plot)
+        body.addWidget(scroll, stretch=1)
+        layout.addLayout(body, stretch=1)
+
+    # --- data -----------------------------------------------------------
+
+    def set_sessions(self, sessions: list[Session]) -> None:
+        """Called with each fresh download. Keeps the session you were
+        looking at selected if the new dump still has it -- re-downloading
+        after recording more shouldn't move you somewhere else."""
+        self.specs = logfile.load_signal_specs()  # same reason LogsTab
+        # reloads names: a signal renamed in the registry shows up without
+        # a restart
+        self.sessions = sessions
+        previous = self._current_session_id()
+
+        self.session_combo.blockSignals(True)
+        self.session_combo.clear()
+        for session in sessions:
+            self.session_combo.addItem(
+                f"Session {session.session_id} — "
+                f"{format_duration(session.duration_ms)}, "
+                f"{session.record_count:,} records",
+                userData=session.session_id,
+            )
+        index = self.session_combo.findData(previous) if previous is not None else -1
+        self.session_combo.setCurrentIndex(index if index >= 0 else 0)
+        self.session_combo.blockSignals(False)
+        self.session_combo.setEnabled(bool(sessions))
+
+        self._shown_session = None  # the records behind it may have changed
+        self._pending = self._current_session_id()
+        self._build_if_visible()
+
+    def show_session(self, session_id: int) -> None:
+        """Entry point for the Logs page's Plot button."""
+        index = self.session_combo.findData(session_id)
+        if index >= 0:
+            self.session_combo.setCurrentIndex(index)  # drives _on_session_changed
+        self.window.select_page(2)
+
+    def _current_session_id(self) -> int | None:
+        return self.session_combo.currentData() if self.session_combo.count() else None
+
+    def _session(self, session_id: int | None) -> Session | None:
+        return next((s for s in self.sessions if s.session_id == session_id), None)
+
+    def _on_session_changed(self) -> None:
+        self._pending = self._current_session_id()
+        self._build_if_visible()
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self._build_if_visible()
+
+    def _build_if_visible(self) -> None:
+        if self.isVisible() and self._pending != self._shown_session:
+            self._build(self._pending)
+
+    def _build(self, session_id: int | None) -> None:
+        session = self._session(session_id)
+        if session is None:
+            self.plot.set_traces([])
+            self.signal_list.clear()
+            self.summary.setText("Nothing downloaded yet.")
+            self._shown_session = None
+            return
+
+        # A long session is six figures of records; splitting them into
+        # traces and summarizing each one is the only O(records) work the
+        # page does, and it is visible on a big dump.
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        try:
+            traces = logfile.build_traces(session, self.specs)
+            self.plot.set_traces(traces)
+        finally:
+            QApplication.restoreOverrideCursor()
+        self._shown_session = session_id
+
+        self.signal_list.blockSignals(True)
+        self.signal_list.clear()
+        for trace in traces:
+            item = QListWidgetItem(trace.name)
+            item.setData(Qt.UserRole, trace.signal_id)
+            item.setCheckState(Qt.Checked)
+            item.setForeground(QColor(self.plot.color_for(trace.signal_id)))
+            item.setToolTip(f"{len(trace):,} records")
+            self.signal_list.addItem(item)
+        self.signal_list.blockSignals(False)
+
+        units = len({t.unit for t in traces})
+        self.summary.setText(
+            f"{session.record_count:,} records · {len(traces)} signals · "
+            f"{units} axis group{'s' if units != 1 else ''}"
+        )
+
+    def _on_signal_toggled(self) -> None:
+        hidden = {
+            self.signal_list.item(i).data(Qt.UserRole)
+            for i in range(self.signal_list.count())
+            if self.signal_list.item(i).checkState() != Qt.Checked
+        }
+        self.plot.set_hidden(hidden)
+
+
 class MainWindow(QMainWindow):
-    PAGES = ["Device", "Logs"]
+    PAGES = ["Device", "Logs", "Plot"]
 
     def __init__(self, port: str | None = None, folder: Path | None = None) -> None:
         super().__init__()
@@ -709,8 +911,10 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget()
         self.device_tab = DeviceTab(self)
         self.logs_tab = LogsTab(self)
+        self.plot_tab = PlotTab(self)
         self.stack.addWidget(self.device_tab)
         self.stack.addWidget(self.logs_tab)
+        self.stack.addWidget(self.plot_tab)
         body_layout.addWidget(self.stack, stretch=1)
 
         root_layout.addWidget(body, stretch=1)

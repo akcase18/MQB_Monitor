@@ -36,7 +36,8 @@ support firmware development but don't ship on any board.
   (`env:teensymm`) itself, not a standalone sniffer. Two front ends over one
   decoder (`mqb_logs/`): **`run.py`**, the **MQB Log Export** app — the same
   PySide6 shell and theme as `monitor/`, with a Device page (status,
-  download, erase) and a Logs page (sessions, preview, CSV export) — and
+  download, erase), a Logs page (sessions, preview, CSV export) and a Plot
+  page (one session's signals against time, zoomable) — and
   **`dump_log.py`**, the scriptable CLI the VS Code tasks run. Either can
   read a storage *directory* instead of a device (`sim_storage/`), so the
   whole path works with nothing plugged in. See its

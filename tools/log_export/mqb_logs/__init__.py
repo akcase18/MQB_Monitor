@@ -13,6 +13,10 @@ tools/monitor's Qt theme.
                   share this one implementation.
   * device.py  -- the serial command set, plus a background dump worker.
   * gui.py     -- the PySide6 app (run.py launches it).
+  * plot.py    -- the Plot page's trace widget. Painted by hand rather
+                  than by a charting library, so the dependency set
+                  stays PySide6 + pyserial -- see its module docstring
+                  for the other reasons.
 """
 
 __version__ = "0.1.0"

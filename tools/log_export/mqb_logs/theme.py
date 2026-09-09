@@ -22,7 +22,9 @@ from mqb_monitor.theme import (  # noqa: E402  (must follow the path insert)
     GREEN,
     MONO_FONT,
     PANEL,
+    PANEL_ALT,
     RED,
+    SERIES_COLORS,
     TEXT,
     TEXT_DIM,
     apply_theme,
@@ -30,6 +32,6 @@ from mqb_monitor.theme import (  # noqa: E402  (must follow the path insert)
 )
 
 __all__ = [
-    "ACCENT", "AMBER", "BORDER", "GREEN", "MONO_FONT", "PANEL", "RED",
-    "TEXT", "TEXT_DIM", "apply_theme", "mark_primary",
+    "ACCENT", "AMBER", "BORDER", "GREEN", "MONO_FONT", "PANEL", "PANEL_ALT",
+    "RED", "SERIES_COLORS", "TEXT", "TEXT_DIM", "apply_theme", "mark_primary",
 ]

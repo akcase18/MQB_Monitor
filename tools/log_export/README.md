@@ -1,13 +1,15 @@
 # tools/log_export/
 
-Pulls the dashboard firmware's black-box signal log (see [core/logging](../../core/logging/README.md)) over USB serial and decodes it to CSV — as a **GUI app** or a **CLI script**, both over the same code.
+Pulls the dashboard firmware's black-box signal log (see [core/logging](../../core/logging/README.md)) over USB serial and decodes it — to a **plot** you can read, or to **CSV** — as a **GUI app** or a **CLI script**, both over the same code.
 
 - **[`run.py`](run.py)** — the **MQB Log Export** app: a PySide6 GUI built on the same shell as [`tools/monitor`](../monitor/README.md) (shared top bar / sidebar / theme), for when you want to see what's on the device before deciding what to keep.
 - **[`dump_log.py`](dump_log.py)** — the scriptable CLI, unchanged in interface. What the VS Code tasks below run.
 - **[`mqb_logs/`](mqb_logs/)** — what both go through, so they can't drift apart:
-  - `logfile.py` — the on-disk chunk/index decode. Pure data: no serial, no Qt.
+  - `logfile.py` — the on-disk chunk/index decode, plus the split of a
+    session's records into per-signal traces. Pure data: no serial, no Qt.
   - `device.py` — the `LOGSTATUS`/`LOGDUMP`/`LOGCLEAR` command set, plus a background dump worker. **Not** the SLCAN protocol `env:can_sniffer`/`tools/monitor` speak — a completely separate board/firmware/protocol for live CAN sniffing, unrelated to this.
   - `gui.py` — the app. `theme.py` re-exports the monitor's palette rather than keeping a second copy.
+  - `plot.py` — the Plot page's trace widget, painted with QPainter.
 
 ## The app
 
@@ -18,10 +20,20 @@ tools/monitor/.venv/bin/python tools/log_export/run.py --folder sim_storage
 tools/monitor/.venv/bin/python tools/log_export/run.py --check sim_storage  # headless decode
 ```
 
-Two pages:
+Three pages:
 
 - **Device** — what `LOGSTATUS` says (ready, session, captures, recorded time, current chunk), an amber banner while the device is *still recording*, and the three actions: **Download Log**, **Save Raw Dump…** (the undecoded bytes, worth keeping if a decode ever looks wrong), **Erase Device Log…** (`LOGCLEAR`, behind a confirmation). A dump shows a running byte count and can be cancelled — chunk boundaries are self-describing, so a cut-short dump is a *partial* log, not a corrupt one.
-- **Logs** — what came back, grouped into sessions, with a record preview and **Export CSV…** (selected sessions, or all of them). Same columns `dump_log.py` writes.
+- **Logs** — what came back, grouped into sessions, with a record preview and **Export CSV…** (selected sessions, or all of them). Same columns `dump_log.py` writes. **Plot Session** opens the selected one on the Plot page.
+- **Plot** — one session's signals drawn against time. Scroll to zoom, drag to pan, double-click to reset; the crosshair puts each signal's value at that instant in its row's legend. The checkbox list turns signals off.
+
+The two output paths are independent: exporting never needs a plot to have been drawn, and the CSV is byte-for-byte what it always was.
+
+### What the plot does with the data, and why
+
+- **Steps, never interpolation.** The firmware writes a record when a value *changes*, so a sample means "it became this, and stayed this until the next one". The plot holds each value flat until the next sample. A straight line between two samples would draw values the ECU never reported — most misleadingly on a signal that sits still for a minute and then jumps.
+- **One session at a time.** Timestamps are boot-relative (the hardware has no RTC), so two sessions share no time axis to draw them on. The x axis counts from the session's own first record.
+- **Rows grouped by unit.** Coolant and oil temperature share an axis and can be read against each other; RPM gets its own, rather than flattening a temperature trace into a line along the bottom. Each row autoscales to what's on screen, so zooming into half a degree of movement shows that half degree.
+- **Decimated when zoomed out, exact when zoomed in.** A long session holds more samples than the plot has pixels, so far out it draws a min/max envelope built from the samples — every spike still appears, it just stops being individually addressable. Zoom in and it switches to drawing every sample. A 45-minute, 188k-record session paints in ~16–34 ms.
 
 **Source** in the top bar is either a serial port or a **storage folder** — the simulator's `sim_storage/`, or a copy of one. The folder source is this app's equivalent of the monitor's Demo mode: the whole decode/preview/export path works with no hardware plugged in. `--check` is the headless version of it (no PySide6 needed), and is the quickest way to see whether a dump decoded.
 
@@ -60,6 +72,6 @@ They run from the repo root (so a relative CSV path lands somewhere findable) us
 
 ## Notes
 
-`dump_log.py` and `--check` need only **pyserial**; the GUI additionally needs **PySide6**. Both are already `tools/monitor` dependencies, which is why this tool borrows that venv rather than keeping its own.
+`dump_log.py` and `--check` need only **pyserial**; the GUI additionally needs **PySide6**. Both are already `tools/monitor` dependencies, which is why this tool borrows that venv rather than keeping its own. The Plot page keeps it that way — it is painted with QPainter rather than pulling in a charting stack (see `plot.py`'s module docstring, and the pen-width note in it before touching how the traces are stroked).
 
 The device streams each chunk file back-to-back with no length prefix (see `core/logging/inc/log_record.hpp` for why); `logfile.py` finds each chunk's boundary by scanning for the next valid `ChunkHeader`, then reorders records into true chronological order using each header's own `chunk_seq` (ever-increasing across the device's lifetime) rather than trusting stream order — rotation means an earlier byte position can hold a *newer* chunk than a later one, once the ring has wrapped. `LOGDUMP` also has no end-of-stream marker, so the read ends on two seconds of silence; that's the same reason a download reports bytes received rather than a percentage.
