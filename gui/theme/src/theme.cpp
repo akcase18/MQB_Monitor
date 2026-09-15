@@ -40,8 +40,16 @@ namespace gui
             lv_color_black(),                      /* bg */
             lv_color_white(),                      /* fg */
             lv_palette_main(LV_PALETTE_GREEN),     /* accent */
-            lv_palette_darken(LV_PALETTE_BLUE, 2), /* warn_lo */
-            lv_palette_darken(LV_PALETTE_RED, 2),  /* warn_hi */
+            /* Kept several shades off the palette main, because that is
+             * exactly what ACCENT_PRESETS' blue and red are: a warning
+             * paints the whole panel while the Bar/Gauge on top of it
+             * stays accent-colored, and at darken(2) a red accent on a red
+             * warning was near enough to read as one solid block. Darker
+             * rather than lighter — the separation works in either
+             * direction, but white readout text over a light blue/red
+             * panel does not. */
+            lv_palette_darken(LV_PALETTE_BLUE, 3), /* warn_lo */
+            lv_palette_darken(LV_PALETTE_RED, 3),  /* warn_hi */
             lv_palette_darken(LV_PALETTE_GREY, 1), /* panel_border */
             lv_palette_main(LV_PALETTE_AMBER),     /* range_overflow */
             lv_palette_main(LV_PALETTE_RED),       /* rec_indicator */

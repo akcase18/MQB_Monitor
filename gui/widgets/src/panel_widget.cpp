@@ -14,7 +14,17 @@ namespace gui
         constexpr lv_coord_t ARC_SIZE_SMALL = 104;
         constexpr lv_coord_t ARC_SIZE_LARGE = 128;
         constexpr lv_coord_t ARC_SIZE_HERO  = 180;
-        constexpr lv_coord_t ARC_WIDTH      = 9;
+        constexpr lv_coord_t ARC_WIDTH      = 7;
+
+        /* Both graphics draw their track wider than their fill and push the
+         * fill in by the difference, leaving a strip of track color ringing
+         * the fill. That strip is the only thing separating an accent-
+         * colored graphic from the panel behind it when the two are the
+         * same hue — which is exactly what a warning does, since a warning
+         * paints the whole panel blue/red (see set_view_model) and the
+         * accent is itself user-selectable to blue or red. */
+        constexpr lv_coord_t INDICATOR_INSET = 2;
+        constexpr lv_coord_t ARC_TRACK_WIDTH = ARC_WIDTH + 2 * INDICATOR_INSET;
 
         constexpr lv_coord_t BAR_HEIGHT      = 18;
         constexpr lv_coord_t BAR_HEIGHT_HERO = 28;
@@ -41,7 +51,10 @@ namespace gui
         /* The arc/bar's unfilled track needs its own visible color — left
          * at LVGL's default it rendered as a near-invisible sliver against
          * the black panel bg, indistinguishable from the (also too dark)
-         * old accent color used for the filled portion. */
+         * old accent color used for the filled portion. Doubles as the
+         * fill's outline (see INDICATOR_INSET), so it has to stay a
+         * neutral that reads against black and against a warning's
+         * blue/red panel alike. */
         const lv_color_t TRACK_COLOR = lv_color_hex(0x404040);
 
         /* 270-degree sweep with the gap centered at the bottom (6 o'clock),
@@ -50,22 +63,17 @@ namespace gui
         constexpr lv_value_precise_t ARC_BG_START_ANGLE = 135;
         constexpr lv_value_precise_t ARC_BG_END_ANGLE   = 45;
 
+        /* Deliberately blind to warn_lo_active/warn_hi_active: a warning
+         * already paints the entire panel that color, so tinting the fill
+         * to match made the Bar/Gauge vanish into its own background for
+         * as long as the warning lasted. */
         lv_color_t indicator_color(const Theme &theme, const PanelViewModel &vm)
         {
-            if (vm.warn_hi_active)
-            {
-                return theme.palette.warn_hi;
-            }
-            if (vm.warn_lo_active)
-            {
-                return theme.palette.warn_lo;
-            }
             /* range_pct is the raw (unclamped) ratio against the signal's
              * display_min/max — outside [0,1] means the value has pegged
              * the graphic at 100%/0% full, which reads identically to
-             * "exactly at max/min" unless tinted differently. This is
-             * independent of warn_hi/warn_lo: a signal can be pegged
-             * without ever crossing a configured warning threshold. */
+             * "exactly at max/min" unless tinted differently. A signal can
+             * peg without ever crossing a configured warning threshold. */
             if (vm.range_pct > 1.0f || vm.range_pct < 0.0f)
             {
                 return theme.palette.range_overflow;
@@ -159,8 +167,12 @@ namespace gui
         lv_arc_set_range(arc_, 0, 100);
         lv_obj_remove_style(arc_, nullptr, LV_PART_KNOB | LV_STATE_ANY);
         lv_obj_set_clickable(arc_, false);
-        lv_obj_set_style_arc_width(arc_, ARC_WIDTH, LV_PART_MAIN);
+        lv_obj_set_style_arc_width(arc_, ARC_TRACK_WIDTH, LV_PART_MAIN);
         lv_obj_set_style_arc_width(arc_, ARC_WIDTH, LV_PART_INDICATOR);
+        /* Both parts share an outer radius, so without this the fill would
+         * sit flush against the track's outer edge and only be ringed on
+         * the inside. */
+        lv_obj_set_style_pad_all(arc_, INDICATOR_INSET, LV_PART_INDICATOR);
         lv_obj_set_style_arc_color(arc_, TRACK_COLOR, LV_PART_MAIN);
         lv_obj_set_hidden(arc_, true);
 
@@ -185,6 +197,7 @@ namespace gui
         lv_bar_set_range(bar_, 0, 100);
         lv_obj_set_style_bg_color(bar_, TRACK_COLOR, LV_PART_MAIN);
         lv_obj_set_style_bg_opa(bar_, LV_OPA_COVER, LV_PART_MAIN);
+        lv_obj_set_style_pad_all(bar_, INDICATOR_INSET, LV_PART_MAIN);
         lv_obj_set_style_bg_color(
             bar_, theme.palette.accent, LV_PART_INDICATOR);
         lv_obj_set_hidden(bar_, true);
@@ -339,9 +352,9 @@ namespace gui
             }
         }
 
-        /* indicator_color() reads the warning flags and whether range_pct
-         * has pegged outside [0,1], so either moving can change it. */
-        if (mode_changed || warn_changed || pct_changed)
+        /* indicator_color() varies only with whether range_pct has pegged
+         * outside [0,1]. */
+        if (mode_changed || pct_changed)
         {
             lv_color_t indicator = indicator_color(*theme_, vm);
             if (vm.mode == DisplayMode::Bar)
