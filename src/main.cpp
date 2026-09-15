@@ -689,16 +689,22 @@ namespace
         apply_backlight(brightness_pct);
     }
 
-    void settings_done_cb(void   *ctx,
-                          uint8_t day_brightness_pct,
-                          uint8_t night_brightness_pct,
-                          uint8_t num_panels)
+    /* Runs on every exit from SettingsScreen — the X button and the
+     * Theme/WiFi hand-offs alike — so an edit is in the store before
+     * anything downstream (a screen rebuild, the phone's config page)
+     * reads the store back. Persist only; settings_done_cb owns the
+     * navigation, since a hand-off to Theme/WiFi must not bounce to the
+     * dashboard. */
+    void settings_commit_cb(void   *ctx,
+                            uint8_t day_brightness_pct,
+                            uint8_t night_brightness_pct,
+                            uint8_t num_panels)
     {
         (void)ctx;
         /* No set_backlight() here — settings_preview_brightness_cb already
          * pushed the real backlight live on every slider move and Day/
          * Night toggle, so it's already showing whichever of day/night was
-         * actually active when Done was pressed. Re-applying
+         * actually active when the screen was left. Re-applying
          * day_brightness_pct unconditionally here was wrong: it stomped
          * over a Night-mode edit with the (usually untouched, 100%) Day
          * value on every exit. */
@@ -707,22 +713,27 @@ namespace
 
         /* Orientation isn't touched here — it's persisted immediately by
          * settings_orientation_confirm_cb() the moment Confirm is pressed
-         * on the popup, not deferred to Done (see SettingsScreen's file
-         * doc comment for why: the popup itself already reads as the
-         * commit step). InfoScreen keeps reflowing against
-         * active_orientation() (set once at boot, never touched again)
-         * rather than settings.orientation, since orientation is a boot-
-         * time-only setting (see platform.hpp's DisplayOrientation/
-         * set_orientation() doc comments) -- the physical panel hasn't
-         * rotated just because Done was pressed. */
+         * on the popup (see SettingsScreen's file doc comment for why:
+         * the popup itself already reads as the commit step). */
         settings.day_brightness   = day_brightness_pct;
         settings.night_brightness = night_brightness_pct;
         settings.num_panels       = num_panels;
         composition().config_store.save();
         sync_active_signals();
+    }
 
+    void settings_done_cb(void *ctx)
+    {
+        (void)ctx;
+        /* InfoScreen reflows against active_orientation() (set once at
+         * boot, never touched again) rather than settings.orientation,
+         * since orientation is a boot-time-only setting (see
+         * platform.hpp's DisplayOrientation/set_orientation() doc
+         * comments) -- the physical panel hasn't rotated just because
+         * Done was pressed. */
         composition().info_screen.rebuild(
-            num_panels, to_gui_orientation(active_orientation()));
+            composition().config_store.get().settings.num_panels,
+            to_gui_orientation(active_orientation()));
         lv_screen_load(composition().info_screen.screen());
     }
 
@@ -1149,6 +1160,8 @@ namespace
                                  settings.num_panels,
                                  settings.accent_color,
                                  to_gui_orientation(settings.orientation),
+                                 settings_commit_cb,
+                                 nullptr,
                                  settings_done_cb,
                                  nullptr,
                                  settings_preview_brightness_cb,

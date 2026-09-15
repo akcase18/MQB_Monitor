@@ -117,6 +117,8 @@ namespace gui
                               uint8_t      initial_num_panels,
                               uint32_t     initial_accent_color,
                               LayoutOrientation initial_orientation,
+                              CommitCallback    commit_cb,
+                              void             *commit_ctx,
                               DoneCallback      done_cb,
                               void             *done_ctx,
                               PreviewBrightnessCallback preview_cb,
@@ -134,6 +136,8 @@ namespace gui
         num_panels_           = initial_num_panels;
         accent_color_         = initial_accent_color;
         orientation_          = initial_orientation;
+        commit_cb_            = commit_cb;
+        commit_ctx_           = commit_ctx;
         done_cb_              = done_cb;
         done_ctx_             = done_ctx;
         preview_cb_           = preview_cb;
@@ -587,6 +591,12 @@ namespace gui
     void SettingsScreen::pick_theme_cb_handler(lv_event_t *e)
     {
         auto *self = static_cast<SettingsScreen *>(lv_event_get_user_data(e));
+
+        /* Before the hand-off, not after: picking a swatch tears down and
+         * rebuilds every screen from the config store, so anything not
+         * persisted by now is gone. */
+        self->commit_pending();
+
         if (self->pick_theme_cb_ != nullptr)
         {
             self->pick_theme_cb_(self->pick_theme_ctx_);
@@ -596,6 +606,13 @@ namespace gui
     void SettingsScreen::pick_wireless_cb_handler(lv_event_t *e)
     {
         auto *self = static_cast<SettingsScreen *>(lv_event_get_user_data(e));
+
+        /* Likewise: the AP serves the phone whatever the config store
+         * holds, and an apply from the phone writes the whole settings
+         * block back, so on-screen edits have to be in the store before
+         * the radio comes up. */
+        self->commit_pending();
+
         if (self->pick_wireless_cb_ != nullptr)
         {
             self->pick_wireless_cb_(self->pick_wireless_ctx_);
@@ -656,32 +673,42 @@ namespace gui
         self->orientation_confirm_mbox_ = nullptr;
     }
 
-    void SettingsScreen::done_cb_handler(lv_event_t *e)
+    void SettingsScreen::commit_pending()
     {
-        auto *self = static_cast<SettingsScreen *>(lv_event_get_user_data(e));
-
-        self->capture_slider_value();
+        capture_slider_value();
 
         /* get_selected_button() tracks focus/last-press, not the checked
-         * state itself, so it can't be trusted if Done is pressed without
-         * ever touching the matrix — scan for whichever button is actually
-         * checked instead. */
+         * state itself, so it can't be trusted if the screen is left
+         * without ever touching the matrix — scan for whichever button is
+         * actually checked instead. */
         for (uint8_t i = 0; i < 6; i++)
         {
             if (lv_buttonmatrix_has_button_ctrl(
-                    self->panel_count_matrix_, i, LV_BUTTONMATRIX_CTRL_CHECKED))
+                    panel_count_matrix_, i, LV_BUTTONMATRIX_CTRL_CHECKED))
             {
-                self->num_panels_ = static_cast<uint8_t>(i + 1);
+                num_panels_ = static_cast<uint8_t>(i + 1);
                 break;
             }
         }
 
+        if (commit_cb_ != nullptr)
+        {
+            commit_cb_(commit_ctx_,
+                       day_brightness_pct_,
+                       night_brightness_pct_,
+                       num_panels_);
+        }
+    }
+
+    void SettingsScreen::done_cb_handler(lv_event_t *e)
+    {
+        auto *self = static_cast<SettingsScreen *>(lv_event_get_user_data(e));
+
+        self->commit_pending();
+
         if (self->done_cb_ != nullptr)
         {
-            self->done_cb_(self->done_ctx_,
-                           self->day_brightness_pct_,
-                           self->night_brightness_pct_,
-                           self->num_panels_);
+            self->done_cb_(self->done_ctx_);
         }
     }
 

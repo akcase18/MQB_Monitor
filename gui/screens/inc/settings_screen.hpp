@@ -3,14 +3,15 @@
  * @brief Day/night brightness slider (toggle-selected, see below) plus
  * panel-count picker. Ported from the old Settings_Screen, but this screen
  * never touches IDisplay itself (gui/screens has no platform:: dependency)
- * — it reports chosen values via DoneCallback (persisted, applied on
- * close) and PreviewBrightnessCallback (fired immediately on every slider
+ * — it reports chosen values via CommitCallback (fired on every exit from
+ * the screen, including the Theme and WiFi hand-offs, not just the X
+ * button) and PreviewBrightnessCallback (fired immediately on every slider
  * move or Day/Night toggle, so the composition root can push it straight
  * to platform.display.set_backlight() for live feedback without waiting
  * for Done). Orientation has no live preview target the way brightness
  * does (InfoScreen, where it actually matters, isn't on screen while
  * Settings is open) — it's captured locally and only delivered through
- * DoneCallback, same as num_panels.
+ * OrientationConfirmCallback.
  *
  * Layout follows WarningConfigScreen's pattern: a top nav bar (title + X
  * close, instead of the bottom-right checkmark other screens use) over two
@@ -53,10 +54,22 @@ namespace gui
     class SettingsScreen
     {
         public:
-            using DoneCallback = void (*)(void   *ctx,
-                                          uint8_t day_brightness_pct,
-                                          uint8_t night_brightness_pct,
-                                          uint8_t num_panels);
+            /** Fired every time this screen hands control away — the X
+             * button, but also the Theme and WiFi rows. Those two used to
+             * navigate off without reporting anything, so a panel-count or
+             * brightness edit made just before tapping one was silently
+             * dropped: the Theme row's pick rebuilds every screen from the
+             * config store, and the WiFi row's AP hands the phone whatever
+             * the store currently holds. Both then read back values the
+             * user had already changed on screen. */
+            using CommitCallback = void (*)(void   *ctx,
+                                            uint8_t day_brightness_pct,
+                                            uint8_t night_brightness_pct,
+                                            uint8_t num_panels);
+            /** Fired only when the X button closes the screen, after
+             * CommitCallback — purely the caller's cue to navigate back to
+             * the dashboard, which a hand-off to Theme/WiFi must not do. */
+            using DoneCallback = void (*)(void *ctx);
             /** Fired immediately on every slider move and Day/Night
              * toggle — lets the caller preview the change on the real
              * backlight without waiting for Done. */
@@ -78,6 +91,8 @@ namespace gui
                       uint8_t                   initial_num_panels,
                       uint32_t                  initial_accent_color,
                       LayoutOrientation         initial_orientation,
+                      CommitCallback            commit_cb,
+                      void                     *commit_ctx,
                       DoneCallback              done_cb,
                       void                     *done_ctx,
                       PreviewBrightnessCallback preview_cb,
@@ -105,6 +120,12 @@ namespace gui
             static void orientation_clicked_cb(lv_event_t *e);
             static void orientation_confirm_cb(lv_event_t *e);
             static void orientation_cancel_cb(lv_event_t *e);
+
+            /** Pulls the live slider and panel-count matrix into
+             * day_/night_brightness_pct_/num_panels_, then hands all three
+             * to commit_cb_. Runs on every exit from this screen, not just
+             * Done — see CommitCallback. */
+            void commit_pending();
 
             void refresh_theme_swatch();
             /** Sets the toggle button's glyph to match showing_night_. */
@@ -148,6 +169,8 @@ namespace gui
             uint32_t          accent_color_         = 0;
             LayoutOrientation orientation_ = LayoutOrientation::Horizontal;
 
+            CommitCallback            commit_cb_         = nullptr;
+            void                     *commit_ctx_        = nullptr;
             DoneCallback              done_cb_           = nullptr;
             void                     *done_ctx_          = nullptr;
             PreviewBrightnessCallback preview_cb_        = nullptr;
