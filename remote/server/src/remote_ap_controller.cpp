@@ -23,7 +23,8 @@ namespace remote::server
 
     FLASHMEM void RemoteApController::activate()
     {
-        /* Also allowed from Deactivating: WirelessSetupScreen's close (X)
+        /**
+         * Also allowed from Deactivating: WirelessSetupScreen's close (X)
          * button both deactivates and returns to Settings optimistically,
          * without waiting for the deactivation round trip (see its file
          * doc comment) — reopening the screen within that window (a real
@@ -42,7 +43,8 @@ namespace remote::server
         snprintf(ssid_, sizeof(ssid_), "%s", AP_SSID);
         ip_text_[0] = '\0';
 
-        /* No password — see the file doc comment. wire.password stays
+        /**
+         * No password — see the file doc comment. wire.password stays
          * empty; ApManager::enable() on the C3 treats that as "open AP". */
         ApEnableWire wire {};
         snprintf(wire.ssid, sizeof(wire.ssid), "%s", ssid_);
@@ -119,7 +121,8 @@ namespace remote::server
             case ApState::Activating:
                 if (now_ms - state_entered_ms_ > AP_ACTIVATE_TIMEOUT_MS)
                 {
-                    /* C3 never answered — give up rather than staying
+                    /**
+                     * C3 never answered — give up rather than staying
                      * "Activating" forever. */
                     state_ = ApState::Idle;
                 }
@@ -135,7 +138,8 @@ namespace remote::server
             case ApState::Deactivating:
                 if (now_ms - state_entered_ms_ > AP_DISABLE_GRACE_MS)
                 {
-                    /* EVT_AP_DISABLED never arrived — assume it's down
+                    /**
+                     * EVT_AP_DISABLED never arrived — assume it's down
                      * anyway rather than staying wedged. */
                     state_ = ApState::Idle;
                 }

@@ -4,7 +4,7 @@ A macOS UDS CAN monitor/decoder for the MQB dashboard project. It sits
 passively on the CAN bus between an **OBDEleven** and the car, watches the
 diagnostic request/response traffic, and decodes it against the **same signal
 registry the firmware compiles from**
-([`core/vehicle/data/signals.json`](../../core/vehicle/data/signals.json)).
+([`core/vehicle/data/mqb/signals.json`](../../core/vehicle/data/mqb/signals.json)). It is the MQB product's registry specifically — the analog gauge has its own, which this tool has no use for since there is no bus to learn DIDs on.
 It's also the primary tool for growing and reviewing that registry: discover
 new UDS DIDs, save partial progress as WIP, and promote/demote/edit any
 signal without touching JSON by hand.
@@ -20,7 +20,7 @@ project's UDS signal registry.
         │  tap CAN-H / CAN-L
    Teensy 4.0 (env:can_sniffer firmware, listen-only)
         │  USB serial (SLCAN)
-   this app  ──reads/writes──►  core/vehicle/data/signals.json
+   this app  ──reads/writes──►  core/vehicle/data/mqb/signals.json
 ```
 
 1. Flash the sniffer firmware onto a **Teensy 4.0** (separate from the display

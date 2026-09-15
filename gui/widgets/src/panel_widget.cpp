@@ -8,7 +8,8 @@ namespace gui
 
     namespace
     {
-        /* Sized to contain a 4-character value (the font each tier's
+        /**
+         * Sized to contain a 4-character value (the font each tier's
          * Bar/Gauge readout uses) without the digits poking out past the
          * ring — a real bug where "3212" at 40px overflowed an 80px arc. */
         constexpr lv_coord_t ARC_SIZE_SMALL = 104;
@@ -20,31 +21,46 @@ namespace gui
         constexpr lv_coord_t BAR_HEIGHT_HERO = 28;
         constexpr lv_coord_t BAR_DATA_GAP    = 6;
 
-        /* Every mode positions exactly one "anchor" element at the
-         * button's center (offset up to leave room for the label's fixed
-         * slot below); any companion element (a Bar's value, a Gauge's
-         * centered value) is then placed relative to that anchor. This
-         * keeps the label's position the only thing that never depends on
-         * which mode/tier is active — previously the label flowed
-         * directly after the graphic in a flex column, so its height
-         * shifted the label around from panel to panel. */
-        constexpr lv_coord_t LABEL_BOTTOM_PAD  = 4;
+        /**
+         * Every mode positions exactly one "anchor" element at the
+         * button's center (offset to leave room for the label's fixed
+         * slot at the panel edge); any companion element (a Bar's value,
+         * a Gauge's centered value) is then placed relative to that
+         * anchor. This keeps the label's position the only thing that
+         * never depends on which mode/tier is active — previously the
+         * label flowed directly after the graphic in a flex column, so
+         * its height shifted the label around from panel to panel.
+         *
+         * The label sits at the bottom, except under Metrics::unit_stacked
+         * where it takes the top and the tag takes the bottom. */
+        constexpr lv_coord_t LABEL_EDGE_PAD    = 4;
         constexpr lv_coord_t CONTENT_LABEL_GAP = 4;
 
-        /* Strictly centering the content in the zone above the label (see
+        /**
+         * Metrics::unit_stacked's counterpart to LABEL_EDGE_PAD/
+         * CONTENT_LABEL_GAP: the tag gets a fixed slot at the bottom of
+         * the panel, mirroring the caption's fixed slot at the top, so it
+         * never moves with the value's width or the display mode. */
+        constexpr lv_coord_t UNIT_EDGE_PAD    = 3;
+        constexpr lv_coord_t CONTENT_UNIT_GAP = 2;
+
+        /**
+         * Strictly centering the content in the zone above the label (see
          * content_center_offset() below) reads as biased high — the eye
          * weighs the label's caption text as part of the panel's visual
          * mass even though it isn't part of the "content" being centered,
          * so nudge the content down a bit to compensate. */
         constexpr lv_coord_t CONTENT_VERTICAL_NUDGE = 8;
 
-        /* The arc/bar's unfilled track needs its own visible color — left
+        /**
+         * The arc/bar's unfilled track needs its own visible color — left
          * at LVGL's default it rendered as a near-invisible sliver against
          * the black panel bg, indistinguishable from the (also too dark)
          * old accent color used for the filled portion. */
         const lv_color_t TRACK_COLOR = lv_color_hex(0x404040);
 
-        /* 270-degree sweep with the gap centered at the bottom (6 o'clock),
+        /**
+         * 270-degree sweep with the gap centered at the bottom (6 o'clock),
          * matching a classic analog gauge face. 0deg is right, angles
          * increase clockwise. */
         constexpr lv_value_precise_t ARC_BG_START_ANGLE = 135;
@@ -60,7 +76,8 @@ namespace gui
             {
                 return theme.palette.warn_lo;
             }
-            /* range_pct is the raw (unclamped) ratio against the signal's
+            /**
+             * range_pct is the raw (unclamped) ratio against the signal's
              * display_min/max — outside [0,1] means the value has pegged
              * the graphic at 100%/0% full, which reads identically to
              * "exactly at max/min" unless tinted differently. This is
@@ -86,7 +103,8 @@ namespace gui
             return static_cast<uint8_t>(range_pct * 100.0f);
         }
 
-        /* Bar/Gauge already give an at-a-glance read via the graphic
+        /**
+         * Bar/Gauge already give an at-a-glance read via the graphic
          * itself — the value next to/inside it is there for a closer
          * look, not to be the dominant element, so a hero slot only
          * bumps it to data_hero, not the much bigger data_mega. Digital
@@ -107,14 +125,30 @@ namespace gui
             return vm.large ? type.data_lg : type.data_sm;
         }
 
-        /* How far to shift the content "anchor" up from dead-center so it
+        /**
+         * How far to shift the content "anchor" up from dead-center so it
          * clears the label's reserved slot below — derived from the
          * caption font actually in use rather than a guessed constant, so
          * it can't drift out of sync if label sizes ever change. */
-        lv_coord_t content_center_offset(const lv_font_t *caption_font)
+        lv_coord_t content_center_offset(const Theme     &theme,
+                                         const lv_font_t *caption_font)
         {
             lv_coord_t label_zone = lv_font_get_line_height(caption_font)
-                                    + LABEL_BOTTOM_PAD + CONTENT_LABEL_GAP;
+                                    + LABEL_EDGE_PAD + CONTENT_LABEL_GAP;
+
+            if (theme.metrics.unit_stacked)
+            {
+                /**
+                 * Caption at the top, tag at the bottom: the content
+                 * centres between the two slots. No nudge here -- the
+                 * caption's visual mass sits above the content, so the
+                 * bias it corrects for does not apply. */
+                lv_coord_t unit_zone
+                    = lv_font_get_line_height(theme.typography.unit)
+                      + UNIT_EDGE_PAD + CONTENT_UNIT_GAP;
+                return (label_zone - unit_zone) / 2;
+            }
+
             return -(label_zone / 2) + CONTENT_VERTICAL_NUDGE;
         }
     } // namespace
@@ -125,7 +159,8 @@ namespace gui
 
         btn_ = lv_btn_create(parent);
         lv_obj_remove_style_all(btn_);
-        /* Panels cover nearly the whole screen, so without this a swipe
+        /**
+         * Panels cover nearly the whole screen, so without this a swipe
          * gesture starting on one (i.e. almost anywhere) would never reach
          * the screen's own gesture handler — bubbling is opt-in per object,
          * not a default. */
@@ -135,14 +170,16 @@ namespace gui
         lv_obj_set_style_text_color(btn_, theme.palette.fg, 0);
         lv_obj_set_style_radius(btn_, theme.metrics.panel_radius, 0);
         lv_obj_set_style_shadow_width(btn_, 0, 0);
-        /* Panels share the screen's own bg color, so without an outline
+        /**
+         * Panels share the screen's own bg color, so without an outline
          * a panel's bounds are only implied by the gap to its neighbors —
          * this draws the actual card edge. */
         lv_obj_set_style_border_width(
             btn_, theme.metrics.panel_border_width, 0);
         lv_obj_set_style_border_color(btn_, theme.palette.panel_border, 0);
         lv_obj_set_style_border_opa(btn_, LV_OPA_COVER, 0);
-        /* Darkened rather than the raw accent — accent is now a bright,
+        /**
+         * Darkened rather than the raw accent — accent is now a bright,
          * saturated color tuned for bar/arc fill visibility, and flashing
          * that at full strength across the whole panel on every tap read
          * as a jarring flash rather than subtle press feedback. */
@@ -150,7 +187,8 @@ namespace gui
             btn_, lv_color_darken(theme.palette.accent, 180), LV_STATE_PRESSED);
         lv_obj_set_style_pad_all(btn_, 4, 0);
 
-        /* No flex here on purpose: every child is positioned explicitly in
+        /**
+         * No flex here on purpose: every child is positioned explicitly in
          * set_view_model() via lv_obj_align()/lv_obj_align_to(), so the
          * label's position never depends on the graphic/value's height
          * the way it would flowing through a flex column. */
@@ -168,7 +206,8 @@ namespace gui
         lv_obj_set_style_text_color(data_, theme.palette.fg, 0);
         lv_obj_set_style_bg_opa(data_, LV_OPA_TRANSP, 0);
 
-        /* Unit sits beside the value as a small superscript-style tag
+        /**
+         * Unit sits beside the value as a small superscript-style tag
          * (e.g. "72" + a smaller "°F") rather than folded into the name
          * caption below — keeping the caption to just the signal's name
          * is what stops it from wrapping in narrow panels. Hidden for
@@ -176,10 +215,19 @@ namespace gui
         unit_ = lv_label_create(btn_);
         lv_obj_set_style_text_color(unit_, theme.palette.fg, 0);
         lv_obj_set_style_bg_opa(unit_, LV_OPA_TRANSP, 0);
-        /* Typography::unit is the same font at every tier and mode (see
+        /**
+         * Typography::unit is the same font at every tier and mode (see
          * theme.hpp), so it belongs here rather than being re-set on
          * every set_view_model() call. */
         lv_obj_set_style_text_font(unit_, theme.typography.unit, 0);
+        if (theme.metrics.unit_stacked)
+        {
+            /**
+             * Placed once and never again: a stacked tag has a fixed slot
+             * and does not track the value's width, which is the entire
+             * reason it cannot be pushed off the panel by a wide number. */
+            lv_obj_align(unit_, LV_ALIGN_BOTTOM_MID, 0, -UNIT_EDGE_PAD);
+        }
 
         bar_ = lv_bar_create(btn_);
         lv_bar_set_range(bar_, 0, 100);
@@ -189,7 +237,8 @@ namespace gui
             bar_, theme.palette.accent, LV_PART_INDICATOR);
         lv_obj_set_hidden(bar_, true);
 
-        /* Fixed to the bottom of the panel regardless of mode/tier — the
+        /**
+         * Fixed to one edge of the panel regardless of mode/tier — the
          * one thing that must never move. Wraps to 2 lines (rather than
          * clipping/running past the edge) for names too long to fit a
          * small panel's width at 1 line. */
@@ -198,14 +247,22 @@ namespace gui
         lv_label_set_long_mode(label_, LV_LABEL_LONG_MODE_WRAP);
         lv_obj_set_style_text_align(label_, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_set_width(label_, LV_PCT(100));
-        lv_obj_align(label_, LV_ALIGN_BOTTOM_MID, 0, -LABEL_BOTTOM_PAD);
+        if (theme.metrics.unit_stacked)
+        {
+            lv_obj_align(label_, LV_ALIGN_TOP_MID, 0, LABEL_EDGE_PAD);
+        }
+        else
+        {
+            lv_obj_align(label_, LV_ALIGN_BOTTOM_MID, 0, -LABEL_EDGE_PAD);
+        }
     }
 
     void PanelWidget::set_view_model(const PanelViewModel &vm)
     {
         const Typography &type = theme_->typography;
 
-        /* Everything below is gated on what actually moved since the last
+        /**
+         * Everything below is gated on what actually moved since the last
          * call. This runs for every visible panel several times a second,
          * and LVGL's setters do no such check of their own -- each one
          * invalidates the style cache and marks the panel dirty for
@@ -254,16 +311,23 @@ namespace gui
 
         if (mode_changed || unit_changed)
         {
-            /* Gauge hides the unit outright rather than risk it — the
+            /**
+             * Gauge hides the unit outright rather than risk it — the
              * ring's size already only has room for the bare value (see
              * ARC_SIZE_* above). Digital/Bar have the horizontal room to
              * spare. */
+            /**
+             * Gauge normally hides the tag outright rather than risk it
+             * -- the ring's size only has room for the bare value. A
+             * stacked tag is not in the ring's way at all, so it stays. */
             lv_obj_set_hidden(unit_,
-                              vm.mode == DisplayMode::Gauge
+                              (vm.mode == DisplayMode::Gauge
+                               && !theme_->metrics.unit_stacked)
                                   || vm.unit_label[0] == '\0');
         }
 
-        /* The graphic's own placement depends only on mode/tier, but
+        /**
+         * The graphic's own placement depends only on mode/tier, but
          * data_ and unit_ are positioned with lv_obj_align_to(), which
          * resolves to a fixed offset against the base's size at the
          * moment it's called rather than tracking it — so a value_str
@@ -272,7 +336,7 @@ namespace gui
         if (mode_changed || tier_changed || value_changed)
         {
             uint8_t    pct    = range_pct_to_100(vm.range_pct);
-            lv_coord_t offset = content_center_offset(caption_font);
+            lv_coord_t offset = content_center_offset(*theme_, caption_font);
 
             lv_obj_set_hidden(arc_, vm.mode != DisplayMode::Gauge);
             lv_obj_set_hidden(bar_, vm.mode != DisplayMode::Bar);
@@ -284,7 +348,8 @@ namespace gui
                     lv_obj_set_size(bar_, LV_PCT(80), bar_h);
                     lv_bar_set_value(bar_, pct, LV_ANIM_OFF);
 
-                    /* The value sits above the bar, so centering the bar
+                    /**
+                     * The value sits above the bar, so centering the bar
                      * alone at `offset` would leave the (value + bar)
                      * pair sitting higher than intended — shift the bar
                      * down by half the pair's combined height so the pair
@@ -297,7 +362,11 @@ namespace gui
 
                     lv_obj_align_to(
                         data_, bar_, LV_ALIGN_OUT_TOP_MID, 0, -BAR_DATA_GAP);
-                    lv_obj_align_to(unit_, data_, LV_ALIGN_OUT_RIGHT_TOP, 3, 2);
+                    if (!theme_->metrics.unit_stacked)
+                    {
+                        lv_obj_align_to(
+                            unit_, data_, LV_ALIGN_OUT_RIGHT_TOP, 3, 2);
+                    }
                     break;
                 }
 
@@ -309,7 +378,8 @@ namespace gui
                     lv_obj_align(arc_, LV_ALIGN_CENTER, 0, offset);
                     lv_arc_set_value(arc_, pct);
 
-                    /* The value sits inside the ring rather than beside
+                    /**
+                     * The value sits inside the ring rather than beside
                      * it — centering it directly on the arc keeps the
                      * "graphic + number together" rule from adding a
                      * third vertical element to position. */
@@ -320,13 +390,18 @@ namespace gui
                 case DisplayMode::Digital:
                 default:
                     lv_obj_align(data_, LV_ALIGN_CENTER, 0, offset);
-                    lv_obj_align_to(unit_, data_, LV_ALIGN_OUT_RIGHT_TOP, 3, 2);
+                    if (!theme_->metrics.unit_stacked)
+                    {
+                        lv_obj_align_to(
+                            unit_, data_, LV_ALIGN_OUT_RIGHT_TOP, 3, 2);
+                    }
                     break;
             }
         }
         else if (pct_changed)
         {
-            /* Same mode and tier, only the fill moved — update the
+            /**
+             * Same mode and tier, only the fill moved — update the
              * graphic's value without redoing any of the geometry above. */
             uint8_t pct = range_pct_to_100(vm.range_pct);
             if (vm.mode == DisplayMode::Bar)
@@ -339,7 +414,8 @@ namespace gui
             }
         }
 
-        /* indicator_color() reads the warning flags and whether range_pct
+        /**
+         * indicator_color() reads the warning flags and whether range_pct
          * has pegged outside [0,1], so either moving can change it. */
         if (mode_changed || warn_changed || pct_changed)
         {
@@ -356,7 +432,8 @@ namespace gui
 
         if (warn_changed)
         {
-            /* A warning shades the whole panel rather than just tinting
+            /**
+             * A warning shades the whole panel rather than just tinting
              * the active visual — a bare colored number/bar/arc is easy
              * to miss at a glance next to five other panels; the panel's
              * entire card flipping to blue/red isn't. Digital has no
@@ -382,7 +459,8 @@ namespace gui
     {
         lv_obj_set_hidden(btn_, !visible);
 
-        /* This is only ever called from InfoScreen::init()/rebuild(), i.e.
+        /**
+         * This is only ever called from InfoScreen::init()/rebuild(), i.e.
          * exactly when the panel is about to be given a new grid cell (and
          * therefore a new size). The lv_obj_align_to() placements in
          * set_view_model() are resolved against the sizes in effect when

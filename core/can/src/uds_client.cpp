@@ -45,7 +45,8 @@ namespace core
                 continue;
             }
 
-            /* `03 7F <service> <nrc>` -- a rejection, not a reading. It
+            /**
+             * `03 7F <service> <nrc>` -- a rejection, not a reading. It
              * names no data identifier, so it is passed straight through
              * for the caller to attribute to whatever it has outstanding
              * (see NegativeResponseCallback). */
@@ -66,7 +67,8 @@ namespace core
             uint8_t byte1 = frame.data[2];
             uint8_t byte2 = frame.data[3];
 
-            /* Only the first `len` bytes of `frame` are written by
+            /**
+             * Only the first `len` bytes of `frame` are written by
              * ICanBus::receive(), so a payload byte past that is whatever
              * the previous iteration left there. Real ECU responses are
              * always full 8-byte frames, but a short one used to be

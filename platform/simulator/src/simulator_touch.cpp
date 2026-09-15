@@ -1,21 +1,21 @@
 /**
  * @file simulator_touch.cpp
- * @brief ITouch over SDL2 mouse events. Also the place that pumps the SDL
- * event queue, since read() is called once per main-loop iteration.
+ * @brief ITouch over SDL2 mouse events.
+ *
+ * The SDL event pump used to live here, on the reasoning that read() runs
+ * every main-loop iteration. It moved to simulator_events.cpp once buttons
+ * needed the same events -- and because a touchless product supplies a
+ * no-op ITouch that is never polled, which would have left the window
+ * unable to process even its own close box.
  */
 
 #include "simulator_touch.hpp"
 
+#include "simulator_display.hpp"
+#include "simulator_events.hpp"
+
 #define SDL_MAIN_HANDLED
 #include <SDL2/SDL.h>
-#include <stdlib.h>
-
-namespace
-{
-    int16_t s_x       = 0;
-    int16_t s_y       = 0;
-    bool    s_pressed = false;
-} // namespace
 
 SimulatorTouch &SimulatorTouch::instance()
 {
@@ -30,7 +30,8 @@ void SimulatorTouch::begin()
 
 void SimulatorTouch::set_orientation(DisplayOrientation orientation)
 {
-    /* No-op -- SDL mouse events already report coordinates in the live
+    /**
+     * No-op -- SDL mouse events already report coordinates in the live
      * window's pixel space, and SimulatorDisplay::set_orientation()
      * resizes that window before it's ever created (see
      * simulator_display.cpp), so there's nothing left to remap here. */
@@ -39,46 +40,26 @@ void SimulatorTouch::set_orientation(DisplayOrientation orientation)
 
 bool SimulatorTouch::read(TouchPoint &out)
 {
-    SDL_Event event;
-    while (SDL_PollEvent(&event))
-    {
-        switch (event.type)
-        {
-            case SDL_QUIT:
-                exit(0);
-                break;
+    simulator_events::pump();
 
-            case SDL_MOUSEBUTTONDOWN:
-                if (event.button.button == SDL_BUTTON_LEFT)
-                {
-                    s_pressed = true;
-                    s_x       = static_cast<int16_t>(event.button.x);
-                    s_y       = static_cast<int16_t>(event.button.y);
-                }
-                break;
+    uint16_t panel_w = 0;
+    uint16_t panel_h = 0;
+    SimulatorDisplay::instance().get_resolution(panel_w, panel_h);
 
-            case SDL_MOUSEBUTTONUP:
-                if (event.button.button == SDL_BUTTON_LEFT)
-                {
-                    s_pressed = false;
-                }
-                break;
+    int16_t x = simulator_events::mouse_x();
+    int16_t y = simulator_events::mouse_y();
 
-            case SDL_MOUSEMOTION:
-                if (s_pressed)
-                {
-                    s_x = static_cast<int16_t>(event.motion.x);
-                    s_y = static_cast<int16_t>(event.motion.y);
-                }
-                break;
+    /**
+     * Clicks in the button strip are not screen touches. Without this
+     * gate, pressing a simulated button would also land as a tap on
+     * whatever LVGL object sits nearest the right edge -- the window is
+     * wider than the panel now, but LVGL only knows about the panel. */
+    bool pressed = simulator_events::mouse_pressed()
+                   && x >= 0 && x < static_cast<int16_t>(panel_w)
+                   && y >= 0 && y < static_cast<int16_t>(panel_h);
 
-            default:
-                break;
-        }
-    }
-
-    out.x       = s_x;
-    out.y       = s_y;
-    out.pressed = s_pressed;
-    return s_pressed;
+    out.x       = x;
+    out.y       = y;
+    out.pressed = pressed;
+    return pressed;
 }

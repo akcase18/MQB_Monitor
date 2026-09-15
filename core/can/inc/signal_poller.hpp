@@ -21,7 +21,8 @@
 #include <stdint.h>
 
 #include "platform.hpp"
-#include "signal_catalog.hpp"
+#include "signal_source.hpp"
+#include "uds_binding.hpp"
 #include "uds_client.hpp"
 
 namespace core
@@ -30,24 +31,27 @@ namespace core
     class SignalPoller
     {
         public:
-            /* Sized for a full screen of panels (core::MAX_PANELS) each
-             * owning the catalog maximum of DIDs, assuming no dedup.
-             * Spelled out here rather than derived from MAX_PANELS so
-             * core/vehicle keeps its independence from core/config --
-             * main.cpp, which already depends on both, is what translates
-             * the displayed panel set into the id list set_active() takes. */
-            static constexpr uint8_t MAX_ACTIVE_SIGNALS = 6;
+            /**
+             * Taken from the interface rather than declared again, so a
+             * poller can never hold fewer signals than the ISignalSource
+             * contract promises callers. See signal_source.hpp for why the
+             * number is what it is, and why it is not derived from
+             * core::MAX_PANELS directly. */
+            static constexpr uint8_t MAX_ACTIVE_SIGNALS
+                = ISignalSource::MAX_ACTIVE_SIGNALS;
             static constexpr uint8_t MAX_ACTIVE_REQUESTS
                 = MAX_ACTIVE_SIGNALS * MAX_REQUESTS_PER_SIGNAL;
 
-            /* Comfortably past a single-frame 0x22 round trip (single
+            /**
+             * Comfortably past a single-frame 0x22 round trip (single
              * digits to low tens of ms on this ECU) without being so long
              * that one dead DID stalls everything else for a visible
              * beat. An ECU that needs longer is required to say so with
              * an 0x78 NRC, which restarts this rather than expiring it. */
             static constexpr uint32_t RESPONSE_TIMEOUT_MS = 60;
 
-            /* A DID this ECU will never answer -- unsupported on the car,
+            /**
+             * A DID this ECU will never answer -- unsupported on the car,
              * or gated behind a diagnostic session this client does not
              * open -- would otherwise burn a RESPONSE_TIMEOUT_MS slot
              * every period forever, crowding out the signals that do

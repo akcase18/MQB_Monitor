@@ -13,12 +13,14 @@
 #include "config_store.hpp"
 #include "panel_widget.hpp"
 #include "signal_store.hpp"
+#include "warning_latch.hpp"
 #include "warning_config_screen.hpp"
 
 namespace gui
 {
 
-    /* The core::DisplayMode <-> gui::DisplayMode translation. gui/bindings
+    /**
+     * The core::DisplayMode <-> gui::DisplayMode translation. gui/bindings
      * is the declared core::/gui:: boundary (see the file doc comment), so
      * these live here rather than being re-implemented by each caller --
      * the composition root needs the gui:: direction too, to hand
@@ -41,6 +43,21 @@ namespace gui
             PanelViewModel build_view_model(uint8_t rank,
                                             bool    large,
                                             bool    hero) const;
+
+            /**
+             * Sources the panels' warning highlight from a
+             * core::WarningLatch instead of evaluating the thresholds
+             * live. Null (the default) keeps the stateless evaluation
+             * every existing caller gets.
+             *
+             * Read-only: the latch is *driven* by whoever owns it, on its
+             * own cadence over every signal. Driving it from here would
+             * tie qualification to what is currently being drawn, and the
+             * gauge product's zoom view draws one panel of three -- the
+             * two off screen would stop qualifying, and a warning would
+             * depend on which panel you happened to be looking at.
+             */
+            void set_warning_latch(const core::WarningLatch *latch);
 
             /** Reassigns rank to a different signal/unit system/display
              * mode, persisted immediately. */
@@ -67,8 +84,9 @@ namespace gui
                                       const WarningThresholdViewModel &vm);
 
         private:
-            core::SignalStore &signals_;
-            core::ConfigStore &config_;
+            core::SignalStore        &signals_;
+            core::ConfigStore        &config_;
+            const core::WarningLatch *latch_ = nullptr;
     };
 
 } // namespace gui

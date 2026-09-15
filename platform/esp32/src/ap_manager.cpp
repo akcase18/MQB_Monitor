@@ -8,7 +8,8 @@ namespace esp32
     {
         WiFi.mode(WIFI_AP);
 
-        /* An empty password means "open AP" (see RemoteApController's file
+        /**
+         * An empty password means "open AP" (see RemoteApController's file
          * doc comment on the Teensy side) — pass nullptr explicitly rather
          * than relying on WiFi.softAP()'s empty-string handling. */
         bool has_password = password != nullptr && password[0] != '\0';

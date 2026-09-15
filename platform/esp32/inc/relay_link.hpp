@@ -67,7 +67,8 @@ namespace esp32
             Stream                       &stream_;
             remote::protocol::FrameReader reader_;
 
-            /* Scratch space for the outbound request frame built by
+            /**
+             * Scratch space for the outbound request frame built by
              * send_request_and_wait() — static rather than a stack array
              * for the same reason send_event() itself doesn't stack-
              * allocate more than once: a handler building a multi-KB HTML

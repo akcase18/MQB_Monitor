@@ -42,6 +42,35 @@ namespace gui
              */
             void rebuild(uint8_t count, LayoutOrientation orientation);
 
+            /**
+             * Which shape rebuild() asks compute_layout() for. Set once at
+             * boot by the composition root and left alone -- it describes
+             * the product's panel, not a user preference.
+             *
+             * Defaults to Grid, so the MQB root needs no change at all.
+             * The gauge root sets Strip: at 172 px tall no panel can
+             * afford to give up vertical space to a neighbour. Takes
+             * effect on the next rebuild().
+             */
+            void set_layout_style(LayoutStyle style);
+
+            /**
+             * A constant added to every slot's computed priority rank.
+             *
+             * Zero for an ordinary overview, where slot 0 shows rank 0.
+             * The zoom view (see gui::ZoomCycle) rebuilds with a single
+             * panel and an offset, which is what lets one full-screen
+             * panel show rank 2 rather than always rank 0 -- the layout
+             * and prominence maths are unchanged, they just start
+             * counting somewhere else.
+             *
+             * Meaningful only for a single-panel rebuild. With more than
+             * one panel a non-zero offset would run the top ranks off the
+             * end, so offsets are clamped and higher counts should leave
+             * this at 0. Takes effect on the next rebuild().
+             */
+            void set_rank_offset(uint8_t offset);
+
             /** Re-pulls view-models for all active panels — call periodically
              * to keep values "live". */
             void refresh();
@@ -80,6 +109,9 @@ namespace gui
              * derived from PanelSlot::rowspan/colspan in rebuild(). */
             bool     panel_hero_[MAX_PANELS] = {};
             ClickCtx click_ctx_[MAX_PANELS]  = {};
+            LayoutStyle style_       = LayoutStyle::Grid;
+            uint8_t     rank_offset_ = 0;
+
             uint8_t  num_panels_             = 0;
 
             /** rank_of_slot_[i] = which priority rank the widget in slot i

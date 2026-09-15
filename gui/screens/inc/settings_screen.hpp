@@ -119,7 +119,8 @@ namespace gui
              * lost. */
             void capture_slider_value();
 
-            /* Stashed only so orientation_clicked_cb() (fired well
+            /**
+             * Stashed only so orientation_clicked_cb() (fired well
              * after init()) can style the confirm popup consistently
              * with the rest of the app rather than leaving it in LVGL's
              * default light-mode look. */
@@ -133,7 +134,8 @@ namespace gui
             lv_obj_t *theme_swatch_       = nullptr;
             lv_obj_t *orientation_btn_            = nullptr;
             lv_obj_t *orientation_lbl_            = nullptr;
-            /* Transient -- created in orientation_clicked_cb(),
+            /**
+             * Transient -- created in orientation_clicked_cb(),
              * destroyed by whichever of orientation_confirm_cb()/
              * orientation_cancel_cb() fires next. Only valid while the
              * popup is on screen. */

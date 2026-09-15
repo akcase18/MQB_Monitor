@@ -1,15 +1,20 @@
 /**
  * @file signal_catalog.hpp
  * @brief Static, ROM-able metadata for every vehicle signal the dashboard
- * can display: which UDS requests feed it, how to combine their decoded
- * values, and how to present the result. Zero LVGL/Arduino/platform deps.
+ * can display: what it is called, what it measures, and how to present the
+ * result. Zero LVGL/Arduino/platform deps -- and, deliberately, zero
+ * knowledge of how a value is acquired.
+ *
+ * How a signal is *obtained* lives outside this file, in a per-product
+ * acquisition table keyed by signal id: core/can's uds_binding.hpp for the
+ * CAN product. That split is what lets everything which includes this
+ * header -- core/config's persisted schema, gui/bindings, the web config
+ * renderer -- stay independent of any particular bus or sensor.
  */
 #pragma once
 
 #include <stddef.h>
 #include <stdint.h>
-
-#include "uds_client.hpp"
 
 namespace core
 {
@@ -27,22 +32,11 @@ namespace core
         Volume
     };
 
-    constexpr uint8_t MAX_REQUESTS_PER_SIGNAL = 2;
-
     struct SignalSpec
     {
-            uint16_t       id;
-            const char    *name;
-            UnitType       unit_type;
-            uint16_t       cycle_time_ms;
-            UdsRequestSpec requests[MAX_REQUESTS_PER_SIGNAL];
-            uint8_t        num_requests;
-
-            /**
-             * Combines this signal's decoded, per-request raw values (already
-             * offset/scaled) into the signal's displayed value.
-             */
-            float (*transform)(const float *raw_values, uint8_t n);
+            uint16_t    id;
+            const char *name;
+            UnitType    unit_type;
 
             /**
              * Full-scale bounds for this signal, in the same native
@@ -61,7 +55,14 @@ namespace core
     };
 
     extern const SignalSpec SIGNAL_CATALOG[];
-    inline constexpr size_t SIGNAL_CATALOG_COUNT = 22;
+
+    /**
+     * SIGNAL_CATALOG_COUNT. Its own generated file, selected by include
+     * path, because the two products this tree builds share no signals at
+     * all and a single hand-declared count cannot describe both. See
+     * tools/gen_catalog.py; platformio.ini puts exactly one product's
+     * generated directory on the include path per environment. */
+#include "signal_catalog_count.inc"
 
     /** A signal's effective display range — either SignalSpec's compiled-in
      * default or a user-calibrated override. */

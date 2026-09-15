@@ -62,7 +62,8 @@ int main(int argc, char **argv)
         catalog[i].display_min = spec.display_min;
         catalog[i].display_max = spec.display_max;
 
-        /* Vary which visual states show up: every other signal has a
+        /**
+         * Vary which visual states show up: every other signal has a
          * warning threshold set, every third has a custom range too, so
          * the preview exercises checked/unchecked and filled/empty
          * fields rather than showing 22 identical blank rows. */

@@ -11,6 +11,18 @@
     "Torque",
     "Volume"
   ],
+  "defaults": {
+    "num_panels": 5,
+    "unit_system": "Imperial",
+    "priority_ids": [
+      0,
+      12,
+      2,
+      1,
+      22,
+      8
+    ]
+  },
   "signals": [
     {
       "id": 0,

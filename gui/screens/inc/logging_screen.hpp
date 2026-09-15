@@ -131,7 +131,8 @@ namespace gui
             /** Greys the erase button out when there's no store to wipe. */
             void refresh_erase();
 
-            /* Stashed so refresh_toggle() (fired long after init()) can
+            /**
+             * Stashed so refresh_toggle() (fired long after init()) can
              * reach the palette — same reason SettingsScreen keeps one. */
             const Theme *theme_ = nullptr;
 
@@ -144,12 +145,14 @@ namespace gui
 
             lv_obj_t *erase_btn_ = nullptr;
             lv_obj_t *erase_lbl_ = nullptr;
-            /* Live only while the confirm popup is up; both its handlers
+            /**
+             * Live only while the confirm popup is up; both its handlers
              * close it and clear this, the same lifetime SettingsScreen's
              * orientation popup has. */
             lv_obj_t *erase_confirm_mbox_ = nullptr;
 
-            /* Value halves of the four status tiles; their captions
+            /**
+             * Value halves of the four status tiles; their captions
              * never change so they aren't kept. */
             lv_obj_t *count_value_    = nullptr;
             lv_obj_t *storage_value_  = nullptr;

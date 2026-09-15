@@ -26,7 +26,8 @@
 
 namespace
 {
-    /* Teensyduino gives Serial2 a 64-byte RX ring and a 40-byte TX ring
+    /**
+     * Teensyduino gives Serial2 a 64-byte RX ring and a 40-byte TX ring
      * (SERIAL2_RX_BUFFER_SIZE / SERIAL2_TX_BUFFER_SIZE in
      * cores/teensy4/HardwareSerial2.cpp). Both are far too small here.
      *
@@ -65,7 +66,8 @@ void TeensySerialLink::begin(uint32_t baud)
     Serial2.begin(baud);
     Serial2.setTimeout(0);
 
-    /* After begin() -- it installs the small default rings, so extending
+    /**
+     * After begin() -- it installs the small default rings, so extending
      * them first would just be overwritten. */
     Serial2.addMemoryForRead(s_rx_buf, sizeof(s_rx_buf));
     Serial2.addMemoryForWrite(s_tx_buf, sizeof(s_tx_buf));
@@ -73,7 +75,8 @@ void TeensySerialLink::begin(uint32_t baud)
 
 size_t TeensySerialLink::read(uint8_t *buf, size_t len)
 {
-    /* readBytes() blocks up to Serial2's timeout waiting to fill `len` —
+    /**
+     * readBytes() blocks up to Serial2's timeout waiting to fill `len` —
      * bounding the request to what's already buffered keeps this call
      * non-blocking regardless of timeout config, matching ISerialLink's
      * contract (poll()-driven, called once per loop() iteration). */

@@ -40,7 +40,8 @@ bool SimulatorCanBus::send(const CanFrame &frame)
     uint8_t byte1 = frame.data[2];
     uint8_t byte2 = frame.data[3];
 
-    /* A per-signal base, plus a slow triangular sweep so values actually
+    /**
+     * A per-signal base, plus a slow triangular sweep so values actually
      * move over time. The sweep is not cosmetic: with a constant response
      * per signal, core::Logger's on-change recording correctly writes
      * nothing at all, which left the entire logging path impossible to

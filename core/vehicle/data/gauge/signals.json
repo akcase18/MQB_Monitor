@@ -1,0 +1,44 @@
+{
+  "_comment": "Signal registry for the analog gauge product (ESP32-S3, 320x172 strip, no vehicle bus). Same shape as the MQB registry and consumed by the same tools/gen_catalog.py, minus the acquisition fields: there is no bus to request these over, so no 'requests', 'transform' or 'cycle_time_ms'. How each one is actually measured is core::SensorCal, which is runtime configuration edited from the web form, not something generated at build time. The two products share no signals at all -- an MQB car cannot report oil pressure -- which is why this is a separate registry rather than a filtered view of the other one. display_min/max here are loose fallbacks only: resolve_display_range() prefers SignalConfig::custom_min/max, which is seeded from the fitted sensor's own span when a calibration is saved (see the build plan's 1.2).",
+  "unit_types": ["None", "Degrees", "Percent", "Pressure", "RPM", "Speed", "Temp", "Torque", "Volume"],
+  "defaults": {
+    "num_panels": 3,
+    "unit_system": "Imperial",
+    "priority_ids": [0, 1, 2]
+  },
+  "signals": [
+    {
+      "id": 0,
+      "name": "Oil Pres",
+      "unit": "Pressure",
+      "display_min": 0.0,
+      "display_max": 10.0,
+      "status": "active",
+      "notes": "Ratiometric transducer on ADS1115 ch0, rail-sense corrected against ch3.",
+      "samples": [],
+      "updated_at": 0.0
+    },
+    {
+      "id": 1,
+      "name": "Oil Temp",
+      "unit": "Temp",
+      "display_min": -40.0,
+      "display_max": 150.0,
+      "status": "active",
+      "notes": "NTC against a pull-up on ADS1115 ch1. Two-wire sender; curve is config.",
+      "samples": [],
+      "updated_at": 0.0
+    },
+    {
+      "id": 2,
+      "name": "Cool Temp",
+      "unit": "Temp",
+      "display_min": -40.0,
+      "display_max": 130.0,
+      "status": "active",
+      "notes": "NTC against a pull-up on ADS1115 ch2. Two-wire sender; curve is config.",
+      "samples": [],
+      "updated_at": 0.0
+    }
+  ]
+}

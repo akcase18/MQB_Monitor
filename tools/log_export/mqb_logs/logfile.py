@@ -55,7 +55,7 @@ CHUNK_FILE_RE = re.compile(r"^log_\d{3}\.bin$")
 
 # Repo layout: tools/log_export/mqb_logs/logfile.py -> repo root is 3 up.
 REPO_ROOT = Path(__file__).resolve().parents[3]
-SIGNALS_JSON = REPO_ROOT / "core/vehicle/data/signals.json"
+SIGNALS_JSON = REPO_ROOT / "core/vehicle/data/mqb/signals.json"
 
 CSV_COLUMNS = [
     "session_id", "chunk_seq", "timestamp_ms", "signal_id", "signal_name", "value",

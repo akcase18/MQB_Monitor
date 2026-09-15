@@ -1,0 +1,23 @@
+# Partition table for the analog gauge product on a 16MB ESP32-S3.
+#
+# Sized from the build plan's 6.4: the firmware is ~506KB today, plus
+# Wi-Fi and lwIP, doubled for OTA, plus the log ring. 16MB was chosen over
+# 8MB for a small price delta, and this table spends the room on generous
+# app slots rather than making them tight to buy filesystem nobody needs.
+#
+#   nvs       Config lives here -- both core::Config and core::DeviceConfig,
+#             via the Arduino EEPROM emulation. 20KB against ~3KB used.
+#   otadata   Which app slot booted last. Required for OTA.
+#   app0/app1 4MB each. The image is nowhere near that; the headroom is
+#             what stops a future feature turning into a partition change,
+#             which on a fielded device is a reflash rather than an update.
+#   spiffs    LittleFS, holding core::Logger's chunk ring. Labelled
+#             "spiffs" because that is the label LittleFS.begin() looks for
+#             by default -- the filesystem in it is LittleFS regardless.
+#
+# Name,   Type, SubType, Offset,   Size,    Flags
+nvs,      data, nvs,     0x9000,   0x5000,
+otadata,  data, ota,     0xE000,   0x2000,
+app0,     app,  ota_0,   0x10000,  0x400000,
+app1,     app,  ota_1,   0x410000, 0x400000,
+spiffs,   data, spiffs,  0x810000, 0x7F0000,

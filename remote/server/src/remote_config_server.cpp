@@ -153,7 +153,8 @@ namespace remote::server
             p                   = protocol::encode_signal_config(p, sw);
         }
 
-        (void)end; /* individual field sizes are fixed/known; a real
+        (void)end; /**
+                    * individual field sizes are fixed/known; a real
                     * overflow here would mean FRAME_MAX_PAYLOAD itself is
                     * too small, not a runtime data-dependent overrun */
         return static_cast<size_t>(p - out);
@@ -194,7 +195,8 @@ namespace remote::server
             return fail(ApplyResult::ErrSignalCountMismatch);
         }
 
-        /* Validate the whole batch before mutating anything — a rejected
+        /**
+         * Validate the whole batch before mutating anything — a rejected
          * Save should never leave the config half-applied. */
         for (uint8_t i = 0; i < core::MAX_PANELS; i++)
         {
@@ -219,7 +221,8 @@ namespace remote::server
             p = protocol::decode_signal_config(p, signals[i]);
         }
 
-        /* Every check above passed — commit. Per signal, resolve the
+        /**
+         * Every check above passed — commit. Per signal, resolve the
          * (possibly just-submitted) custom range first, then clamp that
          * signal's thresholds against it, so a range and its thresholds
          * changing in the same batch are bounded consistently rather than
@@ -285,7 +288,8 @@ namespace remote::server
 
         config_.save();
 
-        /* Only on the success path -- a batch rejected above returns
+        /**
+         * Only on the success path -- a batch rejected above returns
          * through fail() without ever reaching here, so the UI is never
          * rebuilt against a config that was not committed. */
         if (applied_cb_ != nullptr)

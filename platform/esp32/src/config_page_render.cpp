@@ -211,7 +211,8 @@ namespace esp32
         {
             char hex[8];
             format_hex_color(hex, sizeof(hex), ACCENT_PRESETS[i]);
-            /* A native <select> can't reliably show a colored swatch per
+            /**
+             * A native <select> can't reliably show a colored swatch per
              * option across mobile browsers (iOS Safari in particular
              * ignores <option> background-color) -- this is the standard
              * no-JS swap: a hidden radio + a label styled as a solid

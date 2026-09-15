@@ -44,7 +44,8 @@
 
 namespace
 {
-    /* FIFO + a deep software RX ring: the MQB bus is busy and USB drain can
+    /**
+     * FIFO + a deep software RX ring: the MQB bus is busy and USB drain can
      * briefly stall, so over-provision to avoid dropping frames. */
     FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> g_can;
 
@@ -58,7 +59,8 @@ namespace
     bool     g_timestamps  = false;
     uint32_t g_baud        = DEFAULT_BAUD;
 
-    /* Line assembly for inbound host commands. SLCAN commands are short; a
+    /**
+     * Line assembly for inbound host commands. SLCAN commands are short; a
      * transmit command tops out well under 32 chars. */
     char   g_cmd[40];
     size_t g_cmd_len = 0;
@@ -68,7 +70,8 @@ namespace
         return "0123456789ABCDEF"[nibble & 0x0F];
     }
 
-    /* Parses `count` hex chars from `s` into a value. Returns false on any
+    /**
+     * Parses `count` hex chars from `s` into a value. Returns false on any
      * non-hex char. */
     bool parse_hex(const char *s, uint8_t count, uint32_t &out)
     {
@@ -109,7 +112,8 @@ namespace
         Serial.write(BELL);
     }
 
-    /* Maps an SLCAN Sn bitrate index to a bit/s value. Returns 0 for an
+    /**
+     * Maps an SLCAN Sn bitrate index to a bit/s value. Returns 0 for an
      * index we don't support. */
     uint32_t baud_for_index(char idx)
     {
@@ -151,7 +155,8 @@ namespace
 
     void close_channel()
     {
-        /* FlexCAN_T4 has no explicit end(); re-begin on next open re-inits.
+        /**
+         * FlexCAN_T4 has no explicit end(); re-begin on next open re-inits.
          * Marking closed stops us draining/emitting frames. */
         g_open = false;
     }
@@ -201,7 +206,8 @@ namespace
         Serial.write(reinterpret_cast<const uint8_t *>(out), n);
     }
 
-    /* Handles a host transmit command (t/T). Ignored (but ACKed) in
+    /**
+     * Handles a host transmit command (t/T). Ignored (but ACKed) in
      * listen-only so python-can's periodic keep-alives can't fault the bus. */
     void handle_transmit(const char *cmd, size_t len, bool ext)
     {
@@ -387,7 +393,8 @@ namespace
         }
 
         CAN_message_t msg;
-        /* Drain everything queued this iteration so a burst doesn't back up
+        /**
+         * Drain everything queued this iteration so a burst doesn't back up
          * into an RX overrun. */
         while (g_can.read(msg))
         {

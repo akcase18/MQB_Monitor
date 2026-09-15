@@ -2,7 +2,8 @@
 
 extern "C"
 {
-    /* JetBrains Mono (SIL OFL 1.1) — one family for the numeric readouts
+    /**
+     * JetBrains Mono (SIL OFL 1.1) — one family for the numeric readouts
      * (Bold weight, digits-only subset), labels/UI text (Regular weight),
      * and nav bar titles (Bold weight, full charset), sized from actual
      * panel-cell dimensions so a 4-character value ("2546") fits the
@@ -19,7 +20,8 @@ extern "C"
     extern const lv_font_t jetbrains_mono_24;
     extern const lv_font_t jetbrains_mono_bold_24;
 
-    /* Font Awesome Free Solid (SIL OFL 1.1, license in
+    /**
+     * Font Awesome Free Solid (SIL OFL 1.1, license in
      * gui/assets/font-licenses/) — just the sun/moon glyphs (gui::
      * ICON_SUN/ICON_MOON), for SettingsScreen's Day/Night toggle. */
     extern const lv_font_t icon_day_night_28;
@@ -70,6 +72,78 @@ namespace gui
             3,
             0.45f,
             0.55f,
+            /**
+             * unit_stacked. This product's panels are wide enough for the
+             * tag to sit beside the value, which is where it has always
+             * been. */
+            false,
+        },
+    };
+
+    /**
+     * The gauge product: a 320x172 SPI strip, three equal panels, no
+     * touchscreen. Same nine JetBrains faces as THEME_DEFAULT -- this is a
+     * remapping of the semantic ladder, not a new font generation.
+     *
+     * The data faces were chosen by arithmetic, not by eye. A 3-up Strip
+     * column on this panel is
+     *
+     *     320 - 2*screen_margin(3) - 2*panel_gap(3) = 308, / 3 = 102 px
+     *     102 - 2*panel_border_width(2)             =  98 px usable
+     *
+     * and the worst-case value is **five characters**, not three: Pressure
+     * carries two decimals in metric and one in imperial (see
+     * unit_decimals()), so oil pressure reads "10.34" bar or "150.0" psi.
+     * jetbrains_mono_bold_46 advances 27.62 px/char and needs 138 px for
+     * that -- it would clip. bold_30 advances 18.00 and needs 90, which
+     * fits with room for the border. An earlier draft of the build plan
+     * recommended bold_46 on a three-character assumption; measuring the
+     * fonts is what corrected it, and test_gui_theme now pins it.
+     *
+     * The zoom view is the opposite story and the plan had it right:
+     * one panel across 310 px of usable width, where bold_96 needs 288 for
+     * five characters. That is the one place the largest face earns its
+     * place, and it is why it was retained.
+     */
+    const Theme THEME_GAUGE = {
+        /* palette -- unchanged; the reskin here is geometry, not color */
+        THEME_DEFAULT.palette,
+        /* typography */
+        {
+            &jetbrains_mono_bold_30, /* data_sm   -- 3-up panel */
+            &jetbrains_mono_bold_30, /**
+                                      * data_lg   -- every Strip panel is
+                                      * the same size, so there is no
+                                      * second tier to distinguish */
+            &jetbrains_mono_bold_56, /* data_hero -- zoom, with a bar */
+            &jetbrains_mono_bold_96, /* data_mega -- zoom, bare digits */
+            &jetbrains_mono_14,      /* label_sm */
+            &jetbrains_mono_14,      /* label_lg */
+            &jetbrains_mono_14,      /* unit */
+            &jetbrains_mono_14,      /* ui */
+            &lv_font_montserrat_32,  /* symbol_lg */
+            &jetbrains_mono_bold_24, /* title */
+            &icon_day_night_28,
+        },
+        /* metrics */
+        {
+            320,
+            172,
+            6, /* panel_radius -- softer than 10 on a 102px-wide panel */
+            2,
+            3,
+            3,
+            /**
+             * panel_height_sm_pct / _lg_pct are unused in LayoutStyle::
+             * Strip, where every panel spans the full height. Set to an
+             * even split rather than carried over from THEME_DEFAULT's
+             * 0.45/0.55, so nothing reads as a meaningful ratio here. */
+            0.5f,
+            0.5f,
+            /**
+             * unit_stacked. A 102px column cannot hold "10.34" and "bar"
+             * side by side at any font worth reading -- see Metrics. */
+            true,
         },
     };
 
@@ -82,9 +156,11 @@ namespace gui
         THEME_DEFAULT.metrics.screen_margin,
         THEME_DEFAULT.metrics.panel_height_sm_pct,
         THEME_DEFAULT.metrics.panel_height_lg_pct,
+        THEME_DEFAULT.metrics.unit_stacked,
     };
 
-    /* Values match LVGL's built-in palette mains (lv_palette_main()) so a
+    /**
+     * Values match LVGL's built-in palette mains (lv_palette_main()) so a
      * preset reads as the same color it would if picked via that API —
      * plain hex here rather than calling lv_palette_main() at static-init
      * time, since these need to be usable from core::Settings::

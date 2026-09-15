@@ -38,7 +38,8 @@ class SimulatorCanBus : public ICanBus
         uint8_t  tail_              = 0;
         uint8_t  count_             = 0;
 
-        /* Monotonic response counter driving the slow value drift in
+        /**
+         * Monotonic response counter driving the slow value drift in
          * send() -- see there for why fabricated values can't be
          * constant. */
         uint32_t tick_          = 0;

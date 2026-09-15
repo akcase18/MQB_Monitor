@@ -13,7 +13,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/*==============================================================================
+/**
+ * ==============================================================================
  * CAN
  =============================================================================*/
 
@@ -60,7 +61,8 @@ class ICanBus
         virtual bool receive(CanFrame &out) = 0;
 };
 
-/*==============================================================================
+/**
+ * ==============================================================================
  * DISPLAY
  =============================================================================*/
 
@@ -132,7 +134,8 @@ class IDisplay
         virtual void set_backlight_off() = 0;
 };
 
-/*==============================================================================
+/**
+ * ==============================================================================
  * TOUCH
  =============================================================================*/
 
@@ -168,7 +171,91 @@ class ITouch
         virtual bool read(TouchPoint &out) = 0;
 };
 
-/*==============================================================================
+/**
+ * ==============================================================================
+ * BUTTONS
+ =============================================================================*/
+
+/**
+ * Momentary push buttons, addressed by index. Raw level only -- no
+ * debounce, no timing, no interpretation of a press as short/long/double.
+ * All of that is core/input's job, where it is host-testable against a
+ * synthetic clock instead of needing a finger and a stopwatch.
+ *
+ * Indexed rather than one interface instance per button so a board with
+ * one, two or no buttons is the same code path everywhere above here. A
+ * board with no buttons supplies NullButtons (platform/null_buttons.hpp),
+ * whose count() is 0.
+ */
+class IButtons
+{
+    public:
+        virtual ~IButtons() = default;
+
+        virtual void begin() = 0;
+
+        /** How many buttons this board has. Compile-time constant per
+         * implementation; may be 0. */
+        virtual uint8_t count() const = 0;
+
+        /**
+         * @param idx Button index, 0 .. count()-1.
+         *
+         * @returns True while the button is physically held. Out-of-range
+         * indices read as not-pressed, so a caller written for two buttons
+         * behaves sanely on a one-button board.
+         */
+        virtual bool is_down(uint8_t idx) const = 0;
+};
+
+/**
+ * ==============================================================================
+ * ANALOG INPUT
+ =============================================================================*/
+
+/**
+ * A multi-channel ADC, reporting raw measured voltage and nothing else.
+ *
+ * Deliberately knows nothing about what is wired to a channel. Divider
+ * ratios, sensor transfer functions, thermistor curves, filtering and
+ * plausibility limits are all core/sensors' job, where they are plain math
+ * over plain numbers and can be unit-tested on the host against known
+ * inputs -- which matters, because that is where a wrong number on a gauge
+ * would come from.
+ *
+ * The unit is microvolts, not millivolts: an ADS1115 at its +/-4.096V range
+ * resolves 125uV per LSB, and reporting whole millivolts would throw away
+ * most of that before core/sensors ever saw it.
+ */
+class IAnalogInput
+{
+    public:
+        virtual ~IAnalogInput() = default;
+
+        virtual void begin() = 0;
+
+        /** How many channels this board has. May be 0. */
+        virtual uint8_t channel_count() const = 0;
+
+        /**
+         * Reads one channel's voltage at the ADC pin -- i.e. after any
+         * external divider, which core/sensors undoes from its configured
+         * resistor values.
+         *
+         * @param ch  Channel index, 0 .. channel_count()-1.
+         * @param out Measured voltage in microvolts. Untouched on failure.
+         *
+         * @returns False if the channel is out of range or the conversion
+         * failed (bus error, timeout). A failed read is NOT the same as a
+         * valid reading of 0V, and callers must not treat it as one: 0V is
+         * a plausible sensor output, while a failure means the value is
+         * unknown. Not const -- a real implementation does bus I/O here.
+         */
+        virtual bool read_microvolts(uint8_t ch, uint32_t &out) = 0;
+};
+
+/**
+ * ==============================================================================
  * CONFIG STORE
  =============================================================================*/
 
@@ -186,7 +273,8 @@ class IConfigStore
         virtual size_t capacity() const                                    = 0;
 };
 
-/*==============================================================================
+/**
+ * ==============================================================================
  * SERIAL LINK
  =============================================================================*/
 
@@ -229,7 +317,8 @@ class ISerialLink
         virtual size_t write(const uint8_t *buf, size_t len) = 0;
 };
 
-/*==============================================================================
+/**
+ * ==============================================================================
  * STORAGE
  =============================================================================*/
 
@@ -316,7 +405,8 @@ class IStorage
         virtual StorageMedium medium() const = 0;
 };
 
-/*==============================================================================
+/**
+ * ==============================================================================
  * CLOCK
  =============================================================================*/
 
@@ -331,7 +421,8 @@ class IClock
         virtual uint32_t millis() const = 0;
 };
 
-/*==============================================================================
+/**
+ * ==============================================================================
  * PLATFORM
  =============================================================================*/
 
@@ -343,6 +434,8 @@ struct Platform
         ICanBus      &can;
         IDisplay     &display;
         ITouch       &touch;
+        IButtons     &buttons;
+        IAnalogInput &analog;
         IConfigStore &config_store;
         IClock       &clock;
         ISerialLink  &serial;

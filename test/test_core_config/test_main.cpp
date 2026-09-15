@@ -13,7 +13,8 @@
 
 namespace
 {
-    /* In-memory IConfigStore test double — avoids touching the real
+    /**
+     * In-memory IConfigStore test double — avoids touching the real
      * simulator's sim_config.bin file, so tests stay hermetic. */
     class FakeConfigStore : public IConfigStore
     {
@@ -200,7 +201,8 @@ void test_unrecognized_version_resets_to_defaults()
 {
     FakeConfigStore backing;
 
-    /* Craft a header with a valid magic but an unrecognized (older)
+    /**
+     * Craft a header with a valid magic but an unrecognized (older)
      * version, and garbage settings behind it. */
     core::ConfigHeader header { core::ConfigStore::MAGIC_NUMBER, 0 };
     backing.write(0, &header, sizeof(header));

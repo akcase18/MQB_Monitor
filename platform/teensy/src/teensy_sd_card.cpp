@@ -13,7 +13,8 @@
 
 namespace
 {
-    constexpr uint8_t  SD_CS_PIN               = 2; /* EMC_04, shared SPI1
+    constexpr uint8_t  SD_CS_PIN               = 2; /**
+                                                       * EMC_04, shared SPI1
                                                        * with touch */
     constexpr uint8_t  SD_BEGIN_RETRIES        = 3;
     constexpr uint32_t SD_BEGIN_RETRY_DELAY_MS = 50;

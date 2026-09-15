@@ -21,7 +21,8 @@
 
 namespace
 {
-    /* Standard POSIX termios speed constants only — higher rates
+    /**
+     * Standard POSIX termios speed constants only — higher rates
      * (460800/921600) need macOS's non-portable IOSSIOSPEED ioctl instead
      * of a Bxxxxxx constant, not worth the platform-specific code for a
      * desktop dev tool. */
@@ -96,7 +97,8 @@ size_t SimulatorSerialLink::write(const uint8_t *buf, size_t len)
         return 0;
     }
 
-    /* fd_ is O_NONBLOCK, so a single ::write() isn't guaranteed to accept
+    /**
+     * fd_ is O_NONBLOCK, so a single ::write() isn't guaranteed to accept
      * all `len` bytes -- it can legitimately do a short write once `len`
      * exceeds whatever room is currently free in the kernel's serial
      * output buffer, silently truncating the frame if the caller doesn't

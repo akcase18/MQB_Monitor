@@ -130,7 +130,8 @@ namespace esp32
     {
         WebServer &server = *server_;
 
-        /* Refetch rather than trust member state left over from whatever
+        /**
+         * Refetch rather than trust member state left over from whatever
          * GET rendered this form -- cheap (this link never runs on a hot
          * path), and guarantees catalog_[]'s unit_type entries (needed
          * below for the imperial->metric conversion) are current rather

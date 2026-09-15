@@ -16,7 +16,8 @@ namespace
     constexpr uint8_t  FT6236_I2C_ADDR      = 0x38;
     constexpr uint8_t  FT6236_REG_TD_STATUS = 0x02;
 
-    /* Touch-detection threshold: how hard a press has to be before the
+    /**
+     * Touch-detection threshold: how hard a press has to be before the
      * controller reports it. LOWER = lighter touches register.
      *
      * IMPORTANT -- the register address here is NOT confirmed against a
@@ -39,14 +40,16 @@ namespace
     constexpr uint8_t  FT6236_THRESHOLD     = 0; /* 0 = leave default */
     constexpr uint8_t  RST_PIN              = 33;
     constexpr uint32_t RESET_LOW_MS         = 10;
-    constexpr uint32_t RESET_SETTLE_MS      = 300; /* conservative --
+    constexpr uint32_t RESET_SETTLE_MS      = 300; /**
+                                                      * conservative --
                                                       * datasheet only
                                                       * confirms Trst >
                                                       * 5ms low, not the
                                                       * post-release
                                                       * settle time */
 
-    /* The panel's LONG edge, and the full span of the controller's raw Y
+    /**
+     * The panel's LONG edge, and the full span of the controller's raw Y
      * axis. Both orientations invert against this same 480 because raw Y
      * always runs along the long edge, whichever way the display is
      * rotated -- see read(). Must track teensy_display.cpp's LCD_HORZ;
@@ -101,7 +104,8 @@ void TeensyCapTouch::begin()
 
     Wire.begin();
 
-    /* Read the threshold back before touching it -- see FT6236_REG_THRESHOLD.
+    /**
+     * Read the threshold back before touching it -- see FT6236_REG_THRESHOLD.
      * This is the only evidence we have that the address is real. */
     uint8_t before = 0;
     if (read_reg(FT6236_REG_THRESHOLD, before))
@@ -155,12 +159,14 @@ bool TeensyCapTouch::read(TouchPoint &out)
         }
     }
 
-    /* Last valid position retained across release -- see teensy_touch.cpp's
+    /**
+     * Last valid position retained across release -- see teensy_touch.cpp's
      * read() for why LVGL needs this (drag-release finalizes from this
      * exact point). */
     out.pressed = pressed;
 
-    /* The FT6236 reports in the panel's NATIVE portrait frame regardless of
+    /**
+     * The FT6236 reports in the panel's NATIVE portrait frame regardless of
      * how the display is rotated: raw X spans 0-319 (the panel's short
      * edge), raw Y spans 0-479 (the long edge).
      *

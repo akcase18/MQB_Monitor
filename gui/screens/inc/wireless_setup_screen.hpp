@@ -28,7 +28,8 @@ namespace gui
 {
     enum class WirelessSetupPhase : uint8_t
     {
-        Idle,       /* Not yet activated — shown identically to Connecting
+        Idle,       /**
+                     * Not yet activated — shown identically to Connecting
                      * (see WirelessSetupScreen::set_view_model()), since
                      * main.cpp activates on open() and this phase is only
                      * ever momentarily true, if at all. */

@@ -13,6 +13,9 @@ Reworked from the old README's list against what's actually implemented as of th
 
 ## Software
 
+- [X] ~~Revisit signal registry. Should act as 1 registry, but with limits put in place based on which device is connected.~~ **Settled as two registries, not one filtered view.** The two products share no signals at all — an MQB car cannot report oil pressure — so `core/vehicle/data/<product>/signals.json` is per-product and `platformio.ini` puts exactly one product's generated output on the include path per env. `SIGNAL_CATALOG_COUNT` moved out of the header into a generated `.inc` for the same reason: a single hand-declared count cannot describe both. See [core/vehicle](core/vehicle/README.md).
+- [ ] **Flash and bring up the ESP32-S3 gauge board.** `[env:esp32s3_gauge]` and `platform/esp32s3/` exist, build and link, and have never been run — the board does not exist yet. Three things need a scope or an eye on the panel before they are believed, each documented where it lives: the ST7789 GRAM offset and MADCTL rotation, RGB565 byte order on the wire, and ADS1115 timing/noise. A clean `env:simulator_gauge` run says nothing about any of them. The pinout in `platform/esp32s3/inc/esp32s3_pins.hpp` is a set of defaults, not a commitment — every pin is a `-D`, so freezing it when the PCB settles is a `platformio.ini` edit.
+- [ ] LVGL 9's per-flag setters deprecate `lv_obj_add_flag`/`remove_flag`/`has_flag`, which `gui/` uses throughout — every build prints a handful of `-Wdeprecated-declarations` warnings from `info_screen.cpp`, `toast_overlay.cpp` and friends. Harmless, but it is warning noise that trains people to ignore warnings. A mechanical sweep to `lv_obj_set_hidden()`/`lv_obj_is_hidden()`/`lv_obj_set_clickable()`; worth doing in one pass rather than per-file, so `gui/` does not end up with two idioms.
 - [X] EEPROM-backed configuration storage (panel assignments, warning thresholds, brightness, theme) — [core/config](core/config/README.md).
 - [X] Warning light configuration with independent per-signal low/high thresholds — [core/vehicle/inc/warning.hpp](core/vehicle/inc/warning.hpp), [gui/screens/inc/warning_config_screen.hpp](gui/screens/inc/warning_config_screen.hpp).
 - [X] Digital/Bar/Gauge display options, chosen per panel — [gui/widgets](gui/widgets/README.md).
@@ -32,7 +35,7 @@ Reworked from the old README's list against what's actually implemented as of th
   | Constant | Was | Now | Where |
   |---|---|---|---|
   | `INFO_SCREEN_REFRESH_MS` | 200 (5Hz), then 100 (10Hz) | **50** (20Hz) | `src/main.cpp` |
-  | `cycle_time_ms` for Int Pres (4), Engine Speed (7), Engine Torque (8), Throttle Pos (12), Int Pres Act. (22) | 20 | **50** | `core/vehicle/data/signals.json` — re-run `tools/gen_catalog.py` after editing |
+  | `cycle_time_ms` for Int Pres (4), Engine Speed (7), Engine Torque (8), Throttle Pos (12), Int Pres Act. (22) | 20 | **50** | `core/vehicle/data/mqb/signals.json` — re-run `tools/gen_catalog.py` after editing |
   | `core::LOG_MIN_INTERVAL_MS` | 40 | **50** | `core/logging/inc/logger.hpp` |
   | `LOG_SAMPLE_PERIOD_MS` | 20 | **25** | `src/main.cpp` — kept at half the floor |
 

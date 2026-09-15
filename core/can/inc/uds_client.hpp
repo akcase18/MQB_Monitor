@@ -24,6 +24,13 @@ namespace core
             float   scale;
     };
 
+    /**
+     * How many UDS requests may feed one signal. Lives here rather than in
+     * core/vehicle's catalog because it sizes UDS request tables, and
+     * core/vehicle no longer knows UDS exists -- see uds_binding.hpp.
+     */
+    constexpr uint8_t MAX_REQUESTS_PER_SIGNAL = 2;
+
     class UdsClient
     {
         public:

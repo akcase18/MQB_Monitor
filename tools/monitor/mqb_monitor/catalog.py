@@ -1,4 +1,4 @@
-"""Loads and decodes against core/vehicle/data/signals.json -- the two-stage
+"""Loads and decodes against core/vehicle/data/mqb/signals.json -- the two-stage
 signal registry shared with the firmware.
 
 Every signal ever defined lives in this one file, tagged with a `status`:
@@ -31,7 +31,7 @@ from typing import Callable
 
 # Repo layout: tools/monitor/mqb_monitor/catalog.py -> repo root is 3 up.
 REPO_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_SIGNALS_JSON = REPO_ROOT / "core/vehicle/data/signals.json"
+DEFAULT_SIGNALS_JSON = REPO_ROOT / "core/vehicle/data/mqb/signals.json"
 
 
 def decode_raw_payload(payload: bytes) -> float:

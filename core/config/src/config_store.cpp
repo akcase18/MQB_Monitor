@@ -7,6 +7,12 @@
 namespace core
 {
 
+    /**
+     * The product's factory panel assignment: DEFAULT_NUM_PANELS and
+     * DEFAULT_PRIORITIES. Generated from that product's signals.json and
+     * selected by include path -- see tools/gen_catalog.py. */
+#include "signal_defaults.generated.inc"
+
     namespace
     {
         size_t priority_offset(uint8_t rank)
@@ -92,27 +98,26 @@ namespace core
 
         config_.settings.day_brightness   = 100;
         config_.settings.night_brightness = 20;
-        config_.settings.num_panels       = 5;
+        config_.settings.num_panels       = DEFAULT_NUM_PANELS;
         config_.settings.orientation      = LayoutOrientation::Horizontal;
         config_.settings.logging_enabled  = false; /* opt-in, see config.hpp */
         config_.settings.accent_color
             = 0x4CAF50; /* green, gui::ACCENT_PRESETS[0] */
 
-        /* Ported from the old EEPROM_Handler::set_defaults(). info_list's
-         * declaration order there matches SIGNAL_CATALOG's id assignment
-         * here 1:1, so the same positions carry over directly, now read as
-         * priority order (rank 0 = most important) rather than slot order
-         * — Coolant Temp lands in the most prominent slot at every panel
-         * count instead of just being "whatever's in slot 0". priorities[5]
-         * is a real, simply-inactive rank since num_panels defaults to 5. */
-        config_.priorities[0] = { 0, UnitSystem::Imperial };  /* Coolant Temp */
-        config_.priorities[1] = { 12, UnitSystem::Imperial }; /* Throttle Pos */
-        config_.priorities[2] = { 2, UnitSystem::Imperial };  /* Int Air Temp */
-        config_.priorities[3] = { 1, UnitSystem::Imperial };  /* Eng Oil Temp */
-        config_.priorities[4] = { 22, UnitSystem::Imperial }; /* Int Pres Act. */
-        config_.priorities[5] = { 8, UnitSystem::Imperial }; /* Engine Torque */
+        /**
+         * The factory panel assignment comes from the product's registry,
+         * not from ids written out here. It used to be six hardcoded MQB
+         * catalog ids with hand-maintained name comments -- correct for
+         * exactly one product, and silently wrong for any other, since an
+         * id absent from the compiled catalog resolves to -1 and shows
+         * nothing at all. See tools/gen_catalog.py. */
+        for (uint8_t rank = 0; rank < MAX_PANELS; rank++)
+        {
+            config_.priorities[rank] = DEFAULT_PRIORITIES[rank];
+        }
 
-        /* Whole SignalConfig, not just .warn -- this has to leave every
+        /**
+         * Whole SignalConfig, not just .warn -- this has to leave every
          * field at its default rather than relying on config_ never
          * having been loaded into, so migrate() can call it after a real
          * field-by-field migration lands. */
@@ -124,7 +129,8 @@ namespace core
 
     FLASHMEM void ConfigStore::migrate(uint8_t old_version)
     {
-        /* No device has shipped with saved config yet, so every version
+        /**
+         * No device has shipped with saved config yet, so every version
          * bump so far just resets to defaults rather than converting old
          * fields — matching the old EEPROM_Handler's fallback for unknown
          * versions. Once something has actually shipped, this needs real

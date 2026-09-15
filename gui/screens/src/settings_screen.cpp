@@ -11,7 +11,8 @@ namespace gui
 
     namespace
     {
-        /* Nav bar, then Brightness and Panels as single label+control rows
+        /**
+         * Nav bar, then Brightness and Panels as single label+control rows
          * (not label-above-control — that cost a whole extra line each,
          * and this screen doesn't have room to spare), then a footer of
          * two compact tappable rows (Theme|Orientation, WiFi). Every row is
@@ -28,7 +29,8 @@ namespace gui
         constexpr lv_coord_t PANELS_ROW_Y      = 136;
         constexpr lv_coord_t PANELS_ROW_HEIGHT = 40;
         constexpr lv_coord_t PANELS_LABEL_GAP  = 10;
-        /* Matches style_flat_matrix()'s pad_gap (see screen_helpers.hpp)
+        /**
+         * Matches style_flat_matrix()'s pad_gap (see screen_helpers.hpp)
          * — used to compute a single panel-count button's width so the
          * Day/Night button (built first, in the Brightness row above this
          * one) can match it exactly rather than being an arbitrary
@@ -39,7 +41,8 @@ namespace gui
 
         constexpr lv_coord_t THEME_ROW_Y          = 202;
         constexpr lv_coord_t ORIENTATION_ROW_GAP  = 16;
-        /* Extra breathing room after the vertical divider — without it,
+        /**
+         * Extra breathing room after the vertical divider — without it,
          * "Orientation" sits flush against the divider line. */
         constexpr lv_coord_t ORIENTATION_LABEL_LEFT_PAD = 12;
         constexpr lv_coord_t DIVIDER3_Y           = 248;
@@ -47,7 +50,8 @@ namespace gui
         constexpr lv_coord_t COMPACT_ROW_HEIGHT   = 38;
         constexpr lv_coord_t THEME_SWATCH_SIZE    = 22;
 
-        /* Portrait gets its own full set of row Y-positions rather than
+        /**
+         * Portrait gets its own full set of row Y-positions rather than
          * reusing Landscape's — Landscape's rhythm is tuned tight to fit
          * everything in 320px of height, and just reusing it in Portrait's
          * 480px canvas left every row clustered at the top with ~250px of
@@ -90,7 +94,8 @@ namespace gui
 
         constexpr int32_t BRIGHTNESS_STEP = 5;
 
-        /* A vertical counterpart to screen_helpers.hpp's create_divider() —
+        /**
+         * A vertical counterpart to screen_helpers.hpp's create_divider() —
          * same color/thickness, just rotated, for splitting the Theme/
          * Orientation row instead of separating stacked rows. Kept local to
          * this screen rather than promoted to screen_helpers.hpp since
@@ -149,7 +154,8 @@ namespace gui
 
         bool portrait = theme.metrics.screen_height > theme.metrics.screen_width;
 
-        /* Nav bar: title + close, standing in for the bottom-right
+        /**
+         * Nav bar: title + close, standing in for the bottom-right
          * checkmark other screens use (see the file doc comment). */
         create_nav_title(screen_, theme, "Settings");
 
@@ -159,14 +165,16 @@ namespace gui
         create_divider(screen_, theme, HEADER_DIVIDER_Y);
 
         lv_coord_t row_width = theme.metrics.screen_width - 2 * SCREEN_MARGIN;
-        /* Portrait gives Brightness/Panels a label line of their own (see
+        /**
+         * Portrait gives Brightness/Panels a label line of their own (see
          * PORTRAIT_ROW_HEIGHT's comment above) instead of sharing a row
          * with the control — freeing the control to use the full row
          * width and stand taller, for an easier-to-press target. */
         lv_coord_t control_height
             = portrait ? PORTRAIT_ROW_HEIGHT : BRIGHTNESS_ROW_HEIGHT;
 
-        /* Brightness section — Landscape: label, slider, and the Day/
+        /**
+         * Brightness section — Landscape: label, slider, and the Day/
          * Night toggle all share a single row (no separate "100%" readout
          * — the slider's own knob position already shows the value, and a
          * numeric readout wasn't earning its keep). Portrait: label above,
@@ -197,7 +205,8 @@ namespace gui
             lv_obj_align(brightness_label, LV_ALIGN_LEFT_MID, 0, 0);
         }
 
-        /* Measured, not guessed — a hardcoded reserved width drifted out
+        /**
+         * Measured, not guessed — a hardcoded reserved width drifted out
          * of sync with this label's actual rendered width (a monospace
          * UI font renders wider per character than it looks like it
          * should) and let the slider start underneath the text. Only
@@ -206,7 +215,8 @@ namespace gui
         lv_coord_t brightness_label_width
             = portrait ? 0 : lv_obj_get_width(brightness_label);
 
-        /* A throwaway probe, deleted immediately after measuring — lets
+        /**
+         * A throwaway probe, deleted immediately after measuring — lets
          * the Day/Night button (built next) be sized to exactly match a
          * real Panels-matrix button before that matrix exists yet, without
          * duplicating PANEL_BTN_COUNT/PANEL_BTN_GAP's math against a
@@ -216,7 +226,8 @@ namespace gui
             panels_label_probe, theme.typography.label_lg, 0);
         lv_label_set_text(panels_label_probe, "Panels");
         lv_obj_update_layout(panels_label_probe);
-        /* Landscape: Panels' row is label + matrix side by side, so the
+        /**
+         * Landscape: Panels' row is label + matrix side by side, so the
          * matrix only gets what's left after the label. Portrait: the
          * label's on its own line above, so the matrix (and to match it,
          * the Day/Night button below) gets the full row width. */
@@ -229,7 +240,8 @@ namespace gui
             = (panels_matrix_width - (PANEL_BTN_COUNT - 1) * PANEL_BTN_GAP)
               / PANEL_BTN_COUNT;
 
-        /* Day/Night is a fast manual switch, not automatic (no clock/
+        /**
+         * Day/Night is a fast manual switch, not automatic (no clock/
          * light-sensor wiring yet) — flipping it immediately re-applies
          * the real backlight via preview_cb_ so it's actually useful
          * mid-drive, not just a setting you'd tune once and forget. A
@@ -268,7 +280,8 @@ namespace gui
         lv_obj_set_style_text_color(day_night_icon_lbl_, theme.palette.fg, 0);
         lv_obj_center(day_night_icon_lbl_);
 
-        /* Slider fills whatever's left between the label's actual width
+        /**
+         * Slider fills whatever's left between the label's actual width
          * (Landscape only — Portrait's label isn't in this row) and the
          * Day/Night button. */
         lv_coord_t slider_width
@@ -298,7 +311,8 @@ namespace gui
         create_divider(
             screen_, theme, portrait ? PORTRAIT_DIVIDER1_Y : DIVIDER1_Y);
 
-        /* Panels section — same Landscape-single-row / Portrait-label-
+        /**
+         * Panels section — same Landscape-single-row / Portrait-label-
          * above shape as Brightness above it. */
         lv_obj_t *panels_row = lv_obj_create(screen_);
         lv_obj_remove_style_all(panels_row);
@@ -326,7 +340,8 @@ namespace gui
             lv_obj_align(panel_count_label, LV_ALIGN_LEFT_MID, 0, 0);
         }
 
-        /* A row of buttons instead of a vertical roller — the roller's 3
+        /**
+         * A row of buttons instead of a vertical roller — the roller's 3
          * visible rows stood tall enough to cover the "Panels" label
          * above it; this is a fixed, compact height regardless of how
          * many options there are. */
@@ -349,7 +364,8 @@ namespace gui
         create_divider(
             screen_, theme, portrait ? PORTRAIT_DIVIDER2_Y : DIVIDER2_Y);
 
-        /* Theme + Orientation share one row, 50/50, in Landscape — Theme
+        /**
+         * Theme + Orientation share one row, 50/50, in Landscape — Theme
          * doesn't need a full-width row to itself, and this screen is
          * tight on vertical space (see the file doc comment). Portrait
          * doesn't have the width to spare for that split (see
@@ -375,7 +391,8 @@ namespace gui
                 COMPACT_ROW_HEIGHT);
         }
 
-        /* Theme row: tappable, hands off to ThemePickerScreen rather than
+        /**
+         * Theme row: tappable, hands off to ThemePickerScreen rather than
          * embedding a color grid here — same reasoning as Configurator's
          * Signal/Warning Thresholds rows. */
         lv_coord_t compact_row_height
@@ -390,7 +407,8 @@ namespace gui
         lv_obj_add_event_cb(
             theme_row.btn, pick_theme_cb_handler, LV_EVENT_CLICKED, this);
 
-        /* Current-accent preview — a plain colored square rather than a
+        /**
+         * Current-accent preview — a plain colored square rather than a
          * text swatch name, since the presets don't have user-facing
          * names beyond their appearance. */
         theme_swatch_ = lv_obj_create(theme_row.btn);
@@ -404,7 +422,8 @@ namespace gui
         lv_obj_align_to(
             theme_swatch_, theme_row.chevron, LV_ALIGN_OUT_LEFT_MID, -12, 0);
 
-        /* Orientation row: a label plus a compact toggle button (matching
+        /**
+         * Orientation row: a label plus a compact toggle button (matching
          * the Day/Night button's styling), not a navigation row — there's
          * nowhere to hand off to, the button IS the control. A plain tap
          * opens the confirm/cancel popup below rather than applying the
@@ -434,7 +453,8 @@ namespace gui
         lv_obj_set_style_text_color(orientation_label, theme.palette.fg, 0);
         lv_obj_set_style_text_font(
             orientation_label, theme.typography.label_lg, 0);
-        /* In Portrait this row is full-width like Theme's, so it matches
+        /**
+         * In Portrait this row is full-width like Theme's, so it matches
          * Theme's flush-left label (no left pad needed). Landscape's pad
          * is still needed there — see ORIENTATION_LABEL_LEFT_PAD's
          * comment above. */
@@ -467,7 +487,8 @@ namespace gui
         create_divider(
             screen_, theme, portrait ? PORTRAIT_DIVIDER3_Y : DIVIDER3_Y);
 
-        /* WiFi row: tappable, hands off to WirelessSetupScreen — same
+        /**
+         * WiFi row: tappable, hands off to WirelessSetupScreen — same
          * shape as the Theme row above it, just without a preview swatch
          * (there's no "current value" to show at a glance). Full width:
          * logging used to share this row, but it moved to its own
@@ -487,7 +508,8 @@ namespace gui
 
     void SettingsScreen::open()
     {
-        /* Reopens showing whichever of day/night was last selected, not
+        /**
+         * Reopens showing whichever of day/night was last selected, not
          * always Day — flipping to Night to dim the screen and then
          * backing out of Settings shouldn't silently flip back. */
         lv_slider_set_value(brightness_slider_,
@@ -547,7 +569,8 @@ namespace gui
     {
         auto *self = static_cast<SettingsScreen *>(lv_event_get_user_data(e));
 
-        /* lv_slider has no native step option — snap to the nearest 5%
+        /**
+         * lv_slider has no native step option — snap to the nearest 5%
          * here so dragging feels stepped instead of continuous. */
         int32_t raw = lv_slider_get_value(self->brightness_slider_);
         int32_t snapped
@@ -612,7 +635,8 @@ namespace gui
                   ? LayoutOrientation::Vertical
                   : LayoutOrientation::Horizontal;
 
-        /* Rotating the panel only takes effect on the next boot (see
+        /**
+         * Rotating the panel only takes effect on the next boot (see
          * platform.hpp's DisplayOrientation) -- a silent flip with no
          * visible effect until some future restart would look broken, so
          * this asks first rather than applying it immediately. */
@@ -640,7 +664,8 @@ namespace gui
         lv_msgbox_close_async(self->orientation_confirm_mbox_);
         self->orientation_confirm_mbox_ = nullptr;
 
-        /* Persisted right here, not deferred to Done — see the file doc
+        /**
+         * Persisted right here, not deferred to Done — see the file doc
          * comment for why. */
         if (self->orientation_confirm_cb_ != nullptr)
         {
@@ -662,7 +687,8 @@ namespace gui
 
         self->capture_slider_value();
 
-        /* get_selected_button() tracks focus/last-press, not the checked
+        /**
+         * get_selected_button() tracks focus/last-press, not the checked
          * state itself, so it can't be trusted if Done is pressed without
          * ever touching the matrix — scan for whichever button is actually
          * checked instead. */

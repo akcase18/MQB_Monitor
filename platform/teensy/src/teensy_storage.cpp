@@ -12,7 +12,8 @@
 
 namespace
 {
-    /* This board's flash is 16MB; after firmware, teensy_size reports
+    /**
+     * This board's flash is 16MB; after firmware, teensy_size reports
      * ~16.02MB actually free for files. Sized against
      * core::CHUNK_COUNT * core::CHUNK_SIZE_BYTES (13MiB, see
      * core/logging/inc/logger.hpp) plus headroom for LittleFS's own

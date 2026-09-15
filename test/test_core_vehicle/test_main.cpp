@@ -12,22 +12,31 @@
 #include "scheduler.hpp"
 #include "signal_catalog.hpp"
 #include "signal_poller.hpp"
+#include "peak_hold.hpp"
 #include "signal_store.hpp"
 #include "simulator_can.hpp"
+#include "uds_binding.hpp"
 #include "uds_client.hpp"
+#include "uds_decoder.hpp"
+#include "uds_signal_source.hpp"
+#include "warning_latch.hpp"
 
 namespace
 {
     constexpr uint32_t TX_ID = 0x7E0;
     constexpr uint32_t RX_ID = 0x7E8;
 
+    /**
+     * Decoding moved out of SignalStore into core::UdsDecoder, so the
+     * callback context is now the decoder rather than the store. */
     void on_response(void *ctx, uint8_t byte1, uint8_t byte2, float raw)
     {
-        auto *store = static_cast<core::SignalStore *>(ctx);
-        store->on_uds_response(byte1, byte2, raw, 0);
+        auto *decoder = static_cast<core::UdsDecoder *>(ctx);
+        decoder->on_response(byte1, byte2, raw, 0);
     }
 
-    /* Deterministic IClock test double — real wall-clock time would make
+    /**
+     * Deterministic IClock test double — real wall-clock time would make
      * Scheduler's due-task timing flaky under CI. */
     class FakeClock : public IClock
     {
@@ -40,7 +49,8 @@ namespace
             uint32_t now_ms = 0;
     };
 
-    /* An ECU that takes `latency_ms` to answer, holds exactly one request
+    /**
+     * An ECU that takes `latency_ms` to answer, holds exactly one request
      * at a time, and can be told to stay silent on chosen DIDs.
      *
      * SimulatorCanBus answers instantly and queues eight deep, which makes
@@ -245,23 +255,26 @@ void test_single_request_round_trip()
 
     core::UdsClient   client(bus, TX_ID, RX_ID);
     core::SignalStore store;
+    core::UdsDecoder  decoder(store);
 
     /* Signal 0: Coolant Temp, single request (0xF4, 0x05, offset -40). */
-    const core::SignalSpec &spec = core::SIGNAL_CATALOG[0];
-    client.send(spec.requests[0]);
-    client.poll(on_response, &store);
+    const core::SignalSpec       &spec    = core::SIGNAL_CATALOG[0];
+    const core::UdsSignalBinding &binding = core::UDS_BINDINGS[0];
+    client.send(binding.requests[0]);
+    client.poll(on_response, &decoder);
 
     const core::SignalValue &value = store.get(spec.id);
     TEST_ASSERT_TRUE(value.has_data);
 
-    /* Asserted against the raw value the bus actually fabricated rather
+    /**
+     * Asserted against the raw value the bus actually fabricated rather
      * than a copy of its formula here -- fabricated values carry a slow
      * drift (see simulator_can.cpp), so a duplicated formula would both
      * be wrong and silently rot. What's under test is that the decode
      * round-trips whatever was sent, not the specific number. */
-    float expected
-        = (static_cast<float>(bus.last_fake_raw()) + spec.requests[0].offset)
-          * spec.requests[0].scale;
+    float expected = (static_cast<float>(bus.last_fake_raw())
+                      + binding.requests[0].offset)
+                     * binding.requests[0].scale;
     TEST_ASSERT_EQUAL_FLOAT(expected, value.value);
 }
 
@@ -272,10 +285,11 @@ void test_display_value_unit_conversion()
 
     core::UdsClient   client(bus, TX_ID, RX_ID);
     core::SignalStore store;
+    core::UdsDecoder  decoder(store);
 
     const core::SignalSpec &spec = core::SIGNAL_CATALOG[0]; // Coolant Temp
-    client.send(spec.requests[0]);
-    client.poll(on_response, &store);
+    client.send(core::UDS_BINDINGS[0].requests[0]);
+    client.poll(on_response, &decoder);
 
     float metric   = store.get_display_value(spec.id, true);
     float imperial = store.get_display_value(spec.id, false);
@@ -293,27 +307,31 @@ void test_multi_request_signal_waits_for_all_requests()
 
     core::UdsClient   client(bus, TX_ID, RX_ID);
     core::SignalStore store;
+    core::UdsDecoder  decoder(store);
 
-    /* Catalog index 6: Int Pres Act. = intake (req[1]) - ambient (req[0]),
+    /**
+     * Catalog index 6: Int Pres Act. = intake (req[1]) - ambient (req[0]),
      * via the generic "difference" transform. */
-    const core::SignalSpec &spec = core::SIGNAL_CATALOG[6];
-    TEST_ASSERT_EQUAL_UINT8(2, spec.num_requests);
+    const core::SignalSpec       &spec    = core::SIGNAL_CATALOG[6];
+    const core::UdsSignalBinding &binding = core::UDS_BINDINGS[6];
+    TEST_ASSERT_EQUAL_UINT8(2, binding.num_requests);
 
     auto decode = [](uint16_t raw, const core::UdsRequestSpec &req) {
         return (static_cast<float>(raw) + req.offset) * req.scale;
     };
 
-    /* Each raw value is captured right after its own send(), since the
+    /**
+     * Each raw value is captured right after its own send(), since the
      * bus's drift means the two requests don't fabricate from the same
      * base -- see last_fake_raw()'s doc comment. */
-    client.send(spec.requests[0]);
-    float ambient = decode(bus.last_fake_raw(), spec.requests[0]);
-    client.poll(on_response, &store);
+    client.send(binding.requests[0]);
+    float ambient = decode(bus.last_fake_raw(), binding.requests[0]);
+    client.poll(on_response, &decoder);
     TEST_ASSERT_FALSE(store.get(spec.id).has_data);
 
-    client.send(spec.requests[1]);
-    float intake = decode(bus.last_fake_raw(), spec.requests[1]);
-    client.poll(on_response, &store);
+    client.send(binding.requests[1]);
+    float intake = decode(bus.last_fake_raw(), binding.requests[1]);
+    client.poll(on_response, &decoder);
     TEST_ASSERT_TRUE(store.get(spec.id).has_data);
 
     float expected = intake - ambient;
@@ -346,7 +364,8 @@ void test_resolve_display_range_defaults_and_override()
     TEST_ASSERT_EQUAL_FLOAT(0.0f, custom.min);
     TEST_ASSERT_EQUAL_FLOAT(50.0f, custom.max);
 
-    /* Degenerate custom range (min >= max) falls back to the catalog
+    /**
+     * Degenerate custom range (min >= max) falls back to the catalog
      * default rather than returning a zero/negative-width range. */
     core::DisplayRange degenerate
         = core::resolve_display_range(spec, true, 50.0f, 50.0f);
@@ -356,7 +375,8 @@ void test_resolve_display_range_defaults_and_override()
 
 void test_unit_convert_round_trips()
 {
-    /* Regression for the warning-editor bug where a signal's imperial-unit
+    /**
+     * Regression for the warning-editor bug where a signal's imperial-unit
      * threshold was silently compared/edited against its metric value —
      * to_imperial(to_metric(x)) must return x for every convertible type. */
     const core::UnitType types[] = { core::UnitType::Pressure,
@@ -400,7 +420,8 @@ void test_scheduler_fires_due_tasks()
     TEST_ASSERT_EQUAL_INT(2, fire_count);
 }
 
-/* Catalog DIDs the poller tests reason about, named so an assertion below
+/**
+ * Catalog DIDs the poller tests reason about, named so an assertion below
  * reads as the signal it is really about. */
 namespace did
 {
@@ -419,7 +440,8 @@ void test_poller_only_requests_displayed_signals()
     core::UdsClient    client(ecu, TX_ID, RX_ID);
     core::SignalPoller poller(client, clock);
 
-    /* Engine Speed and Engine Torque on panels; Throttle Pos and Coolant
+    /**
+     * Engine Speed and Engine Torque on panels; Throttle Pos and Coolant
      * Temp in the catalog but on no panel. */
     const uint16_t active[] = { 7, 8 };
     poller.set_active(active, 2);
@@ -431,7 +453,8 @@ void test_poller_only_requests_displayed_signals()
     TEST_ASSERT_GREATER_THAN_UINT16(
         0, ecu.requests_for(did::ENGINE_TORQUE[0], did::ENGINE_TORQUE[1]));
 
-    /* The old one-scheduler-task-per-catalog-entry model asked for these
+    /**
+     * The old one-scheduler-task-per-catalog-entry model asked for these
      * every cycle whether or not anything could show them. */
     TEST_ASSERT_EQUAL_UINT16(
         0, ecu.requests_for(did::THROTTLE[0], did::THROTTLE[1]));
@@ -461,13 +484,13 @@ bool displayed_signal_owns(const core::UdsRequestSpec &req,
 {
     for (uint8_t i = 0; i < count; i++)
     {
-        int idx = core::signal_catalog_find(displayed[i]);
+        int idx = core::uds_binding_find(displayed[i]);
         if (idx < 0)
         {
             continue;
         }
 
-        const core::SignalSpec &shown = core::SIGNAL_CATALOG[idx];
+        const core::UdsSignalBinding &shown = core::UDS_BINDINGS[idx];
         for (uint8_t r = 0; r < shown.num_requests; r++)
         {
             if (shown.requests[r].byte1 == req.byte1
@@ -487,7 +510,8 @@ void test_poller_asks_for_nothing_outside_the_displayed_panels()
     core::UdsClient    client(ecu, TX_ID, RX_ID);
     core::SignalPoller poller(client, clock);
 
-    /* Three panels, the way a user might actually set the dashboard up:
+    /**
+     * Three panels, the way a user might actually set the dashboard up:
      * Coolant Temp (2000ms), Engine Speed (50ms), Throttle Pos (50ms). */
     const uint16_t displayed[]   = { 0, 7, 12 };
     const uint8_t  displayed_len = 3;
@@ -495,32 +519,36 @@ void test_poller_asks_for_nothing_outside_the_displayed_panels()
 
     run_loop(clock, client, poller, 2000);
 
-    /* The whole catalog, not a hand-picked pair: every request of every
+    /**
+     * The whole catalog, not a hand-picked pair: every request of every
      * signal that is not on a panel must never have reached the wire.
      * This is the assertion that would have failed outright under the
      * old model, which registered a poll task per catalog entry. */
-    for (size_t i = 0; i < core::SIGNAL_CATALOG_COUNT; i++)
+    for (size_t i = 0; i < core::UDS_BINDING_COUNT; i++)
     {
-        const core::SignalSpec &spec = core::SIGNAL_CATALOG[i];
-        if (is_displayed(spec.id, displayed, displayed_len))
+        const core::UdsSignalBinding &binding = core::UDS_BINDINGS[i];
+        if (is_displayed(binding.signal_id, displayed, displayed_len))
         {
             continue;
         }
 
-        for (uint8_t r = 0; r < spec.num_requests; r++)
+        for (uint8_t r = 0; r < binding.num_requests; r++)
         {
-            const core::UdsRequestSpec &req = spec.requests[r];
+            const core::UdsRequestSpec &req = binding.requests[r];
             if (displayed_signal_owns(req, displayed, displayed_len))
             {
                 continue;
             }
 
             TEST_ASSERT_EQUAL_UINT16_MESSAGE(
-                0, ecu.requests_for(req.byte1, req.byte2), spec.name);
+                0,
+                ecu.requests_for(req.byte1, req.byte2),
+                core::SIGNAL_CATALOG[i].name);
         }
     }
 
-    /* All three displayed signals are genuinely being read, so the above
+    /**
+     * All three displayed signals are genuinely being read, so the above
      * cannot pass by the poller simply doing nothing. */
     TEST_ASSERT_GREATER_THAN_UINT16(
         0, ecu.responses_for(did::COOL_TEMP[0], did::COOL_TEMP[1]));
@@ -529,7 +557,8 @@ void test_poller_asks_for_nothing_outside_the_displayed_panels()
     TEST_ASSERT_GREATER_THAN_UINT16(
         0, ecu.responses_for(did::THROTTLE[0], did::THROTTLE[1]));
 
-    /* And the point of all this: total bus and loop work is bounded by
+    /**
+     * And the point of all this: total bus and loop work is bounded by
      * what is on screen. Two 50ms signals plus one 2000ms signal over 2s
      * is ~81 requests. The 22-signal catalog polled at its own cadences
      * is ~400 over the same window. */
@@ -543,7 +572,8 @@ void test_poller_keeps_one_request_outstanding()
     core::UdsClient    client(ecu, TX_ID, RX_ID);
     core::SignalPoller poller(client, clock);
 
-    /* Four 50ms signals, all due at once — the burst that used to put six
+    /**
+     * Four 50ms signals, all due at once — the burst that used to put six
      * frames on the wire inside ~1.3ms. */
     const uint16_t active[] = { 4, 7, 8, 12 };
     poller.set_active(active, 4);
@@ -572,7 +602,8 @@ void test_poller_deduplicates_a_shared_did()
     core::UdsClient    client(ecu, TX_ID, RX_ID);
     core::SignalPoller poller(client, clock);
 
-    /* Int Pres (0x3E70) and Int Pres Act. (0x13CA + 0x3E70) share a DID,
+    /**
+     * Int Pres (0x3E70) and Int Pres Act. (0x13CA + 0x3E70) share a DID,
      * and SignalStore fans one response out to both — so 0x3E70 must go
      * out once per cycle, not once per signal that wants it. */
     const uint16_t active[] = { 4, 22 };
@@ -584,7 +615,8 @@ void test_poller_deduplicates_a_shared_did()
     uint16_t only_22 = ecu.requests_for(did::AMB_PRES[0], did::AMB_PRES[1]);
 
     TEST_ASSERT_GREATER_THAN_UINT16(0, only_22);
-    /* Asked at the same 50ms cadence as the DID only one signal wants,
+    /**
+     * Asked at the same 50ms cadence as the DID only one signal wants,
      * rather than at twice it. */
     TEST_ASSERT_INT_WITHIN(2, only_22, shared);
 }
@@ -596,7 +628,8 @@ void test_poller_serves_every_signal_when_the_ecu_cannot_keep_up()
     core::UdsClient    client(ecu, TX_ID, RX_ID);
     core::SignalPoller poller(client, clock);
 
-    /* The reported hardware failure, reproduced: five panels, four of them
+    /**
+     * The reported hardware failure, reproduced: five panels, four of them
      * on the same 50ms cadence, against an ECU slow enough that demand
      * (~80 req/s for the 50ms group) exceeds capacity (~66 req/s). Under
      * the old model the tail of each burst was dropped and one signal --
@@ -630,11 +663,13 @@ void test_poller_serves_every_signal_when_the_ecu_cannot_keep_up()
         }
     }
 
-    /* Real throughput, not a trickle: 3s of a ~15ms round trip shared four
+    /**
+     * Real throughput, not a trickle: 3s of a ~15ms round trip shared four
      * ways is ~50 readings each. */
     TEST_ASSERT_GREATER_THAN_UINT16(30, lowest);
 
-    /* Nobody is systematically behind: serving an entry pushes it a full
+    /**
+     * Nobody is systematically behind: serving an entry pushes it a full
      * cycle into the future, so equal-cadence signals take turns instead
      * of the front of the burst crowding out the back. */
     TEST_ASSERT_LESS_OR_EQUAL_UINT16(3, highest - lowest);
@@ -647,7 +682,8 @@ void test_poller_does_not_starve_a_slow_signal_behind_fast_ones()
     core::UdsClient    client(ecu, TX_ID, RX_ID);
     core::SignalPoller poller(client, clock);
 
-    /* Two 50ms signals and one 2000ms signal, against an ECU slower than
+    /**
+     * Two 50ms signals and one 2000ms signal, against an ECU slower than
      * the fast pair's cadence — so something is always overdue and the
      * poller never gets an idle moment to spend on the slow one.
      *
@@ -681,7 +717,8 @@ void test_poller_recovers_from_an_unanswered_did()
     core::UdsClient    client(ecu, TX_ID, RX_ID);
     core::SignalPoller poller(client, clock);
 
-    /* One DID this ECU does not support, sharing the schedule with two it
+    /**
+     * One DID this ECU does not support, sharing the schedule with two it
      * does. Without backoff it would burn a full RESPONSE_TIMEOUT_MS every
      * 50ms cycle, which is the same starvation in a different costume. */
     ecu.stay_silent_on(did::THROTTLE[0], did::THROTTLE[1]);
@@ -695,7 +732,8 @@ void test_poller_recovers_from_an_unanswered_did()
     uint16_t alive
         = ecu.responses_for(did::ENGINE_SPEED[0], did::ENGINE_SPEED[1]);
 
-    /* Backed off to BACKOFF_PERIOD_MS: a handful of attempts over 3s, not
+    /**
+     * Backed off to BACKOFF_PERIOD_MS: a handful of attempts over 3s, not
      * one every 50ms. */
     TEST_ASSERT_LESS_THAN_UINT16(3000 / core::SignalPoller::BACKOFF_PERIOD_MS
                                      + core::SignalPoller::MISSES_BEFORE_BACKOFF
@@ -723,7 +761,8 @@ void test_poller_treats_a_rejection_as_the_end_of_a_request()
     run_loop(
         clock, client, poller, core::SignalPoller::RESPONSE_TIMEOUT_MS - 1);
 
-    /* Two requests inside one timeout window is only possible if the NRC
+    /**
+     * Two requests inside one timeout window is only possible if the NRC
      * freed the in-flight slot instead of the deadline expiring. */
     uint16_t total
         = ecu.requests_for(did::ENGINE_SPEED[0], did::ENGINE_SPEED[1])
@@ -738,7 +777,8 @@ void test_poller_waits_through_a_response_pending()
     core::UdsClient    client(ecu, TX_ID, RX_ID);
     core::SignalPoller poller(client, clock);
 
-    /* 0x78 is the one NRC that does not end a request: the ECU is saying
+    /**
+     * 0x78 is the one NRC that does not end a request: the ECU is saying
      * "still working". Sending the next request on top of it is exactly
      * the overrun this class exists to prevent. */
     ecu.reply_with_nrc(0x78);
@@ -756,12 +796,360 @@ void test_poller_waits_through_a_response_pending()
     TEST_ASSERT_EQUAL_UINT16(1, total);
 }
 
+/** UdsSignalSource is the composition root's whole view of acquisition, so
+ * this drives it exactly the way src/main.cpp does -- set_active() once,
+ * then tick() per loop iteration -- and asserts the round trip lands in the
+ * store. The pieces inside it are covered in detail by the poller and
+ * decoder tests above; what is under test here is that they are wired
+ * together, since main.cpp no longer does that wiring itself. */
+void test_uds_signal_source_drives_a_round_trip()
+{
+    FakeClock clock;
+    FakeEcu   ecu(clock);
+
+    core::SignalStore     store;
+    core::UdsSignalSource source(ecu, clock, store, TX_ID, RX_ID);
+
+    /* Coolant Temp (id 0) and Engine Speed (id 7). */
+    const uint16_t displayed[] = { 0, 7 };
+    source.set_active(displayed, 2);
+
+    core::ISignalSource &via_interface = source;
+    for (uint32_t i = 0; i < 500; i++)
+    {
+        clock.now_ms++;
+        via_interface.tick(clock.now_ms);
+    }
+
+    TEST_ASSERT_TRUE_MESSAGE(store.get(0).has_data, "Cool Temp never landed");
+    TEST_ASSERT_TRUE_MESSAGE(store.get(7).has_data,
+                             "Engine Speed never landed");
+
+    /**
+     * Flow control still holds through the wrapper: a signal that was never
+     * displayed must not have been acquired. Misfire Cnt (id 13, DID
+     * 0x2904) is not in `displayed` and shares no DID with either signal
+     * that is (0xF405, 0x206E), so nothing can have filled it incidentally
+     * via UdsDecoder's fan-out. */
+    TEST_ASSERT_FALSE_MESSAGE(store.get(13).has_data,
+                              "acquired a signal that was never displayed");
+}
+
+/** core::SIGNAL_CATALOG and core::UDS_BINDINGS are parallel arrays -- same
+ * length, same order, so index i is the same signal in both (see
+ * uds_binding.hpp). Both are emitted by one pass of tools/gen_catalog.py, so
+ * this holds by construction; it is asserted here because everything that
+ * indexes one array with the other's index silently reads the wrong signal
+ * if it ever stops holding. UdsDecoder does exactly that on every response. */
+void test_catalog_and_bindings_are_parallel()
+{
+    TEST_ASSERT_EQUAL_size_t(core::SIGNAL_CATALOG_COUNT,
+                             core::UDS_BINDING_COUNT);
+
+    for (size_t i = 0; i < core::SIGNAL_CATALOG_COUNT; i++)
+    {
+        TEST_ASSERT_EQUAL_UINT16_MESSAGE(core::SIGNAL_CATALOG[i].id,
+                                         core::UDS_BINDINGS[i].signal_id,
+                                         core::SIGNAL_CATALOG[i].name);
+
+        /**
+         * The id-keyed lookups must agree with the shared index too --
+         * SignalPoller resolves an id through uds_binding_find() and then
+         * hands the resulting requests to a store indexed by catalog
+         * position. */
+        TEST_ASSERT_EQUAL_INT(
+            static_cast<int>(i),
+            core::signal_catalog_find(core::SIGNAL_CATALOG[i].id));
+        TEST_ASSERT_EQUAL_INT(
+            static_cast<int>(i),
+            core::uds_binding_find(core::SIGNAL_CATALOG[i].id));
+    }
+}
+
+
+/**
+ * ==============================================================================
+ * PeakHold
+ =============================================================================*/
+
+void test_peak_hold_tracks_both_bounds(void)
+{
+    core::SignalStore store;
+    core::PeakHold    peaks;
+    peaks.reset();
+
+    const uint16_t id  = core::SIGNAL_CATALOG[0].id;
+    const float    seq[] = { 80.0f, 95.0f, 71.0f, 88.0f };
+
+    for (unsigned i = 0; i < sizeof(seq) / sizeof(seq[0]); i++)
+    {
+        store.set(id, seq[i], 1000 + (i * 100));
+        peaks.sample(store);
+    }
+
+    TEST_ASSERT_TRUE(peaks.has_data(id));
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 71.0f, peaks.min(id));
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 95.0f, peaks.max(id));
+
+    peaks.reset();
+    TEST_ASSERT_FALSE(peaks.has_data(id));
+}
+
+void test_peak_hold_never_samples_a_signal_with_no_data(void)
+{
+    /**
+     * The interaction with core/sensors that matters. An analog channel
+     * that fails its plausibility check declines to write, so has_data
+     * stays false -- and a peak tracker that sampled it anyway would pin
+     * the minimum at 0.0 and leave "0.00 bar minimum oil pressure" on
+     * screen for the rest of the drive, sourced from a loose connector. */
+    core::SignalStore store;
+    core::PeakHold    peaks;
+    peaks.reset();
+
+    const uint16_t live_id = core::SIGNAL_CATALOG[0].id;
+    const uint16_t dead_id = core::SIGNAL_CATALOG[1].id;
+
+    store.set(live_id, 4.2f, 1000);
+    for (int i = 0; i < 20; i++)
+    {
+        peaks.sample(store);
+    }
+
+    TEST_ASSERT_TRUE(peaks.has_data(live_id));
+
+    /**
+     * Never written, so never sampled -- and reported as absent rather
+     * than as a confident 0.0. */
+    TEST_ASSERT_FALSE(peaks.has_data(dead_id));
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.0f, peaks.min(dead_id));
+}
+
+/**
+ * ==============================================================================
+ * WarningLatch
+ =============================================================================*/
+
+namespace
+{
+    core::SignalValue value_of(float v, uint32_t at_ms)
+    {
+        core::SignalValue out;
+        out.value          = v;
+        out.has_data       = true;
+        out.last_update_ms = at_ms;
+        return out;
+    }
+
+    /* Low-pressure style: warn below 1.5, no high bound. */
+    const core::WarningThresholds LO_ONLY { 1.5f, 0.0f, true, false };
+} // namespace
+
+void test_a_transient_dip_latches_and_survives(void)
+{
+    /**
+     * The whole reason this class exists: evaluate_warning() is stateless,
+     * so a 200 ms dip between two refreshes is never seen. */
+    core::WarningLatch latch;
+    latch.reset();
+
+    const int idx = 0;
+
+    TEST_ASSERT_FALSE(
+        latch.update(idx, value_of(4.0f, 1000), LO_ONLY, 1000).lo_active);
+
+    /* One sample below the line. */
+    TEST_ASSERT_TRUE(
+        latch.update(idx, value_of(0.9f, 1100), LO_ONLY, 1100).lo_active);
+
+    /* Back to normal, and it is still showing. */
+    for (uint32_t t = 1200; t < 5000; t += 100)
+    {
+        TEST_ASSERT_TRUE(
+            latch.update(idx, value_of(4.0f, t), LO_ONLY, t).lo_active);
+    }
+    TEST_ASSERT_TRUE(latch.any_held());
+
+    /**
+     * And it is a memory now, not a live condition -- worth showing
+     * differently. */
+    TEST_ASSERT_TRUE(latch.is_stale_at(idx));
+
+    latch.acknowledge();
+    TEST_ASSERT_FALSE(
+        latch.update(idx, value_of(4.0f, 5100), LO_ONLY, 5100).lo_active);
+    TEST_ASSERT_FALSE(latch.any_held());
+}
+
+void test_a_crossing_shorter_than_the_qualify_time_never_raises(void)
+{
+    /**
+     * The other half, from the plan's own risk register: with no RPM
+     * input there is no honest low-oil-pressure threshold, so a brief
+     * legitimate dip at idle must not alarm. */
+    core::WarningLatch latch;
+    latch.reset();
+    latch.set_qualify_ms(500);
+
+    const int idx = 0;
+
+    for (uint32_t t = 1000; t < 1400; t += 50)
+    {
+        TEST_ASSERT_FALSE(
+            latch.update(idx, value_of(0.9f, t), LO_ONLY, t).lo_active);
+    }
+
+    /**
+     * Recovered before qualifying. Nothing was ever raised, and nothing
+     * is held. */
+    for (uint32_t t = 1400; t < 3000; t += 50)
+    {
+        TEST_ASSERT_FALSE(
+            latch.update(idx, value_of(4.0f, t), LO_ONLY, t).lo_active);
+    }
+    TEST_ASSERT_FALSE(latch.any_held());
+}
+
+void test_a_crossing_past_the_qualify_time_latches(void)
+{
+    core::WarningLatch latch;
+    latch.reset();
+    latch.set_qualify_ms(500);
+
+    const int idx = 0;
+
+    /* Held below the line for longer than the qualify window. */
+    bool raised = false;
+    for (uint32_t t = 1000; t <= 1600; t += 50)
+    {
+        raised = latch.update(idx, value_of(0.9f, t), LO_ONLY, t).lo_active;
+    }
+    TEST_ASSERT_TRUE(raised);
+
+    /* It raised exactly once qualified, not before. */
+    core::WarningLatch probe;
+    probe.reset();
+    probe.set_qualify_ms(500);
+    TEST_ASSERT_FALSE(
+        probe.update(idx, value_of(0.9f, 1000), LO_ONLY, 1000).lo_active);
+    TEST_ASSERT_FALSE(
+        probe.update(idx, value_of(0.9f, 1499), LO_ONLY, 1499).lo_active);
+    TEST_ASSERT_TRUE(
+        probe.update(idx, value_of(0.9f, 1500), LO_ONLY, 1500).lo_active);
+}
+
+void test_acknowledging_a_live_fault_buys_quiet_then_re_raises(void)
+{
+    /* Acknowledging dismisses the notice, not the fault. */
+    core::WarningLatch latch;
+    latch.reset();
+    latch.set_qualify_ms(500);
+
+    const int idx = 0;
+
+    for (uint32_t t = 1000; t <= 1600; t += 50)
+    {
+        latch.update(idx, value_of(0.9f, t), LO_ONLY, t);
+    }
+    TEST_ASSERT_TRUE(latch.held_at(idx));
+
+    latch.acknowledge();
+
+    /**
+     * Still faulted, but quiet for at least the qualify window rather
+     * than re-raising on the very next sample. */
+    TEST_ASSERT_FALSE(
+        latch.update(idx, value_of(0.9f, 1650), LO_ONLY, 1650).lo_active);
+    TEST_ASSERT_FALSE(
+        latch.update(idx, value_of(0.9f, 2100), LO_ONLY, 2100).lo_active);
+    TEST_ASSERT_TRUE(
+        latch.update(idx, value_of(0.9f, 2150), LO_ONLY, 2150).lo_active);
+}
+
+void test_a_latched_warning_survives_the_signal_going_dark(void)
+{
+    /**
+     * A sensor that fails after tripping a warning: the value stops
+     * updating and has_data goes false, so the live evaluator reports
+     * nothing. The latch must still remember -- losing the warning at the
+     * same moment the sensor died is the worst possible time to lose it. */
+    core::WarningLatch latch;
+    latch.reset();
+
+    const int idx = 0;
+
+    TEST_ASSERT_TRUE(
+        latch.update(idx, value_of(0.9f, 1000), LO_ONLY, 1000).lo_active);
+
+    core::SignalValue dark; /* has_data == false */
+    for (uint32_t t = 1100; t < 4000; t += 100)
+    {
+        TEST_ASSERT_TRUE(latch.update(idx, dark, LO_ONLY, t).lo_active);
+    }
+    TEST_ASSERT_TRUE(latch.any_held());
+}
+
+void test_state_at_reads_back_what_update_returned(void)
+{
+    /**
+     * The presentation layer reads the latch instead of driving it (see
+     * gui::VehicleBinding::set_warning_latch), because the gauge
+     * product's zoom view draws one panel of three -- a warning that only
+     * qualified while its own panel happened to be on screen would depend
+     * on where the driver was looking. That split only works if reading
+     * and driving agree.
+     */
+    core::WarningLatch latch;
+    latch.reset();
+    latch.set_qualify_ms(300);
+
+    const int idx = 0;
+
+    /* Above the line: nothing either way. */
+    core::WarningState driven
+        = latch.update(idx, value_of(4.0f, 1000), LO_ONLY, 1000);
+    TEST_ASSERT_FALSE(driven.lo_active);
+    TEST_ASSERT_FALSE(latch.state_at(idx).lo_active);
+
+    /**
+     * Crossing, but not yet qualified -- reported inactive by both, and
+     * reading it must not advance qualification either. */
+    driven = latch.update(idx, value_of(0.9f, 1100), LO_ONLY, 1100);
+    TEST_ASSERT_FALSE(driven.lo_active);
+    for (int i = 0; i < 10; i++)
+    {
+        TEST_ASSERT_FALSE(latch.state_at(idx).lo_active);
+    }
+
+    /* Qualified. */
+    driven = latch.update(idx, value_of(0.9f, 1400), LO_ONLY, 1400);
+    TEST_ASSERT_TRUE(driven.lo_active);
+    TEST_ASSERT_TRUE(latch.state_at(idx).lo_active);
+    TEST_ASSERT_FALSE(latch.state_at(idx).hi_active);
+
+    /**
+     * Held after the value recovers, and still readable without an
+     * update -- which is the case a refresh between two ticks hits. */
+    latch.update(idx, value_of(4.0f, 1500), LO_ONLY, 1500);
+    TEST_ASSERT_TRUE(latch.state_at(idx).lo_active);
+
+    latch.acknowledge();
+    TEST_ASSERT_FALSE(latch.state_at(idx).lo_active);
+
+    /* Out of range reads as no warning rather than as garbage. */
+    TEST_ASSERT_FALSE(latch.state_at(-1).lo_active);
+    TEST_ASSERT_FALSE(
+        latch.state_at(static_cast<int>(core::SIGNAL_CATALOG_COUNT)).hi_active);
+}
+
 int main(int argc, char **argv)
 {
     (void)argc;
     (void)argv;
 
     UNITY_BEGIN();
+    RUN_TEST(test_catalog_and_bindings_are_parallel);
+    RUN_TEST(test_uds_signal_source_drives_a_round_trip);
     RUN_TEST(test_single_request_round_trip);
     RUN_TEST(test_display_value_unit_conversion);
     RUN_TEST(test_multi_request_signal_waits_for_all_requests);
@@ -778,5 +1166,13 @@ int main(int argc, char **argv)
     RUN_TEST(test_poller_recovers_from_an_unanswered_did);
     RUN_TEST(test_poller_treats_a_rejection_as_the_end_of_a_request);
     RUN_TEST(test_poller_waits_through_a_response_pending);
+    RUN_TEST(test_peak_hold_tracks_both_bounds);
+    RUN_TEST(test_peak_hold_never_samples_a_signal_with_no_data);
+    RUN_TEST(test_a_transient_dip_latches_and_survives);
+    RUN_TEST(test_a_crossing_shorter_than_the_qualify_time_never_raises);
+    RUN_TEST(test_a_crossing_past_the_qualify_time_latches);
+    RUN_TEST(test_acknowledging_a_live_fault_buys_quiet_then_re_raises);
+    RUN_TEST(test_a_latched_warning_survives_the_signal_going_dark);
+    RUN_TEST(test_state_at_reads_back_what_update_returned);
     return UNITY_END();
 }

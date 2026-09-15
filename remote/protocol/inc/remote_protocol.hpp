@@ -14,7 +14,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* This link runs rarely (a batch config load/save, an AP enable/disable)
+/**
+ * This link runs rarely (a batch config load/save, an AP enable/disable)
  * and never on a hot path, so every function and large buffer in remote/
  * carries FLASHMEM/DMAMEM as a matter of course -- see
  * platform/mem_placement.hpp for what they do and when not to use them. */
@@ -22,7 +23,8 @@
 
 namespace remote::protocol
 {
-    /*==========================================================================
+    /**
+     * ==========================================================================
      * BYTE-LEVEL PUT/GET HELPERS (little-endian)
      =========================================================================*/
 
@@ -38,12 +40,14 @@ namespace remote::protocol
     const uint8_t *get_f32(const uint8_t *p, float &out);
     const uint8_t *get_bytes(const uint8_t *p, void *dst, size_t n);
 
-    /*==========================================================================
+    /**
+     * ==========================================================================
      * FRAMING
      =========================================================================*/
 
     constexpr uint8_t FRAME_SYNC = 0xA5;
-    /* Comfortably above RESP_STATE's worst-case ~1223-byte payload (22
+    /**
+     * Comfortably above RESP_STATE's worst-case ~1223-byte payload (22
      * signals' worth of catalog + config), with headroom for catalog
      * growth. */
     constexpr uint16_t FRAME_MAX_PAYLOAD = 1536;
@@ -155,7 +159,8 @@ namespace remote::protocol
             uint16_t received_       = 0;
             uint16_t crc_received_   = 0;
             uint32_t frame_start_ms_ = 0;
-            /* static, not a plain member: GCC rejects a `section`
+            /**
+             * static, not a plain member: GCC rejects a `section`
              * attribute on a non-static data member (there's no
              * independent storage to place — it's part of whatever object
              * contains it), so DMAMEM placement needs static storage
@@ -172,7 +177,8 @@ namespace remote::protocol
             DecodedFrame   frame_ {};
     };
 
-    /*==========================================================================
+    /**
+     * ==========================================================================
      * PER-RECORD WIRE STRUCTS
      *
      * Plain in-memory records (not wire-laid-out — see the file doc

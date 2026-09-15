@@ -37,7 +37,8 @@ namespace gui
 
     namespace
     {
-        /* A bounded, always-terminating string copy. build_view_model()
+        /**
+         * A bounded, always-terminating string copy. build_view_model()
          * runs for every panel on every InfoScreen refresh, and this used
          * to be snprintf(dst, cap, "%s", src) -- dragging the whole
          * printf format-parsing machinery in to do what amounts to a
@@ -59,6 +60,11 @@ namespace gui
         : signals_(signals)
         , config_(config)
     {
+    }
+
+    void VehicleBinding::set_warning_latch(const core::WarningLatch *latch)
+    {
+        latch_ = latch;
     }
 
     PanelViewModel VehicleBinding::build_view_model(uint8_t rank,
@@ -91,7 +97,8 @@ namespace gui
                  sizeof(vm.unit_label),
                  core::unit_label(spec.unit_type, is_metric));
 
-        /* Index-keyed, not id-keyed: catalog_idx is already resolved
+        /**
+         * Index-keyed, not id-keyed: catalog_idx is already resolved
          * above, and the id-keyed accessors would each re-scan the whole
          * catalog to arrive back at it. */
         const core::SignalValue &value = signals_.get_at(catalog_idx);
@@ -111,7 +118,10 @@ namespace gui
         }
 
         core::WarningState warn
-            = core::evaluate_warning(value, cfg.signals[catalog_idx].warn);
+            = latch_ != nullptr
+                  ? latch_->state_at(catalog_idx)
+                  : core::evaluate_warning(value,
+                                           cfg.signals[catalog_idx].warn);
         vm.warn_lo_active = warn.lo_active;
         vm.warn_hi_active = warn.hi_active;
 
@@ -186,7 +196,8 @@ namespace gui
                 = core::unit_convert_to_imperial(spec.unit_type, min_value);
             max_value
                 = core::unit_convert_to_imperial(spec.unit_type, max_value);
-            /* step is a delta, not an absolute value — only the
+            /**
+             * step is a delta, not an absolute value — only the
              * conversion's multiplicative scale applies, not Temp's +32
              * offset, so subtract off the zero-point's converted value. */
             step = core::unit_convert_to_imperial(spec.unit_type, step)

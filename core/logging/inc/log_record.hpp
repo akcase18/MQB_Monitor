@@ -21,7 +21,8 @@ namespace core
      * signal_id simply means it still held its last-logged value. */
     struct LogRecord
     {
-            uint32_t timestamp_ms; /* SignalValue::last_update_ms, boot-
+            uint32_t timestamp_ms; /**
+                                     * SignalValue::last_update_ms, boot-
                                      * relative -- no RTC exists in this
                                      * codebase/hardware, so only
                                      * meaningful alongside the owning
@@ -44,11 +45,13 @@ namespace core
     {
             uint32_t magic;      /* LOG_MAGIC */
             uint8_t  version;    /* LOG_VERSION */
-            uint32_t session_id; /* Increments once per boot -- every
+            uint32_t session_id; /**
+                                   * Increments once per boot -- every
                                    * chunk written during the same power
                                    * cycle shares one value, disambiguating
                                    * timestamp_ms across power cycles. */
-            uint32_t chunk_seq;  /* Ever-increasing across the device's
+            uint32_t chunk_seq;  /**
+                                   * Ever-increasing across the device's
                                    * lifetime (never reset, never wraps
                                    * back to 0 the way the chunk's file-
                                    * name slot does) -- lets a reader sort
@@ -59,7 +62,8 @@ namespace core
                                    * two visits to the same slot apart. */
     };
 
-    /*==================================================================
+    /**
+     * ==================================================================
      * Log index -- a small side file (`/log_index.bin`) tracking one
      * entry per *capture* (a Logging on -> off cycle), which is what the
      * user thinks of as "a log". Nothing in the chunk files themselves
@@ -82,7 +86,8 @@ namespace core
     struct LogIndexEntry
     {
             uint32_t log_id;
-            uint32_t session_id; /* Which boot -- pairs with the records'
+            uint32_t session_id; /**
+                                   * Which boot -- pairs with the records'
                                    * boot-relative timestamp_ms. */
             uint32_t first_chunk_seq;
             uint32_t last_chunk_seq;

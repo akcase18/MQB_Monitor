@@ -30,7 +30,8 @@ bool TeensyCanBus::begin(uint32_t tx_id, uint32_t rx_id, uint32_t baud)
     s_bus.setBaudRate(baud);
     s_bus.setMBFilter(REJECT_ALL);
 
-    /* Four mailboxes on the response id, not one. FlexCAN mailboxes do
+    /**
+     * Four mailboxes on the response id, not one. FlexCAN mailboxes do
      * not chain: a second matching frame arriving before the CPU has read
      * the first overwrites it, so a single open mailbox could only ever
      * hand up one frame per receive() cycle no matter how many arrived.
@@ -58,7 +59,8 @@ bool TeensyCanBus::begin(uint32_t tx_id, uint32_t rx_id, uint32_t baud)
 
 namespace
 {
-    /* Both payload arrays are 8 bytes (CanFrame::data, CAN_message_t::buf),
+    /**
+     * Both payload arrays are 8 bytes (CanFrame::data, CAN_message_t::buf),
      * so this only ever clamps a frame claiming a length longer than a
      * classic CAN frame can hold. */
     uint8_t clamped_len(uint8_t len)

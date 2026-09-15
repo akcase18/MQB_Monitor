@@ -17,4 +17,18 @@ Palette, typography, and metrics tokens for every screen and widget — the one 
 
 ## Adding a new theme variant
 
-Add another `const Theme` alongside `THEME_DEFAULT` and pass it wherever `THEME_DEFAULT` is currently passed in `src/main.cpp`'s `build_screens()` — nothing in `gui/widgets` or `gui/screens` needs to change.
+Add another `const Theme` alongside `THEME_DEFAULT` and pass it wherever `THEME_DEFAULT` is currently passed in a composition root — nothing in `gui/widgets` or `gui/screens` needs to change.
+
+## `THEME_GAUGE` — the 320×172 strip
+
+A second `const Theme` remapping the same nine JetBrains faces, plus metrics to match. No new font generation.
+
+**The data faces were picked by arithmetic, and the build plan's original recommendation did not survive it.** A 3-up `LayoutStyle::Strip` column on this panel is `320 − 2·screen_margin(3) − 2·panel_gap(3) = 308`, `÷3 = 102 px`, less `2·panel_border_width(2)` = **98 px usable**. The plan sized the readout at `bold_46` assuming a three-character worst case — but `unit_decimals()` gives Pressure two decimals in metric and one in imperial, so oil pressure reads `10.34` bar or `150.0` psi: **five characters**. `bold_46` advances 27.62 px/char and needs 138 px, which clips. `bold_30` advances 18.00 and needs 90, which fits.
+
+The zoom view is the opposite and the plan had it right: one panel across 310 px, where `bold_96` needs 288 for five characters. That is the one place the largest face earns its keep, and why it was retained.
+
+`panel_height_sm_pct` / `panel_height_lg_pct` are unused under `Strip` (every panel is full height) and are set to an even split rather than carried over, so nothing there reads as a meaningful ratio.
+
+**`unit_stacked` is set here, and the arithmetic above is why.** The 98 px budget covers the *value*; the panel also draws a unit tag, and normally places it to the right of a value that is itself centred — so the pair overhangs the centre line by half the value plus the whole tag. "77.2 psi" therefore rendered as "77.2 ps", with the tag running off the panel edge, on a build whose font-fit test was entirely green. Stacking the tag on its own line makes the constraint `max(value, tag)` rather than their sum. The cost moves to the vertical budget, where a 172 px panel has room for three lines and `test_gui_theme` now counts all three.
+
+All of this is pinned by [`test/test_gui_theme/`](../../test/README.md) against the real font data — a value that clips at full scale is not something a code review catches, nor reliably a glance at the simulator.

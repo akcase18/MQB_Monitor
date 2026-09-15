@@ -1,12 +1,16 @@
 /**
  * @file signal_catalog.cpp
- * @brief Home of the transform_* functions and unit helpers for the signal
- * catalog. The SIGNAL_CATALOG[] array itself is GENERATED from
- * core/vehicle/data/signals.json -- the canonical catalog shared with the
+ * @brief Home of the unit helpers for the signal catalog. The
+ * SIGNAL_CATALOG[] array itself is GENERATED from
+ * core/vehicle/data/<product>/signals.json -- the canonical catalog shared with the
  * Mac monitor tool (tools/monitor) -- into signal_catalog.generated.inc by
  * tools/gen_catalog.py. Edit signals.json and re-run that script to change a
- * signal; add a new transform here (and reference it by name in the JSON's
- * "transform" field) to add non-default combining behavior.
+ * signal.
+ *
+ * The transform_* functions that used to live here moved to core/can's
+ * uds_binding.cpp along with the rest of the acquisition data -- a transform
+ * combines *UDS request* values, so it belongs with the requests rather than
+ * with the presentation metadata.
  *
  * History: the 22 signals were ported from the old Info/Request catalog
  * (src/logic/setup.cpp). Two dead, unused requests (actual/specified lambda,
@@ -18,50 +22,6 @@
 
 namespace core
 {
-
-    namespace
-    {
-        float transform_default(const float *raw_values, uint8_t n)
-        {
-            (void)n;
-            return raw_values[0];
-        }
-
-        /* Generic two-request combiners for compound signals built via the
-         * monitor tool's Registry "New Compound Signal..." dialog -- no new
-         * C++ needed per combination. */
-        float transform_sum(const float *raw_values, uint8_t n)
-        {
-            (void)n;
-            return raw_values[0] + raw_values[1];
-        }
-
-        float transform_difference(const float *raw_values, uint8_t n)
-        {
-            (void)n;
-            return raw_values[1] - raw_values[0];
-        }
-
-        float transform_average(const float *raw_values, uint8_t n)
-        {
-            (void)n;
-            return (raw_values[0] + raw_values[1]) * 0.5f;
-        }
-
-        float transform_min(const float *raw_values, uint8_t n)
-        {
-            (void)n;
-            return raw_values[0] < raw_values[1] ? raw_values[0]
-                                                 : raw_values[1];
-        }
-
-        float transform_max(const float *raw_values, uint8_t n)
-        {
-            (void)n;
-            return raw_values[0] > raw_values[1] ? raw_values[0]
-                                                 : raw_values[1];
-        }
-    } // namespace
 
 #include "signal_catalog.generated.inc"
 

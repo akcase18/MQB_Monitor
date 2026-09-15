@@ -34,7 +34,8 @@ namespace gui
                          sizeof(vm.url_text),
                          "http://%s",
                          ap_.ip_text());
-                /* The QR opens the config site, not a Wi-Fi join — the AP
+                /**
+                 * The QR opens the config site, not a Wi-Fi join — the AP
                  * has no password (see RemoteApController's file doc
                  * comment) so joining is just picking the SSID by hand;
                  * the QR's job is the second step, once already on the
@@ -45,7 +46,8 @@ namespace gui
 
             case ApState::Activating:
             case ApState::Deactivating:
-                /* Deactivating folds into Activating's "please wait" view
+                /**
+                 * Deactivating folds into Activating's "please wait" view
                  * rather than getting its own phase — it's brief (<=
                  * AP_DISABLE_GRACE_MS) and only ever entered by the user's
                  * own close (X) tap, which WirelessSetupScreen answers by

@@ -8,16 +8,19 @@ namespace gui
 
     namespace
     {
-        /* Small enough to sit unobtrusively over the panel grid's top-
+        /**
+         * Small enough to sit unobtrusively over the panel grid's top-
          * right corner without covering a reading, large enough to catch
          * the eye when it blinks. */
         constexpr lv_coord_t LOGGING_LED_SIZE   = 12;
-        /* Inset from the top-right corner, applied on both axes (so it
+        /**
+         * Inset from the top-right corner, applied on both axes (so it
          * moves the LED left and down together). Sits on top of
          * screen_'s own small pad_all, so the visible gap is a little
          * larger than this alone. */
         constexpr lv_coord_t LOGGING_LED_MARGIN = 8;
-        /* Half-period: lit this long, dark this long. Slow enough to
+        /**
+         * Half-period: lit this long, dark this long. Slow enough to
          * read as a deliberate recording light rather than an alarm. */
         constexpr uint32_t LOGGING_LED_BLINK_MS = 700;
     } // namespace
@@ -51,7 +54,8 @@ namespace gui
                                 &click_ctx_[i]);
         }
 
-        /* Capture indicator: a small blinking red LED, the convention
+        /**
+         * Capture indicator: a small blinking red LED, the convention
          * every recording device uses, rather than the static SD-card
          * glyph this started as -- that one sat muted grey over a dense
          * panel grid and was easy to miss entirely, which is the one
@@ -72,6 +76,16 @@ namespace gui
         lv_obj_add_flag(logging_led_, LV_OBJ_FLAG_HIDDEN);
     }
 
+    void InfoScreen::set_layout_style(LayoutStyle style)
+    {
+        style_ = style;
+    }
+
+    void InfoScreen::set_rank_offset(uint8_t offset)
+    {
+        rank_offset_ = offset;
+    }
+
     void InfoScreen::rebuild(uint8_t count, LayoutOrientation orientation)
     {
         if (count < 1)
@@ -84,14 +98,15 @@ namespace gui
         }
 
         PanelSlot slots[MAX_PANELS];
-        compute_layout(count, orientation, slots);
+        compute_layout(count, orientation, style_, slots);
 
         uint8_t rank_of_slot[MAX_PANELS];
         compute_prominence_ranks(slots, count, rank_of_slot);
 
         bool horizontal = orientation == LayoutOrientation::Horizontal;
 
-        /* Vertical's 5-panel layout (see layout.cpp) is a plain 2-col x
+        /**
+         * Vertical's 5-panel layout (see layout.cpp) is a plain 2-col x
          * 3-row grid, not the fine-6-unit-axis/2-band-split scheme every
          * other count uses -- its grid descriptors are set up directly
          * rather than through band_dsc/split_dsc below. */
@@ -108,7 +123,8 @@ namespace gui
         }
         else
         {
-            /* The fine 6-unit axis always has 6 divisions and the
+            /**
+             * The fine 6-unit axis always has 6 divisions and the
              * band-split axis always has 2 -- transpose() (see
              * layout.cpp) swaps which physical axis (row vs col) carries
              * which range, not the ranges themselves, so band_axis_len
@@ -124,7 +140,8 @@ namespace gui
             }
             band_dsc[band_axis_len] = LV_GRID_TEMPLATE_LAST;
 
-            /* Only the fixed Horizontal 5-panel layout keeps the
+            /**
+             * Only the fixed Horizontal 5-panel layout keeps the
              * small/large band split — every other count either has no
              * meaningful row split (1/2, both rows fully spanned) or
              * wants equal-sized cells (3/4/6), so it splits 50/50
@@ -165,8 +182,20 @@ namespace gui
             panel_large_[i] = slot.large;
             panel_hero_[i]  = is_hero_slot(slot);
 
-            rank_of_slot_[i]    = rank_of_slot[i];
-            click_ctx_[i].index = rank_of_slot[i];
+            /**
+             * Clamped rather than wrapped: an offset that would run a
+             * slot off the end of priorities[] is a caller error, and
+             * pinning to the last rank shows something real instead of
+             * reading past the array. */
+            uint16_t ranked = static_cast<uint16_t>(rank_of_slot[i])
+                              + static_cast<uint16_t>(rank_offset_);
+            if (ranked >= MAX_PANELS)
+            {
+                ranked = MAX_PANELS - 1;
+            }
+
+            rank_of_slot_[i]    = static_cast<uint8_t>(ranked);
+            click_ctx_[i].index = static_cast<uint8_t>(ranked);
         }
 
         num_panels_ = count;
@@ -196,7 +225,8 @@ namespace gui
         {
             lv_obj_remove_flag(logging_led_, LV_OBJ_FLAG_HIDDEN);
 
-            /* A hard on/off blink, not a fade: lv_anim_path_step holds
+            /**
+             * A hard on/off blink, not a fade: lv_anim_path_step holds
              * the start value for the whole duration then jumps, so the
              * LED sits lit for BLINK_PERIOD_MS and dark for the same,
              * forever. Driven by an animation rather than an lv_timer so
@@ -219,7 +249,8 @@ namespace gui
         }
         else
         {
-            /* Stop the blink before hiding, so re-enabling starts a
+            /**
+             * Stop the blink before hiding, so re-enabling starts a
              * fresh animation rather than stacking a second one. */
             lv_anim_delete(logging_led_, nullptr);
             lv_obj_add_flag(logging_led_, LV_OBJ_FLAG_HIDDEN);
@@ -228,7 +259,8 @@ namespace gui
 
     void InfoScreen::panel_clicked_cb(lv_event_t *e)
     {
-        /* LVGL fires CLICKED on release whenever no ancestor actually
+        /**
+         * LVGL fires CLICKED on release whenever no ancestor actually
          * scrolled, even if the press traveled far enough to also fire a
          * GESTURE (this screen doesn't scroll, so a swipe-to-open-Settings
          * that starts on a panel would otherwise open that panel too).

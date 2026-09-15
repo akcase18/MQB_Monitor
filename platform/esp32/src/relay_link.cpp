@@ -87,7 +87,8 @@ namespace esp32
                 = reader_.decoded_frame();
             if (frame.type != expected_resp_type)
             {
-                /* Desync -- the Teensy only ever replies to one
+                /**
+                 * Desync -- the Teensy only ever replies to one
                  * outstanding request at a time, so anything else here
                  * means this reply doesn't belong to this request. */
                 return false;

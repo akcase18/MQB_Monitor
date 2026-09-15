@@ -21,16 +21,19 @@ namespace gui
             lv_color_t accent;  /* pressed-button highlight */
             lv_color_t warn_lo; /* low-warning highlight */
             lv_color_t warn_hi; /* high-warning highlight */
-            /* Panel outline — panels share the screen's own bg color, so
+            /**
+             * Panel outline — panels share the screen's own bg color, so
              * without a visible border a panel's bounds are only implied
              * by the gap between it and its neighbors. */
             lv_color_t panel_border;
-            /* Bar/Gauge fill when the value is outside SignalSpec::
+            /**
+             * Bar/Gauge fill when the value is outside SignalSpec::
              * display_min/max — distinct from warn_lo/warn_hi (a
              * configured "this is bad" threshold) since a value can peg
              * a graphic at 100%/0% without ever crossing a warning. */
             lv_color_t range_overflow;
-            /* InfoScreen's blinking capture indicator. Its own token
+            /**
+             * InfoScreen's blinking capture indicator. Its own token
              * rather than reusing warn_hi: both are red by convention,
              * but a warning means "something is wrong" and this means
              * "recording", and a reskin should be free to keep the
@@ -48,15 +51,18 @@ namespace gui
     {
             const lv_font_t *data_sm;   /* small-panel data readout */
             const lv_font_t *data_lg;   /* large-panel data readout */
-            const lv_font_t *data_hero; /* Bar/Gauge value in a true hero
+            const lv_font_t *data_hero; /**
+                                         * Bar/Gauge value in a true hero
                                          * slot (count 1, count 3's hero) */
-            const lv_font_t *data_mega; /* bare Digital value in a true
+            const lv_font_t *data_mega; /**
+                                         * bare Digital value in a true
                                          * hero slot — as big as the
                                          * narrower of those slots (count
                                          * 3's hero) can fit */
             const lv_font_t *label_sm;  /* small-panel name label */
             const lv_font_t *label_lg;  /* large-panel name label */
-            const lv_font_t *unit;      /* value's adjacent unit tag — its
+            const lv_font_t *unit;      /**
+                                         * value's adjacent unit tag — its
                                          * own (smaller) size regardless of
                                          * panel tier, since even a small-
                                          * panel-sized font let a long unit
@@ -64,10 +70,12 @@ namespace gui
                                          * panel's edge */
             const lv_font_t *ui;        /* general UI text (screens, buttons) */
             const lv_font_t *symbol_lg; /* done/settings buttons */
-            const lv_font_t *title;     /* nav bar title — bold, sets it apart
+            const lv_font_t *title;     /**
+                                         * nav bar title — bold, sets it apart
                                          * from the plain-weight row labels
                                          * below it */
-            const lv_font_t *icon_day_night; /* sun/moon glyphs (see
+            const lv_font_t *icon_day_night; /**
+                                              * sun/moon glyphs (see
                                               * ICON_SUN/ICON_MOON below) —
                                               * a separate font from
                                               * symbol_lg since LVGL's
@@ -86,6 +94,24 @@ namespace gui
             uint8_t  screen_margin; /* outer padding around the panel grid */
             float    panel_height_sm_pct; /* fraction of screen_height */
             float    panel_height_lg_pct; /* fraction of screen_height */
+
+            /**
+             * Put the unit tag on its own line at the top of the panel
+             * rather than beside the value.
+             *
+             * A width decision, not a taste one. The tag normally sits to
+             * the right of a value that is itself centred, so the pair
+             * overhangs the centre line by half the value plus the whole
+             * tag -- fine in a 213px hero, and impossible in a 102px
+             * strip column, where the value alone can be 90px wide.
+             * Stacking makes the constraint max(value, tag) instead of
+             * their sum, which is what lets a short wide panel keep a
+             * readable number.
+             *
+             * False everywhere the panels are wide enough, so the CAN
+             * product renders exactly as it always has.
+             */
+            bool unit_stacked;
     };
 
     struct Theme
@@ -96,6 +122,13 @@ namespace gui
     };
 
     extern const Theme THEME_DEFAULT;
+
+    /** The gauge product's 320x172 strip: the same font ladder remapped
+     * for a much shorter panel, and metrics to match. See theme.cpp for
+     * the width arithmetic that picked the data faces -- it is pinned by
+     * test_gui_theme, because a value that clips is not something a code
+     * review catches. */
+    extern const Theme THEME_GAUGE;
 
     /** THEME_DEFAULT.metrics with screen_width/screen_height swapped for a
      * portrait-mounted panel (320x480, see platform::DisplayOrientation).

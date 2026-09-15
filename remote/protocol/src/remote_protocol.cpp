@@ -4,7 +4,8 @@
 
 namespace remote::protocol
 {
-    /*==========================================================================
+    /**
+     * ==========================================================================
      * PUT/GET
      =========================================================================*/
 
@@ -77,7 +78,8 @@ namespace remote::protocol
         return p + n;
     }
 
-    /*==========================================================================
+    /**
+     * ==========================================================================
      * CRC-16/CCITT-FALSE
      =========================================================================*/
 
@@ -86,7 +88,8 @@ namespace remote::protocol
         constexpr uint16_t CRC16_POLY = 0x1021;
     } // namespace
 
-    /* Bitwise rather than the usual 256-entry lookup table. The table
+    /**
+     * Bitwise rather than the usual 256-entry lookup table. The table
      * would be 512 bytes of RAM (a static constructor's worth of boot
      * work to fill, since the CRC polynomial loop isn't foldable at
      * compile time under this file's oldest target standard) or 512 bytes
@@ -117,7 +120,8 @@ namespace remote::protocol
         return crc16_ccitt_continue(0xFFFF, data, len);
     }
 
-    /*==========================================================================
+    /**
+     * ==========================================================================
      * FRAMING
      =========================================================================*/
 
@@ -216,7 +220,8 @@ namespace remote::protocol
             case State::CrcHi: {
                 crc_received_ = static_cast<uint16_t>(crc_received_ | (b << 8));
 
-                /* CRC covers MSG_TYPE || LEN || PAYLOAD — header and
+                /**
+                 * CRC covers MSG_TYPE || LEN || PAYLOAD — header and
                  * payload aren't contiguous in memory here, so the CRC is
                  * chained across two calls via crc16_ccitt_update(). */
                 uint8_t header[3]
@@ -231,7 +236,8 @@ namespace remote::protocol
                 uint8_t  type        = msg_type_;
                 uint16_t payload_len = len_;
 
-                reset(); /* clears len_/received_ — must run after both are
+                reset(); /**
+                          * clears len_/received_ — must run after both are
                           * captured above, not before */
 
                 if (!ok)
@@ -249,7 +255,8 @@ namespace remote::protocol
         return false;
     }
 
-    /*==========================================================================
+    /**
+     * ==========================================================================
      * PER-RECORD WIRE STRUCTS
      =========================================================================*/
 

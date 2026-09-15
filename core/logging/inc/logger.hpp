@@ -40,7 +40,8 @@
 namespace core
 {
 
-    /* Sized for roughly a few hours of retention in the worst case --
+    /**
+     * Sized for roughly a few hours of retention in the worst case --
      * all MAX_PANELS panels showing 20ms-cadence signals, every one of
      * them genuinely changing every sample -- against the dashboard's
      * real per-signal cadences (see core/logging/README.md for the
@@ -61,7 +62,8 @@ namespace core
     constexpr uint32_t CHUNK_SIZE_BYTES = 256u * 1024u;
     constexpr uint16_t CHUNK_COUNT      = 52;
 
-    /* Floor on how often any one signal may be recorded. A signal
+    /**
+     * Floor on how often any one signal may be recorded. A signal
      * arriving faster than this (the catalog's 20ms group) is logged at
      * 40ms spacing; a signal arriving slower (100ms, 500ms, ...) is
      * logged at its own arrival cadence, untouched -- this is a floor,
@@ -73,7 +75,8 @@ namespace core
      * Nothing in the catalog sits between 20ms and 100ms
      * (signal_catalog.generated.inc), so this coarsens exactly the 20ms
      * group it's meant to and leaves every other signal alone. */
-    constexpr uint32_t LOG_MIN_INTERVAL_MS = 50;  /* was 40 before the
+    constexpr uint32_t LOG_MIN_INTERVAL_MS = 50;  /**
+                                                   * was 40 before the
                                                    * 2026-08-25 cadence
                                                    * floor -- see below */
 
@@ -191,7 +194,8 @@ namespace core
                 return current_chunk_index_;
             }
 
-            /*==========================================================
+            /**
+             * ==========================================================
              * Log-index status, for LoggingScreen. All in-RAM reads --
              * the index is loaded once by begin() and kept current from
              * there, so a screen can poll these every refresh without
@@ -244,7 +248,8 @@ namespace core
             uint64_t used_bytes() const;
 
         private:
-            /* ~3.5s worth of records at worst-case write rate -- in
+            /**
+             * ~3.5s worth of records at worst-case write rate -- in
              * practice the buffer filling up is the usual flush trigger
              * (not FLUSH_INTERVAL_MS's timer), trading a bit more flash-
              * write frequency for keeping this comfortably small in
@@ -284,7 +289,8 @@ namespace core
             LogRecord buffer_[BUFFER_CAPACITY];
             uint16_t  buffer_count_ = 0;
 
-            /* Per-catalog-index (not per signal_id -- ids aren't
+            /**
+             * Per-catalog-index (not per signal_id -- ids aren't
              * contiguous, see signal_catalog.generated.inc) state behind
              * sample()'s decision to write a record or not.
              *
@@ -304,24 +310,28 @@ namespace core
             float    last_value_[SIGNAL_CATALOG_COUNT];
             bool     in_display_set_[SIGNAL_CATALOG_COUNT] = {};
 
-            /* Whether Settings::logging_enabled was set on the previous
+            /**
+             * Whether Settings::logging_enabled was set on the previous
              * sample() call -- lets the off-transition be caught once
              * (flush what's buffered, drop the primed baselines) instead
              * of every tick while logging stays off. */
             bool was_enabled_ = false;
 
-            /* Log index -- see log_record.hpp. entries_ is ordered oldest
+            /**
+             * Log index -- see log_record.hpp. entries_ is ordered oldest
              * capture first, so pruning is always a front-truncation. */
             LogIndexEntry entries_[MAX_LOG_ENTRIES] = {};
             uint16_t      entry_count_              = 0;
             uint32_t      next_log_id_              = 1;
-            /* Boot-relative start of the capture currently open, so its
+            /**
+             * Boot-relative start of the capture currently open, so its
              * duration can be recomputed each tick rather than
              * accumulated (which would drift). */
             uint32_t active_capture_start_ms_ = 0;
             uint32_t last_index_save_ms_      = 0;
 
-            /* The index is rewritten whole (it's only ~2.5KB), so it's
+            /**
+             * The index is rewritten whole (it's only ~2.5KB), so it's
              * saved on capture start/stop and otherwise only this often
              * -- a power cut mid-capture then costs at most this much
              * accuracy in that capture's recorded duration, never any
@@ -332,7 +342,8 @@ namespace core
             uint32_t next_chunk_seq_      = 0;
             uint16_t current_chunk_index_ = 0;
             uint32_t chunk_bytes_written_ = 0;
-            /* Whether the chunk at current_chunk_index_ has actually been
+            /**
+             * Whether the chunk at current_chunk_index_ has actually been
              * created on disk yet. Chunks are created lazily, on the
              * first flush that has something to put in them, so that
              * neither booting nor stopping a capture on a chunk boundary

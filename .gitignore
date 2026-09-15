@@ -15,6 +15,15 @@ sim_storage/*
 sim_sdcard/*
 !sim_sdcard/README.md
 
+# The gauge simulator's config blob. There is one per product now (both
+# write a core::Config, but the struct's size and every signal id in it come
+# from that product's own catalog -- sharing one file made the gauge
+# simulator load the MQB panel assignment and blank the panels whose ids it
+# does not have). sim_config.bin is *tracked*, which predates this; this one
+# deliberately is not, so a simulator run does not dirty the tree. Flip
+# either way, but flip both.
+sim_config_gauge.bin
+
 # Default output path of the "Logs: Download to CSV…" VS Code task
 # (.vscode/tasks.json). Any other name you type is yours to manage.
 /log_export_out.csv

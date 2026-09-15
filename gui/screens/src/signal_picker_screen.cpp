@@ -36,7 +36,8 @@ namespace gui
 
         create_divider(screen_, theme, HEADER_DIVIDER_Y);
 
-        /* A plain content_group (full width/height below the header
+        /**
+         * A plain content_group (full width/height below the header
          * divider) purely so the roller — self-sized from its row count,
          * see the comment below — can be lv_obj_center()'d within
          * whatever space is actually available instead of pinned to a
@@ -53,7 +54,8 @@ namespace gui
         lv_obj_set_style_text_font(roller_, theme.typography.ui, 0);
         lv_obj_set_width(roller_, theme.metrics.screen_width - 40);
         lv_obj_center(roller_);
-        /* An even row count reads more clearly as "a scrollable strip"
+        /**
+         * An even row count reads more clearly as "a scrollable strip"
          * than an odd one — with an odd count the selected row falls
          * exactly in the visual center, which can look like a fixed list
          * rather than something you scroll. No explicit set_height() here
@@ -67,7 +69,8 @@ namespace gui
         bool portrait = theme.metrics.screen_height > theme.metrics.screen_width;
         lv_roller_set_visible_row_count(roller_, portrait ? 8 : 4);
 
-        /* Default LVGL theming is a light-mode card — restyle to match
+        /**
+         * Default LVGL theming is a light-mode card — restyle to match
          * this app's dark, flat, bordered treatment. */
         lv_obj_set_style_bg_color(roller_, theme.palette.bg, 0);
         lv_obj_set_style_bg_opa(roller_, LV_OPA_COVER, 0);

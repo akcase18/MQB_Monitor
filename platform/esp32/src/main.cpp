@@ -33,7 +33,8 @@
 
 namespace
 {
-    /* Relay UART. Defaults are the XIAO ESP32-C3's Serial1 pins: GPIO21 is
+    /**
+     * Relay UART. Defaults are the XIAO ESP32-C3's Serial1 pins: GPIO21 is
      * TX (silkscreen D6), GPIO20 is RX (D7). Change these if the board
      * routes the link elsewhere.
      *
@@ -93,7 +94,8 @@ namespace
 
 void setup()
 {
-    /* Arduino-ESP32's native USB-CDC defaults to a 256-byte RX ring
+    /**
+     * Arduino-ESP32's native USB-CDC defaults to a 256-byte RX ring
      * buffer (USBCDC::begin() -> setRxBufferSize(256) if not preset) --
      * fine for the tiny CMD_AP_ENABLE/EVT_AP_* frames, but RESP_STATE's
      * payload alone can be over 1200 bytes, and a real USB transfer
@@ -106,7 +108,8 @@ void setup()
     /* USB-CDC is debug output only now -- the relay moved to Serial1. */
     Serial.begin(115200);
 
-    /* The default RX ring is 256 bytes, but RESP_STATE's payload alone can
+    /**
+     * The default RX ring is 256 bytes, but RESP_STATE's payload alone can
      * exceed 1200, and RelayLink only drains the port once per loop() pass
      * -- so a large frame overruns the buffer before it is read, which
      * showed up as send_request_and_wait() timing out on every real
@@ -115,7 +118,8 @@ void setup()
     Serial1.setRxBufferSize(remote::protocol::FRAME_MAX_PAYLOAD + 8);
     Serial1.begin(RELAY_BAUD, SERIAL_8N1, RELAY_RX_PIN, RELAY_TX_PIN);
 
-    /* Touching WiFi for the first time lazily inside on_relay_frame() (on
+    /**
+     * Touching WiFi for the first time lazily inside on_relay_frame() (on
      * the first real CMD_AP_ENABLE, which could arrive at any point after
      * boot) races the ESP-IDF lwIP task's own startup — observed as a hard
      * crash ("assert failed: tcpip_send_msg_wait_sem ... Invalid mbox")

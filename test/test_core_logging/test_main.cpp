@@ -21,7 +21,8 @@
 
 namespace
 {
-    /* In-memory IStorage test double -- a plain path -> byte-vector map, so
+    /**
+     * In-memory IStorage test double -- a plain path -> byte-vector map, so
      * tests stay hermetic (no touching the real simulator's sim_storage/
      * directory) and can read back exactly what Logger wrote via the same
      * public open/read/write/close API a real caller would use. */
@@ -195,12 +196,14 @@ void test_begin_writes_nothing_until_there_is_something_to_record()
     TEST_ASSERT_EQUAL_UINT32(1, logger.session_id());
     TEST_ASSERT_EQUAL_UINT16(0, logger.current_chunk_index());
 
-    /* No chunk yet. Creating one truncates a ring slot, and booting isn't
+    /**
+     * No chunk yet. Creating one truncates a ring slot, and booting isn't
      * recording -- with logging opt-in, a run of ignition cycles must not
      * eat the ring. */
     TEST_ASSERT_FALSE(storage.exists(chunk_path_str(0).c_str()));
 
-    /* The first flush with real content is what creates it, header and
+    /**
+     * The first flush with real content is what creates it, header and
      * all. */
     core::SignalStore signals;
     uint16_t           id  = core::SIGNAL_CATALOG[0].id;
@@ -246,7 +249,8 @@ void test_repeated_boots_without_recording_do_not_evict_anything()
         TEST_ASSERT_EQUAL_UINT16(1, logger.log_count());
     }
 
-    /* ...then ten power cycles with the recorder left off. Far more than
+    /**
+     * ...then ten power cycles with the recorder left off. Far more than
      * the ring has slots: if booting created a chunk, the capture would
      * be long gone. */
     for (int i = 0; i < 10; i++)
@@ -272,7 +276,8 @@ void test_sample_records_a_changed_value_but_not_a_repeated_one()
     signals.set(id, 42.0f, 100);
     logger.sample(signals, cfg, 100); // primes the baseline, writes nothing
 
-    /* Polled again, far enough past the rate floor, but the value hasn't
+    /**
+     * Polled again, far enough past the rate floor, but the value hasn't
      * moved -- SignalValue::last_update_ms advanced anyway, so this is
      * what separates on-change from on-poll. */
     signals.set(id, 42.0f, 200);
@@ -307,7 +312,8 @@ void test_a_fast_signal_is_rate_floored_to_the_minimum_interval()
     uint16_t           id  = core::SIGNAL_CATALOG[0].id;
     core::Config       cfg = displaying({ id });
 
-    /* A signal arriving twice as fast as the floor allows, with a
+    /**
+     * A signal arriving twice as fast as the floor allows, with a
      * genuinely new value every time -- the case LOG_MIN_INTERVAL_MS
      * exists for. Sampled on every arrival too, so nothing but the floor
      * itself is limiting the rate.
@@ -337,7 +343,8 @@ void test_a_fast_signal_is_rate_floored_to_the_minimum_interval()
             + expected_records * sizeof(core::LogRecord),
         bytes.size());
 
-    /* Every other arrival, i.e. exactly LOG_MIN_INTERVAL_MS apart -- not
+    /**
+     * Every other arrival, i.e. exactly LOG_MIN_INTERVAL_MS apart -- not
      * the rate it arrived at, and not coarser. */
     core::LogRecord records[expected_records];
     memcpy(records, bytes.data() + sizeof(core::ChunkHeader),
@@ -363,7 +370,8 @@ void test_a_slower_signal_is_logged_at_its_own_arrival_cadence()
     signals.set(id, 0.0f, 0);
     logger.sample(signals, cfg, 0); // primes
 
-    /* 100ms arrivals, sampled at 20ms. The floor is a floor, not a target
+    /**
+     * 100ms arrivals, sampled at 20ms. The floor is a floor, not a target
      * rate: every arrival past it gets its own record, so this signal is
      * logged at 100ms rather than being pulled to 40ms. */
     for (uint32_t t = 20; t <= 500; t += 20)
@@ -413,7 +421,8 @@ void test_sample_records_only_the_signals_currently_on_screen()
     core::Logger logger(storage);
     logger.begin();
 
-    /* Two signals both have fresh data, but only the first is assigned to
+    /**
+     * Two signals both have fresh data, but only the first is assigned to
      * a panel -- the second must not reach the log at all. */
     core::SignalStore signals;
     uint16_t           shown  = core::SIGNAL_CATALOG[0].id;
@@ -453,7 +462,8 @@ void test_a_reassigned_panels_new_signal_is_primed_not_logged_stale()
     uint16_t           first  = core::SIGNAL_CATALOG[0].id;
     uint16_t           second = core::SIGNAL_CATALOG[1].id;
 
-    /* `second` has been polled all along despite never being displayed,
+    /**
+     * `second` has been polled all along despite never being displayed,
      * so by the time it goes on screen it already holds a value from
      * t=100 that must never reach the log. */
     signals.set(first, 11.0f, 100);
@@ -465,7 +475,8 @@ void test_a_reassigned_panels_new_signal_is_primed_not_logged_stale()
     signals.set(first, 12.0f, 200);
     logger.sample(signals, cfg, 200); // records `first` = 12.0
 
-    /* User reassigns the panel to `second`. Its stale 22.0 from t=100 is
+    /**
+     * User reassigns the panel to `second`. Its stale 22.0 from t=100 is
      * taken as a baseline only -- no record. */
     cfg.priorities[0].signal_id = second;
     logger.sample(signals, cfg, 240);
@@ -488,7 +499,8 @@ void test_a_reassigned_panels_new_signal_is_primed_not_logged_stale()
     TEST_ASSERT_EQUAL_UINT16(first, records[0].signal_id);
     TEST_ASSERT_EQUAL_FLOAT(12.0f, records[0].value);
 
-    /* The stale 22.0 is absent entirely -- the first record for `second`
+    /**
+     * The stale 22.0 is absent entirely -- the first record for `second`
      * is the value that arrived after it came on screen. */
     TEST_ASSERT_EQUAL_UINT16(second, records[1].signal_id);
     TEST_ASSERT_EQUAL_UINT32(400, records[1].timestamp_ms);
@@ -513,7 +525,8 @@ void test_sample_records_nothing_while_logging_is_disabled()
     logger.sample(signals, cfg, 200);
     logger.sample(signals, cfg, 5200); // would flush, if anything were buffered
 
-    /* Not even a chunk header: chunks are created by the first flush that
+    /**
+     * Not even a chunk header: chunks are created by the first flush that
      * has content, and there was none. */
     TEST_ASSERT_FALSE(storage.exists(chunk_path_str(0).c_str()));
 }
@@ -534,7 +547,8 @@ void test_turning_logging_off_flushes_and_back_on_reprimes()
     signals.set(id, 22.0f, 200);
     logger.sample(signals, cfg, 200); // buffers a record, not yet flushed
 
-    /* Switching off must not strand that buffered record waiting for a
+    /**
+     * Switching off must not strand that buffered record waiting for a
      * flush interval that will never come while logging is off. */
     cfg.settings.logging_enabled = false;
     logger.sample(signals, cfg, 240);
@@ -544,7 +558,8 @@ void test_turning_logging_off_flushes_and_back_on_reprimes()
         sizeof(core::ChunkHeader) + sizeof(core::LogRecord),
         after_off.size());
 
-    /* Values keep moving while logging is off -- none of that may appear
+    /**
+     * Values keep moving while logging is off -- none of that may appear
      * once it resumes. */
     signals.set(id, 99.0f, 300);
     logger.sample(signals, cfg, 300);
@@ -582,7 +597,8 @@ void test_each_on_off_cycle_counts_as_its_own_log()
     uint16_t           id  = core::SIGNAL_CATALOG[0].id;
     core::Config       cfg = displaying({ id });
 
-    /* Three captures, all within one "power cycle" (one Logger, one
+    /**
+     * Three captures, all within one "power cycle" (one Logger, one
      * session_id) -- the count must follow the toggle, not the boot. */
     for (uint32_t i = 0; i < 3; i++)
     {
@@ -616,7 +632,8 @@ void test_erase_clears_the_store_and_the_capture_count()
     uint16_t          id  = core::SIGNAL_CATALOG[0].id;
     core::Config      cfg = displaying({ id });
 
-    /* One complete capture, so there's both a chunk and an index entry
+    /**
+     * One complete capture, so there's both a chunk and an index entry
      * to destroy. */
     signals.set(id, 1.0f, 1000);
     logger.sample(signals, cfg, 1000);
@@ -637,7 +654,8 @@ void test_erase_clears_the_store_and_the_capture_count()
     TEST_ASSERT_EQUAL_UINT64(0, logger.used_bytes());
     TEST_ASSERT_FALSE(storage.exists(chunk_path_str(0).c_str()));
 
-    /* Rotation starts over from the empty store, exactly as begin()
+    /**
+     * Rotation starts over from the empty store, exactly as begin()
      * derives it at boot -- no chunk is created until something is
      * actually recorded again. */
     TEST_ASSERT_EQUAL_UINT16(0, logger.current_chunk_index());
@@ -654,7 +672,8 @@ void test_erase_mid_capture_does_not_let_buffered_records_survive()
     uint16_t          id  = core::SIGNAL_CATALOG[0].id;
     core::Config      cfg = displaying({ id });
 
-    /* A capture left running, with records buffered in RAM and not yet
+    /**
+     * A capture left running, with records buffered in RAM and not yet
      * flushed -- the state the on-screen Erase button can be pressed in
      * (main.cpp's logging_erase_cb clears logging_enabled, but the
      * Logger's own tick hasn't run yet). */
@@ -667,7 +686,8 @@ void test_erase_mid_capture_does_not_let_buffered_records_survive()
 
     TEST_ASSERT_TRUE(logger.erase());
 
-    /* The buffer went with the wipe, so the next tick has nothing to
+    /**
+     * The buffer went with the wipe, so the next tick has nothing to
      * strand in a fresh chunk, and no capture is left half-open to be
      * closed against an index that no longer holds it. */
     TEST_ASSERT_FALSE(logger.is_capturing());
@@ -698,7 +718,8 @@ void test_recording_after_an_erase_starts_a_fresh_capture()
 
     TEST_ASSERT_TRUE(logger.erase());
 
-    /* Every signal re-primes after an erase, the same as it does after
+    /**
+     * Every signal re-primes after an erase, the same as it does after
      * logging is switched off and back on -- so the first tick back on
      * writes nothing, and the first record is the next genuinely new
      * value. */
@@ -746,7 +767,8 @@ void test_log_count_survives_a_reboot()
         TEST_ASSERT_EQUAL_UINT16(1, logger.log_count());
     }
 
-    /* New Logger over the same storage == a power cycle. The index file
+    /**
+     * New Logger over the same storage == a power cycle. The index file
      * is what carries the capture across it; the chunk headers alone
      * couldn't. */
     core::Logger rebooted(storage);
@@ -761,7 +783,8 @@ void test_logs_drop_out_of_the_count_once_the_ring_laps_past_them()
     FakeStorage storage;
     storage.begin();
 
-    /* One record per chunk, three chunks -- so the ring laps quickly and
+    /**
+     * One record per chunk, three chunks -- so the ring laps quickly and
      * eviction is reachable in a handful of writes. */
     core::Logger logger(
         storage, sizeof(core::ChunkHeader) + sizeof(core::LogRecord), 3);
@@ -771,7 +794,8 @@ void test_logs_drop_out_of_the_count_once_the_ring_laps_past_them()
     uint16_t           id  = core::SIGNAL_CATALOG[0].id;
     core::Config       cfg = displaying({ id });
 
-    /* Five short captures. Each writes one record, filling its chunk and
+    /**
+     * Five short captures. Each writes one record, filling its chunk and
      * rotating -- so each capture lands in its own chunk_seq, and the
      * 3-slot ring can only hold the newest few. */
     for (uint32_t i = 0; i < 5; i++)
@@ -788,13 +812,15 @@ void test_logs_drop_out_of_the_count_once_the_ring_laps_past_them()
         logger.sample(signals, cfg, t + 10000); /* flush -> rotate */
     }
 
-    /* The count is bounded by what the ring can still hold, not by how
+    /**
+     * The count is bounded by what the ring can still hold, not by how
      * many captures were ever taken -- which is the whole point of
      * pruning against oldest_live_chunk_seq(). */
     TEST_ASSERT_TRUE(logger.log_count() > 0);
     TEST_ASSERT_TRUE(logger.log_count() < 5);
 
-    /* And it stays pruned across a reboot rather than the index
+    /**
+     * And it stays pruned across a reboot rather than the index
      * resurrecting captures whose chunks are gone -- nor does the reboot
      * itself evict anything further, since it creates no chunk. */
     uint16_t before = logger.log_count();
@@ -815,7 +841,8 @@ void test_a_corrupt_index_self_heals_to_an_empty_one()
     storage.write(garbage, sizeof(garbage));
     storage.close();
 
-    /* Same treatment a corrupt chunk header gets: start clean rather
+    /**
+     * Same treatment a corrupt chunk header gets: start clean rather
      * than refusing to run or reporting nonsense. */
     core::Logger logger(storage);
     TEST_ASSERT_TRUE(logger.begin());
@@ -842,7 +869,8 @@ void test_used_bytes_climbs_to_capacity_and_pins_there()
     uint16_t           id  = core::SIGNAL_CATALOG[0].id;
     core::Config       cfg = displaying({ id });
 
-    /* Fill the ring one chunk at a time, then keep going well past it.
+    /**
+     * Fill the ring one chunk at a time, then keep going well past it.
      * used_bytes() must climb and then stop at capacity rather than
      * running away -- rotation overwrites, it doesn't add space. */
     uint64_t previous = 0;
@@ -868,7 +896,8 @@ void test_chunk_rotation_advances_through_all_slots_then_wraps()
     FakeStorage  storage;
     storage.begin();
 
-    /* One record (10 bytes) per chunk before it rotates -- tiny on
+    /**
+     * One record (10 bytes) per chunk before it rotates -- tiny on
      * purpose, see the file doc comment. */
     core::Logger logger(
         storage, sizeof(core::ChunkHeader) + sizeof(core::LogRecord), 3);
@@ -879,14 +908,16 @@ void test_chunk_rotation_advances_through_all_slots_then_wraps()
     uint16_t           id  = core::SIGNAL_CATALOG[0].id;
     core::Config       cfg = displaying({ id });
 
-    /* The first sample after a signal comes on screen only primes its
+    /**
+     * The first sample after a signal comes on screen only primes its
      * baseline (see Logger::sample), so get that out of the way up front
      * and leave each loop iteration below a clean one-record-one-rotation
      * step. */
     signals.set(id, -1.0f, 100);
     logger.sample(signals, cfg, 100);
 
-    /* Each iteration: one changed value (forces a buffered record) then a
+    /**
+     * Each iteration: one changed value (forces a buffered record) then a
      * big enough time jump to guarantee a flush -- fills chunk i to
      * capacity, rotating into chunk i+1. */
     for (uint32_t i = 0; i < 5; i++)
@@ -896,7 +927,8 @@ void test_chunk_rotation_advances_through_all_slots_then_wraps()
         logger.sample(signals, cfg, 1000 + i * 10000 + 6000); // due -> flush
     }
 
-    /* begin() writes chunk_seq 0 into slot 0; the 5 loop iterations each
+    /**
+     * begin() writes chunk_seq 0 into slot 0; the 5 loop iterations each
      * fill their chunk to capacity and rotate, writing chunk_seq
      * 1,2,3,4,5 into slots 1,2,0,1,2 in turn (each overwriting that
      * slot's earlier visit) -- so the ring ends up mid-way through its
@@ -904,7 +936,8 @@ void test_chunk_rotation_advances_through_all_slots_then_wraps()
      * only, no record yet). */
     TEST_ASSERT_EQUAL_UINT16(2, logger.current_chunk_index());
 
-    /* Slot 0 was overwritten by chunk_seq 3 -- confirm it holds the
+    /**
+     * Slot 0 was overwritten by chunk_seq 3 -- confirm it holds the
      * *newer* record (value 3.0), not the original chunk_seq 0 (value
      * 0.0) -- the whole point of wraparound being an overwrite, not an
      * append. */
@@ -926,7 +959,8 @@ void test_begin_self_heals_from_corrupt_chunk_and_recovers_max_seq()
     FakeStorage storage;
     storage.begin();
 
-    /* Slot 0: a valid header (chunk_seq=0, session_id=1) -- large
+    /**
+     * Slot 0: a valid header (chunk_seq=0, session_id=1) -- large
      * chunk_size_bytes so this never rotates, keeping the scenario to
      * exactly one real chunk. It takes an actual capture to produce that
      * chunk; begin() alone writes nothing. */
@@ -942,7 +976,8 @@ void test_begin_self_heals_from_corrupt_chunk_and_recovers_max_seq()
     cfg.settings.logging_enabled = false;
     seed.sample(signals, cfg, 200); // flush -> chunk_seq 0 exists
 
-    /* Slot 3 gets garbage instead of a real header -- begin() must skip
+    /**
+     * Slot 3 gets garbage instead of a real header -- begin() must skip
      * it (wrong/missing magic) rather than misreading it as a
      * higher-priority high-water mark than slot 0's real one. */
     storage.open(chunk_path_str(3).c_str(), StorageFileMode::Write);
@@ -953,7 +988,8 @@ void test_begin_self_heals_from_corrupt_chunk_and_recovers_max_seq()
     core::Logger recovered(storage, 4096, 4);
     TEST_ASSERT_TRUE(recovered.begin());
 
-    /* Recovers exactly seed's chunk_seq=0/session_id=1 from slot 0 and
+    /**
+     * Recovers exactly seed's chunk_seq=0/session_id=1 from slot 0 and
      * starts strictly past both -- next chunk_seq=1 (slot 1), session
      * incremented to 2. */
     TEST_ASSERT_EQUAL_UINT32(2, recovered.session_id());

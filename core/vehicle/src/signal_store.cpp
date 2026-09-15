@@ -74,7 +74,8 @@ namespace core
             value = unit_convert_to_imperial(spec.unit_type, value);
         }
 
-        /* Old round_data(): Volume/Pressure round to N decimals, everything
+        /**
+         * Old round_data(): Volume/Pressure round to N decimals, everything
          * else truncates toward zero (no rounding). Preserved as-is. */
         switch (spec.unit_type)
         {
@@ -92,61 +93,6 @@ namespace core
         }
 
         return value;
-    }
-
-    void SignalStore::on_uds_response(uint8_t  byte1,
-                                      uint8_t  byte2,
-                                      float    raw,
-                                      uint32_t now_ms)
-    {
-        for (size_t i = 0; i < SIGNAL_CATALOG_COUNT; i++)
-        {
-            const SignalSpec &spec = SIGNAL_CATALOG[i];
-
-            /* A signal that owns none of this response's requests can't
-             * have changed state, so there's nothing to re-evaluate for
-             * it -- skipping straight past keeps the per-frame cost
-             * proportional to how many signals actually match rather
-             * than re-walking every catalog entry's requests twice. */
-            bool matched = false;
-            for (uint8_t r = 0; r < spec.num_requests; r++)
-            {
-                const UdsRequestSpec &req = spec.requests[r];
-                if (req.byte1 != byte1 || req.byte2 != byte2)
-                {
-                    continue;
-                }
-
-                request_raw_[i][r]  = (raw + req.offset) * req.scale;
-                request_recv_[i][r] = true;
-                matched             = true;
-            }
-
-            if (!matched)
-            {
-                continue;
-            }
-
-            bool all_received = true;
-            for (uint8_t r = 0; r < spec.num_requests; r++)
-            {
-                if (!request_recv_[i][r])
-                {
-                    all_received = false;
-                    break;
-                }
-            }
-
-            if (all_received)
-            {
-                /* set_at(i), not set(spec.id) -- the catalog index is
-                 * already in hand here, so re-deriving it from the id
-                 * would be a pointless second scan of the catalog. */
-                set_at(static_cast<int>(i),
-                       spec.transform(request_raw_[i], spec.num_requests),
-                       now_ms);
-            }
-        }
     }
 
 } // namespace core

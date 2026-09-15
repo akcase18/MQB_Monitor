@@ -20,7 +20,8 @@ namespace
     using namespace remote::protocol;
     using namespace remote::server;
 
-    /* In-memory IConfigStore test double, same pattern test_core_config
+    /**
+     * In-memory IConfigStore test double, same pattern test_core_config
      * already uses — avoids touching sim_config.bin. */
     class FakeConfigStore : public IConfigStore
     {
@@ -61,7 +62,8 @@ namespace
             uint8_t bytes_[CAPACITY];
     };
 
-    /* Deterministic IClock test double, same pattern test_core_vehicle
+    /**
+     * Deterministic IClock test double, same pattern test_core_vehicle
      * already uses. */
     class FakeClock : public IClock
     {
@@ -74,7 +76,8 @@ namespace
             uint32_t now_ms = 0;
     };
 
-    /* ISerialLink test double: a byte queue to "receive" and a capture
+    /**
+     * ISerialLink test double: a byte queue to "receive" and a capture
      * buffer for what gets "sent". */
     class FakeSerialLink : public ISerialLink
     {
@@ -122,12 +125,14 @@ namespace
             size_t  write_len_       = 0;
     };
 
-    /* Feeds a fully-encoded frame through a fresh FrameReader and returns
+    /**
+     * Feeds a fully-encoded frame through a fresh FrameReader and returns
      * the decoded frame — used to check what a RemoteConfigLink actually
      * wrote onto the wire. */
     DecodedFrame decode_one_frame(const uint8_t *bytes, size_t len)
     {
-        static FrameReader reader; /* static: DecodedFrame::payload aliases
+        static FrameReader reader; /**
+                                    * static: DecodedFrame::payload aliases
                                     * its internal buffer, must outlive
                                     * the caller's use of the result */
         reader = FrameReader {};
@@ -149,7 +154,8 @@ void tearDown()
 {
 }
 
-/*==============================================================================
+/**
+ * ==============================================================================
  * CRC
  =============================================================================*/
 
@@ -159,7 +165,8 @@ void test_crc16_known_answer_vector()
     TEST_ASSERT_EQUAL_UINT16(0x29B1, crc16_ccitt(check, 9));
 }
 
-/*==============================================================================
+/**
+ * ==============================================================================
  * FRAMING
  =============================================================================*/
 
@@ -230,7 +237,8 @@ void test_corrupted_frame_resyncs_on_next_frame()
     }
     TEST_ASSERT_FALSE(completed); /* CRC mismatch, silently dropped */
 
-    /* A subsequent real frame must still decode correctly — the corrupt
+    /**
+     * A subsequent real frame must still decode correctly — the corrupt
      * frame can't wedge the reader. */
     completed = false;
     for (size_t i = 0; i < frame_len; i++)
@@ -277,7 +285,8 @@ void test_stalled_frame_times_out()
                                     sizeof(frame_bytes));
 
     FrameReader reader;
-    /* Feed everything up to (not including) the last payload byte, then
+    /**
+     * Feed everything up to (not including) the last payload byte, then
      * stall past FRAME_TIMEOUT_MS before finishing it. */
     for (size_t i = 0; i < frame_len - 3; i++)
     {
@@ -298,7 +307,8 @@ void test_stalled_frame_times_out()
     TEST_ASSERT_TRUE(completed);
 }
 
-/*==============================================================================
+/**
+ * ==============================================================================
  * REMOTECONFIGSERVER — REQ_GET_STATE
  =============================================================================*/
 
@@ -370,13 +380,15 @@ void test_get_state_reports_defaults()
         static_cast<uint32_t>(resp_len));
 }
 
-/*==============================================================================
+/**
+ * ==============================================================================
  * REMOTECONFIGSERVER — REQ_APPLY_CONFIG
  =============================================================================*/
 
 namespace
 {
-    /* Builds a valid REQ_APPLY_CONFIG payload matching the current
+    /**
+     * Builds a valid REQ_APPLY_CONFIG payload matching the current
      * defaults, so individual tests only need to override what they're
      * testing. */
     size_t build_apply_payload(const core::Config &defaults,
@@ -459,7 +471,8 @@ void test_apply_config_persists_valid_batch()
     TEST_ASSERT_TRUE(MsgType::RESP_APPLY_RESULT == resp_type);
     TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ApplyResult::Ok), resp[0]);
 
-    /* Persisted for real — a fresh ConfigStore over the same backing sees
+    /**
+     * Persisted for real — a fresh ConfigStore over the same backing sees
      * it. */
     core::ConfigStore reloaded(backing);
     reloaded.load();
@@ -571,7 +584,8 @@ void test_apply_config_clamps_thresholds_to_effective_range()
 
     RemoteConfigServer server(config, signals);
 
-    /* Signal 0 (Coolant Temp): catalog range is -40..130. Submit a custom
+    /**
+     * Signal 0 (Coolant Temp): catalog range is -40..130. Submit a custom
      * range (0..50) *and* thresholds outside it in the same batch — the
      * thresholds must clamp against the custom range just submitted, not
      * the catalog default. */
@@ -631,7 +645,8 @@ void test_apply_config_swaps_reversed_thresholds()
                      <= config.get().signals[0].warn.hi);
 }
 
-/*==============================================================================
+/**
+ * ==============================================================================
  * REMOTECONFIGLINK / REMOTEAPCONTROLLER
  =============================================================================*/
 
@@ -701,7 +716,8 @@ void test_ap_controller_activate_sends_command_and_reaches_active()
     /* Deliberately open AP — see RemoteApController's file doc comment. */
     TEST_ASSERT_EQUAL_STRING("", wire.password);
 
-    /* Simulate the C3 replying, via the same poll()/evt_cb path a real
+    /**
+     * Simulate the C3 replying, via the same poll()/evt_cb path a real
      * link would use. */
     link.clear_write();
     uint8_t     evt_frame[16];
@@ -750,7 +766,8 @@ void test_ap_controller_idle_timeout_disables()
     controller.tick(AP_IDLE_TIMEOUT_MS + 1);
     TEST_ASSERT_TRUE(ApState::Deactivating == controller.state());
 
-    /* No EVT_AP_DISABLED ever arrives — the grace-period fallback must
+    /**
+     * No EVT_AP_DISABLED ever arrives — the grace-period fallback must
      * still return to Idle rather than staying wedged. */
     controller.tick(AP_IDLE_TIMEOUT_MS + 1 + AP_DISABLE_GRACE_MS + 1);
     TEST_ASSERT_TRUE(ApState::Idle == controller.state());
@@ -800,7 +817,8 @@ void test_ap_controller_reactivate_from_deactivating_resends_enable()
     controller.deactivate();
     TEST_ASSERT_TRUE(ApState::Deactivating == controller.state());
 
-    /* Reopening Wireless Setup before EVT_AP_DISABLED (or the grace-period
+    /**
+     * Reopening Wireless Setup before EVT_AP_DISABLED (or the grace-period
      * fallback) arrives — the screen's own close (X) button doesn't wait
      * around for it, so this is a real workflow, not just a race. Must
      * resend CMD_AP_ENABLE rather than silently no-op and strand the

@@ -41,7 +41,8 @@ namespace core
             void tick();
 
         private:
-            /* No `active` flag: nothing can ever deregister a task (there
+            /**
+             * No `active` flag: nothing can ever deregister a task (there
              * is no cancel/remove entry point, by design -- every task
              * here is registered once at boot and runs for the life of the
              * process), so a per-task enabled bit was a byte of state and

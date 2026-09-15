@@ -18,7 +18,8 @@ namespace core
     {
         public:
             static constexpr uint16_t MAGIC_NUMBER = 0xFEA7;
-            /* v2: added PanelConfig::display_mode. v3: added
+            /**
+             * v2: added PanelConfig::display_mode. v3: added
              * Settings::accent_color. v4: added SignalConfig::
              * use_custom_range/custom_min/custom_max. v5: Config.panels[]
              * (screen-slot-indexed) renamed to Config.priorities[]

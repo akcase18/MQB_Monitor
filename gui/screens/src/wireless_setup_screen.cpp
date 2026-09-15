@@ -15,14 +15,16 @@ namespace gui
 
         constexpr lv_coord_t SPINNER_SIZE      = 56;
         constexpr lv_coord_t SPINNER_LABEL_GAP = 16;
-        /* Spinner(56) + gap(16) + status label, measured off Landscape's
+        /**
+         * Spinner(56) + gap(16) + status label, measured off Landscape's
          * original SPINNER_Y=120 (each exactly reproduced by the formula
          * below at screen_height=320) -- same centering technique as
          * QR_BLOCK_HEIGHT below, see its comment. */
         constexpr lv_coord_t CONNECTING_BLOCK_HEIGHT = 130;
 
         constexpr lv_coord_t QR_SIZE = 130;
-        /* QR(130) + gap(12) + SSID line + gap(22) + URL line, measured off
+        /**
+         * QR(130) + gap(12) + SSID line + gap(22) + URL line, measured off
          * Landscape's original QR_Y=92/ACTIVE_SSID_Y=234/ACTIVE_URL_Y=256
          * (each exactly reproduced by the formula below at
          * screen_height=320). Used to vertically center the whole block
@@ -50,7 +52,8 @@ namespace gui
 
         create_divider(screen_, theme, HEADER_DIVIDER_Y);
 
-        /* Connecting group: spinner + status label — covers Idle (opening
+        /**
+         * Connecting group: spinner + status label — covers Idle (opening
          * this screen activates the AP immediately, see the file doc
          * comment, so Idle is only ever momentarily true if at all),
          * Activating, and Deactivating (see RemoteBinding::build_view_
@@ -84,7 +87,8 @@ namespace gui
                      0,
                      connecting_margin + SPINNER_SIZE + SPINNER_LABEL_GAP);
 
-        /* Active group: QR code + credentials fallback. Deactivating is
+        /**
+         * Active group: QR code + credentials fallback. Deactivating is
          * the close (X) button's job (see the file doc comment) — no
          * separate control needed here. */
         active_group_ = lv_obj_create(screen_);
@@ -124,7 +128,8 @@ namespace gui
                                    lv_obj_t                     *return_screen)
     {
         return_screen_ = return_screen;
-        /* Force set_view_model() to touch the QR widget even if the phase
+        /**
+         * Force set_view_model() to touch the QR widget even if the phase
          * happens to match last_phase_ from a previous session (e.g.
          * reopening while still Active from before). */
         last_phase_ = static_cast<WirelessSetupPhase>(0xFF);
@@ -141,7 +146,8 @@ namespace gui
     {
         if (vm.phase != last_phase_)
         {
-            /* Idle and Activating share one visual (see the file doc
+            /**
+             * Idle and Activating share one visual (see the file doc
              * comment) — only Active gets its own. Un-hide before touching
              * the QR canvas below: lv_qrcode_update()'s internal
              * lv_obj_invalidate() is a no-op while the parent is still
@@ -175,7 +181,8 @@ namespace gui
             self->deactivate_cb_(self->deactivate_ctx_);
         }
 
-        /* Optimistic: don't wait around to watch ApState reach Idle (see
+        /**
+         * Optimistic: don't wait around to watch ApState reach Idle (see
          * the file doc comment) — back out to Settings immediately. */
         if (self->return_screen_ != nullptr)
         {

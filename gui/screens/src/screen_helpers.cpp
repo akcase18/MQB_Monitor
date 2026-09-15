@@ -14,7 +14,8 @@ namespace gui
         lv_obj_set_style_border_width(screen, 0, 0);
         lv_obj_set_style_radius(screen, 0, 0);
 
-        /* Every screen here is a fixed, fully custom layout on a fixed-size
+        /**
+         * Every screen here is a fixed, fully custom layout on a fixed-size
          * panel — nothing should ever scroll. Hiding the scrollbar alone
          * (LV_SCROLLBAR_MODE_OFF) only hides the visual indicator; the object
          * stays scrollable and can still eat swipes as scroll attempts,
@@ -86,7 +87,8 @@ namespace gui
         lv_obj_set_style_bg_opa(row.btn, LV_OPA_TRANSP, 0);
         lv_obj_set_style_border_width(row.btn, 0, 0);
         lv_obj_set_style_shadow_width(row.btn, 0, 0);
-        /* lv_btn's default theme pads its content in from the button's own
+        /**
+         * lv_btn's default theme pads its content in from the button's own
          * edges — without zeroing that, LEFT_MID-aligned children sit
          * further right than the plain labels elsewhere on the same
          * screen, which aren't buttons and so have no such padding. */
@@ -146,7 +148,8 @@ namespace gui
          * screens' own control rows wanting an easy tap target. */
         constexpr lv_coord_t CONFIRM_POPUP_FOOTER_HEIGHT = 60;
 
-        /* Matches the flat, bordered look of the screens' own buttons, so
+        /**
+         * Matches the flat, bordered look of the screens' own buttons, so
          * the footer doesn't end up in LVGL's default light-mode styling.
          * `fill` (the Confirm button) sits solid at rest in the color that
          * every other button here only shows on press -- marking the one
@@ -190,14 +193,16 @@ namespace gui
             popup.mbox, theme.palette.panel_border, 0);
         lv_obj_set_style_radius(popup.mbox, 10, 0);
 
-        /* Both strings stay short and single-line on purpose: a full
+        /**
+         * Both strings stay short and single-line on purpose: a full
          * sentence of each wrapped onto several lines apiece, which read
          * as cluttered at the popup's ~260px width in both orientations. */
         lv_obj_t *title = lv_msgbox_add_title(popup.mbox, title_text);
         lv_obj_set_style_text_color(title, theme.palette.fg, 0);
         lv_obj_set_style_text_font(title, theme.typography.label_lg, 0);
 
-        /* lv_msgbox_add_title() is what actually creates the header
+        /**
+         * lv_msgbox_add_title() is what actually creates the header
          * container (get_header() would return null before this point) --
          * it picks up LVGL's default (light-mode) theme styling on its own
          * bg, so override it explicitly to match everything else here
@@ -210,7 +215,8 @@ namespace gui
         lv_obj_set_style_text_color(body, theme.palette.fg, 0);
         lv_obj_set_style_text_font(body, theme.typography.label_lg, 0);
 
-        /* Cancel added first, Confirm second -- lv_msgbox's footer is a
+        /**
+         * Cancel added first, Confirm second -- lv_msgbox's footer is a
          * left-to-right flex row, so this puts Confirm on the right. */
         popup.cancel_btn = lv_msgbox_add_footer_button(popup.mbox, "Cancel");
         popup.confirm_btn
@@ -221,7 +227,8 @@ namespace gui
         style_flat_footer_button(popup.cancel_btn, theme);
         style_flat_footer_button(popup.confirm_btn, theme, &fill);
 
-        /* The buttons are LV_PCT(100) of the footer, so growing the footer
+        /**
+         * The buttons are LV_PCT(100) of the footer, so growing the footer
          * grows them too. */
         lv_obj_set_height(lv_msgbox_get_footer(popup.mbox),
                           CONFIRM_POPUP_FOOTER_HEIGHT);

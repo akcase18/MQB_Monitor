@@ -10,7 +10,8 @@ namespace gui
 
     namespace
     {
-        /* Nav bar, one oversized toggle, the status tiles, then the
+        /**
+         * Nav bar, one oversized toggle, the status tiles, then the
          * erase action. The toggle gets far more room than any control on
          * SettingsScreen: it's the whole point of the screen and it gets
          * pressed while driving, so it's sized to be hit without looking
@@ -40,7 +41,8 @@ namespace gui
         constexpr lv_coord_t ERASE_ROW_Y     = 260;
         constexpr lv_coord_t ERASE_HEIGHT    = 44;
 
-        /* Portrait has ~160px more height to spend, so everything gets
+        /**
+         * Portrait has ~160px more height to spend, so everything gets
          * taller and further apart rather than sitting in a cluster at
          * the top -- the same treatment SettingsScreen's Portrait pass
          * applies for the same reason. The four tiles stay in one column
@@ -163,7 +165,8 @@ namespace gui
 
         lv_coord_t row_width = theme.metrics.screen_width - 2 * SCREEN_MARGIN;
 
-        /* The toggle is the whole row, not a small control on the right of
+        /**
+         * The toggle is the whole row, not a small control on the right of
          * a labelled row the way SettingsScreen's toggles are -- there's
          * nothing else competing for this space, and a full-width target
          * is far easier to hit in a moving car. */
@@ -189,7 +192,8 @@ namespace gui
         lv_obj_set_style_text_font(toggle_lbl_, theme.typography.title, 0);
         lv_obj_align(toggle_lbl_, LV_ALIGN_CENTER, 0, -10);
 
-        /* Second line inside the button: what a press will do next, so
+        /**
+         * Second line inside the button: what a press will do next, so
          * the control states its own affordance instead of relying on
          * the user remembering what the fill color means. */
         toggle_hint_ = lv_label_create(toggle_btn_);
@@ -206,7 +210,8 @@ namespace gui
         lv_coord_t step   = portrait ? PORTRAIT_STAT_STEP : STAT_STEP;
         lv_coord_t height = portrait ? PORTRAIT_STAT_HEIGHT : STAT_HEIGHT;
 
-        /* One column in Portrait, two in Landscape -- so the same four
+        /**
+         * One column in Portrait, two in Landscape -- so the same four
          * tiles walk down a single column or fill a 2x2 grid without two
          * separate placement loops. */
         uint8_t    columns = portrait ? 1 : STAT_COLUMNS;
@@ -244,7 +249,8 @@ namespace gui
                        theme,
                        portrait ? PORTRAIT_ERASE_DIVIDER_Y : ERASE_DIVIDER_Y);
 
-        /* Same full-width shape as the toggle, deliberately not the same
+        /**
+         * Same full-width shape as the toggle, deliberately not the same
          * weight: bordered in warn_hi rather than filled, so it reads as
          * the one destructive control on the screen without competing
          * with the control the user actually came here for. */
@@ -306,7 +312,8 @@ namespace gui
                           vm.storage_label[0] != '\0' ? vm.storage_label
                                                       : "--");
 
-        /* Used against the ring's total. Not "remaining": the ring
+        /**
+         * Used against the ring's total. Not "remaining": the ring
          * overwrites rather than filling up, so past the first lap this
          * pins at full and recording simply continues, dropping the
          * oldest chunk each time around. A countdown-to-zero would sit
@@ -330,7 +337,8 @@ namespace gui
 
         if (!storage_ready_)
         {
-            /* No store mounted -- nothing to record onto. Shown as a
+            /**
+             * No store mounted -- nothing to record onto. Shown as a
              * disabled-looking button rather than hidden, so the screen
              * still explains itself instead of just missing its main
              * control. */
@@ -344,7 +352,8 @@ namespace gui
             return;
         }
 
-        /* Recording reads as a solid accent fill, the same treatment
+        /**
+         * Recording reads as a solid accent fill, the same treatment
          * every other checked/active control in this app uses (see
          * screen_helpers' style_flat_matrix()). */
         lv_obj_set_style_bg_color(toggle_btn_,
@@ -366,7 +375,8 @@ namespace gui
             return;
         }
 
-        /* Nothing mounted means nothing to wipe. Dimmed rather than
+        /**
+         * Nothing mounted means nothing to wipe. Dimmed rather than
          * hidden, for the same reason the toggle is: the screen should
          * still explain its own shape when storage is missing, not lose
          * half its controls. */
@@ -390,7 +400,8 @@ namespace gui
             return; /* nothing to erase -- see refresh_erase() */
         }
 
-        /* Unlike the toggle, this is not undoable by pressing again, so
+        /**
+         * Unlike the toggle, this is not undoable by pressing again, so
          * it asks first -- the same Cancel/Confirm popup rotating the
          * display sits behind. The body names the one surprising side
          * effect: the caller stops recording as part of erasing, rather
@@ -418,7 +429,8 @@ namespace gui
         lv_msgbox_close_async(self->erase_confirm_mbox_);
         self->erase_confirm_mbox_ = nullptr;
 
-        /* No local state is touched here. The caller wipes the store and
+        /**
+         * No local state is touched here. The caller wipes the store and
          * pushes a fresh view-model straight back through refresh(),
          * which is what zeroes the readouts and drops the toggle to OFF
          * -- guessing at the result locally could only disagree with what
@@ -464,7 +476,8 @@ namespace gui
 
         if (self->return_screen_ != nullptr)
         {
-            /* Mirrors open()'s OVER_TOP with its opposite, so closing
+            /**
+             * Mirrors open()'s OVER_TOP with its opposite, so closing
              * visually undoes the swipe that opened this. */
             lv_screen_load_anim(self->return_screen_,
                                 LV_SCR_LOAD_ANIM_OVER_BOTTOM,
