@@ -111,6 +111,38 @@ class IDisplay
                            const uint16_t *pixels) = 0;
 
         /**
+         * Whole-screen render targets, if the board has them. A display
+         * that returns true owns two frame buffers of at least
+         * width*height RGB565 pixels each (post-rotation) and wants LVGL
+         * rendering straight into them (LV_DISPLAY_RENDER_MODE_DIRECT)
+         * rather than into main.cpp's banded partial buffers. Under that
+         * mode flush()'s `pixels` is the *base of the whole frame
+         * buffer*, the coordinates are the area within it that changed,
+         * and the display may hold the push back until flush_end() so a
+         * pass goes to the panel as one transfer. Called once, at boot.
+         *
+         * Default: none; main.cpp then renders in bands.
+         */
+        virtual bool get_frame_buffers(uint16_t *&buf_1,
+                                       uint16_t *&buf_2,
+                                       size_t    &bytes)
+        {
+            buf_1 = nullptr;
+            buf_2 = nullptr;
+            bytes = 0;
+            return false;
+        }
+
+        /**
+         * Marks the end of one render pass: every flush() for it has
+         * been issued. Called on every platform; only a display that
+         * defers its pushes (see get_frame_buffers) has anything to do.
+         */
+        virtual void flush_end()
+        {
+        }
+
+        /**
          * Sets backlight brightness.
          *
          * @param pct Brightness, 0-100.
