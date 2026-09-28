@@ -13,19 +13,23 @@ The S3 makes this much simpler than it would be on the Teensy: ESP-IDF has nativ
 
 ## Design
 
-### 1. Partition table — two 2.5 MB app slots
+### 1. Partition table — two 2 MB app slots
 
 ```
 # Name,    Type, SubType, Offset,   Size
 nvs,       data, nvs,     0x9000,   0x5000
 otadata,   data, ota,     0xE000,   0x2000
-app0,      app,  ota_0,   0x10000,  0x280000
-app1,      app,  ota_1,   0x290000, 0x280000
-spiffs,    data, spiffs,  0x510000, 0xAF0000
+app0,      app,  ota_0,   0x10000,  0x200000
+app1,      app,  ota_1,   0x210000, 0x200000
+spiffs,    data, spiffs,  0x410000, 0xBF0000
 ```
 
-- **Why 2.5 MB and not 3 MB:** 2.5 MB is about 2× today's 1.22 MB app. The largest additions we might plausibly make still fit: HTTPS downloads (`esp_https_ota`, the TLS cert bundle) and BLE (NimBLE) would each add a few hundred KB at most. Each extra 0.5 MB per slot would cost 1 MB of log space, so 3 MB slots would buy headroom we don't expect to use. The case for 3 MB was that the partition table can only be changed over USB, but that's a small cost on a single dash where USB stays accessible. If the app ever does outgrow 2.5 MB, it's one USB reflash.
-- **Log ring shrinks from 13 MiB to 10 MiB:** the ring becomes 40 × 256 KiB chunks instead of 52. That keeps the same ~0.94 MiB of LittleFS headroom the current table has (10.94 MiB partition), and worst-case retention drops from about 3 hours to about 2.3. `src/main.cpp` currently builds `core::Logger` with the default `CHUNK_COUNT`, so the S3 needs to pass 40 explicitly. The ring doesn't check the partition's capacity (see TODO.md), so this has to be done by hand.
+- **Why 2 MB:** A/B doesn't need slots twice the app's size. Each slot holds one complete image, so a slot only has to fit the largest firmware we'll ever install. 2 MB is the same size as today's single `factory` slot, so the app keeps the ~0.78 MB of growth room it has now. Every extra MB per slot costs 2 MB of log space, because there are two slots. Larger options that were considered:
+  - **2.5 MB** — ~1.28 MB headroom, 10 MiB log ring.
+  - **3 MB** — ~1.78 MB headroom, 9 MiB log ring.
+
+  Neither was worth the lost log space. If HTTPS downloads (`esp_https_ota`) plus BLE (NimBLE) ever push the app past 2 MB, resizing is one USB reflash, and USB stays accessible on this single dash.
+- **Log ring shrinks from 13 MiB to 11 MiB:** the ring becomes 44 × 256 KiB chunks instead of 52. That keeps the same ~0.94 MiB of LittleFS headroom the current table has (11.94 MiB partition), and worst-case retention drops from about 3 hours to about 2.5. `src/main.cpp` currently builds `core::Logger` with the default `CHUNK_COUNT`, so the S3 needs to pass 44 explicitly. The ring doesn't check the partition's capacity (see TODO.md), so this has to be done by hand.
 - **Migration is a one-time USB flash:** it writes the new partition table plus `otadata`. LittleFS moves, so existing logs are lost once. Settings are in NVS at the same offset, so they survive. After this, updates never need USB.
 
 ### 2. Upload — `/update` on the existing config site
@@ -80,7 +84,7 @@ The S3's serial/USB download mode is in mask ROM, so `esptool` over USB can alwa
 
 ## Work items, in order
 
-1. New `partitions_dash.csv` and a 40-chunk `core::Logger` ring on the S3. This first flash has to go over USB.
+1. New `partitions_dash.csv` and a 44-chunk `core::Logger` ring on the S3. This first flash has to go over USB.
 2. `/update` upload handler plus the identity/version marker (`platform/esp32`, build flags). Items 1–2 alone make a working laptop-driven update.
 3. `EVT_OTA_*` / `CMD_OTA_COMMIT` in `remote/protocol`; the update and confirm screens in `gui/screens`; pausing logging in `src/main.cpp`.
 4. `verifyRollbackLater()` override, health-check mark-valid, task watchdog on loopTask, and the rollback notice.
