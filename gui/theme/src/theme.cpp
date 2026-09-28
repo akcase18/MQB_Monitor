@@ -10,6 +10,7 @@ extern "C"
      * fits inside the arc alongside it — without overflowing.
      * License lives in gui/assets/font-licenses/. */
     extern const lv_font_t jetbrains_mono_bold_30;
+    extern const lv_font_t jetbrains_mono_bold_38;
     extern const lv_font_t jetbrains_mono_bold_46;
     extern const lv_font_t jetbrains_mono_bold_56;
     extern const lv_font_t jetbrains_mono_bold_96;
@@ -57,7 +58,9 @@ namespace gui
         /* typography */
         {
             &jetbrains_mono_bold_30,
+            &jetbrains_mono_bold_38,
             &jetbrains_mono_bold_46,
+            &jetbrains_mono_bold_56,
             &jetbrains_mono_bold_56,
             &jetbrains_mono_bold_96,
             &jetbrains_mono_14,
