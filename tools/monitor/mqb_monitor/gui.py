@@ -1582,6 +1582,7 @@ class MainWindow(QMainWindow):
         self.engine = MonitorEngine(self.catalog)
         self.settings = QSettings("MQBMonitor", "monitor")
         self.source = None
+        self._connect_error: str | None = None
         self.listen_only = listen_only
         self._preselect_port = port
         self._preselect_demo = demo
@@ -1744,7 +1745,12 @@ class MainWindow(QMainWindow):
         if self._preselect_demo:
             self.source_combo.setCurrentIndex(0)
         else:
-            target = self._preselect_port or current or guess_teensy_port()
+            # A port picked earlier wins only while it's still plugged in;
+            # otherwise re-guess, so Refresh after plugging the dash in
+            # lands on it rather than on whatever was showing.
+            listed = self.source_combo.findData(current) >= 0
+            kept = current if listed and current != "__demo__" else None
+            target = self._preselect_port or kept or guess_teensy_port()
             if target:
                 idx = self.source_combo.findData(target)
                 if idx >= 0:
@@ -1757,6 +1763,7 @@ class MainWindow(QMainWindow):
             self._disconnect()
 
     def _connect(self) -> None:
+        self._connect_error = None
         choice = self.source_combo.currentData()
         try:
             if choice == "__demo__":
@@ -1824,10 +1831,21 @@ class MainWindow(QMainWindow):
         self.wip_tab.refresh(set(snap.unknown.keys()))
 
         rate = snap.total_frames / max(1e-3, time.monotonic() - snap.started_at)
+        if (
+            isinstance(self.source, SlcanSerialSource)
+            and self.source.state in SlcanSerialSource.FAILED_STATES
+        ):
+            # The dash said no (or nothing) -- drop the port and say why
+            # until the next Connect.
+            self._connect_error = self.source.state
+            self._disconnect()
         if isinstance(self.source, DemoSource):
             conn, dot_color = "Demo", ACCENT
-        elif self.source:
-            conn, dot_color = "Connected", GREEN
+        elif isinstance(self.source, SlcanSerialSource):
+            conn = self.source.state
+            dot_color = GREEN if conn == SlcanSerialSource.STREAMING else ACCENT
+        elif self._connect_error:
+            conn, dot_color = self._connect_error, TEXT_DIM
         else:
             conn, dot_color = "Disconnected", TEXT_DIM
         self.status_dot.setStyleSheet(f"color: {dot_color};")

@@ -23,8 +23,9 @@ support firmware development but don't ship on any board.
   ```
 
 - **[`monitor/`](monitor/)** — the **MQB Monitor**, a Mac (PySide6) app that
-  passively watches UDS traffic between an OBDEleven and the car via a Teensy
-  4.0 CAN sniffer, decodes it against the *same* `signals.json` registry the
+  passively watches UDS traffic between an OBDEleven and the car via a USB
+  SLCAN sniffer (a standalone Teensy 4.0, or the dash itself in sniffer
+  mode), decodes it against the *same* `signals.json` registry the
   firmware uses, and is how you add, review, and promote/demote signals — its
   Registry/Learn/WIP tabs read and write the registry directly. See its
   [README](monitor/README.md).

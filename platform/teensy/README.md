@@ -4,7 +4,7 @@ The real-hardware implementation of every [platform](../README.md) interface, fo
 
 ## Files
 
-- **`inc/teensy_can.hpp`** / **`src/teensy_can.cpp`** — `TeensyCanBus`, wrapping `lib/FlexCAN_T4` (mailbox filter, baud, mailbox setup for the OBD2 response ID).
+- **`inc/teensy_can.hpp`** / **`src/teensy_can.cpp`** — `TeensyCanBus`, wrapping `lib/FlexCAN_T4` (mailbox filter, baud, mailbox setup for the OBD2 response ID). Its sniffer mode switches CAN3 to an accept-all FIFO whose interrupt copies each frame into a 512-entry (8 KB) ring in **RAM2** (`DMAMEM`) — not into FlexCAN_T4's own RX ring, which stays 16 deep because it lives in RAM1 whether sniffing or not. The 6-deep hardware FIFO alone lasts ~1.5 ms on a busy bus, so frames have to leave it from the ISR. `sniff_end()` re-runs `begin()` with the boot-time arguments.
 - **`inc/teensy_display.hpp`** / **`src/teensy_display.cpp`** — `TeensyDisplay`, wrapping `lib/ILI948x_t4_mm` for the 480×320 ILI948x-family panel (init, pixel flush, backlight PWM).
 - **`inc/teensy_cap_touch.hpp`** / **`src/teensy_cap_touch.cpp`** — `TeensyCapTouch`, a minimal I2C polling driver for the FT6236 capacitive touch controller (currently on the PCB). Reads the standard FocalTech FT6x06-family touch-count/X/Y registers directly, no vendor library.
 - **`inc/teensy_touch.hpp`** / **`src/teensy_touch.cpp`** — `TeensyTouch`, a raw SPI XPT2046-style resistive touch controller driver (multi-sample averaging + rotation remap), ported directly from the original firmware's touch driver. Kept for whenever a resistive panel is back in the design.

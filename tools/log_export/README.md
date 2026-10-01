@@ -7,7 +7,7 @@ Pulls the dashboard firmware's black-box signal log (see [core/logging](../../co
 - **[`mqb_logs/`](mqb_logs/)** — what both go through, so they can't drift apart:
   - `logfile.py` — the on-disk chunk/index decode, plus the split of a
     session's records into per-signal traces. Pure data: no serial, no Qt.
-  - `device.py` — the `LOGSTATUS`/`LOGDUMP`/`LOGCLEAR` command set, plus a background dump worker. **Not** the SLCAN protocol `env:can_sniffer`/`tools/monitor` speak — a completely separate board/firmware/protocol for live CAN sniffing, unrelated to this.
+  - `device.py` — the `LOGSTATUS`/`LOGDUMP`/`LOGCLEAR` command set, plus a background dump worker. **Not** the SLCAN protocol `tools/monitor` speaks for live CAN sniffing. The dash answers both on the same USB port, but never at once: while it's in sniffer mode, `LOG*` commands get BELL until it's back on the gauges.
   - `gui.py` — the app. `theme.py` re-exports the monitor's palette rather than keeping a second copy.
   - `plot.py` — the Plot page's trace widget, painted with QPainter.
 

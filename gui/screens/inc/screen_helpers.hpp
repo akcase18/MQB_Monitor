@@ -117,4 +117,31 @@ namespace gui
                                       const char  *confirm_text,
                                       bool         destructive = false);
 
+    /**
+     * A small countdown ring at the right end of a create_confirm_popup()
+     * header -- for a popup that gives up on its own, so the timeout isn't
+     * a surprise. Starts full; the caller drains it with
+     * lv_arc_set_value(ring, remaining) over the range [0, `range`]. Lives
+     * and dies with the popup.
+     */
+    lv_obj_t *add_popup_countdown(const ConfirmPopup &popup,
+                                  const Theme        &theme,
+                                  int32_t             range);
+
+    /** A status tile: fixed caption above, value below, both left-
+     * aligned. Returns the value label, which is the only half that ever
+     * changes.
+     *
+     * Stacked rather than caption-left/value-right so the value gets the
+     * tile's full width. Captions sit back in panel_border, the theme's
+     * "structural, not content" tone, which keeps the eye on the numbers.
+     * Shared by LoggingScreen and SnifferScreen. */
+    lv_obj_t *create_status_tile(lv_obj_t    *parent,
+                                 const Theme &theme,
+                                 const char  *caption,
+                                 lv_coord_t   x,
+                                 lv_coord_t   y,
+                                 lv_coord_t   width,
+                                 lv_coord_t   height);
+
 } // namespace gui

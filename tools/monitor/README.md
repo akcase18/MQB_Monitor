@@ -19,12 +19,14 @@ project's UDS signal registry.
   car (MQB ECU) ⇄ CAN 500k ⇄ OBDEleven
         │  tap CAN-H / CAN-L
    Teensy 4.0 (env:can_sniffer firmware, listen-only)
+     or the dash itself, in sniffer mode (env:teensymm)
         │  USB serial (SLCAN)
    this app  ──reads/writes──►  core/vehicle/data/signals.json
 ```
 
-1. Flash the sniffer firmware onto a **Teensy 4.0** (separate from the display
-   board):
+1. Pick a sniffer. **Either** use the dash itself (no extra hardware -- see
+   *Sniffing through the dash* below), **or** flash the standalone sniffer
+   firmware onto a **Teensy 4.0** (separate from the display board):
    ```sh
    pio run -e can_sniffer -t upload
    ```
@@ -45,6 +47,25 @@ project's UDS signal registry.
 
 3. In the OBDEleven app, open live data / adaptation for the values you care
    about. Their queries appear here decoded in real time.
+
+### Sniffing through the dash
+
+The dash firmware (`env:teensymm`) can stand in for the standalone sniffer:
+it's already on the bus, and its USB port speaks the same SLCAN (both use
+`core/can`'s `slcan.hpp`). It never switches on its own -- Connect sends
+`SNIFFREQ`, the dash pops up **Start CAN sniffer?**, and nothing changes
+until the driver taps **Start**. The status bar reads *Confirm on dash…*
+meanwhile; Cancel, a 10 s timeout, or the dash being in a menu rather than
+on the gauges ends the attempt with the reason shown.
+
+While sniffing, the dash is paused outright -- no UDS polling (so the
+capture holds none of its own requests), no logging -- and shows a
+**CAN Sniffer** screen with frames/s, total and dropped counts. **Stop** on
+the panel, Disconnect here, or unplugging USB all return it to the gauges
+with the bus restored exactly as it boots (Stop on the panel disconnects
+the app too, showing *Stopped on dash*; unplugging shows *Device
+disconnected*). Nothing is persisted: a reboot
+always comes up as a normal dash.
 
 ## Running
 
