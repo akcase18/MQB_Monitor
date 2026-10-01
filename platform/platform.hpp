@@ -24,6 +24,34 @@ struct CanFrame
         uint8_t  data[8];
 };
 
+/**
+ * One frame as seen on the wire in sniffer mode -- unlike CanFrame, which
+ * only ever carries the dash's own 11-bit UDS traffic, a sniffed frame can
+ * be extended or remote, and carries a capture time for SLCAN's optional
+ * timestamp suffix. 16 bytes, so a ring of them packs evenly.
+ */
+struct SniffFrame
+{
+        uint32_t id;
+        uint16_t ts_ms;
+        uint8_t  len;
+        uint8_t  flags; /* SNIFF_FLAG_* */
+        uint8_t  data[8];
+};
+
+constexpr uint8_t SNIFF_FLAG_EXTENDED = 0x01;
+constexpr uint8_t SNIFF_FLAG_REMOTE   = 0x02;
+
+struct SniffStats
+{
+        /** Frames taken off the bus since sniff_begin(). */
+        uint32_t rx;
+
+        /** Frames lost because the sniff ring was full -- the host fell
+         * behind. Nonzero means the capture has gaps. */
+        uint32_t dropped;
+};
+
 class ICanBus
 {
     public:
@@ -58,6 +86,51 @@ class ICanBus
          * @returns True if data is received, otherwise false.
          */
         virtual bool receive(CanFrame &out) = 0;
+
+        /*
+         * Sniffer mode -- an opt-in that boards without it never have to
+         * think about: every default below reports "unsupported".
+         *
+         * sniff_begin() reconfigures the bus to accept every frame and
+         * buffers them for sniff_read(); send()/receive() must not be used
+         * until sniff_end(), which puts back exactly what begin() set up.
+         */
+
+        /**
+         * @param baud        Bus baud rate, in bits/sec.
+         * @param listen_only True never ACKs or transmits -- a silent third
+         *                    node. False joins the bus normally so
+         *                    sniff_send() works.
+         *
+         * @returns False if this board can't sniff.
+         */
+        virtual bool sniff_begin(uint32_t baud, bool listen_only)
+        {
+            (void)baud;
+            (void)listen_only;
+            return false;
+        }
+
+        virtual void sniff_end() {}
+
+        /** Non-blocking; oldest buffered frame first. */
+        virtual bool sniff_read(SniffFrame &out)
+        {
+            (void)out;
+            return false;
+        }
+
+        /** Ignored (returns false) when sniffing listen-only. */
+        virtual bool sniff_send(const SniffFrame &frame)
+        {
+            (void)frame;
+            return false;
+        }
+
+        virtual SniffStats sniff_stats() const
+        {
+            return SniffStats{0, 0};
+        }
 };
 
 /*==============================================================================

@@ -2,8 +2,10 @@
 push frames to an `on_frame(CanFrame)` callback; they are Qt-agnostic so the
 engine can be exercised headless.
 
-  * SlcanSerialSource -- the real thing: drives the Teensy sniffer
-    (env:can_sniffer) over USB using the SLCAN handshake, listen-only.
+  * SlcanSerialSource -- the real thing: drives an SLCAN device over USB,
+    listen-only by default. Either the standalone sniffer (env:can_sniffer)
+    or the dash itself in sniffer mode, which has to be confirmed on its
+    panel first (see SlcanSerialSource's docstring).
   * DemoSource -- synthesizes plausible OBDEleven-style scan traffic from the
     catalog (including one unknown DID and one multi-frame response) so the UI
     and decode/learn paths can be developed with no hardware attached.
@@ -49,16 +51,58 @@ def available_ports() -> list[tuple[str, str]]:
 
 
 def guess_teensy_port() -> str | None:
+    """The first port that looks like a sniffer, or None. Deliberately no
+    "any port will do" fallback: with the dash unplugged or still booting,
+    that picked macOS's /dev/cu.debug-console, which never answers."""
     for p in list_ports.comports():
-        text = f"{p.description} {p.manufacturer} {p.product}".lower()
+        text = f"{p.device} {p.description} {p.manufacturer} {p.product}".lower()
         if "teensy" in text or "usb serial" in text or "usbmodem" in text:
             return p.device
-    ports = list_ports.comports()
-    return ports[0].device if ports else None
+    return None
 
 
 class SlcanSerialSource:
-    """Reads SLCAN frames from the Teensy sniffer over a serial port."""
+    """Reads SLCAN frames from a USB sniffer over a serial port.
+
+    Two kinds of device answer here. The standalone sniffer (env:can_sniffer)
+    takes the SLCAN handshake straight away. The dash (env:teensymm) only
+    speaks SLCAN once its driver has agreed to it on the panel, so the
+    connection starts by asking:
+
+      SNIFFREQ -> SNIFFWAIT     dash: popup is up, a person is being asked
+               -> SNIFFOK       dash: confirmed (or was already sniffing)
+               -> SNIFFNO       dash: declined, or the popup timed out
+               -> SNIFFBUSY     dash: not on the gauges (in a menu)
+               -> BELL          not a dash -- go straight to SLCAN
+               -> silence       not a sniffer at all (wrong port)
+
+    Once streaming, a SNIFFSTOP line means Stop was tapped on the panel.
+
+    That wait can be up to SNIFF_CONFIRM_TIMEOUT_S, so it runs on the
+    background thread, not in start(). `state` tracks where it is for the
+    GUI to show; on a refusal it ends in one of FAILED_STATES with the
+    thread stopped, and the caller should disconnect.
+    """
+
+    # States, in rough order. Plain strings so the GUI can show them as-is.
+    ARMING = "Connecting"
+    WAITING = "Confirm on dash…"
+    STREAMING = "Connected"
+    DECLINED = "Declined on dash"
+    BUSY = "Dash is in a menu -- return to the gauges and retry"
+    NO_ANSWER = "Dash didn't answer"
+    SILENT = "No reply -- is this the sniffer's port?"
+    STOPPED = "Stopped on dash"
+    LOST = "Device disconnected"
+    FAILED_STATES = (DECLINED, BUSY, NO_ANSWER, SILENT, STOPPED, LOST)
+
+    # Slightly over the dash's own 10 s popup timeout, so its SNIFFNO
+    # normally arrives first.
+    SNIFF_CONFIRM_TIMEOUT_S = 12.0
+    # How long a device gets to say anything at all. Both sniffers answer
+    # SNIFFREQ at once (the standalone one with BELL, SLCAN's "unknown
+    # command"), so silence means the port isn't a sniffer.
+    SNIFF_ACK_TIMEOUT_S = 1.5
 
     def __init__(
         self,
@@ -73,17 +117,17 @@ class SlcanSerialSource:
         self.listen_only = listen_only
         self.can_baud = can_baud
         self.serial_baud = serial_baud
+        self.state = self.ARMING
+        self.is_dash = False
         self._ser: serial.Serial | None = None
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
 
     def start(self) -> None:
         self._ser = serial.Serial(self.port, self.serial_baud, timeout=0.1)
-        # Handshake: close (in case it was left open), set bitrate, open.
-        self._ser.write(b"C\r")
-        self._ser.write((SLCAN_BAUD_INDEX[self.can_baud] + "\r").encode())
-        self._ser.write(b"L\r" if self.listen_only else b"O\r")
         self._ser.reset_input_buffer()
+        self.state = self.ARMING
+        self._ser.write(b"SNIFFREQ\r")
         self._stop.clear()
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
@@ -95,18 +139,73 @@ class SlcanSerialSource:
         if self._ser:
             try:
                 self._ser.write(b"C\r")
+                if self.is_dash:
+                    self._ser.write(b"SNIFFEND\r")  # back to the gauges
                 self._ser.close()
-            except serial.SerialException:
+            except OSError:  # already unplugged
                 pass
             self._ser = None
 
+    def _negotiate(self) -> bool:
+        """Runs the SNIFFREQ exchange. True to carry on into SLCAN."""
+        assert self._ser is not None
+        buf = bytearray()
+        started = time.monotonic()
+        acked = False
+        while not self._stop.is_set():
+            elapsed = time.monotonic() - started
+            if not acked and elapsed > self.SNIFF_ACK_TIMEOUT_S:
+                self.state = self.SILENT
+                return False
+            if acked and elapsed > self.SNIFF_CONFIRM_TIMEOUT_S:
+                self.state = self.NO_ANSWER
+                return False
+            try:
+                chunk = self._ser.read(64)
+            except OSError:  # SerialException included -- unplugged
+                self.state = self.LOST
+                return False
+            buf.extend(chunk)
+            if b"\a" in buf and b"SNIFF" not in buf:
+                return True  # standalone sniffer: SNIFFREQ isn't SLCAN
+            while b"\r" in buf:
+                line, _, rest = buf.partition(b"\r")
+                buf = bytearray(rest)
+                reply = line.strip(b"\a\n")
+                if reply == b"SNIFFWAIT":
+                    acked = True
+                    self.is_dash = True
+                    self.state = self.WAITING
+                elif reply == b"SNIFFOK":
+                    self.is_dash = True
+                    return True
+                elif reply == b"SNIFFNO":
+                    self.state = self.DECLINED
+                    return False
+                elif reply == b"SNIFFBUSY":
+                    self.state = self.BUSY
+                    return False
+        return False
+
     def _run(self) -> None:
         assert self._ser is not None
+        if not self._negotiate():
+            return
+        # Handshake: close (in case it was left open), set bitrate, open.
+        try:
+            self._ser.write(b"C\r")
+            self._ser.write((SLCAN_BAUD_INDEX[self.can_baud] + "\r").encode())
+            self._ser.write(b"L\r" if self.listen_only else b"O\r")
+        except OSError:
+            self.state = self.LOST
+            return
+        self.state = self.STREAMING
         buf = bytearray()
         while not self._stop.is_set():
             try:
                 chunk = self._ser.read(256)
-            except serial.SerialException:
+            except OSError:
+                self.state = self.LOST
                 break
             if not chunk:
                 continue
@@ -114,6 +213,11 @@ class SlcanSerialSource:
             while b"\r" in buf:
                 line, _, rest = buf.partition(b"\r")
                 buf = bytearray(rest)
+                if line.strip(b"\a\n") == b"SNIFFSTOP":
+                    # Stop tapped on the panel -- already back on the gauges.
+                    self.is_dash = False  # nothing left for stop() to end
+                    self.state = self.STOPPED
+                    return
                 frame = parse_slcan_line(bytes(line))
                 if frame is not None:
                     self.on_frame(frame)

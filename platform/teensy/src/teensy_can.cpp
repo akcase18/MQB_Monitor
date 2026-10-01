@@ -24,7 +24,9 @@ TeensyCanBus &TeensyCanBus::instance()
 
 bool TeensyCanBus::begin(uint32_t tx_id, uint32_t rx_id, uint32_t baud)
 {
-    (void)tx_id;
+    tx_id_ = tx_id;
+    rx_id_ = rx_id;
+    baud_  = baud;
 
     s_bus.begin();
     s_bus.setBaudRate(baud);
@@ -90,4 +92,133 @@ bool TeensyCanBus::receive(CanFrame &out)
     memcpy(out.data, msg.buf, out.len);
 
     return true;
+}
+
+/*==============================================================================
+ * Sniffer mode
+ *
+ * s_bus's own RX ring stays 16 deep -- it lives inside a static object in
+ * RAM1, and growing it would cost every boot whether sniffing or not.
+ * Sniffing instead takes frames straight from the FIFO interrupt into a
+ * ring of its own in RAM2 (DMAMEM), which is nearly empty: the 6-deep
+ * hardware FIFO alone lasts ~1.5 ms on a busy 500k bus, less than one LVGL
+ * pass or a USB hiccup, so loop()-paced polling would drop frames.
+ *
+ * Single producer (the ISR), single consumer (loop() via sniff_read()), so
+ * the two indices need only be volatile -- each is written by one side.
+ =============================================================================*/
+
+namespace
+{
+    constexpr uint32_t SNIFF_RING_SIZE = 512; /* power of two; 8 KB */
+
+    DMAMEM SniffFrame s_ring[SNIFF_RING_SIZE];
+
+    volatile uint32_t s_head    = 0; /* ISR writes */
+    volatile uint32_t s_tail    = 0; /* loop() writes */
+    volatile uint32_t s_rx      = 0;
+    volatile uint32_t s_dropped = 0;
+
+    /* FLASHMEM by another name. Plain FLASHMEM here collides with the
+     * template's own FLASHMEM members (setBaudRate et al.), which GCC emits
+     * as COMDAT into the same ".flashmem" section -- the same "section type
+     * conflict" begin()'s setMBFilterRange note above dodges. The linker
+     * script collects *(.flashmem*), so a subsection lands in flash all
+     * the same. */
+    #define SNIFF_FLASHMEM __attribute__((section(".flashmem.sniff")))
+
+    /* Called from the CAN3 ISR -- FlexCAN_T4 dispatches onReceive handlers
+     * directly from flexcan_interrupt() as long as events() is never
+     * called, which nothing in this firmware does. */
+    void sniff_isr(const CAN_message_t &msg)
+    {
+        s_rx = s_rx + 1;
+
+        uint32_t head = s_head;
+        if (head - s_tail >= SNIFF_RING_SIZE)
+        {
+            s_dropped = s_dropped + 1;
+            return;
+        }
+
+        SniffFrame &f = s_ring[head & (SNIFF_RING_SIZE - 1)];
+        f.id          = msg.id;
+        f.ts_ms       = static_cast<uint16_t>(millis() % 60000);
+        f.len         = clamped_len(msg.len);
+        f.flags       = (msg.flags.extended ? SNIFF_FLAG_EXTENDED : 0)
+                  | (msg.flags.remote ? SNIFF_FLAG_REMOTE : 0);
+        memcpy(f.data, msg.buf, sizeof(f.data));
+
+        s_head = head + 1;
+    }
+} // namespace
+
+SNIFF_FLASHMEM bool TeensyCanBus::sniff_begin(uint32_t baud, bool listen_only)
+{
+    s_head    = 0;
+    s_tail    = 0;
+    s_rx      = 0;
+    s_dropped = 0;
+
+    s_bus.begin();
+    s_bus.setBaudRate(baud, listen_only ? LISTEN_ONLY : TX);
+    s_bus.setMBFilter(ACCEPT_ALL);
+    s_bus.enableFIFO();
+    s_bus.setFIFOFilter(ACCEPT_ALL);
+    s_bus.onReceive(sniff_isr);
+    s_bus.enableFIFOInterrupt();
+
+    sniffing_    = true;
+    listen_only_ = listen_only;
+    return true;
+}
+
+SNIFF_FLASHMEM void TeensyCanBus::sniff_end()
+{
+    if (!sniffing_)
+    {
+        return;
+    }
+
+    s_bus.disableFIFOInterrupt();
+    s_bus.onReceive(nullptr);
+    sniffing_ = false;
+
+    /* begin() soft-resets the controller and drops the FIFO, so this is
+     * the exact boot-time REJECT_ALL + response-id mailbox setup again. */
+    begin(tx_id_, rx_id_, baud_);
+}
+
+bool TeensyCanBus::sniff_read(SniffFrame &out)
+{
+    uint32_t tail = s_tail;
+    if (tail == s_head)
+    {
+        return false;
+    }
+
+    out    = s_ring[tail & (SNIFF_RING_SIZE - 1)];
+    s_tail = tail + 1;
+    return true;
+}
+
+SNIFF_FLASHMEM bool TeensyCanBus::sniff_send(const SniffFrame &frame)
+{
+    if (!sniffing_ || listen_only_)
+    {
+        return false;
+    }
+
+    CAN_message_t msg;
+    msg.id             = frame.id;
+    msg.len            = clamped_len(frame.len);
+    msg.flags.extended = (frame.flags & SNIFF_FLAG_EXTENDED) != 0;
+    memcpy(msg.buf, frame.data, msg.len);
+
+    return s_bus.write(msg) > 0;
+}
+
+SniffStats TeensyCanBus::sniff_stats() const
+{
+    return SniffStats{s_rx, s_dropped};
 }

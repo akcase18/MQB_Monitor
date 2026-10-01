@@ -221,12 +221,80 @@ namespace gui
         style_flat_footer_button(popup.cancel_btn, theme);
         style_flat_footer_button(popup.confirm_btn, theme, &fill);
 
+        /* lv_msgbox sizes footer buttons to their labels, so "Cancel" sat
+         * wider than "Start". A shared percentage evens them out and the
+         * footer's SPACE_EVENLY flex keeps the gaps equal. */
+        lv_obj_set_width(popup.cancel_btn, LV_PCT(40));
+        lv_obj_set_width(popup.confirm_btn, LV_PCT(40));
+
         /* The buttons are LV_PCT(100) of the footer, so growing the footer
          * grows them too. */
         lv_obj_set_height(lv_msgbox_get_footer(popup.mbox),
                           CONFIRM_POPUP_FOOTER_HEIGHT);
 
         return popup;
+    }
+
+    FLASHMEM lv_obj_t *add_popup_countdown(const ConfirmPopup &popup,
+                                           const Theme        &theme,
+                                           int32_t             range)
+    {
+        constexpr lv_coord_t SIZE  = 24;
+        constexpr lv_coord_t WIDTH = 3;
+
+        /* The header is a flex row with the title growing to fill it, so
+         * appending here lands the ring flush right of the title. */
+        lv_obj_t *ring = lv_arc_create(lv_msgbox_get_header(popup.mbox));
+        lv_obj_set_size(ring, SIZE, SIZE);
+        lv_obj_set_clickable(ring, false);
+        lv_obj_remove_style(ring, nullptr, LV_PART_KNOB | LV_STATE_ANY);
+
+        /* A full circle from 12 o'clock, draining clockwise. */
+        lv_arc_set_rotation(ring, 270);
+        lv_arc_set_bg_angles(ring, 0, 360);
+        lv_arc_set_mode(ring, LV_ARC_MODE_REVERSE);
+        lv_arc_set_range(ring, 0, range);
+        lv_arc_set_value(ring, range);
+
+        /* No track: the drained part just goes back to the popup's own
+         * background, so an empty ring is no ring at all. */
+        lv_obj_set_style_arc_opa(ring, LV_OPA_TRANSP, LV_PART_MAIN);
+        lv_obj_set_style_arc_width(ring, WIDTH, LV_PART_INDICATOR);
+        lv_obj_set_style_arc_color(
+            ring, theme.palette.accent, LV_PART_INDICATOR);
+        lv_obj_set_style_arc_rounded(ring, false, LV_PART_INDICATOR);
+        lv_obj_set_style_pad_all(ring, 0, LV_PART_MAIN);
+
+        return ring;
+    }
+
+    FLASHMEM lv_obj_t *create_status_tile(lv_obj_t    *parent,
+                                          const Theme &theme,
+                                          const char  *caption,
+                                          lv_coord_t   x,
+                                          lv_coord_t   y,
+                                          lv_coord_t   width,
+                                          lv_coord_t   height)
+    {
+        lv_obj_t *tile = lv_obj_create(parent);
+        lv_obj_remove_style_all(tile);
+        lv_obj_set_size(tile, width, height);
+        lv_obj_align(tile, LV_ALIGN_TOP_LEFT, x, y);
+
+        lv_obj_t *caption_lbl = lv_label_create(tile);
+        lv_label_set_text(caption_lbl, caption);
+        lv_obj_set_style_text_font(caption_lbl, theme.typography.label_lg, 0);
+        lv_obj_set_style_text_color(
+            caption_lbl, theme.palette.panel_border, 0);
+        lv_obj_align(caption_lbl, LV_ALIGN_TOP_LEFT, 0, 0);
+
+        lv_obj_t *value_lbl = lv_label_create(tile);
+        lv_label_set_text(value_lbl, "--");
+        lv_obj_set_style_text_font(value_lbl, theme.typography.ui, 0);
+        lv_obj_set_style_text_color(value_lbl, theme.palette.fg, 0);
+        lv_obj_align(value_lbl, LV_ALIGN_BOTTOM_LEFT, 0, 0);
+
+        return value_lbl;
     }
 
 } // namespace gui
