@@ -37,8 +37,8 @@ namespace
      * is 5.5ms, while a full LVGL repaint is ten flushes of ~1.5ms DMA plus
      * render time. So any inbound frame bigger than 64 bytes outruns the
      * drain and is shredded mid-flight: the CRC fails and the frame is
-     * dropped with no error anywhere. REQ_APPLY_CONFIG is the only large
-     * inbound frame, which is why WiFi and page loads worked while applying
+     * dropped with no error anywhere. REQ_APPLY_CONFIG/REQ_PREVIEW_CONFIG
+     * are the only large inbound frames, which is why WiFi and page loads worked while applying
      * config silently did nothing.
      *
      * TX: RESP_STATE alone can exceed 1200 bytes. write() blocks until the

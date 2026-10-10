@@ -7,6 +7,7 @@
  * validation/clamping), and RemoteConfigLink/RemoteApController against a
  * fake ISerialLink. Run with `pio test -e simulator`.
  */
+#include <math.h>
 #include <string.h>
 #include <unity.h>
 
@@ -364,10 +365,18 @@ void test_get_state_reports_defaults()
     TEST_ASSERT_EQUAL_UINT8(0, sig0.use_hi);
     TEST_ASSERT_EQUAL_UINT8(0, sig0.use_custom_range);
 
-    TEST_ASSERT_EQUAL_UINT32(
-        static_cast<uint32_t>(p - resp) /* consumed so far */
-            + static_cast<uint32_t>(signal_count - 1) * 19,
-        static_cast<uint32_t>(resp_len));
+    for (size_t i = 1; i < signal_count; i++)
+    {
+        SignalConfigWire sig {};
+        p = decode_signal_config(p, sig);
+    }
+
+    uint8_t preview_active = 0xFF;
+    p                      = get_u8(p, preview_active);
+    TEST_ASSERT_EQUAL_UINT8(0, preview_active);
+
+    TEST_ASSERT_EQUAL_UINT32(static_cast<uint32_t>(p - resp),
+                             static_cast<uint32_t>(resp_len));
 }
 
 /*==============================================================================
@@ -631,9 +640,298 @@ void test_apply_config_swaps_reversed_thresholds()
                      <= config.get().signals[0].warn.hi);
 }
 
+void test_apply_config_keeps_lone_threshold_on_its_side()
+{
+    FakeConfigStore   backing;
+    core::ConfigStore config(backing);
+    config.load();
+    core::SignalStore signals;
+
+    RemoteConfigServer server(config, signals);
+
+    /* High warning at 10, an unused low left at 90 -- the pair is
+     * "reversed", but only one side is live, so nothing should swap. */
+    float   lo = 90.0f;
+    float   hi = 10.0f;
+    uint8_t req[FRAME_MAX_PAYLOAD];
+    size_t  req_len = build_apply_payload(config.get(), req, &lo, &hi);
+    /* Signal 0's record starts after settings (8), the panels (24) and
+     * the count (2); use_lo is its 9th byte. */
+    req[8 + 24 + 2 + 8] = 0;
+
+    uint8_t resp[16];
+    MsgType resp_type;
+    server.handle_request(MsgType::REQ_APPLY_CONFIG,
+                          req,
+                          static_cast<uint16_t>(req_len),
+                          resp,
+                          sizeof(resp),
+                          resp_type);
+
+    TEST_ASSERT_FALSE(config.get().signals[0].warn.use_lo);
+    TEST_ASSERT_TRUE(config.get().signals[0].warn.use_hi);
+    TEST_ASSERT_EQUAL_FLOAT(10.0f, config.get().signals[0].warn.hi);
+}
+
 /*==============================================================================
  * REMOTECONFIGLINK / REMOTEAPCONTROLLER
  =============================================================================*/
+
+/*==============================================================================
+ * REMOTECONFIGSERVER — PREVIEW / COMMIT / REVERT
+ =============================================================================*/
+
+namespace
+{
+    struct EventLog
+    {
+            RemoteConfigServer::ConfigEvent events[8];
+            uint8_t                         count = 0;
+    };
+
+    void record_event(void *ctx, RemoteConfigServer::ConfigEvent event)
+    {
+        auto *log = static_cast<EventLog *>(ctx);
+        if (log->count < 8)
+        {
+            log->events[log->count++] = event;
+        }
+    }
+
+    /* Sends one config-changing request and returns its ApplyResult
+     * byte. */
+    uint8_t send_change(RemoteConfigServer &server,
+                        MsgType             type,
+                        const uint8_t      *payload,
+                        size_t              len)
+    {
+        uint8_t resp[16] = { 0xFF };
+        MsgType resp_type;
+        size_t  resp_len = server.handle_request(type,
+                                                payload,
+                                                static_cast<uint16_t>(len),
+                                                resp,
+                                                sizeof(resp),
+                                                resp_type);
+        TEST_ASSERT_TRUE(MsgType::RESP_APPLY_RESULT == resp_type);
+        TEST_ASSERT_EQUAL_UINT32(1, resp_len);
+        return resp[0];
+    }
+
+    /* A valid batch equal to `cfg` but with day brightness `day`. */
+    size_t build_payload_with_day(const core::Config &cfg,
+                                  uint8_t             day,
+                                  uint8_t            *out)
+    {
+        core::Config edited            = cfg;
+        edited.settings.day_brightness = day;
+        return build_apply_payload(edited, out);
+    }
+} // namespace
+
+void test_preview_changes_live_config_without_saving()
+{
+    FakeConfigStore   backing;
+    core::ConfigStore config(backing);
+    config.load();
+    core::SignalStore signals;
+
+    RemoteConfigServer server(config, signals);
+    EventLog           log;
+    server.set_config_callback(record_event, &log);
+
+    uint8_t req[FRAME_MAX_PAYLOAD];
+    size_t  req_len = build_payload_with_day(config.get(), 40, req);
+
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(ApplyResult::Ok),
+        send_change(server, MsgType::REQ_PREVIEW_CONFIG, req, req_len));
+
+    TEST_ASSERT_EQUAL_UINT8(40, config.get().settings.day_brightness);
+    TEST_ASSERT_TRUE(server.preview_active());
+    TEST_ASSERT_EQUAL_UINT8(1, log.count);
+    TEST_ASSERT_TRUE(RemoteConfigServer::ConfigEvent::Previewed
+                     == log.events[0]);
+
+    /* Nothing reached the store. */
+    core::ConfigStore reloaded(backing);
+    reloaded.load();
+    TEST_ASSERT_EQUAL_UINT8(100, reloaded.get().settings.day_brightness);
+
+    /* RESP_STATE's trailing byte reports the session (bit 0) and its
+     * unsaved edits (bit 1). */
+    uint8_t resp[FRAME_MAX_PAYLOAD];
+    MsgType resp_type;
+    size_t  resp_len = server.handle_request(
+        MsgType::REQ_GET_STATE, nullptr, 0, resp, sizeof(resp), resp_type);
+    TEST_ASSERT_EQUAL_UINT8(3, resp[resp_len - 1]);
+    TEST_ASSERT_TRUE(server.has_unsaved_changes());
+
+    /* Previewing the saved config again is a session with nothing to
+     * save -- what the phone's page sends when it first opens. */
+    req_len = build_payload_with_day(config.get(), 100, req);
+    send_change(server, MsgType::REQ_PREVIEW_CONFIG, req, req_len);
+    TEST_ASSERT_TRUE(server.preview_active());
+    TEST_ASSERT_FALSE(server.has_unsaved_changes());
+}
+
+void test_apply_during_preview_saves_and_keeps_session()
+{
+    FakeConfigStore   backing;
+    core::ConfigStore config(backing);
+    config.load();
+    core::SignalStore signals;
+
+    RemoteConfigServer server(config, signals);
+    EventLog           log;
+    server.set_config_callback(record_event, &log);
+
+    uint8_t req[FRAME_MAX_PAYLOAD];
+    size_t  req_len = build_payload_with_day(config.get(), 40, req);
+    send_change(server, MsgType::REQ_PREVIEW_CONFIG, req, req_len);
+
+    req_len = build_payload_with_day(config.get(), 55, req);
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(ApplyResult::Ok),
+        send_change(server, MsgType::REQ_APPLY_CONFIG, req, req_len));
+
+    /* The phone's page is still open, so the session carries on -- only
+     * the unsaved flag clears. */
+    TEST_ASSERT_TRUE(server.preview_active());
+    TEST_ASSERT_FALSE(server.has_unsaved_changes());
+    TEST_ASSERT_EQUAL_UINT8(2, log.count);
+    TEST_ASSERT_TRUE(RemoteConfigServer::ConfigEvent::Committed
+                     == log.events[1]);
+
+    core::ConfigStore reloaded(backing);
+    reloaded.load();
+    TEST_ASSERT_EQUAL_UINT8(55, reloaded.get().settings.day_brightness);
+
+    /* Ending the session now goes back to the save, not to what was
+     * saved before the session began. */
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(ApplyResult::Ok),
+        send_change(server, MsgType::REQ_REVERT_PREVIEW, nullptr, 0));
+    TEST_ASSERT_EQUAL_UINT8(55, config.get().settings.day_brightness);
+    TEST_ASSERT_FALSE(server.preview_active());
+    TEST_ASSERT_EQUAL_UINT8(3, log.count);
+
+    /* With no session, a revert is a no-op. */
+    send_change(server, MsgType::REQ_REVERT_PREVIEW, nullptr, 0);
+    TEST_ASSERT_EQUAL_UINT8(3, log.count);
+}
+
+void test_preview_values_replace_live_ones_for_the_session()
+{
+    FakeConfigStore   backing;
+    core::ConfigStore config(backing);
+    config.load();
+    core::SignalStore signals;
+
+    RemoteConfigServer server(config, signals);
+    TEST_ASSERT_NULL(server.preview_values());
+
+    /* The batch, then one value per signal: 87.5 for the first, NaN (no
+     * value) for the second, 0 for the rest. */
+    uint8_t  req[FRAME_MAX_PAYLOAD];
+    size_t   req_len = build_apply_payload(config.get(), req);
+    uint8_t *p       = req + req_len;
+    p = put_u16(p, static_cast<uint16_t>(core::SIGNAL_CATALOG_COUNT));
+    for (size_t i = 0; i < core::SIGNAL_CATALOG_COUNT; i++)
+    {
+        p = put_f32(p, i == 0 ? 87.5f : (i == 1 ? NAN : 0.0f));
+    }
+    send_change(server,
+                MsgType::REQ_PREVIEW_CONFIG,
+                req,
+                static_cast<size_t>(p - req));
+
+    const core::SignalStore *values = server.preview_values();
+    TEST_ASSERT_NOT_NULL(values);
+    TEST_ASSERT_TRUE(values->get_at(0).has_data);
+    TEST_ASSERT_EQUAL_FLOAT(87.5f, values->get_at(0).value);
+    TEST_ASSERT_FALSE(values->get_at(1).has_data);
+    TEST_ASSERT_TRUE(values->get_at(2).has_data);
+
+    /* A preview without values shows none. */
+    send_change(server, MsgType::REQ_PREVIEW_CONFIG, req, req_len);
+    TEST_ASSERT_FALSE(server.preview_values()->get_at(0).has_data);
+
+    server.revert_preview();
+    TEST_ASSERT_NULL(server.preview_values());
+}
+
+void test_revert_restores_config_from_before_first_preview()
+{
+    FakeConfigStore   backing;
+    core::ConfigStore config(backing);
+    config.load();
+    core::SignalStore signals;
+
+    RemoteConfigServer server(config, signals);
+    EventLog           log;
+    server.set_config_callback(record_event, &log);
+
+    /* Two previews in a row: the revert target is the saved config, not
+     * the first preview. */
+    uint8_t req[FRAME_MAX_PAYLOAD];
+    size_t  req_len = build_payload_with_day(config.get(), 40, req);
+    send_change(server, MsgType::REQ_PREVIEW_CONFIG, req, req_len);
+    req_len = build_payload_with_day(config.get(), 10, req);
+    send_change(server, MsgType::REQ_PREVIEW_CONFIG, req, req_len);
+    TEST_ASSERT_EQUAL_UINT8(10, config.get().settings.day_brightness);
+
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(ApplyResult::Ok),
+        send_change(server, MsgType::REQ_REVERT_PREVIEW, nullptr, 0));
+
+    TEST_ASSERT_EQUAL_UINT8(100, config.get().settings.day_brightness);
+    TEST_ASSERT_FALSE(server.preview_active());
+    TEST_ASSERT_EQUAL_UINT8(3, log.count);
+    TEST_ASSERT_TRUE(RemoteConfigServer::ConfigEvent::Reverted
+                     == log.events[2]);
+
+    /* The composition root's path (AP going down) behaves the same, and
+     * is a no-op once nothing is pending. */
+    req_len = build_payload_with_day(config.get(), 30, req);
+    send_change(server, MsgType::REQ_PREVIEW_CONFIG, req, req_len);
+    server.revert_preview();
+    server.revert_preview();
+    TEST_ASSERT_EQUAL_UINT8(100, config.get().settings.day_brightness);
+    TEST_ASSERT_EQUAL_UINT8(5, log.count);
+}
+
+void test_rejected_preview_leaves_live_config_untouched()
+{
+    FakeConfigStore   backing;
+    core::ConfigStore config(backing);
+    config.load();
+    core::SignalStore signals;
+
+    RemoteConfigServer server(config, signals);
+    EventLog           log;
+    server.set_config_callback(record_event, &log);
+
+    uint8_t req[FRAME_MAX_PAYLOAD];
+    size_t  req_len = build_apply_payload(config.get(), req, nullptr, nullptr,
+                                         /* bad_signal_id */ 9999);
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(ApplyResult::ErrInvalidSignal),
+        send_change(server, MsgType::REQ_PREVIEW_CONFIG, req, req_len));
+
+    TEST_ASSERT_FALSE(server.preview_active());
+    TEST_ASSERT_EQUAL_UINT8(0, log.count);
+
+    /* Cut short mid-signal-list. */
+    req_len = build_apply_payload(config.get(), req);
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(ApplyResult::ErrTruncated),
+        send_change(server, MsgType::REQ_PREVIEW_CONFIG, req, req_len - 1));
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(ApplyResult::ErrTruncated),
+        send_change(server, MsgType::REQ_APPLY_CONFIG, req, 3));
+    TEST_ASSERT_EQUAL_UINT8(0, log.count);
+}
 
 void test_link_dispatches_request_and_writes_response()
 {
@@ -756,6 +1054,34 @@ void test_ap_controller_idle_timeout_disables()
     TEST_ASSERT_TRUE(ApState::Idle == controller.state());
 }
 
+void test_ap_controller_activity_restarts_idle_timeout()
+{
+    FakeConfigStore   backing;
+    core::ConfigStore config(backing);
+    config.load();
+    core::SignalStore signals;
+
+    RemoteConfigServer server(config, signals);
+    FakeSerialLink     link;
+    RemoteConfigLink   remote_link(link, server);
+    FakeClock          clock;
+    RemoteApController controller(remote_link, clock);
+
+    controller.activate();
+    ApReadyWire wire { { 10, 0, 0, 1 } };
+    uint8_t     payload[sizeof(ApReadyWire::ip)];
+    encode_ap_ready(payload, wire);
+    controller.on_event(MsgType::EVT_AP_READY, payload, sizeof(payload), 0);
+
+    /* A phone still editing near the end of the window keeps it open. */
+    controller.note_activity(AP_IDLE_TIMEOUT_MS - 10);
+    controller.tick(AP_IDLE_TIMEOUT_MS + 1);
+    TEST_ASSERT_TRUE(ApState::Active == controller.state());
+
+    controller.tick(2 * AP_IDLE_TIMEOUT_MS);
+    TEST_ASSERT_TRUE(ApState::Deactivating == controller.state());
+}
+
 void test_ap_controller_activate_timeout_falls_back_to_idle()
 {
     FakeConfigStore   backing;
@@ -832,9 +1158,16 @@ int main(int argc, char **argv)
     RUN_TEST(test_apply_config_clamps_brightness_and_panel_count);
     RUN_TEST(test_apply_config_clamps_thresholds_to_effective_range);
     RUN_TEST(test_apply_config_swaps_reversed_thresholds);
+    RUN_TEST(test_apply_config_keeps_lone_threshold_on_its_side);
+    RUN_TEST(test_preview_changes_live_config_without_saving);
+    RUN_TEST(test_apply_during_preview_saves_and_keeps_session);
+    RUN_TEST(test_preview_values_replace_live_ones_for_the_session);
+    RUN_TEST(test_revert_restores_config_from_before_first_preview);
+    RUN_TEST(test_rejected_preview_leaves_live_config_untouched);
     RUN_TEST(test_link_dispatches_request_and_writes_response);
     RUN_TEST(test_ap_controller_activate_sends_command_and_reaches_active);
     RUN_TEST(test_ap_controller_idle_timeout_disables);
+    RUN_TEST(test_ap_controller_activity_restarts_idle_timeout);
     RUN_TEST(test_ap_controller_activate_timeout_falls_back_to_idle);
     RUN_TEST(test_ap_controller_reactivate_from_deactivating_resends_enable);
     return UNITY_END();

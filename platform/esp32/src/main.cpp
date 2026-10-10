@@ -3,11 +3,11 @@
  * @brief ESP32-C3 relay firmware entry point. Reacts to CMD_AP_ENABLE/
  * CMD_AP_DISABLE frames from the Teensy by driving the SoftAP up/down and
  * replying EVT_AP_READY/EVT_AP_DISABLED — the half of remote::protocol
- * gui::WirelessSetupScreen's QR-code flow needs — and serves the
- * phone-facing wireless config form (ConfigWebHandler, config_web.hpp),
- * which relays REQ_GET_STATE/REQ_APPLY_CONFIG to the Teensy over the same
- * link. See platform/esp32/README.md for how to test this against the
- * desktop simulator with no Teensy or display wiring at all.
+ * gui::WirelessSetupScreen's QR-code flow needs — and serves the phone
+ * configurator (ConfigWebHandler, config_web.hpp), which relays its REQ_*
+ * config messages to the Teensy over the same link. See
+ * platform/esp32/README.md for working on the page against the desktop
+ * simulator with no C3 or Teensy at all.
  *
  * The relay link runs on Serial1 (UART) wired to the Teensy's Serial4,
  * leaving native USB-CDC free for flashing and debug logs. It used to run

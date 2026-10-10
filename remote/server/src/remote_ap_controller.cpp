@@ -112,6 +112,14 @@ namespace remote::server
         }
     }
 
+    FLASHMEM void RemoteApController::note_activity(uint32_t now_ms)
+    {
+        if (state_ == ApState::Active)
+        {
+            state_entered_ms_ = now_ms;
+        }
+    }
+
     FLASHMEM void RemoteApController::tick(uint32_t now_ms)
     {
         switch (state_)

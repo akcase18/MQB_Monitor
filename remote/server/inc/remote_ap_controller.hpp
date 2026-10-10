@@ -56,6 +56,12 @@ namespace remote::server
              * has actually elapsed. */
             void tick(uint32_t now_ms);
 
+            /** Restarts the idle timeout -- call whenever the phone does
+             * something, so a session that is still editing isn't cut off
+             * AP_IDLE_TIMEOUT_MS after the AP came up. No-op unless
+             * Active. */
+            void note_activity(uint32_t now_ms);
+
             ApState state() const
             {
                 return state_;

@@ -491,6 +491,27 @@ namespace gui
 
     void SettingsScreen::open()
     {
+        sync_widgets();
+        lv_screen_load_anim(
+            screen_, LV_SCR_LOAD_ANIM_OVER_BOTTOM, 220, 0, false);
+    }
+
+    FLASHMEM void SettingsScreen::set_values(uint8_t           day_brightness_pct,
+                                    uint8_t           night_brightness_pct,
+                                    uint8_t           num_panels,
+                                    uint32_t          accent_color,
+                                    LayoutOrientation orientation)
+    {
+        day_brightness_pct_   = day_brightness_pct;
+        night_brightness_pct_ = night_brightness_pct;
+        num_panels_           = num_panels;
+        accent_color_         = accent_color;
+        orientation_          = orientation;
+        sync_widgets();
+    }
+
+    FLASHMEM void SettingsScreen::sync_widgets()
+    {
         /* Reopens showing whichever of day/night was last selected, not
          * always Day — flipping to Night to dim the screen and then
          * backing out of Settings shouldn't silently flip back. */
@@ -508,9 +529,6 @@ namespace gui
 
         refresh_theme_swatch();
         refresh_orientation_label();
-
-        lv_screen_load_anim(
-            screen_, LV_SCR_LOAD_ANIM_OVER_BOTTOM, 220, 0, false);
     }
 
     void SettingsScreen::refresh_theme_swatch()

@@ -1,5 +1,6 @@
 #include "remote_config_server.hpp"
 
+#include <math.h>
 #include <string.h>
 
 #include "signal_catalog.hpp"
@@ -15,30 +16,88 @@ namespace remote::server
 
     namespace
     {
-        FLASHMEM void clamp_swap(float &lo, float &hi, float min, float max)
+        /* Wire sizes of each record -- see the encode_*() functions in
+         * remote_protocol.cpp. A config batch is settings, MAX_PANELS
+         * panels, the signal count and one SignalConfigWire per signal. */
+        constexpr size_t SETTINGS_BYTES = 8;
+        constexpr size_t PANEL_BYTES    = 4;
+        constexpr size_t SIGNAL_BYTES   = 19;
+        constexpr size_t HEAD_LEN
+            = SETTINGS_BYTES + core::MAX_PANELS * PANEL_BYTES + 2;
+        constexpr size_t BATCH_LEN
+            = HEAD_LEN + core::SIGNAL_CATALOG_COUNT * SIGNAL_BYTES;
+
+        /* Clamps both thresholds into the signal's range, and puts a
+         * reversed pair back in order -- but only when both are in use. A
+         * disabled threshold keeps whatever value it was last left at,
+         * which is routinely on the "wrong" side of the enabled one (a
+         * high warning set to 1.6 below an untouched low of 2.0); swapping
+         * then would silently move the warning the user actually set. */
+        FLASHMEM void clamp_thresholds(float &lo,
+                                       float &hi,
+                                       bool   use_lo,
+                                       bool   use_hi,
+                                       float  min,
+                                       float  max)
         {
-            if (lo < min)
-            {
-                lo = min;
-            }
-            if (lo > max)
-            {
-                lo = max;
-            }
-            if (hi < min)
-            {
-                hi = min;
-            }
-            if (hi > max)
-            {
-                hi = max;
-            }
-            if (lo > hi)
+            lo = lo < min ? min : (lo > max ? max : lo);
+            hi = hi < min ? min : (hi > max ? max : hi);
+            if (use_lo && use_hi && lo > hi)
             {
                 float tmp = lo;
                 lo        = hi;
                 hi        = tmp;
             }
+        }
+
+        /* Field by field rather than memcmp, which would also compare
+         * struct padding. A threshold or custom range only counts while
+         * it's switched on: apply_to_live() clamps every threshold into
+         * range whether it's in use or not, so a never-set (0, 0) pair on
+         * a signal whose range excludes 0 comes back from a round trip
+         * through the phone moved, with nothing actually changed. */
+        FLASHMEM bool configs_equal(const core::Config &a, const core::Config &b)
+        {
+            const core::Settings &sa = a.settings;
+            const core::Settings &sb = b.settings;
+            if (sa.day_brightness != sb.day_brightness
+                || sa.night_brightness != sb.night_brightness
+                || sa.num_panels != sb.num_panels
+                || sa.orientation != sb.orientation
+                || sa.accent_color != sb.accent_color)
+            {
+                return false;
+            }
+            for (uint8_t i = 0; i < core::MAX_PANELS; i++)
+            {
+                const core::PrioritizedSignal &pa = a.priorities[i];
+                const core::PrioritizedSignal &pb = b.priorities[i];
+                if (pa.signal_id != pb.signal_id || pa.units != pb.units
+                    || pa.display_mode != pb.display_mode)
+                {
+                    return false;
+                }
+            }
+            for (size_t i = 0; i < core::SIGNAL_CATALOG_COUNT; i++)
+            {
+                const core::SignalConfig &ca = a.signals[i];
+                const core::SignalConfig &cb = b.signals[i];
+                if (ca.warn.use_lo != cb.warn.use_lo
+                    || ca.warn.use_hi != cb.warn.use_hi
+                    || ca.use_custom_range != cb.use_custom_range)
+                {
+                    return false;
+                }
+                if ((ca.warn.use_lo && ca.warn.lo != cb.warn.lo)
+                    || (ca.warn.use_hi && ca.warn.hi != cb.warn.hi)
+                    || (ca.use_custom_range
+                        && (ca.custom_min != cb.custom_min
+                            || ca.custom_max != cb.custom_max)))
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         FLASHMEM uint8_t clamp_u8(uint32_t v, uint8_t lo, uint8_t hi)
@@ -54,6 +113,8 @@ namespace remote::server
             return static_cast<uint8_t>(v);
         }
     } // namespace
+
+    DMAMEM core::Config RemoteConfigServer::saved_before_preview_;
 
     FLASHMEM RemoteConfigServer::RemoteConfigServer(core::ConfigStore &config,
                                                     core::SignalStore &signals)
@@ -76,9 +137,18 @@ namespace remote::server
                 resp_type = MsgType::RESP_STATE;
                 return handle_get_state(resp_buf, resp_cap);
 
+            case MsgType::REQ_PREVIEW_CONFIG:
             case MsgType::REQ_APPLY_CONFIG:
-                return handle_apply_config(
-                    req_payload, req_len, resp_buf, resp_cap, resp_type);
+            case MsgType::REQ_REVERT_PREVIEW:
+                resp_type = MsgType::RESP_APPLY_RESULT;
+                if (resp_cap < 1)
+                {
+                    return 0;
+                }
+                protocol::put_u8(resp_buf,
+                                 static_cast<uint8_t>(handle_config_change(
+                                     req_type, req_payload, req_len)));
+                return 1;
 
             default:
                 resp_type = MsgType::RESP_ERROR;
@@ -86,11 +156,103 @@ namespace remote::server
         }
     }
 
-    void RemoteConfigServer::set_applied_callback(AppliedCallback cb,
-                                                  void           *ctx)
+    FLASHMEM void RemoteConfigServer::set_config_callback(ConfigCallback cb, void *ctx)
     {
-        applied_cb_  = cb;
-        applied_ctx_ = ctx;
+        config_cb_  = cb;
+        config_ctx_ = ctx;
+    }
+
+    FLASHMEM void RemoteConfigServer::revert_preview()
+    {
+        if (!preview_active_)
+        {
+            return;
+        }
+        config_.get()   = saved_before_preview_;
+        preview_active_ = false;
+        unsaved_        = false;
+        notify(ConfigEvent::Reverted);
+    }
+
+    FLASHMEM void RemoteConfigServer::notify(ConfigEvent event)
+    {
+        if (config_cb_ != nullptr)
+        {
+            config_cb_(config_ctx_, event);
+        }
+    }
+
+    FLASHMEM ApplyResult
+    RemoteConfigServer::handle_config_change(MsgType        req_type,
+                                             const uint8_t *payload,
+                                             uint16_t       len)
+    {
+        if (req_type == MsgType::REQ_REVERT_PREVIEW)
+        {
+            revert_preview();
+            return ApplyResult::Ok;
+        }
+
+        /* Captured before apply_to_live() touches anything, so it is the
+         * saved config even when this first preview is the one rejected
+         * below -- a rejection leaves the live config alone, and the
+         * snapshot then simply equals it. */
+        bool starting_preview
+            = req_type == MsgType::REQ_PREVIEW_CONFIG && !preview_active_;
+        if (starting_preview)
+        {
+            saved_before_preview_ = config_.get();
+        }
+
+        ApplyResult result = apply_to_live(payload, len);
+        if (result != ApplyResult::Ok)
+        {
+            return result;
+        }
+
+        if (req_type == MsgType::REQ_PREVIEW_CONFIG)
+        {
+            read_preview_values(payload + BATCH_LEN, len - BATCH_LEN);
+            preview_active_ = true;
+            unsaved_ = !configs_equal(config_.get(), saved_before_preview_);
+            notify(ConfigEvent::Previewed);
+        }
+        else
+        {
+            config_.save();
+            /* What a later revert goes back to is now this. */
+            saved_before_preview_ = config_.get();
+            unsaved_              = false;
+            notify(ConfigEvent::Committed);
+        }
+        return ApplyResult::Ok;
+    }
+
+    FLASHMEM void RemoteConfigServer::read_preview_values(const uint8_t *p,
+                                                          size_t         len)
+    {
+        preview_values_ = core::SignalStore {};
+
+        uint16_t count = 0;
+        if (len < 2)
+        {
+            return;
+        }
+        p = protocol::get_u16(p, count);
+        if (count != core::SIGNAL_CATALOG_COUNT || len < 2 + count * 4u)
+        {
+            return;
+        }
+
+        for (size_t i = 0; i < count; i++)
+        {
+            float value = 0.0f;
+            p           = protocol::get_f32(p, value);
+            if (!isnan(value))
+            {
+                preview_values_.set_at(static_cast<int>(i), value, 0);
+            }
+        }
     }
 
     FLASHMEM size_t RemoteConfigServer::handle_get_state(uint8_t *out,
@@ -153,21 +315,27 @@ namespace remote::server
             p                   = protocol::encode_signal_config(p, sw);
         }
 
+        p = protocol::put_u8(
+            p,
+            static_cast<uint8_t>((preview_active_ ? 1 : 0) | (unsaved_ ? 2 : 0)));
+
         (void)end; /* individual field sizes are fixed/known; a real
                     * overflow here would mean FRAME_MAX_PAYLOAD itself is
                     * too small, not a runtime data-dependent overrun */
         return static_cast<size_t>(p - out);
     }
 
-    FLASHMEM size_t
-    RemoteConfigServer::handle_apply_config(const uint8_t *payload,
-                                            uint16_t       len,
-                                            uint8_t       *out,
-                                            size_t         cap,
-                                            MsgType       &resp_type)
+    FLASHMEM ApplyResult RemoteConfigServer::apply_to_live(
+        const uint8_t *payload,
+        uint16_t       len)
     {
-        (void)len;
-        resp_type = MsgType::RESP_APPLY_RESULT;
+        /* The batch comes from browser-side JS rather than this
+         * firmware's own encoder, so a short one is checked here instead
+         * of being decoded off the end of the frame buffer. */
+        if (payload == nullptr || len < HEAD_LEN)
+        {
+            return ApplyResult::ErrTruncated;
+        }
 
         const uint8_t *p = payload;
 
@@ -183,15 +351,13 @@ namespace remote::server
         uint16_t signal_count = 0;
         p                     = protocol::get_u16(p, signal_count);
 
-        auto fail = [&](ApplyResult result) -> size_t {
-            uint8_t *w = out;
-            w          = protocol::put_u8(w, static_cast<uint8_t>(result));
-            return static_cast<size_t>(w - out);
-        };
-
         if (signal_count != core::SIGNAL_CATALOG_COUNT)
         {
-            return fail(ApplyResult::ErrSignalCountMismatch);
+            return ApplyResult::ErrSignalCountMismatch;
+        }
+        if (len < BATCH_LEN)
+        {
+            return ApplyResult::ErrTruncated;
         }
 
         /* Validate the whole batch before mutating anything — a rejected
@@ -200,16 +366,16 @@ namespace remote::server
         {
             if (core::signal_catalog_find(priorities[i].signal_id) < 0)
             {
-                return fail(ApplyResult::ErrInvalidSignal);
+                return ApplyResult::ErrInvalidSignal;
             }
             if (priorities[i].units > 1)
             {
-                return fail(ApplyResult::ErrInvalidEnum);
+                return ApplyResult::ErrInvalidEnum;
             }
             if (priorities[i].display_mode
                 > static_cast<uint8_t>(core::DisplayMode::Gauge))
             {
-                return fail(ApplyResult::ErrInvalidEnum);
+                return ApplyResult::ErrInvalidEnum;
             }
         }
 
@@ -275,7 +441,12 @@ namespace remote::server
 
             float lo = sw.lo;
             float hi = sw.hi;
-            clamp_swap(lo, hi, range.min, range.max);
+            clamp_thresholds(lo,
+                             hi,
+                             sw.use_lo != 0,
+                             sw.use_hi != 0,
+                             range.min,
+                             range.max);
 
             sig_cfg.warn.lo     = lo;
             sig_cfg.warn.hi     = hi;
@@ -283,18 +454,7 @@ namespace remote::server
             sig_cfg.warn.use_hi = sw.use_hi != 0;
         }
 
-        config_.save();
-
-        /* Only on the success path -- a batch rejected above returns
-         * through fail() without ever reaching here, so the UI is never
-         * rebuilt against a config that was not committed. */
-        if (applied_cb_ != nullptr)
-        {
-            applied_cb_(applied_ctx_);
-        }
-
-        (void)cap;
-        return fail(ApplyResult::Ok);
+        return ApplyResult::Ok;
     }
 
 } // namespace remote::server

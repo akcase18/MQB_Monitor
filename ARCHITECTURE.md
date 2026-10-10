@@ -32,7 +32,7 @@ This means a given `.cpp` file's `#include`s tell you which layer it belongs to,
 | `core/vehicle/` | The 22-signal catalog, the flow-controlled UDS request scheduler, the runtime value store, and warning-threshold evaluation. | [core/vehicle/README.md](core/vehicle/README.md) |
 | `core/config/` | Persisted config schema (`Config`/`Settings`/`PrioritizedSignal`/`SignalConfig`) and `ConfigStore`'s load/save/migrate logic over `IConfigStore`. | [core/config/README.md](core/config/README.md) |
 | `remote/protocol/` | Wire format for the Teensy↔ESP32-C3 link: message types, framing, CRC, per-record encode/decode. Zero deps — compiles into both firmwares. | — |
-| `remote/server/` | Teensy-side: `RemoteConfigServer` (batch-validates and applies a config over the wire), `RemoteConfigLink` (UART bytes ↔ frames), `RemoteApController` (AP lifecycle state machine). | — |
+| `remote/server/` | Teensy-side: `RemoteConfigServer` (batch-validates a config over the wire, then previews it unsaved, saves it, or reverts a preview), `RemoteConfigLink` (UART bytes ↔ frames), `RemoteApController` (AP lifecycle state machine). | — |
 | `gui/` | The LVGL presentation layer. | [gui/README.md](gui/README.md) |
 | `gui/theme/` | Palette/typography/metrics tokens — the one file a reskin touches. | [gui/theme/README.md](gui/theme/README.md) |
 | `gui/widgets/` | `PanelWidget` — the single reusable data-panel building block. | [gui/widgets/README.md](gui/widgets/README.md) |
