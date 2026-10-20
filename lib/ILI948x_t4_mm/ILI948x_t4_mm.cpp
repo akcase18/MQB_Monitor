@@ -1500,7 +1500,13 @@ FASTRUN void ILI948x_t4_mm::MulBeatWR_nPrm_DMA(uint32_t const cmd, const void *v
   DCHigh();
   microSecondDelay();
 
-  if (length < 8)
+  /* MQB_Monitor local fix: was `length < 8`. The DMA path below moves
+   * whole BeatsPerMinLoop-pixel minor loops and finishes the remainder in
+   * the completion ISR, so anything shorter than one minor loop programmed
+   * a zero-iteration transfer that never completes -- WR_DMATransferDone
+   * stayed false and the next push spun forever. LVGL only flushes areas
+   * that small for tiny invalidations (a countdown ring's sliver). */
+  if (length < BeatsPerMinLoop)
   {
     // Serial.println ("In DMA but to Short to multibeat");
     const uint16_t *newValue = (uint16_t *)value;

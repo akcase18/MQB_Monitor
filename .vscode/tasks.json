@@ -21,7 +21,8 @@
       "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
     },
     {
-      "label": "Monitor: Connect to Teensy (auto-detect port)",
+      "label": "Monitor: Open CAN Sniffer app",
+      "detail": "Dash (tap Start on its popup after Connect) or standalone sniffer; auto-detects the port",
       "type": "shell",
       "command": "${workspaceFolder}/tools/monitor/.venv/bin/python",
       "args": ["run.py"],
@@ -30,7 +31,8 @@
       "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
     },
     {
-      "label": "Monitor: Connect to Teensy (choose port…)",
+      "label": "Monitor: Open CAN Sniffer app (choose port…)",
+      "detail": "Same, but for when auto-detect picks the wrong serial device",
       "type": "shell",
       "command": "${workspaceFolder}/tools/monitor/.venv/bin/python",
       "args": ["run.py", "--port", "${input:serialPort}"],
@@ -158,7 +160,7 @@
     {
       "id": "serialPort",
       "type": "promptString",
-      "description": "Serial port of the Teensy sniffer",
+      "description": "Serial port of the dash or standalone sniffer",
       "default": "/dev/tty.usbmodem"
     }
   ]

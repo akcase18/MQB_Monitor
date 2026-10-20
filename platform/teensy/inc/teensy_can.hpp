@@ -15,6 +15,20 @@ class TeensyCanBus : public ICanBus
         bool send(const CanFrame &frame) override;
         bool receive(CanFrame &out) override;
 
+        bool       sniff_begin(uint32_t baud, bool listen_only) override;
+        void       sniff_end() override;
+        bool       sniff_read(SniffFrame &out) override;
+        bool       sniff_send(const SniffFrame &frame) override;
+        SniffStats sniff_stats() const override;
+
     private:
         TeensyCanBus() = default;
+
+        /* begin()'s arguments, so sniff_end() can put them back. */
+        uint32_t tx_id_ = 0;
+        uint32_t rx_id_ = 0;
+        uint32_t baud_  = 0;
+
+        bool sniffing_    = false;
+        bool listen_only_ = true;
 };

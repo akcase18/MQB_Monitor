@@ -47,7 +47,13 @@ namespace gui
     struct Typography
     {
             const lv_font_t *data_sm;   /* small-panel data readout */
+            const lv_font_t *data_md;   /* small-panel bare Digital value —
+                                         * no ring to fit inside, so it
+                                         * can outgrow data_sm */
             const lv_font_t *data_lg;   /* large-panel data readout */
+            const lv_font_t *data_xl;   /* large-panel bare Digital value,
+                                         * when the panel is wide enough
+                                         * (see panel_widget.cpp) */
             const lv_font_t *data_hero; /* Bar/Gauge value in a true hero
                                          * slot (count 1, count 3's hero) */
             const lv_font_t *data_mega; /* bare Digital value in a true

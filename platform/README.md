@@ -5,7 +5,7 @@ Hardware abstraction: seven interfaces that everything in [core/](../core/README
 ## Files
 
 - **`platform.hpp`** — the interfaces:
-  - `ICanBus` — `begin(tx_id, rx_id, baud)`, non-blocking `send(frame)`/`receive(out)`.
+  - `ICanBus` — `begin(tx_id, rx_id, baud)`, non-blocking `send(frame)`/`receive(out)`. Plus an opt-in sniffer mode -- `sniff_begin(baud, listen_only)` / `sniff_read(SniffFrame&)` / `sniff_send()` / `sniff_stats()` / `sniff_end()` -- that accepts every frame on the bus for `src/main.cpp`'s USB sniffer mode, then puts back exactly what `begin()` set up. Every hook has an "unsupported" default, so a board without it compiles unchanged; only `TeensyCanBus` implements it today.
   - `IDisplay` — `begin()`, `get_resolution()`, `flush()` (push an RGB565 pixel rect), `set_backlight(pct)`, `set_backlight_off()`. The last two are distinct on purpose: the user-facing 0–100% scale floors at a minimum duty (below ~15% the panel reads as black anyway), so `set_backlight(0)` means "as dim as it gets", not "off". `set_backlight_off()` is the true off, for hiding a transition the panel shouldn't be showing at all — see `src/main.cpp`'s `BacklightState`.
   - `ITouch` — `begin()`, non-blocking `read(out)`.
   - `IConfigStore` — raw byte-blob `read(offset, buf, len)`/`write(offset, buf, len)`/`capacity()`. [core/config](../core/config/README.md) owns the actual schema and versioning on top of this; this interface only knows about bytes.

@@ -94,14 +94,36 @@ namespace gui
             return static_cast<uint8_t>(range_pct * 100.0f);
         }
 
+        /* Widest Digital readout a panel has to hold, beside its unit
+         * tag and the 3px gap set_view_model() leaves between them: a
+         * 5-glyph value with a 3-glyph unit ("-14.5" psi, "-1.00" bar)
+         * or a 4-glyph value with the 5-glyph "lb-ft" (torque has no
+         * decimals). Both fonts are monospace, so a glyph's advance
+         * times the count is exact. */
+        lv_coord_t worst_readout_width(const lv_font_t *value_font,
+                                       const lv_font_t *unit_font)
+        {
+            lv_coord_t v = lv_font_get_glyph_width(value_font, '0', 0);
+            lv_coord_t u = lv_font_get_glyph_width(unit_font, '0', 0);
+            lv_coord_t short_unit = 5 * v + 3 + 3 * u;
+            lv_coord_t long_unit  = 4 * v + 3 + 5 * u;
+            return short_unit > long_unit ? short_unit : long_unit;
+        }
+
         /* Bar/Gauge already give an at-a-glance read via the graphic
          * itself — the value next to/inside it is there for a closer
          * look, not to be the dominant element, so a hero slot only
          * bumps it to data_hero, not the much bigger data_mega. Digital
-         * has no ring to fit inside, so a hero slot's bare number gets to
-         * be as big as the panel can hold. */
+         * has no ring to fit inside, so its bare number gets to be as big
+         * as the panel can hold — data_mega in a hero slot, data_md in a
+         * small one, and in a large one the biggest of data_xl/data_lg
+         * that fits (data_md if neither does). Large cells run from
+         * ~150px (portrait 4-panel) to ~300px (portrait 5-panel's merged
+         * bottom row) wide, so that's the one tier sized by `content_w`
+         * rather than by tier alone. */
         const lv_font_t *value_font(const Typography     &type,
-                                    const PanelViewModel &vm)
+                                    const PanelViewModel &vm,
+                                    lv_coord_t            content_w)
         {
             if (vm.hero)
             {
@@ -112,7 +134,20 @@ namespace gui
             {
                 return type.data_sm;
             }
-            return vm.large ? type.data_lg : type.data_sm;
+            if (!vm.large)
+            {
+                return type.data_md;
+            }
+            const lv_font_t *const candidates[] = { type.data_xl,
+                                                    type.data_lg };
+            for (const lv_font_t *font : candidates)
+            {
+                if (worst_readout_width(font, type.unit) <= content_w)
+                {
+                    return font;
+                }
+            }
+            return type.data_md;
         }
 
         /* How far to shift the content "anchor" up from dead-center so it
@@ -243,7 +278,15 @@ namespace gui
 
         if (mode_changed || tier_changed)
         {
-            lv_obj_set_style_text_font(data_, value_font(type, vm), 0);
+            /* The grid sizes btn_ lazily -- resolve it so the width
+             * value_font() sees is this cell's, not a stale one. A move
+             * to a new cell always lands here: set_visible() clears
+             * applied_valid_, making it a `first` call. */
+            lv_obj_update_layout(btn_);
+            lv_obj_set_style_text_font(
+                data_,
+                value_font(type, vm, lv_obj_get_content_width(btn_)),
+                0);
         }
         if (value_changed)
         {
@@ -304,7 +347,8 @@ namespace gui
                      * as a whole lands at `offset`, matching Digital/
                      * Gauge's single-element look. */
                     lv_coord_t data_h
-                        = lv_font_get_line_height(value_font(type, vm));
+                        = lv_font_get_line_height(
+                            lv_obj_get_style_text_font(data_, LV_PART_MAIN));
                     lv_coord_t pair_shift = (data_h + BAR_DATA_GAP) / 2;
                     lv_obj_align(bar_, LV_ALIGN_CENTER, 0, offset + pair_shift);
 
@@ -331,10 +375,35 @@ namespace gui
                 }
 
                 case DisplayMode::Digital:
-                default:
+                default: {
                     lv_obj_align(data_, LV_ALIGN_CENTER, 0, offset);
                     lv_obj_align_to(unit_, data_, LV_ALIGN_OUT_RIGHT_TOP, 3, 2);
+
+                    /* The value stays centered with the unit hanging off
+                     * its right, but at data_md a 5-char value plus a
+                     * long unit ("-12.5" + "lb-ft") can run that tag past
+                     * a small panel's edge — slide the pair left just
+                     * enough to keep it inside, never past the left edge. */
+                    if (!lv_obj_has_flag(unit_, LV_OBJ_FLAG_HIDDEN))
+                    {
+                        /* align_to() only stores the position — resolve it
+                         * before reading coords back. */
+                        lv_obj_update_layout(unit_);
+                        lv_coord_t overflow = lv_obj_get_x(unit_)
+                                              + lv_obj_get_width(unit_)
+                                              - lv_obj_get_content_width(btn_);
+                        lv_coord_t room = lv_obj_get_x(data_);
+                        lv_coord_t shift = overflow < room ? overflow : room;
+                        if (shift > 0)
+                        {
+                            lv_obj_align(
+                                data_, LV_ALIGN_CENTER, -shift, offset);
+                            lv_obj_align_to(
+                                unit_, data_, LV_ALIGN_OUT_RIGHT_TOP, 3, 2);
+                        }
+                    }
                     break;
+                }
             }
         }
         else if (pct_changed)

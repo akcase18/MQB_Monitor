@@ -63,44 +63,6 @@ namespace gui
 
         constexpr uint8_t STATUS_ROW_COUNT = 4;
 
-        /** A status tile: fixed caption above, value below, both left-
-         * aligned. Returns the value label, which is the only half that
-         * ever changes.
-         *
-         * Stacked rather than caption-left/value-right so the value gets
-         * the tile's full width -- see the header comment. Captions sit
-         * back in panel_border, the theme's "structural, not content"
-         * tone, which keeps the eye on the numbers. */
-        FLASHMEM lv_obj_t *create_status_tile(lv_obj_t    *parent,
-                                              const Theme &theme,
-                                              const char  *caption,
-                                              lv_coord_t   x,
-                                              lv_coord_t   y,
-                                              lv_coord_t   width,
-                                              lv_coord_t   height)
-        {
-            lv_obj_t *tile = lv_obj_create(parent);
-            lv_obj_remove_style_all(tile);
-            lv_obj_set_size(tile, width, height);
-            lv_obj_align(tile, LV_ALIGN_TOP_LEFT, x, y);
-
-            lv_obj_t *caption_lbl = lv_label_create(tile);
-            lv_label_set_text(caption_lbl, caption);
-            lv_obj_set_style_text_font(
-                caption_lbl, theme.typography.label_lg, 0);
-            lv_obj_set_style_text_color(
-                caption_lbl, theme.palette.panel_border, 0);
-            lv_obj_align(caption_lbl, LV_ALIGN_TOP_LEFT, 0, 0);
-
-            lv_obj_t *value_lbl = lv_label_create(tile);
-            lv_label_set_text(value_lbl, "--");
-            lv_obj_set_style_text_font(value_lbl, theme.typography.ui, 0);
-            lv_obj_set_style_text_color(value_lbl, theme.palette.fg, 0);
-            lv_obj_align(value_lbl, LV_ALIGN_BOTTOM_LEFT, 0, 0);
-
-            return value_lbl;
-        }
-
         /**
          * Formats `used`/`total` as "4.2 / 13.0 MB" into `out`.
          *

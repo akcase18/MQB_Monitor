@@ -18,6 +18,7 @@
 #include "signal_catalog.hpp"
 #include "signal_poller.hpp"
 #include "signal_store.hpp"
+#include "slcan.hpp"
 #include "uds_client.hpp"
 
 #include "remote_ap_controller.hpp"
@@ -28,8 +29,10 @@
 #include "info_screen.hpp"
 #include "logging_screen.hpp"
 #include "remote_binding.hpp"
+#include "screen_helpers.hpp"
 #include "settings_screen.hpp"
 #include "signal_picker_screen.hpp"
+#include "sniffer_screen.hpp"
 #include "theme_picker_screen.hpp"
 #include "vehicle_binding.hpp"
 #include "warning_config_screen.hpp"
@@ -159,6 +162,9 @@ namespace
             gui::SettingsScreen      settings_screen;
             gui::ThemePickerScreen   theme_picker_screen;
             gui::WirelessSetupScreen wireless_setup_screen;
+            /* Not built by build_screens() -- created and destroyed around
+             * each sniffer session (see enter_sniff()). */
+            gui::SnifferScreen sniffer_screen;
 
             const char *signal_names[core::SIGNAL_CATALOG_COUNT];
             uint16_t    signal_ids[core::SIGNAL_CATALOG_COUNT];
@@ -876,11 +882,10 @@ namespace
     }
 
 #ifdef ARDUINO
-    /* USB-serial log retrieval -- a small bespoke line command set (not
-     * SLCAN; that's can_sniffer.cpp's separate, unrelated firmware/
-     * protocol for a different Teensy board entirely), modeled on the same
-     * "line assembly, dispatch on CR/LF" shape can_sniffer.cpp already
-     * uses for its own USB-CDC command parsing. Deliberately blocking --
+    /* USB-serial log retrieval -- a small bespoke line command set,
+     * sharing the USB port with sniffer mode's SLCAN (see
+     * handle_usb_line() below, which routes between the two). Deliberately
+     * blocking --
      * this is meant to run as its own dedicated offload action (park,
      * plug in, dump), not interleaved with driving, so freezing
      * everything else (CAN polling, GUI) for the duration is fine. */
@@ -938,9 +943,384 @@ namespace
         }
     }
 
-    void poll_log_serial()
+    /*==========================================================================
+     * CAN sniffer mode
+     *
+     * Lets tools/monitor use this dash as its USB CAN sniffer, in place of
+     * the standalone env:can_sniffer board. Never entered on its own: the
+     * host asks (SNIFFREQ), the panel asks the driver (Cancel/Start popup),
+     * and only Start changes anything. While active the dashboard is
+     * paused outright -- no UDS polling (so the capture holds none of the
+     * dash's own requests), no scheduler (logging, refresh tasks, the
+     * remote link) -- and the panel shows SnifferScreen instead. Stop on
+     * the panel, SNIFFEND from the host, or the host closing the port all
+     * end it the same way; nothing is persisted, so a reboot always comes
+     * up as a normal dash.
+     *
+     * Host line protocol, on top of the LOG* commands and SLCAN:
+     *
+     *   SNIFFREQ  -> SNIFFWAIT at once when the popup goes up, then
+     *                SNIFFOK (confirmed, or already active)
+     *                SNIFFNO (declined on the panel, or timed out)
+     *                SNIFFBUSY (panel isn't on the gauges -- in a menu)
+     *   SNIFFEND  -> CR; leaves sniffer mode (or withdraws a pending ask)
+     *   SNIFFSTOP <- sent unasked when Stop is tapped on the panel
+     *
+     * SLCAN commands are answered only while active, BELL otherwise.
+     *========================================================================*/
+
+    constexpr uint32_t SNIFF_CONFIRM_TIMEOUT_MS = 10000;
+    constexpr uint32_t SNIFF_SCREEN_REFRESH_MS  = 500;
+    constexpr uint32_t SNIFF_HOST_GONE_MS       = 250;
+
+    enum class SniffState : uint8_t
     {
-        static char   cmd[16];
+        Off,
+        Pending, /* popup up, waiting on the driver */
+        Active
+    };
+
+    /* SLCAN's bus/serial side for the dash: ICanBus's sniff_* hooks and
+     * the USB port. */
+    class DashSniffPort : public core::slcan::IPort
+    {
+        public:
+            FLASHMEM bool open(uint32_t baud, bool listen_only) override
+            {
+                return platform_get().can.sniff_begin(baud, listen_only);
+            }
+
+            FLASHMEM void close() override
+            {
+                platform_get().can.sniff_end();
+            }
+
+            FLASHMEM void transmit(const SniffFrame &frame) override
+            {
+                platform_get().can.sniff_send(frame);
+            }
+
+            FLASHMEM void write(const char *data, size_t len) override
+            {
+                Serial.write(reinterpret_cast<const uint8_t *>(data), len);
+            }
+    };
+
+    DashSniffPort        s_sniff_port;
+    core::slcan::Session s_sniff_session(s_sniff_port);
+
+    SniffState s_sniff_state      = SniffState::Off;
+    lv_obj_t  *s_sniff_popup      = nullptr;
+    lv_obj_t  *s_sniff_ring       = nullptr; /* popup's countdown */
+    uint32_t   s_sniff_pending_ms = 0;
+
+    /* frames/s, sampled at SNIFF_SCREEN_REFRESH_MS */
+    uint32_t s_sniff_rate_ms = 0;
+    uint32_t s_sniff_rate_rx = 0;
+
+    /* When `Serial` last read true -- see host_gone(). */
+    uint32_t s_sniff_host_ms = 0;
+
+    FLASHMEM void usb_reply(const char *text)
+    {
+        Serial.print(text);
+        Serial.write(core::slcan::CR);
+    }
+
+    FLASHMEM void close_sniff_popup()
+    {
+        if (s_sniff_popup != nullptr)
+        {
+            lv_msgbox_close_async(s_sniff_popup);
+            s_sniff_popup = nullptr;
+            s_sniff_ring  = nullptr; /* goes with it */
+        }
+    }
+
+    FLASHMEM void decline_sniff()
+    {
+        close_sniff_popup();
+        s_sniff_state = SniffState::Off;
+        usb_reply("SNIFFNO");
+    }
+
+    FLASHMEM void sniff_stop_cb(void *ctx);
+
+    FLASHMEM void enter_sniff()
+    {
+        Composition &app = composition();
+
+        close_sniff_popup();
+        s_sniff_session.reset();
+        s_sniff_state   = SniffState::Active;
+        s_sniff_rate_ms = platform_get().clock.millis();
+        s_sniff_rate_rx = 0;
+
+        app.sniffer_screen.create(runtime_theme(), sniff_stop_cb, nullptr);
+        lv_screen_load(app.sniffer_screen.screen());
+
+        usb_reply("SNIFFOK");
+    }
+
+    FLASHMEM void exit_sniff()
+    {
+        Composition &app = composition();
+
+        /* Closing the SLCAN channel is what calls sniff_end(), which puts
+         * the bus back exactly as begin() left it at boot. */
+        s_sniff_session.reset();
+        s_sniff_state = SniffState::Off;
+
+        app.info_screen.refresh();
+        lv_screen_load(app.info_screen.screen());
+        app.sniffer_screen.destroy();
+    }
+
+    FLASHMEM void exit_sniff_async(void *ctx)
+    {
+        (void)ctx;
+        if (s_sniff_state == SniffState::Active)
+        {
+            exit_sniff();
+
+            /* Unprompted, unlike every other reply: the host is otherwise
+             * left streaming from a dash that quietly went back to the
+             * gauges. */
+            usb_reply("SNIFFSTOP");
+        }
+    }
+
+    /* Fires from inside the Stop button's own click handler, and
+     * exit_sniff() deletes that button -- the same reentrancy
+     * rebuild_screens_for_theme_change() defers around. */
+    FLASHMEM void sniff_stop_cb(void *ctx)
+    {
+        (void)ctx;
+        lv_async_call(exit_sniff_async, nullptr);
+    }
+
+    FLASHMEM void sniff_confirm_cb(lv_event_t *e)
+    {
+        (void)e;
+        if (s_sniff_state == SniffState::Pending)
+        {
+            enter_sniff();
+        }
+    }
+
+    FLASHMEM void sniff_cancel_cb(lv_event_t *e)
+    {
+        (void)e;
+        if (s_sniff_state == SniffState::Pending)
+        {
+            decline_sniff();
+        }
+    }
+
+    FLASHMEM void request_sniff()
+    {
+        Composition &app = composition();
+
+        if (s_sniff_state == SniffState::Active)
+        {
+            usb_reply("SNIFFOK"); /* a reconnecting host -- already on */
+            return;
+        }
+        if (s_sniff_state == SniffState::Pending)
+        {
+            return; /* the popup's already asking */
+        }
+
+        /* Only from the gauges. Pulling the panel out from under
+         * Settings or the configurator would skip their own exit paths
+         * (Settings' done callback is what saves, for one), so a menu
+         * just says no and the driver retries from the gauges. */
+        if (lv_screen_active() != app.info_screen.screen())
+        {
+            usb_reply("SNIFFBUSY");
+            return;
+        }
+
+        gui::ConfirmPopup popup
+            = gui::create_confirm_popup(runtime_theme(),
+                                        "Start CAN sniffer?",
+                                        "Gauges will pause.",
+                                        "Start");
+        lv_obj_add_event_cb(
+            popup.confirm_btn, sniff_confirm_cb, LV_EVENT_CLICKED, nullptr);
+        lv_obj_add_event_cb(
+            popup.cancel_btn, sniff_cancel_cb, LV_EVENT_CLICKED, nullptr);
+
+        s_sniff_popup      = popup.mbox;
+        s_sniff_ring       = gui::add_popup_countdown(
+            popup, runtime_theme(), SNIFF_CONFIRM_TIMEOUT_MS / 100);
+        s_sniff_state      = SniffState::Pending;
+        s_sniff_pending_ms = platform_get().clock.millis();
+        s_sniff_host_ms    = s_sniff_pending_ms; /* the host just wrote */
+
+        /* Tells the host a person is being asked, so it can tell this
+         * wait apart from a plain SLCAN device that will never answer. */
+        usb_reply("SNIFFWAIT");
+    }
+
+    FLASHMEM void refresh_sniffer_screen(uint32_t now)
+    {
+        SniffStats stats   = platform_get().can.sniff_stats();
+        uint32_t   elapsed = now - s_sniff_rate_ms;
+
+        gui::SnifferViewModel vm;
+        vm.channel = !s_sniff_session.is_open()
+                         ? gui::SnifferChannel::Closed
+                     : s_sniff_session.is_listen_only()
+                         ? gui::SnifferChannel::ListenOnly
+                         : gui::SnifferChannel::Normal;
+        vm.frames_per_sec = elapsed == 0 ? 0
+                                         : (stats.rx - s_sniff_rate_rx) * 1000u
+                                               / elapsed;
+        vm.total_frames   = stats.rx;
+        vm.dropped_frames = stats.dropped;
+        composition().sniffer_screen.refresh(vm);
+
+        s_sniff_rate_ms = now;
+        s_sniff_rate_rx = stats.rx;
+    }
+
+    /* Per-loop while active: hand buffered frames to USB, but only as many
+     * as its TX buffer takes without blocking. A host that stops reading
+     * then backs frames up into the sniff ring (counted as dropped once
+     * it's full) rather than freezing loop() -- and with it the Stop
+     * button -- inside Serial.write().
+     *
+     * FLASHMEM despite running per frame, as does everything else on this
+     * path but the ISR: RAM1 code sits a few hundred bytes under a 32 KB
+     * ITCM block boundary, and crossing it costs 32 KB of RAM1 data. It
+     * only ever runs with the dashboard paused, and a loop this small
+     * stays resident in the I-cache. */
+    FLASHMEM void pump_sniff()
+    {
+        if (!s_sniff_session.is_open())
+        {
+            return;
+        }
+
+        ICanBus   &can = platform_get().can;
+        SniffFrame frame;
+        while (Serial.availableForWrite()
+                   >= static_cast<int>(core::slcan::ENCODED_MAX)
+               && can.sniff_read(frame))
+        {
+            char   line[core::slcan::ENCODED_MAX];
+            size_t n
+                = core::slcan::encode(frame, s_sniff_session.timestamps(), line);
+            Serial.write(reinterpret_cast<const uint8_t *>(line), n);
+        }
+    }
+
+    /** Only called while not Off -- loop() checks that itself, so the
+     * normal dash path pays for one compare, not a flash call.
+     *
+     * @returns True while sniffing -- loop() skips the dashboard.
+     *
+     * noinline, like handle_usb_line(): each has exactly one caller in
+     * ITCM code, and GCC will happily inline a FLASHMEM function into it
+     * -- which lands the body right back in ITCM. */
+    /* True once the host has been gone for SNIFF_HOST_GONE_MS. `Serial`
+     * alone is too twitchy: Teensy's operator bool reads false for 15 ms
+     * after *any* DTR/RTS change, and opening the port (pyserial raises
+     * DTR, then RTS) is exactly such a change -- a SNIFFREQ sent straight
+     * after open would otherwise see the host "leave" and be declined
+     * before the popup was even drawn. */
+    FLASHMEM bool host_gone(uint32_t now)
+    {
+        if (Serial)
+        {
+            s_sniff_host_ms = now;
+            return false;
+        }
+        return now - s_sniff_host_ms >= SNIFF_HOST_GONE_MS;
+    }
+
+    FLASHMEM __attribute__((noinline)) bool sniff_tick()
+    {
+        uint32_t now = platform_get().clock.millis();
+
+        if (s_sniff_state == SniffState::Pending)
+        {
+            if (host_gone(now)
+                || now - s_sniff_pending_ms >= SNIFF_CONFIRM_TIMEOUT_MS)
+            {
+                decline_sniff();
+            }
+            else if (s_sniff_ring != nullptr)
+            {
+                /* Tenths of a second; lv_arc_set_value() ignores a repeat,
+                 * so this redraws the ring ten times a second at most. */
+                lv_arc_set_value(s_sniff_ring,
+                                 (SNIFF_CONFIRM_TIMEOUT_MS
+                                  - (now - s_sniff_pending_ms))
+                                     / 100);
+            }
+            return false;
+        }
+
+        /* DTR drops when the host closes the port or the cable comes
+         * out -- either way nobody is listening any more. */
+        if (host_gone(now))
+        {
+            exit_sniff();
+            return false;
+        }
+
+        pump_sniff();
+
+        if (now - s_sniff_rate_ms >= SNIFF_SCREEN_REFRESH_MS)
+        {
+            refresh_sniffer_screen(now);
+        }
+        return true;
+    }
+
+    FLASHMEM __attribute__((noinline)) void handle_usb_line(const char *cmd,
+                                                            size_t      len)
+    {
+        bool log_cmd = len >= 3 && memcmp(cmd, "LOG", 3) == 0;
+
+        if (len == 8 && memcmp(cmd, "SNIFFREQ", 8) == 0)
+        {
+            request_sniff();
+        }
+        else if (len == 8 && memcmp(cmd, "SNIFFEND", 8) == 0)
+        {
+            if (s_sniff_state == SniffState::Active)
+            {
+                exit_sniff();
+            }
+            else if (s_sniff_state == SniffState::Pending)
+            {
+                close_sniff_popup();
+                s_sniff_state = SniffState::Off;
+            }
+            Serial.write(core::slcan::CR);
+        }
+        else if (s_sniff_state == SniffState::Active && !log_cmd)
+        {
+            /* LOG* excluded explicitly: "LOGDUMP" would otherwise read as
+             * SLCAN's 'L' (open listen-only). */
+            s_sniff_session.handle(cmd, len);
+        }
+        else if (s_sniff_state == SniffState::Off && log_cmd)
+        {
+            handle_log_command(cmd, len);
+        }
+        else
+        {
+            Serial.write(core::slcan::BELL);
+        }
+    }
+
+    void poll_usb_serial()
+    {
+        static char   cmd[core::slcan::COMMAND_MAX + 1];
         static size_t cmd_len = 0;
 
         while (Serial.available() > 0)
@@ -948,9 +1328,12 @@ namespace
             char c = static_cast<char>(Serial.read());
             if (c == '\r' || c == '\n')
             {
-                if (cmd_len > 0)
+                /* A bare CR is an SLCAN no-op that still wants its CR
+                 * back; a bare LF is just the tail of a CRLF. */
+                if (cmd_len > 0
+                    || (c == '\r' && s_sniff_state == SniffState::Active))
                 {
-                    handle_log_command(cmd, cmd_len);
+                    handle_usb_line(cmd, cmd_len);
                     cmd_len = 0;
                 }
             }
@@ -1406,7 +1789,14 @@ void loop()
     Composition &app = composition();
 
 #ifdef ARDUINO
-    poll_log_serial();
+    poll_usb_serial();
+
+    /* Sniffer mode pauses the whole dashboard -- see its block comment. */
+    if (s_sniff_state != SniffState::Off && sniff_tick())
+    {
+        lv_timer_handler();
+        return;
+    }
 #endif
 
     app.scheduler.tick();
