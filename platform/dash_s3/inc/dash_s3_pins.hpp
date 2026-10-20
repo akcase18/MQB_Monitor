@@ -3,33 +3,22 @@
  * @brief Every pin this board uses, in one place, and every one of them
  * overridable from platformio.ini.
  *
- * **The pinout is not frozen.** Today the "board" is an ESP32-S3-DevKitC-1
- * (N16R8) on a bench with the dash's panel, touch controller and CAN
- * transceiver wired to its headers. So none of these is written into a
- * driver: each is a `-D` an `[env:]` can set, and the defaults below are
- * a coherent starting set laid out for that dev kit's header order rather
- * than a commitment. Changing one is a line in `platformio.ini`, not an
- * edit to a driver.
+ * The defaults below are the dash PCB's pinout (ESP32-S3-WROOM-1 N16R2).
+ * Each is a `-D` an `[env:]` can override, which is how
+ * env:dash_s3_devkit puts back the old N16R8 DevKitC-1 bench wiring.
+ * Changing one is a line in `platformio.ini`, not an edit to a driver.
  *
- * ## Why these defaults
- *
- * The ESP32-S3 has a lot of GPIOs and several traps. Avoided here:
+ * ## Pins to avoid
  *
  * | Pins | Why not |
  * |---|---|
  * | 0, 3, 45, 46 | Strapping pins -- sampled at reset, so a pull on one changes boot mode |
- * | 19, 20 | Native USB D-/D+ |
+ * | 19, 20 | Native USB D-/D+ (the console) |
  * | 26-32 | SPI flash bus |
- * | 33-37 | Octal PSRAM bus on the R8 module. This is why the panel runs 8 data lines, not 16 |
- * | 43, 44 | UART0, the console this firmware logs to (the dev kit's "UART" USB port) |
- * | 38, 48 | The dev kit's RGB LED (GPIO38 on v1.0, GPIO48 on v1.1) -- left spare, not driven |
+ * | 33-37 | Octal PSRAM bus on R8 modules only. The PCB's R2 has quad PSRAM on the flash bus, which frees these; the panel uses 35-37 |
  *
- * There is no companion-link UART: the S3's own Wi-Fi runs the relay
- * in-process (dash_s3_wireless.cpp). 39, 40 and 47 are the unassigned
- * GPIOs after the above; 47 takes the panel's TE output.
- *
- * The LCD data lines take eight consecutive positions on the dev kit's J1
- * header (4-7, 15-18) so the ribbon can be a straight run.
+ * The panel runs 8 data lines (PARALLEL_0-7 on the schematic);
+ * PARALLEL_8-15 are no-connects.
  */
 #pragma once
 
@@ -40,71 +29,72 @@
  *---------------------------------------------------------------------*/
 
 #ifndef DASH_S3_PIN_LCD_D0
-    #define DASH_S3_PIN_LCD_D0 4
+    #define DASH_S3_PIN_LCD_D0 42
 #endif
 #ifndef DASH_S3_PIN_LCD_D1
-    #define DASH_S3_PIN_LCD_D1 5
+    #define DASH_S3_PIN_LCD_D1 41
 #endif
 #ifndef DASH_S3_PIN_LCD_D2
-    #define DASH_S3_PIN_LCD_D2 6
+    #define DASH_S3_PIN_LCD_D2 40
 #endif
 #ifndef DASH_S3_PIN_LCD_D3
-    #define DASH_S3_PIN_LCD_D3 7
+    #define DASH_S3_PIN_LCD_D3 39
 #endif
 #ifndef DASH_S3_PIN_LCD_D4
-    #define DASH_S3_PIN_LCD_D4 15
+    #define DASH_S3_PIN_LCD_D4 38
 #endif
 #ifndef DASH_S3_PIN_LCD_D5
-    #define DASH_S3_PIN_LCD_D5 16
+    #define DASH_S3_PIN_LCD_D5 37
 #endif
 #ifndef DASH_S3_PIN_LCD_D6
-    #define DASH_S3_PIN_LCD_D6 17
+    #define DASH_S3_PIN_LCD_D6 36
 #endif
 #ifndef DASH_S3_PIN_LCD_D7
-    #define DASH_S3_PIN_LCD_D7 18
+    #define DASH_S3_PIN_LCD_D7 35
 #endif
 /** Write strobe. The i80 peripheral calls this PCLK. */
 #ifndef DASH_S3_PIN_LCD_WR
-    #define DASH_S3_PIN_LCD_WR 8
+    #define DASH_S3_PIN_LCD_WR 21
 #endif
 /** Data/Command select. Low for a command byte, high for parameters and
  * pixel data. Driven by the peripheral, not by GPIO writes. */
 #ifndef DASH_S3_PIN_LCD_DC
-    #define DASH_S3_PIN_LCD_DC 9
+    #define DASH_S3_PIN_LCD_DC 14
 #endif
 #ifndef DASH_S3_PIN_LCD_CS
-    #define DASH_S3_PIN_LCD_CS 10
+    #define DASH_S3_PIN_LCD_CS 13
 #endif
 #ifndef DASH_S3_PIN_LCD_RST
-    #define DASH_S3_PIN_LCD_RST 11
+    #define DASH_S3_PIN_LCD_RST 8
 #endif
 /** Backlight, driven by LEDC PWM so the brightness setting means
- * something. On the v3 PCB this is the TPS61169's CTRL input; on the
- * bench it is whatever drives the panel's LED string. */
+ * something. On the PCB this is BL_CTRL, the PAM2804's EN input (500Hz
+ * PWM, see dash_s3_display.cpp). */
 #ifndef DASH_S3_PIN_LCD_BL
-    #define DASH_S3_PIN_LCD_BL 12
+    #define DASH_S3_PIN_LCD_BL 10
 #endif
 /** Tearing-effect output from the ILI9488 (JP1 pin 22 on the breakout):
  * a pulse at the start of each vertical blank, which is when a frame
  * push starts so the write stays ahead of the panel's scan. An input;
- * set to -1 to run unsynchronised with nothing wired. */
+ * -1 runs unsynchronised, which is the PCB (TE is not routed). */
 #ifndef DASH_S3_PIN_LCD_TE
-    #define DASH_S3_PIN_LCD_TE 47
+    #define DASH_S3_PIN_LCD_TE -1
 #endif
 
 /**
  * ----------------------------------------------------------------------
- * Touch -- FT6236 over I2C at 0x38. INT is not used (polled).
+ * Touch -- FT6236 over I2C at 0x38. INT (TOUCH_PEN_INT, IO12 on the
+ * PCB) is not used (polled).
  *---------------------------------------------------------------------*/
 
 #ifndef DASH_S3_PIN_TOUCH_SDA
-    #define DASH_S3_PIN_TOUCH_SDA 13
+    #define DASH_S3_PIN_TOUCH_SDA 1
 #endif
 #ifndef DASH_S3_PIN_TOUCH_SCL
-    #define DASH_S3_PIN_TOUCH_SCL 14
+    #define DASH_S3_PIN_TOUCH_SCL 2
 #endif
 #ifndef DASH_S3_PIN_TOUCH_RST
-    #define DASH_S3_PIN_TOUCH_RST 21
+    #define DASH_S3_PIN_TOUCH_RST 11
 #endif
 
 /**
@@ -114,9 +104,9 @@
  * ER-TFTM035-6 breakout this is JP1 pins 30 (RTP_/CS), 32 (SDO -> MISO),
  * 33 (SCL -> SCK), 34 (SDI -> MOSI). /RTP_PEN (pin 31) is unused.
  *
- * The DevKitC-1's J1 header is fully spoken for by the LCD, so SCK/MOSI
- * reuse the I2C pins on J1 and MISO/CS take the two adjacent spares at
- * the top of J3.
+ * Bench-only: the PCB has no XPT2046. These defaults are the DevKitC-1
+ * wiring (they overlap the PCB's LCD pins, which doesn't matter since
+ * only one board ever builds with DASH_S3_TOUCH_USE_RESISTIVE).
  *---------------------------------------------------------------------*/
 
 #ifndef DASH_S3_PIN_RTP_SCK
@@ -140,8 +130,8 @@
  *---------------------------------------------------------------------*/
 
 #ifndef DASH_S3_PIN_CAN_TX
-    #define DASH_S3_PIN_CAN_TX 41
+    #define DASH_S3_PIN_CAN_TX 47
 #endif
 #ifndef DASH_S3_PIN_CAN_RX
-    #define DASH_S3_PIN_CAN_RX 42
+    #define DASH_S3_PIN_CAN_RX 48
 #endif

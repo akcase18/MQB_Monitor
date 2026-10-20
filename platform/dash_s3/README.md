@@ -8,12 +8,14 @@ The MCU-level half (clock, NVS config store, LittleFS storage) lives in **[esp32
 
 ## Hardware status
 
-Today's target is an ESP32-S3-DevKitC-1 (N16R8) on a bench, with the panel, touch controller and a CAN transceiver on jumper wires. The panel renders (8-bit i80 at 40 MHz on jumper wires; the whole-frame, TE-synced push path is the response to the wipe and tear lines the banded path showed on screen-wide changes). Touch, CAN and the in-process Wi-Fi relay are less proven. The ways each is expected to go wrong, and what that looks like:
+`env:dash_s3` targets the dash PCB: an ESP32-S3-WROOM-1 **N16R2** (2 MB *quad* PSRAM, hence `memory_type = qio_qspi`), a PAM2804 backlight driver, an FT6236 and no TE line. `env:dash_s3_devkit` is the earlier bench setup, an ESP32-S3-DevKitC-1 (N16R8, octal PSRAM) with the panel, the resistive touch breakout and a CAN transceiver on jumper wires. On the bench the panel renders whole-frame and TE-synced (8-bit i80 at 20 MHz on jumper wires), which is what removed the wipe and tear lines the banded path showed on screen-wide changes. The PCB has no TE, so it renders banded from internal SRAM at 20 MHz instead (see `dash_s3_display.*` below). The console, USB log export and SLCAN sniffer use the native USB port (`ARDUINO_USB_CDC_ON_BOOT=1`), since the PCB doesn't route UART0. Touch, CAN and the in-process Wi-Fi relay are less proven. The ways each is expected to go wrong, and what that looks like:
 
 | Symptom | Suspect | Where |
 |---|---|---|
+| White screen, backlight on | PSRAM init failed (`opi psram: PSRAM ID read error` on the console: wrong `memory_type` for the module), or the LCD pins don't match the board | `platformio.ini`, `dash_s3_pins.hpp` |
 | Nothing on the panel at all | RD not tied to 3V3; IM jumpers not set for 8-bit 8080; CS/DC swapped | `dash_s3_pins.hpp`, the panel module |
 | Torn or corrupt pixels, no error | Bus too fast for the wiring | `LCD_BUS_HZ` in `dash_s3_display.cpp` — start at 10 MHz |
+| Parts of the screen keep stale content until touched or redrawn | Whole-frame mode on quad PSRAM: LCD DMA starved of bandwidth (15 MHz and up failed on the N16R2) | `DASH_S3_LCD_BUS_HZ` — whole-frame defaults to 10 MHz |
 | Believable but wrong colours | RGB565 byte order | `swap_color_bytes` in `dash_s3_display.cpp` |
 | Red and blue swapped | `MADCTL_BGR` | same |
 | Mirrored or rotated image | MADCTL rotation bits | same — and the touch transform is coupled to them |
@@ -22,26 +24,24 @@ Today's target is an ESP32-S3-DevKitC-1 (N16R8) on a bench, with the panel, touc
 | Screen-wide changes wipe or tear; "no TE edge" once on the console | TE not wired, or on the wrong pin | `DASH_S3_PIN_LCD_TE`, JP1 pin 22 |
 | Every pass stalls ~50 ms | Same -- the push task is timing out waiting for TE | same |
 
-## The pinout is not frozen
+## Pinout
 
-Every pin is a `-D` with a default, in **`inc/dash_s3_pins.hpp`**. Override them from `platformio.ini` after wiring; do not edit a driver. The defaults avoid the S3's traps — strapping pins (0, 3, 45, 46), native USB (19, 20), the flash bus (26–32), the octal PSRAM bus (33–37, which is also why the panel gets 8 data lines rather than 16), UART0 (43, 44) and the dev kit's LED (38/48).
+Every pin is a `-D` with a default, in **`inc/dash_s3_pins.hpp`**. The defaults are the PCB's; `env:dash_s3_devkit` overrides them with the dev kit wiring. Override from `platformio.ini`; do not edit a driver.
 
-| | GPIO | |
-|---|---|---|
-| LCD D0–D7 | 4, 5, 6, 7, 15, 16, 17, 18 | Eight consecutive header positions. RD tied to 3V3. |
-| LCD WR / DC / CS / RST | 8 / 9 / 10 / 11 | WR is the i80 peripheral's PCLK. |
-| LCD BL | 12 | LEDC PWM at 20 kHz. |
-| LCD TE | 47 | Panel's tearing-effect pulse, an input. `-1` to run unsynchronised. |
-| Touch SDA / SCL / RST | 13 / 14 / 21 | FT6236 at 0x38, INT unused. |
-| CAN TX / RX | 41 / 42 | To an external 3.3 V transceiver. |
-
-No companion-link UART; 39 and 40 are free.
+| | PCB | DevKitC-1 | |
+|---|---|---|---|
+| LCD D0–D7 | 42, 41, 40, 39, 38, 37, 36, 35 | 4, 5, 6, 7, 15, 16, 17, 18 | RD tied to 3V3. 35–37 are only free because the R2's PSRAM is quad. |
+| LCD WR / DC / CS / RST | 21 / 14 / 13 / 8 | 8 / 9 / 10 / 11 | WR is the i80 peripheral's PCLK. |
+| LCD BL | 10 | 12 | LEDC PWM at 500 Hz, the PAM2804's EN-pin dimming frequency. |
+| LCD TE | — (`-1`) | 47 | Unsynchronised push on the PCB. |
+| Touch SDA / SCL / RST | 1 / 2 / 11 | 13 / 14 / 21 | FT6236 at 0x38, INT (IO12 on the PCB) unused. |
+| CAN TX / RX | 47 / 48 | 41 / 42 | To an external 3.3 V transceiver. |
 
 ## Stress test without a car
 
 `pio run -e dash_s3_stress -t upload` builds the same firmware with `DASH_S3_FAKE_CAN=1`, which swaps the TWAI driver for `platform/synthetic_can_bus.hpp` — the simulator's synthetic bus. Every readout sweeps continuously at the real 20 Hz poll rate, warnings trip as values cross thresholds, and logging records the changes, all with nothing but the panel wired. No transceiver needed; "TWAI" never starts.
 
-## Bench wiring: ER-TFTM035-6 breakout (JP1) → DevKitC-1
+## Bench wiring (`env:dash_s3_devkit`): ER-TFTM035-6 breakout (JP1) → DevKitC-1
 
 The panel's bare-panel datasheet (`docs/ER-TFT035-6_Datasheet.pdf`) confirms 8-bit 8080 mode (IM = 011) uses **DB0–DB7 only**; DB8–DB17 stay open.
 
@@ -60,7 +60,7 @@ The panel's bare-panel datasheet (`docs/ER-TFT035-6_Datasheet.pdf`) confirms 8-b
 | 22 | TE | 47 | rising edge = start of vertical blank; frame pushes start on it |
 | 27, 28, 35–38 | SDI/SDO, SD/font/flash CS | — | open |
 
-Pins 30–34 and 39 depend on which touch panel the breakout carries. `DASH_S3_TOUCH_USE_RESISTIVE` in `platformio.ini` must match:
+Pins 30–34 and 39 depend on which touch panel the breakout carries. `DASH_S3_TOUCH_USE_RESISTIVE` in `env:dash_s3_devkit` must match:
 
 | JP1 | Capacitive (FT6236, `=0`) | GPIO | Resistive (XPT2046, `=1`) | GPIO |
 |---|---|---|---|---|
@@ -81,8 +81,8 @@ JP1 has no CTP reset pin — the breakout handles it on-board, so `DASH_S3_PIN_T
 - **`partitions_dash.csv`** — 16 MB, no OTA: a 2 MB factory app and a 13.94 MB LittleFS partition, the same ~1 MB of headroom over `core::Logger`'s 13 MB ring that the Teensy has. Moving to two 2 MB OTA slots is planned — see **[OTA_PLAN.md](OTA_PLAN.md)**.
 - **`dash_s3_display.*`** — `DashS3Display`, an ILI9488 driver written directly against ESP-IDF's `esp_lcd` i80 panel-IO layer rather than a display library. The init sequence, MADCTL rotation values and byte order are ported from `lib/ILI948x_t4_mm`, so what shows up should match the Teensy pixel for pixel. Two contracts carry over from the Teensy driver: a push blocks only on the *previous* DMA transfer, then issues and returns (which is what lets `src/main.cpp` call `lv_display_flush_ready` synchronously), and the backlight comes up **off** and stays off until `main.cpp` has seen a real frame land.
 
-  Unlike the Teensy it renders **whole-frame, not in bands**: `get_frame_buffers()` hands LVGL two full-screen RGB565 buffers in PSRAM (64-byte aligned, which is what the i80 driver needs to DMA out of PSRAM; it write-backs the cache itself) and `main.cpp` runs `LV_DISPLAY_RENDER_MODE_DIRECT` against them. `flush()` then only records which rows a pass touched; `flush_end()` hands that row band to a small push task, which waits for the panel's next **TE** rising edge and issues one DMA. Render time is never visible and the write starts at the top of the blanking interval ahead of the scan, which is what removed the wipe and tear lines that band-by-band pushing showed on screen-wide changes. `-D DASH_S3_FRAME_BUFFERS=0` restores the banded path for comparison; with TE unwired (`DASH_S3_PIN_LCD_TE=-1`, or just no wire) the task pushes after a 50 ms timeout and says so once on the console.
-- **`dash_s3_res_touch.*`** — `DashS3ResTouch`, `teensy_touch.cpp` (XPT2046 over SPI) on the S3's HSPI host with explicit pins. Active when `DASH_S3_TOUCH_USE_RESISTIVE=1`, which is what `platformio.ini` sets for the bench breakout.
+  Unlike the Teensy it renders **whole-frame, not in bands**: `get_frame_buffers()` hands LVGL two full-screen RGB565 buffers in PSRAM (64-byte aligned, which is what the i80 driver needs to DMA out of PSRAM; it write-backs the cache itself) and `main.cpp` runs `LV_DISPLAY_RENDER_MODE_DIRECT` against them. `flush()` then only records which rows a pass touched; `flush_end()` hands that row band to a small push task, which waits for the panel's next **TE** rising edge and issues one DMA. Render time is never visible and the write starts at the top of the blanking interval ahead of the scan, which is what removed the wipe and tear lines that band-by-band pushing showed on screen-wide changes. **Whole-frame is on only when `DASH_S3_PIN_LCD_TE` is set** (the default follows it; `-D DASH_S3_FRAME_BUFFERS=0/1` forces it). Without TE the push lands mid-scan and tears anyway, and on the PCB's quad PSRAM whole-frame was the slower path: a full redraw took ~57 ms, against ~33–46 ms banded from internal SRAM with fifth-of-a-screen bands (`DRAW_BUF_DIVISOR=5`). With TE configured but unwired (`DASH_S3_PIN_LCD_TE=-1`, or just no wire) the task pushes after a 50 ms timeout and says so once on the console.
+- **`dash_s3_res_touch.*`** — `DashS3ResTouch`, `teensy_touch.cpp` (XPT2046 over SPI) on the S3's HSPI host with explicit pins. Active when `DASH_S3_TOUCH_USE_RESISTIVE=1`, which is what `env:dash_s3_devkit` sets for the bench breakout.
 - **`dash_s3_touch.*`** — `DashS3Touch`, `teensy_cap_touch.cpp` with the bus pins made explicit, a 5 ms I2C timeout (the core's 50 ms default would stall the UI on every 10 ms poll if the controller went missing) and a presence probe at boot so a bench without a touch panel doesn't pay for that at all.
 - **`dash_s3_can.*`** — `DashS3CanBus` over the S3's TWAI controller. Hardware-filters to the response ID (as the Teensy's mailboxes do), non-blocking transmit/receive, and heals a bus-off from `receive()` so a fixed splice doesn't need a reboot. **Needs an external 3.3 V transceiver** (SN65HVD230, TJA1051T/3).
 - **`dash_s3_wireless.*`** — `DashS3Wireless`, the `ISerialLink` `main.cpp` hands to `remote::server`, except there is no serial: `begin()` creates two FreeRTOS stream buffers and a task on core 0 running `esp32::RelayApp` (the C3's SoftAP + config-form relay, from `platform/esp32/`) against a `Stream` over the other ends. `remote::server` writes `CMD_AP_ENABLE` into the pipe and gets `EVT_AP_READY` back; a phone's `GET /` becomes a `REQ_GET_STATE` the relay task blocks on while loopTask answers it — the same two-ended arrangement the Teensy and C3 have, minus the UART. Settings → Wi-Fi on the panel, the QR code, `http://192.168.4.1/` and the form all behave as on the Teensy dash.

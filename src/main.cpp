@@ -120,15 +120,21 @@ namespace
      * LV_COLOR_DEPTH, so declaring them as an array of it over-allocated
      * every buffer by 50% (46080 bytes each for 15360 pixels' worth of
      * RGB565) without LVGL ever using the extra byte per pixel.
-     * Deliberately one tenth of the panel, not a full framebuffer --
-     * LV_DISPLAY_RENDER_MODE_PARTIAL renders and flushes in bands.
+     * Deliberately a fraction of the panel (DRAW_BUF_DIVISOR: a tenth by
+     * default, a fifth on the S3), not a full framebuffer --
+     * LV_DISPLAY_RENDER_MODE_PARTIAL renders and flushes in bands. Bigger
+     * bands mean fewer passes over the widget tree per frame, which is
+     * most of LVGL's cost on a full-screen redraw.
      * 4-byte aligned for the DMA push in TeensyDisplay::flush().
      *
      * Only the fallback: a platform whose display offers whole-screen
      * buffers (IDisplay::get_frame_buffers -- the S3, out of its PSRAM)
      * renders DIRECT into those instead, and these go unused. */
-    alignas(4) uint16_t s_draw_buf_1[(LCD_HORZ * LCD_VERT) / 10];
-    alignas(4) uint16_t s_draw_buf_2[(LCD_HORZ * LCD_VERT) / 10];
+#ifndef DRAW_BUF_DIVISOR
+    #define DRAW_BUF_DIVISOR 10
+#endif
+    alignas(4) uint16_t s_draw_buf_1[(LCD_HORZ * LCD_VERT) / DRAW_BUF_DIVISOR];
+    alignas(4) uint16_t s_draw_buf_2[(LCD_HORZ * LCD_VERT) / DRAW_BUF_DIVISOR];
 
     /**
      * Every long-lived object the app needs, wired together once. Lazily

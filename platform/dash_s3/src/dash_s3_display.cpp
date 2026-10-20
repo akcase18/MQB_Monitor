@@ -78,28 +78,41 @@ namespace
         = MADCTL_MX | MADCTL_MY | MADCTL_MV | MADCTL_BGR;       /* 0xE8 */
     constexpr uint8_t MADCTL_PORTRAIT = MADCTL_MX | MADCTL_BGR; /* 0x48 */
 
-    /* Pixel-clock, i.e. WR-strobe, rate. The ILI9488's 8080 write cycle
-     * is specified at ~50ns (20MHz). The Teensy drives it at 40MHz on the
-     * v3 PCB's short ribbon and gets away with it; the dev kit is on
-     * jumper wires, which is the worst case for an unterminated parallel
-     * bus, and the failure mode for too-fast is corrupted pixels rather
-     * than a clean error. So this starts conservative. Step it 10 -> 20
-     * -> 40 only with the panel in hand and a stable picture at each
-     * stop.
+    /* Whole-frame rendering (see the file comment) only pays for itself
+     * when the push can wait for TE: without it the push lands mid-scan
+     * and tears anyway, while rendering into PSRAM and DMAing out of it
+     * costs real time. On the PCB (no TE, quad PSRAM) a full redraw took
+     * ~57ms whole-frame against ~33-46ms banded from internal SRAM with
+     * 1/5-screen bands (DRAW_BUF_DIVISOR in platformio.ini). So it
+     * follows the TE pin by default; set 0/1 to A/B on the bench. */
+#ifndef DASH_S3_FRAME_BUFFERS
+    #define DASH_S3_FRAME_BUFFERS (DASH_S3_PIN_LCD_TE >= 0)
+#endif
+
+    /* Pixel-clock, i.e. WR-strobe, rate. In whole-frame mode the limit
+     * is PSRAM bandwidth, not the panel: the LCD DMA reads the frame out
+     * of PSRAM while LVGL renders and syncs the other buffer there too.
+     * On the PCB's N16R2 (quad PSRAM, ~40MB/s at 80MHz) 20MHz and 15MHz
+     * both starved the DMA -- rows silently kept stale content until
+     * something redrew them -- and 10MHz is clean; the N16R8 dev kit's
+     * octal PSRAM runs 20MHz fine. Banded mode DMAs from internal SRAM,
+     * so it has no such limit: 20MHz is the ILI9488's rated ~50ns write
+     * cycle (the Teensy runs 40MHz on its ribbon, out of spec).
      *
      * At 10MHz a full 480x320 RGB565 frame (307,200 bytes, one byte per
      * strobe) is ~31ms of DMA; at 20MHz ~15ms, matching the Teensy. */
-    constexpr uint32_t LCD_BUS_HZ = 20 * 1000 * 1000;
+#ifndef DASH_S3_LCD_BUS_HZ
+    #if DASH_S3_FRAME_BUFFERS
+        #define DASH_S3_LCD_BUS_HZ (10 * 1000 * 1000)
+    #else
+        #define DASH_S3_LCD_BUS_HZ (20 * 1000 * 1000)
+    #endif
+#endif
+    constexpr uint32_t LCD_BUS_HZ = DASH_S3_LCD_BUS_HZ;
 
     /* One whole screen of RGB565, whichever way round it is mounted. */
     constexpr size_t FRAME_BYTES
         = static_cast<size_t>(LCD_HORZ) * LCD_VERT * sizeof(uint16_t);
-
-    /* Whole-frame rendering (see the file comment). 0 falls back to the
-     * banded path, for an A/B on the bench. */
-#ifndef DASH_S3_FRAME_BUFFERS
-    #define DASH_S3_FRAME_BUFFERS 1
-#endif
 
     /* How long the push task waits for a TE edge before sending anyway.
      * The ILI9488 refreshes at ~60Hz on its power-on frame-rate setting
@@ -116,18 +129,20 @@ namespace
     constexpr uint32_t    PUSH_TASK_STACK = 3072;
     constexpr UBaseType_t PUSH_TASK_PRIO  = 3;
 
-    /* Backlight PWM. On the v3 PCB this pin feeds the TPS61169's CTRL
-     * input, which does analog dimming by chopping its reference at the
-     * CTRL duty and low-pass filtering the result -- so LED current comes
-     * out DC and proportional to duty, and nothing here has to worry
-     * about beating against the panel refresh. The datasheet wants the
-     * carrier in 5kHz-100kHz (SNVSA40B section 6.3.5); below 5kHz the
-     * FB voltage ripples and the part can whine. 20kHz is comfortably
-     * inside that band and, at 8-bit resolution, well under the LEDC
-     * timer's 80MHz source (20kHz * 256 = 5.12MHz). */
+    /* Backlight PWM. On the S3 PCB this pin drives the PAM2804's EN
+     * input. Unlike the Teensy board's TPS61169 (which filters its CTRL
+     * duty into an analog reference, and wants a 5kHz-100kHz carrier),
+     * EN is a plain enable: PWM on it gates the buck on and off, and
+     * every rising edge restarts the part through its soft-start. The
+     * datasheet's PWM-dimming figure is 500Hz (DS36403 "Application
+     * Information"); a 20kHz carrier has a 50us period, too short for the
+     * output to ever come up, so the LEDs stay dark. 500Hz is above
+     * visible flicker. 10-bit resolution gives finer steps at the dim
+     * end, where the soft-start eats into each on-pulse, and is trivial
+     * for the LEDC timer (500Hz * 1024 = 512kHz). */
     constexpr uint8_t  BL_LEDC_CHANNEL = 0;
-    constexpr uint32_t BL_PWM_FREQ_HZ  = 20000;
-    constexpr uint8_t  BL_PWM_BITS     = 8;
+    constexpr uint32_t BL_PWM_FREQ_HZ  = 500;
+    constexpr uint8_t  BL_PWM_BITS     = 10;
     constexpr uint32_t BL_PWM_MAX      = (1u << BL_PWM_BITS) - 1;
 
     /* Hardware reset pulse, as ILI948x_t4_mm::begin() does it. */
@@ -438,7 +453,7 @@ void DashS3Display::begin()
      * it there after init: the panel's GRAM is stale from power-on until
      * the first real frame lands, so it is on the caller (see main.cpp's
      * display_flush_cb) to light the backlight once that has happened.
-     * On the TPS61169 a held-low CTRL is a true shutdown, not a dim. */
+     * On the PAM2804 a held-low EN is a true shutdown (<1uA). */
     pinMode(DASH_S3_PIN_LCD_BL, OUTPUT);
     digitalWrite(DASH_S3_PIN_LCD_BL, LOW);
     ledcSetup(BL_LEDC_CHANNEL, BL_PWM_FREQ_HZ, BL_PWM_BITS);
@@ -705,14 +720,11 @@ void DashS3Display::set_backlight(uint8_t pct)
      * "0%" is the dimmest the panel goes rather than off -- the
      * distinction IDisplay::set_backlight_off() exists to draw.
      *
-     * 5% is the v3 PCB's floor for the TPS61169 (see teensy_display.cpp
-     * for the derivation: the smallest duty that keeps the FB reference
-     * clear of the FB bias current's error). It carries over unchanged
-     * when this pin drives that same part. On a bench with a different
-     * backlight driver -- a MOSFET chopping the LED string, say -- the
-     * floor is cosmetic rather than structural and may want re-tuning:
-     * raise it if the low end flickers or drops to black early, lower it
-     * if the dimmest setting is still too bright at night. */
+     * The floor keeps the dimmest setting visibly lit: each EN pulse
+     * starts with the PAM2804's soft-start, so at a 2ms period the
+     * shortest pulses deliver less current than their duty suggests.
+     * Raise it if the low end drops to black early, lower it if the
+     * dimmest setting is still too bright at night. */
     constexpr uint32_t MIN_BACKLIGHT_PCT = 5;
     uint32_t           effective_pct
         = MIN_BACKLIGHT_PCT
@@ -726,7 +738,7 @@ void DashS3Display::set_backlight_off()
     /* Deliberately not set_backlight(0), which floors at
      * MIN_BACKLIGHT_PCT and would leave the panel dimly lit -- still
      * bright enough to show the transition this is meant to hide. Duty
-     * 0 holds the pin low continuously: on the TPS61169 that is a hard
-     * shutdown after t_SD, on anything else it is simply off. */
+     * 0 holds the pin low continuously, which is the PAM2804's
+     * shutdown state. */
     ledcWrite(BL_LEDC_CHANNEL, 0);
 }

@@ -5,6 +5,7 @@
 
 #include "layout.hpp"
 #include "screen_helpers.hpp"
+#include "screen_transition.hpp"
 
 namespace gui
 {
@@ -509,8 +510,7 @@ namespace gui
         refresh_theme_swatch();
         refresh_orientation_label();
 
-        lv_screen_load_anim(
-            screen_, LV_SCR_LOAD_ANIM_OVER_BOTTOM, 220, 0, false);
+        slide_screen_in(screen_, LV_SCR_LOAD_ANIM_OVER_BOTTOM, 220);
     }
 
     void SettingsScreen::refresh_theme_swatch()
