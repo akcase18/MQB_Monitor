@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 #include "screen_helpers.hpp"
+#include "screen_transition.hpp"
 
 namespace gui
 {
@@ -243,8 +244,7 @@ namespace gui
     {
         return_screen_ = return_screen;
         set_view_model(vm);
-        lv_screen_load_anim(
-            screen_, LV_SCR_LOAD_ANIM_OVER_TOP, 220, 0, false);
+        slide_screen_in(screen_, LV_SCR_LOAD_ANIM_OVER_TOP, 220);
     }
 
     void LoggingScreen::refresh(const LoggingViewModel &vm)
@@ -428,11 +428,8 @@ namespace gui
         {
             /* Mirrors open()'s OVER_TOP with its opposite, so closing
              * visually undoes the swipe that opened this. */
-            lv_screen_load_anim(self->return_screen_,
-                                LV_SCR_LOAD_ANIM_OVER_BOTTOM,
-                                220,
-                                0,
-                                false);
+            slide_screen_in(
+                self->return_screen_, LV_SCR_LOAD_ANIM_OVER_BOTTOM, 220);
         }
     }
 

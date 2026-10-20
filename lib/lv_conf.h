@@ -674,7 +674,15 @@
 #define LV_ATTRIBUTE_LARGE_RAM_ARRAY
 
 /** Place performance critical functions into a faster memory (e.g RAM) */
-#define LV_ATTRIBUTE_FAST_MEM
+/* On the S3, LVGL's hot blend/fill loops run from IRAM rather than
+ * through the flash cache: ~10% off a full redraw for ~16KB of IRAM,
+ * which comes out of the same internal SRAM as the heap (~28KB left with
+ * the SoftAP up). The Teensy's ITCM is too tight to do the same. */
+#if defined(PLATFORM_DASH_S3)
+    #define LV_ATTRIBUTE_FAST_MEM __attribute__((section(".iram1.lvgl_fast")))
+#else
+    #define LV_ATTRIBUTE_FAST_MEM
+#endif
 
 /** Export integer constant to binding. This macro is used with constants in the form of LV_<CONST> that
  *  should also appear on LVGL binding API such as MicroPython. */
@@ -1150,8 +1158,13 @@
  *==================*/
 /* Documentation for several of the below items can be found here: https://docs.lvgl.io/master/auxiliary-modules/index.html . */
 
-/** 1: Enable API to take snapshot for object */
-#define LV_USE_SNAPSHOT 0
+/** 1: Enable API to take snapshot for object. On wherever
+ * gui::slide_screen_in() uses it (GUI_SNAPSHOT_TRANSITIONS). */
+#if GUI_SNAPSHOT_TRANSITIONS
+    #define LV_USE_SNAPSHOT 1
+#else
+    #define LV_USE_SNAPSHOT 0
+#endif
 
 /** 1: Enable system monitor component */
 #define LV_USE_SYSMON   0

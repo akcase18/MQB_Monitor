@@ -120,11 +120,21 @@ namespace
      * LV_COLOR_DEPTH, so declaring them as an array of it over-allocated
      * every buffer by 50% (46080 bytes each for 15360 pixels' worth of
      * RGB565) without LVGL ever using the extra byte per pixel.
-     * Deliberately one tenth of the panel, not a full framebuffer --
-     * LV_DISPLAY_RENDER_MODE_PARTIAL renders and flushes in bands.
-     * 4-byte aligned for the DMA push in TeensyDisplay::flush(). */
-    alignas(4) uint16_t s_draw_buf_1[(LCD_HORZ * LCD_VERT) / 10];
-    alignas(4) uint16_t s_draw_buf_2[(LCD_HORZ * LCD_VERT) / 10];
+     * Deliberately a fraction of the panel (DRAW_BUF_DIVISOR: a tenth by
+     * default, a fifth on the S3), not a full framebuffer --
+     * LV_DISPLAY_RENDER_MODE_PARTIAL renders and flushes in bands. Bigger
+     * bands mean fewer passes over the widget tree per frame, which is
+     * most of LVGL's cost on a full-screen redraw.
+     * 4-byte aligned for the DMA push in TeensyDisplay::flush().
+     *
+     * Only the fallback: a platform whose display offers whole-screen
+     * buffers (IDisplay::get_frame_buffers -- the S3, out of its PSRAM)
+     * renders DIRECT into those instead, and these go unused. */
+#ifndef DRAW_BUF_DIVISOR
+    #define DRAW_BUF_DIVISOR 10
+#endif
+    alignas(4) uint16_t s_draw_buf_1[(LCD_HORZ * LCD_VERT) / DRAW_BUF_DIVISOR];
+    alignas(4) uint16_t s_draw_buf_2[(LCD_HORZ * LCD_VERT) / DRAW_BUF_DIVISOR];
 
     /**
      * Every long-lived object the app needs, wired together once. Lazily
@@ -448,6 +458,13 @@ namespace
      * caller's counterpart. */
     void blank_backlight()
     {
+#if STRESS_TEST
+        /* Bench stress builds leave the panel lit through the theme
+         * rebuild so the transition itself can be watched.
+         * settings_screen_loaded_cb is a no-op unless the state is
+         * Blanked, so skipping this leaves nothing dangling. */
+        return;
+#endif
         backlight_state() = BacklightState::Blanked;
         platform_get().display.set_backlight_off();
         begin_backlight_wait();
@@ -457,24 +474,30 @@ namespace
                           const lv_area_t *area,
                           uint8_t         *px_map)
     {
+        /* One render pass reaches here as several flush() calls -- one
+         * per band in partial mode, one per invalidated area in direct
+         * mode -- and lv_display_flush_is_last() marks the one that
+         * completes it. flush_end() lets a display that holds its push
+         * back (DashS3Display) send the whole pass as one transfer. */
+        bool last = lv_display_flush_is_last(disp);
         platform_get().display.flush(
             area->x1,
             area->y1,
             area->x2,
             area->y2,
             reinterpret_cast<const uint16_t *>(px_map));
+        if (last)
+        {
+            platform_get().display.flush_end();
+        }
         lv_display_flush_ready(disp);
 
         last_flush_ms() = platform_get().clock.millis();
 
-        /* The draw buffer only covers a fraction of the screen (see
-         * s_draw_buf_1's size below), so one full frame takes several
-         * flush() calls; lv_display_flush_is_last() marks the one that
-         * completes a render pass. Boot counts those -- see
-         * BacklightState for why it counts rather than timing them, and
-         * why the rebuild path doesn't. */
-        if (backlight_state() == BacklightState::AwaitingBootPasses
-            && lv_display_flush_is_last(disp))
+        /* Boot counts completed passes -- see BacklightState for why it
+         * counts rather than timing them, and why the rebuild path
+         * doesn't. */
+        if (backlight_state() == BacklightState::AwaitingBootPasses && last)
         {
             if (++boot_passes() >= BOOT_SETTLE_PASSES)
             {
@@ -1674,11 +1697,29 @@ FLASHMEM void setup()
 
     lv_display_t *display = lv_display_create(width, height);
     lv_display_set_flush_cb(display, display_flush_cb);
-    lv_display_set_buffers(display,
-                           s_draw_buf_1,
-                           s_draw_buf_2,
-                           sizeof(s_draw_buf_1),
-                           LV_DISPLAY_RENDER_MODE_PARTIAL);
+
+    /* Whole-screen buffers from the platform if it has them (see
+     * s_draw_buf_1's comment), else the banded partial pair here. */
+    uint16_t *frame_buf_1;
+    uint16_t *frame_buf_2;
+    size_t    frame_buf_bytes;
+    if (platform.display.get_frame_buffers(
+            frame_buf_1, frame_buf_2, frame_buf_bytes))
+    {
+        lv_display_set_buffers(display,
+                               frame_buf_1,
+                               frame_buf_2,
+                               frame_buf_bytes,
+                               LV_DISPLAY_RENDER_MODE_DIRECT);
+    }
+    else
+    {
+        lv_display_set_buffers(display,
+                               s_draw_buf_1,
+                               s_draw_buf_2,
+                               sizeof(s_draw_buf_1),
+                               LV_DISPLAY_RENDER_MODE_PARTIAL);
+    }
 
     lv_indev_t *indev = lv_indev_create();
     lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);

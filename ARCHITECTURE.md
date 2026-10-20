@@ -31,7 +31,7 @@ This means a given `.cpp` file's `#include`s tell you which layer it belongs to,
 | `core/can/` | `UdsClient` — UDS request/response protocol over `ICanBus`. Protocol only; `core/vehicle`'s `SignalPoller` decides what to send and when. | [core/can/README.md](core/can/README.md) |
 | `core/vehicle/` | The 22-signal catalog, the flow-controlled UDS request scheduler, the runtime value store, and warning-threshold evaluation. | [core/vehicle/README.md](core/vehicle/README.md) |
 | `core/config/` | Persisted config schema (`Config`/`Settings`/`PrioritizedSignal`/`SignalConfig`) and `ConfigStore`'s load/save/migrate logic over `IConfigStore`. | [core/config/README.md](core/config/README.md) |
-| `remote/protocol/` | Wire format for the Teensy↔ESP32-C3 link: message types, framing, CRC, per-record encode/decode. Zero deps — compiles into both firmwares. | — |
+| `remote/protocol/` | Wire format for the dash↔relay link: message types, framing, CRC, per-record encode/decode. Zero deps — compiles into the Teensy, C3 and S3 firmwares (on the S3 both ends are in one process, joined by an in-memory pipe). | — |
 | `remote/server/` | Teensy-side: `RemoteConfigServer` (batch-validates and applies a config over the wire), `RemoteConfigLink` (UART bytes ↔ frames), `RemoteApController` (AP lifecycle state machine). | — |
 | `gui/` | The LVGL presentation layer. | [gui/README.md](gui/README.md) |
 | `gui/theme/` | Palette/typography/metrics tokens — the one file a reskin touches. | [gui/theme/README.md](gui/theme/README.md) |
@@ -54,7 +54,7 @@ Two points worth knowing if you're changing wiring here:
 
 ## Build system
 
-`platformio.ini` defines two environments, `teensymm` and `simulator`. Both compile the same `core/` and `gui/` sources; the only thing that differs is which `platform/<board>/src` directory is included (via `build_src_filter`'s `+<...>`/`-<...>` entries) and a `-D PLATFORM_TEENSY` / `-D PLATFORM_SIMULATOR` define (used only inside that board's own `platform/<board>` files, never in `core/` or `gui/`). There's no third `esp32` environment yet — see [TODO.md](TODO.md).
+`platformio.ini` defines three display environments, `teensymm`, `dash_s3` and `simulator`. All compile the same `src/main.cpp`, `core/`, `gui/` and `remote/` sources; the only thing that differs is which `platform/` directories are included (via `build_src_filter`'s `+<...>`/`-<...>` entries) and a `-D PLATFORM_TEENSY` / `-D PLATFORM_DASH_S3` / `-D PLATFORM_SIMULATOR` define (used only inside that board's own `platform/` files, never in `core/` or `gui/`). `dash_s3` includes two platform directories — `platform/esp32_common/` (MCU-level) and `platform/dash_s3/` (board-level) — which is the pattern a second ESP32-S3 board would follow. It also compiles `platform/esp32/` (the C3 relay, minus its `main.cpp`): the S3 has its own Wi-Fi, so the relay runs in-process on a second task and `platform/dash_s3/`'s `ISerialLink` is an in-memory pipe to it rather than a UART.
 
 The simulator environment also runs two build-time scripts from `support/` (SDL2 include/lib discovery, and wiring PlatformIO's `upload`/"execute" target to just run the compiled binary) — see [support/README.md](support/README.md).
 

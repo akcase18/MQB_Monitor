@@ -1,0 +1,13 @@
+# Dash on a 16MB ESP32-S3 (N16R8). No OTA: one factory app slot, the rest
+# is the LittleFS log ring. The `spiffs` subtype/label is what
+# LittleFS.begin() mounts by default; the filesystem inside is LittleFS.
+# 0xDF0000 = 13.94MiB, i.e. the same ~1MiB headroom over core::Logger's
+# 13MiB ring that the Teensy's 14MiB region has. Sums to 0x1000000.
+#
+# If the app ever outgrows 2MB, take from `spiffs` -- and shrink the ring
+# to match via core::Logger's constructor arguments in src/main.cpp,
+# because the ring does not consult the backend for capacity (TODO.md).
+# Name,    Type, SubType, Offset,   Size
+nvs,       data, nvs,     0x9000,   0x5000
+factory,   app,  factory, 0x10000,  0x200000
+spiffs,    data, spiffs,  0x210000, 0xDF0000

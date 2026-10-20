@@ -14,10 +14,16 @@ Hardware abstraction: seven interfaces that everything in [core/](../core/README
   - `IClock` — `millis()`, monotonic milliseconds since boot.
   - `Platform { ICanBus &can; IDisplay &display; ITouch &touch; IConfigStore &config_store; IClock &clock; ISerialLink &serial; IStorage &storage; }` and `Platform &platform_get()` — implemented once per board, returning that board's singleton instances.
 
+## Board-agnostic implementations
+
+- **`synthetic_can_bus.hpp`** — `SyntheticCanBus`, an `ICanBus` that answers every UDS request instantly with a deterministic, slowly drifting fabricated value. Header-only, no dependencies. The simulator's only bus (`SimulatorCanBus` is a singleton wrapper), and any real board can swap it in for its hardware CAN driver to run the display pipeline on a bench with no vehicle — `env:dash_s3_stress` and `env:teensymm_stress` do exactly that (sweeping faster and wider than the simulator's gentle wobble, via the constructor arguments).
+
 ## Boards
 
 - **[teensy/](teensy/README.md)** — the real hardware: FlexCAN_T4, ILI948x_t4_mm, Teensy `EEPROM.h`, and (uniquely) two switchable implementations each of `ITouch` (capacitive FT6236 over I2C, or resistive XPT2046 over SPI) and `IStorage` (internal MCU program flash via `LittleFS_Program`, or Micro-SD via SdFat).
 - **[simulator/](simulator/README.md)** — a desktop stand-in over raw SDL2, with a file-backed config store and a synthetic CAN bus, used as the primary GUI development loop.
+- **[esp32_common/](esp32_common/README.md)** — the MCU-level half of any ESP32-S3 board: `IClock` over `millis()`, `IConfigStore` over the NVS-backed EEPROM emulation, `IStorage` over LittleFS. No pin numbers.
+- **[dash_s3/](dash_s3/README.md)** — the dash on an ESP32-S3 (DevKitC-1 N16R8 on the bench today): the same ILI9488 panel over the S3's 8-bit i80 bus via `esp_lcd`, the same FT6236, TWAI for CAN, and a UART to the C3 relay. Composes `esp32_common/` with its own board-level drivers. Not yet run on hardware.
 - **[esp32/](esp32/README.md)** — the companion ESP32-C3 relay firmware for wireless configuration. Not another `Platform` implementation (no display/touch/CAN on that board) — see its own README for what it actually is.
 
 ## Adding a new board
