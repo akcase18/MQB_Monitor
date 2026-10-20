@@ -1,4 +1,5 @@
-"""PlatformIO pre-build script for env:esp32c3: gzips the phone
+"""PlatformIO pre-build script for env:esp32c3 and env:dash_s3 (whose
+in-process relay serves the same page): gzips the phone
 configurator page (platform/esp32/web/index.html) into a C header the
 firmware serves as-is (see platform/esp32/src/config_web.cpp).
 

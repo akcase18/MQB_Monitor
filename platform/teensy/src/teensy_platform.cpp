@@ -46,10 +46,35 @@
     #define TEENSY_ACTIVE_TOUCH TeensyCapTouch::instance()
 #endif
 
+/* Which ICanBus is active. 0 = FlexCAN on the car. 1 = the synthetic bus
+ * the simulator runs on, sweeping fast and wide, so the whole
+ * poll/decode/warn/render path runs on a bench with no vehicle attached.
+ * env:teensymm_stress sets it; same switch as dash_s3's DASH_S3_FAKE_CAN. */
+#ifndef TEENSY_FAKE_CAN
+    #define TEENSY_FAKE_CAN 0
+#endif
+
+#if TEENSY_FAKE_CAN
+    #include "synthetic_can_bus.hpp"
+#endif
+
+namespace
+{
+    ICanBus &active_can()
+    {
+#if TEENSY_FAKE_CAN
+        static SyntheticCanBus s_bus(1, 2048);
+        return s_bus;
+#else
+        return TeensyCanBus::instance();
+#endif
+    }
+} // namespace
+
 Platform &platform_get()
 {
     static Platform s_platform {
-        TeensyCanBus::instance(), TeensyDisplay::instance(),
+        active_can(),             TeensyDisplay::instance(),
         TEENSY_ACTIVE_TOUCH,      TeensyConfigStore::instance(),
         TeensyClock::instance(),  TeensySerialLink::instance(),
         TEENSY_ACTIVE_STORAGE,

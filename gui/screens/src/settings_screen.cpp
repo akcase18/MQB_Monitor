@@ -5,6 +5,7 @@
 
 #include "layout.hpp"
 #include "screen_helpers.hpp"
+#include "screen_transition.hpp"
 
 namespace gui
 {
@@ -492,8 +493,7 @@ namespace gui
     void SettingsScreen::open()
     {
         sync_widgets();
-        lv_screen_load_anim(
-            screen_, LV_SCR_LOAD_ANIM_OVER_BOTTOM, 220, 0, false);
+        slide_screen_in(screen_, LV_SCR_LOAD_ANIM_OVER_BOTTOM, 220);
     }
 
     FLASHMEM void SettingsScreen::set_values(uint8_t           day_brightness_pct,
