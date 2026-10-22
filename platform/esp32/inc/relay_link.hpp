@@ -4,8 +4,8 @@
  * bytes from the UART link to the Teensy through a remote::protocol::
  * FrameReader and hands complete frames to a callback. CMD_AP_ENABLE/
  * CMD_AP_DISABLE are dispatched through poll() (see platform/esp32/src/
- * main.cpp); REQ_GET_STATE/REQ_APPLY_CONFIG (C3 -> Teensy, for the
- * phone-facing config form, see config_web.hpp) go through the separate
+ * main.cpp); the REQ_* config messages (C3 -> Teensy, for the phone
+ * configurator, see config_web.hpp) go through the separate
  * blocking send_request_and_wait() below instead — an HTTP handler has to
  * return a response body synchronously, so it can't wait for poll() to
  * come back around on a later loop() iteration the way EVT_AP_READY does.

@@ -57,7 +57,9 @@ namespace remote::server
                 switch (frame.type)
                 {
                     case MsgType::REQ_GET_STATE:
-                    case MsgType::REQ_APPLY_CONFIG: {
+                    case MsgType::REQ_APPLY_CONFIG:
+                    case MsgType::REQ_PREVIEW_CONFIG:
+                    case MsgType::REQ_REVERT_PREVIEW: {
                         MsgType resp_type;
                         size_t  resp_len
                             = server_.handle_request(frame.type,

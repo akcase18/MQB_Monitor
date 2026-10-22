@@ -2,8 +2,8 @@
  * @file relay_app.hpp
  * @brief The whole relay, minus the transport: SoftAP up/down on
  * CMD_AP_ENABLE/CMD_AP_DISABLE with EVT_AP_READY/EVT_AP_DISABLED back,
- * and the phone-facing config form (ConfigWebHandler) relaying
- * REQ_GET_STATE/REQ_APPLY_CONFIG over the same link.
+ * and the phone configurator (ConfigWebHandler) relaying its REQ_*
+ * config messages over the same link.
  *
  * Two boards run it against two different Streams: the ESP32-C3 relay
  * (platform/esp32/src/main.cpp) over the UART to the Teensy, and the

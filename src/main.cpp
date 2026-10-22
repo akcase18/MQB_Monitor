@@ -283,10 +283,12 @@ namespace
      * to how long they take, which matters because the panel is far
      * slower than a dev host.
      *
-     * A REBUILD waits for the display to go quiet instead. Its landing
-     * screen (SettingsScreen) has no refresh task at all, so once drawn
-     * it stops rendering entirely -- counting passes there would wait
-     * for a pass that never comes.
+     * A REBUILD landing on SettingsScreen waits for the display to go
+     * quiet instead. That screen has no refresh task at all, so once
+     * drawn it stops rendering entirely -- counting passes there would
+     * wait for a pass that never comes. A rebuild landing on the
+     * dashboard (a phone previewing a new accent) is boot's situation
+     * again, and counts passes like boot does.
      *
      * Note what does NOT work, since it looks like the obvious
      * unification: quiet-period detection on the boot path. It held only
@@ -331,7 +333,9 @@ namespace
     enum class BacklightState
     {
         Live,               /* lit, at backlight_pct() */
-        AwaitingBootPasses, /* boot: off until BOOT_SETTLE_PASSES land */
+        AwaitingBootPasses, /* boot, or a rebuild landing on the
+                             * dashboard: off until BOOT_SETTLE_PASSES
+                             * land */
         Blanked,            /* off, and the transition isn't over yet */
         Settling,           /* off -- waiting for rendering to stop */
     };
@@ -611,6 +615,57 @@ namespace
         composition().uds_poller.on_negative_response(service, nrc);
     }
 
+    /** Whether a revert in progress came from the panel (the AP going
+     * down) rather than from the phone -- see remote_config_event_cb. */
+    bool &reverting_locally()
+    {
+        static bool local = false;
+        return local;
+    }
+
+    /** Throws away the phone's unsaved preview, if there is one. For when
+     * the session ends without a Save: the panel's X, or the AP timing
+     * out. */
+    FLASHMEM void revert_remote_preview()
+    {
+        reverting_locally() = true;
+        composition().remote_server.revert_preview();
+        reverting_locally() = false;
+    }
+
+    /* How long the phone's page can go without a request before its
+     * preview session is ended for it. The page pings well inside this
+     * while it's open (see index.html); a phone that walked out of range,
+     * or a browser killed without its pagehide firing, sends nothing --
+     * and the panel shouldn't go on showing sample values for the rest of
+     * the AP's idle timeout. */
+    constexpr uint32_t REMOTE_SESSION_TIMEOUT_MS = 60 * 1000;
+
+    /** When the phone last changed anything -- see
+     * REMOTE_SESSION_TIMEOUT_MS. */
+    uint32_t &remote_last_request_ms()
+    {
+        static uint32_t ms = 0;
+        return ms;
+    }
+
+    /** The settings as of the last phone-side change (or the AP coming
+     * up) -- what a preview is compared against to see which brightness
+     * it touched. */
+    core::Settings &remote_last_settings()
+    {
+        static core::Settings settings {};
+        return settings;
+    }
+
+    /** Which brightness a phone-side change shows: the one it last edited.
+     * See remote_config_event_cb. */
+    bool &remote_showing_night()
+    {
+        static bool night = false;
+        return night;
+    }
+
     /* Request/response pairs are handled internally by
      * RemoteConfigLink::poll(); this only ever sees the async EVT_*
      * messages (EVT_AP_READY/EVT_AP_DISABLED). */
@@ -630,7 +685,28 @@ namespace
     FLASHMEM void remote_ap_idle_check_task(void *ctx)
     {
         (void)ctx;
-        composition().remote_ap.tick(platform_get().clock.millis());
+        Composition &app = composition();
+        app.remote_ap.tick(platform_get().clock.millis());
+
+        /* The AP timed out (or otherwise went down) with the phone's
+         * edits still unsaved -- nobody is left to Save them. Keyed on the
+         * AP *leaving* Active rather than on it not being Active, so a
+         * preview from tools/web/dev_server.py (which needs no AP) isn't
+         * thrown away a second after it lands. */
+        static bool was_active = false;
+        bool        active = app.remote_ap.state() == remote::server::ApState::Active;
+        if (was_active && !active)
+        {
+            revert_remote_preview();
+        }
+        was_active = active;
+
+        if (app.remote_server.preview_active()
+            && platform_get().clock.millis() - remote_last_request_ms()
+                   > REMOTE_SESSION_TIMEOUT_MS)
+        {
+            revert_remote_preview();
+        }
     }
 
     gui::PanelViewModel view_model_builder(void   *ctx,
@@ -642,9 +718,29 @@ namespace
         return binding->build_view_model(rank, large, hero);
     }
 
+    /** While the phone holds an unsaved preview, the dashboard is showing
+     * the phone's edits, not something to edit locally -- any local save()
+     * would quietly persist them. A tap or swipe instead goes back to the
+     * Wireless screen, whose X is the way out (and reverts). */
+    FLASHMEM __attribute__((noinline)) bool divert_to_wireless_if_previewing()
+    {
+        Composition &app = composition();
+        if (!app.remote_server.preview_active())
+        {
+            return false;
+        }
+        app.wireless_setup_screen.open(app.remote_binding.build_view_model(),
+                                       app.settings_screen.screen());
+        return true;
+    }
+
     void panel_pressed_cb(void *ctx, uint8_t rank)
     {
         (void)ctx;
+        if (divert_to_wireless_if_previewing())
+        {
+            return;
+        }
         const core::Config            &cfg   = composition().config_store.get();
         const core::PrioritizedSignal &panel = cfg.priorities[rank];
 
@@ -1358,6 +1454,52 @@ namespace
     void rebuild_screens_for_theme_change(void *user_data);
     void settings_screen_loaded_cb(lv_event_t *e);
 
+    /** The accent every screen was last built against -- a config whose
+     * accent differs needs a rebuild before it shows. */
+    uint32_t &built_accent()
+    {
+        static uint32_t accent = 0;
+        return accent;
+    }
+
+    /** Where a queued rebuild lands: the dashboard, or SettingsScreen. */
+    bool &rebuild_to_dashboard()
+    {
+        static bool to_dashboard = false;
+        return to_dashboard;
+    }
+
+    bool &rebuild_pending()
+    {
+        static bool pending = false;
+        return pending;
+    }
+
+    /**
+     * Darkens the panel and queues a rebuild of every screen against the
+     * config's current accent. Several requests before it runs (a phone
+     * tapping through swatches) cost one rebuild, landing wherever the
+     * last one asked for.
+     */
+    FLASHMEM void request_rebuild(bool to_dashboard)
+    {
+        rebuild_to_dashboard() = to_dashboard;
+        if (rebuild_pending())
+        {
+            return;
+        }
+        rebuild_pending() = true;
+
+        /* Every screen is about to be deleted and rebuilt, which is not
+         * something the panel should be showing: the blank transition
+         * screen destroy_screens() loads reads as a white flash. Killed
+         * here rather than inside the rebuild so the panel is already dark
+         * before the triggering press-release even finishes drawing. The
+         * rebuild arranges for it to come back. */
+        blank_backlight();
+        lv_async_call(rebuild_screens_for_theme_change, nullptr);
+    }
+
     void settings_pick_theme_cb(void *ctx)
     {
         (void)ctx;
@@ -1376,16 +1518,7 @@ namespace
         settings.accent_color    = accent_color;
         composition().config_store.save();
 
-        /* Every screen is about to be deleted and rebuilt, which is not
-         * something the panel should be showing: the blank transition
-         * screen destroy_screens() loads reads as a white flash, and
-         * SettingsScreen then slides back in from the top. Killed here
-         * rather than inside the rebuild so the panel is already dark
-         * before the swatch's own press-release even finishes drawing.
-         * settings_screen_loaded_cb brings it back. */
-        blank_backlight();
-
-        lv_async_call(rebuild_screens_for_theme_change, nullptr);
+        request_rebuild(false);
     }
 
     /* The other half of theme_picker_done_cb's blank_backlight(). Fires
@@ -1423,69 +1556,105 @@ namespace
         (void)ctx;
         Composition &app = composition();
         app.remote_binding.activate();
+        remote_last_settings() = app.config_store.get().settings;
+        remote_showing_night() = false;
         app.wireless_setup_screen.open(app.remote_binding.build_view_model(),
                                        app.settings_screen.screen());
     }
 
-    /** Set when a phone-side Save commits, cleared when the resulting
-     * rebuild is kicked off. Deferred rather than acted on immediately
-     * because the apply lands while WirelessSetupScreen is on-screen, and
-     * rebuilding there would delete the screen the user is looking at
-     * mid-session. Coalescing also means several Saves in one sitting cost
-     * one rebuild, not one each. */
-    bool &remote_config_dirty()
-    {
-        static bool dirty = false;
-        return dirty;
-    }
-
-    /* Fired by RemoteConfigServer once a phone-side Save has validated,
-     * committed and persisted. The config store has already changed; every
-     * screen is still built against the values from the last
-     * build_screens(), so they have to be rebuilt before any of this shows.
+    /* Fired by RemoteConfigServer whenever a phone-side request changes the
+     * live config: a preview (unsaved), a Save, or the end of the phone's
+     * preview session. In
+     * every case the config store already holds the values to show; this
+     * brings the panel in line with them, so what the phone is editing is
+     * on the dashboard as it's edited.
      *
-     * Brightness is the one thing pushed live here rather than deferred,
-     * since the local path (settings_preview_brightness_cb) applies it on
-     * every slider move and a remote change that did nothing until the
-     * screen closed would read as broken. Day is assumed: which of
-     * day/night is "current" lives in SettingsScreen::showing_night_ and
-     * isn't visible from here, and Day is what SettingsScreen opens in.
-     * Editing night brightness from the phone therefore stores correctly
-     * but won't be what the panel shows until night is selected locally.
+     * Brightness follows whichever of day/night the phone last changed,
+     * so dragging the night slider is visible on the panel. A Save or a
+     * discard goes back to Day, which is what the panel shows outside
+     * Settings (SettingsScreen::showing_night_ is local to that screen).
      *
-     * Orientation is NOT applied live and cannot be -- it is boot-time-only
-     * (see platform.hpp's DisplayOrientation). The rebuilt SettingsScreen
-     * shows the newly saved value; the panel rotates on the next restart,
-     * exactly as it does for a local orientation change. */
-    void remote_config_applied_cb(void *ctx)
+     * Orientation is NOT applied and cannot be -- it is boot-time-only
+     * (see platform.hpp's DisplayOrientation). The phone's own mock shows
+     * it; the panel rotates on the next restart, exactly as it does for a
+     * local orientation change. */
+    FLASHMEM void remote_config_event_cb(
+        void                                           *ctx,
+        remote::server::RemoteConfigServer::ConfigEvent event)
     {
         (void)ctx;
-        apply_backlight(
-            composition().config_store.get().settings.day_brightness);
+        using Event = remote::server::RemoteConfigServer::ConfigEvent;
 
-        /* A remote apply can rewrite priorities[] and num_panels wholesale,
-         * so the poller's request table has to follow it. */
+        Composition          &app      = composition();
+        const core::Settings &settings = app.config_store.get().settings;
+        uint32_t now = platform_get().clock.millis();
+        app.remote_ap.note_activity(now);
+        remote_last_request_ms() = now;
+
+        if (event == Event::Previewed)
+        {
+            const core::Settings &last = remote_last_settings();
+            if (settings.night_brightness != last.night_brightness)
+            {
+                remote_showing_night() = true;
+            }
+            else if (settings.day_brightness != last.day_brightness)
+            {
+                remote_showing_night() = false;
+            }
+        }
+        else
+        {
+            remote_showing_night() = false;
+        }
+        remote_last_settings() = settings;
+        apply_backlight(remote_showing_night() ? settings.night_brightness
+                                               : settings.day_brightness);
+
+        /* A remote change can rewrite priorities[] and num_panels
+         * wholesale, so the poller's request table has to follow it. */
         sync_active_signals();
-        remote_config_dirty() = true;
+
+        /* The phone's mock shows sample values; the panel shows the same
+         * ones for as long as the phone is driving it. */
+        app.vehicle_binding.set_value_override(app.remote_server.preview_values());
+
+        /* Kept in step even mid-preview: SettingsScreen commits its own
+         * copy of these on every exit, which would otherwise write stale
+         * values back over whatever the phone just did. */
+        app.settings_screen.set_values(settings.day_brightness,
+                                       settings.night_brightness,
+                                       settings.num_panels,
+                                       settings.accent_color,
+                                       to_gui_orientation(settings.orientation));
+
+        /* The phone's own edits (and its Discard) land on the dashboard,
+         * which is what they change. A revert because the session ended
+         * stays put -- the panel's X is already on its way back to
+         * Settings. */
+        bool to_dashboard = !reverting_locally()
+                            || lv_screen_active() == app.info_screen.screen();
+
+        if (settings.accent_color != built_accent())
+        {
+            request_rebuild(to_dashboard);
+            return;
+        }
+
+        app.info_screen.rebuild(settings.num_panels,
+                                to_gui_orientation(active_orientation()));
+        app.info_screen.refresh();
+        if (to_dashboard)
+        {
+            lv_screen_load(app.info_screen.screen());
+        }
     }
 
-    void wireless_deactivate_cb(void *ctx)
+    FLASHMEM void wireless_deactivate_cb(void *ctx)
     {
         (void)ctx;
         composition().remote_binding.deactivate();
-
-        if (!remote_config_dirty())
-        {
-            return;
-        }
-        remote_config_dirty() = false;
-
-        /* Same treatment as an accent change: the rebuild flashes a blank
-         * transition screen, so kill the backlight first and let
-         * settings_screen_loaded_cb bring it back once the rebuilt
-         * SettingsScreen has finished its slide-in. */
-        blank_backlight();
-        lv_async_call(rebuild_screens_for_theme_change, nullptr);
+        revert_remote_preview();
     }
 
     /* Registered at a modest cadence (see WIRELESS_SCREEN_REFRESH_MS) so
@@ -1509,6 +1678,12 @@ namespace
         }
 
         lv_dir_t dir = lv_indev_get_gesture_dir(lv_indev_active());
+
+        if ((dir == LV_DIR_BOTTOM || dir == LV_DIR_TOP)
+            && divert_to_wireless_if_previewing())
+        {
+            return;
+        }
 
         if (dir == LV_DIR_BOTTOM)
         {
@@ -1535,6 +1710,8 @@ namespace
         Composition          &app      = composition();
         const gui::Theme     &theme    = runtime_theme();
         const core::Settings &settings = app.config_store.get().settings;
+
+        built_accent() = settings.accent_color;
 
         app.info_screen.init(theme,
                              view_model_builder,
@@ -1650,9 +1827,25 @@ namespace
         runtime_theme().palette.accent = lv_color_hex(
             composition().config_store.get().settings.accent_color);
 
+        rebuild_pending() = false;
+
         lv_obj_t *transition = destroy_screens();
         build_screens();
-        composition().settings_screen.open();
+
+        if (rebuild_to_dashboard())
+        {
+            /* The dashboard has no load animation to wait out, and never
+             * goes quiet (its readouts refresh constantly), so it settles
+             * the way boot does: by counting render passes. */
+            lv_screen_load(composition().info_screen.screen());
+            boot_passes()     = 0;
+            backlight_state() = BacklightState::AwaitingBootPasses;
+        }
+        else
+        {
+            /* settings_screen_loaded_cb brings the light back. */
+            composition().settings_screen.open();
+        }
         lv_obj_delete(transition);
     }
 } // namespace
@@ -1756,7 +1949,7 @@ FLASHMEM void setup()
                                          ? gui::METRICS_PORTRAIT
                                          : gui::THEME_DEFAULT.metrics;
 
-    app.remote_server.set_applied_callback(remote_config_applied_cb, nullptr);
+    app.remote_server.set_config_callback(remote_config_event_cb, nullptr);
 
     build_screens();
 

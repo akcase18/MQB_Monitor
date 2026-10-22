@@ -2,28 +2,46 @@
 
 The companion ESP32-C3 relay firmware — the other end of the `remote/protocol` wire link `remote/server` (on `env:teensymm`/`env:simulator`) already speaks. The relay itself is `esp32::RelayApp` (`relay_app.hpp`), which takes any `Stream`: `env:esp32c3` runs it over the UART to the Teensy, and the ESP32-S3 dash (`env:dash_s3`, [dash_s3/](../dash_s3/README.md)) compiles this same directory minus `main.cpp` and runs it in-process over an in-memory pipe, since that chip has its own Wi-Fi and needs no C3. Unlike `platform/teensy`/`platform/simulator`, this is **not** another implementation of [`platform.hpp`](../platform.hpp)'s `Platform` interface — the C3 has no display, touch, or CAN, so it isn't part of that abstraction at all. It's a standalone Arduino sketch with its own `main.cpp`, built as a separate PlatformIO env (`esp32c3`) that excludes the shared `src/main.cpp` and pulls in only `remote/protocol` (zero `core::`/`gui::` deps) plus this directory.
 
-It drives the SoftAP up/down in response to `CMD_AP_ENABLE`/`CMD_AP_DISABLE` and replies `EVT_AP_READY`/`EVT_AP_DISABLED` — enough for `gui::WirelessSetupScreen`'s QR-code flow to work end to end — and serves the phone-facing wireless config form once a phone joins the AP: `GET /` relays a `REQ_GET_STATE` and renders a plain HTML `<form>` (day/night brightness, panel count/orientation, accent color, per-panel signal/units/display-mode, and per-signal warning thresholds + custom display-range — including a metric/imperial toggle); `POST /save` relays the edits back as `REQ_APPLY_CONFIG` and redirects to `/` with a success/error banner. No JSON, no client-side JS — see the Phase 5 plan (`.claude/plans/immutable-jingling-balloon.md` if still present) for why.
+It drives the SoftAP up/down in response to `CMD_AP_ENABLE`/`CMD_AP_DISABLE` and replies `EVT_AP_READY`/`EVT_AP_DISABLED` — enough for `gui::WirelessSetupScreen`'s QR-code flow to work end to end — and serves the phone configurator once a phone joins the AP.
+
+## The phone configurator
+
+One static page, [`web/index.html`](web/index.html), with a mock of the dash at the top: the real panel layout for the chosen count and orientation, each panel drawn as Digital/Bar/Gauge in the chosen accent, with sample values. Under it, two tabs: **Dash** (panel count, orientation, theme, brightness — what affects the whole screen) and **Panel** (the selected panel's signal, units, display mode, custom scale and warnings). Tapping a panel in the mock selects it and opens the Panel tab, the same flow as tapping a panel on the dash. A "Try a value" slider moves the selected signal's sample value so a warning can be seen tripping.
+
+While the page is open the dash is in a **preview session**: the Teensy applies the page's config to the live config without saving, and shows the mock's sample values in place of live ones, so the real screen and the mock always match. Every edit (and the Try-a-value slider) re-sends the preview. **Save** writes the config and the session carries on; **Discard** goes back to the last save. The session ends — live values and the saved config come back — when the page is hidden or closed, when the dash hears nothing from it for 60 s (the page pings every 20 s), when the WiFi screen is closed, or when the AP times out. Orientation is the exception to all of this — it's boot-time-only, so the mock shows it and the dash rotates on its next restart.
+
+The C3 decodes nothing. The page speaks `remote/protocol`'s records itself (hex over HTTP, since `WebServer` returns a POST body as an Arduino `String`, which can't hold NULs), and the Teensy validates every batch:
+
+| Route | Relays | Answers |
+| --- | --- | --- |
+| `GET /` | — | the page, gzipped |
+| `GET /api/state` | `REQ_GET_STATE` | `RESP_STATE` payload, hex |
+| `POST /api/preview` | `REQ_PREVIEW_CONFIG` (hex body: config, then sample values) | `ApplyResult`, as a digit |
+| `POST /api/save` | `REQ_APPLY_CONFIG` (hex body) | `ApplyResult` |
+| `POST /api/revert` | `REQ_REVERT_PREVIEW` | `ApplyResult` |
+
+That keeps every copy of the Teensy's tables out of the C3. The page does mirror a few (unit labels/conversions/decimals, the accent presets, `compute_layout()`, and `PanelWidget`'s geometry for the mock) — the comment at the top of `index.html` lists each one's source. Keep them in step when those change.
 
 ## Files
 
+- **`web/index.html`** — the configurator page, self-contained (a phone on the dash's AP has no internet, so nothing can come from a CDN). [`tools/web/embed_web.py`](../../tools/web/embed_web.py) gzips it into `web_index_gz.h` in the build directory on every `env:esp32c3` build (~12 KB).
+- **`inc/config_web.hpp`** / **`src/config_web.cpp`** — `ConfigWebHandler`: the routes above. Hex in, hex out, one relay round trip per request.
 - **`inc/relay_app.hpp`** / **`src/relay_app.cpp`** — `RelayApp`: the relay's `setup()`/`loop()` as an object over a `Stream` — owns the `ApManager`, `RelayLink`, `WebServer` and `ConfigWebHandler`, answers `CMD_AP_ENABLE`/`CMD_AP_DISABLE`, and does the boot-time `WiFi.mode(WIFI_AP)` that avoids the lazy-init lwIP crash (see its comment). Shared by this firmware and the S3 dash.
-- **`inc/relay_link.hpp`** / **`src/relay_link.cpp`** — `RelayLink`: the C3-side counterpart to `remote::server::RemoteConfigLink`. Feeds bytes from a `Stream&` through a `remote::protocol::FrameReader` and dispatches complete frames to a callback; `send_event()` is the outbound counterpart for `EVT_AP_READY`/`EVT_AP_DISABLED`. `send_request_and_wait()` is a separate *blocking* request/response helper for `REQ_GET_STATE`/`REQ_APPLY_CONFIG` — needed because an HTTP handler has to return its response body synchronously, unlike the fire-and-forget AP events. Never call it and `poll()` in the same call stack; it's only safe from inside a `WebServer` handler invoked from `loop()`.
+- **`inc/relay_link.hpp`** / **`src/relay_link.cpp`** — `RelayLink`: the C3-side counterpart to `remote::server::RemoteConfigLink`. Feeds bytes from a `Stream&` through a `remote::protocol::FrameReader` and dispatches complete frames to a callback; `send_event()` is the outbound counterpart for `EVT_AP_READY`/`EVT_AP_DISABLED`. `send_request_and_wait()` is a separate *blocking* request/response helper for the `REQ_*` config messages — needed because an HTTP handler has to return its response body synchronously, unlike the fire-and-forget AP events. Never call it and `poll()` in the same call stack; it's only safe from inside a `WebServer` handler invoked from `loop()`.
 - **`inc/ap_manager.hpp`** / **`src/ap_manager.cpp`** — `ApManager`: thin wrapper over `WiFi.softAP()`/`softAPdisconnect()`/`softAPIP()`.
-- **`inc/unit_labels.hpp`** — Small presentation tables the config form needs (unit labels, metric↔imperial conversion, the accent-color preset list) duplicated here rather than linking `core::vehicle`/`gui::theme` into this env — see the file's own doc comment for why, and keep it in sync if those tables ever change on the Teensy side.
-- **`inc/config_web.hpp`** / **`src/config_web.cpp`** — `ConfigWebHandler`: registers `GET /` and `POST /save` on the shared `WebServer` and does the relay/parse work described above; delegates the actual markup to `render_config_page()`.
-- **`inc/config_page_render.hpp`** / **`src/config_page_render.cpp`** — `render_config_page()`: the config form's HTML, as a pure function of already-decoded wire state — takes plain data in, writes HTML chunks out via a callback, zero Arduino/WebServer dependency. Extracted out of `ConfigWebHandler` specifically so there's exactly one implementation shared by the real firmware and the host-native layout preview below, rather than two that could drift apart.
-- **`tools/preview_main.cpp`** — host-native `main()` for `env:web_preview` (see below): fabricates sample wire state from the real `core::SIGNAL_CATALOG` and calls `render_config_page()` to produce a static `.html` file — a way to eyeball the form's layout without any hardware.
 - **`src/main.cpp`** — the transport only: `Serial1` on GPIO20/21 to the Teensy, with the enlarged RX ring `RESP_STATE` needs, handed to a `RelayApp`. Native USB-CDC is debug output.
 
-## Previewing the form's layout (no hardware, no server)
+## Working on the page (no C3, no Teensy)
 
-`env:web_preview` is a small host-native build that runs the *actual* `render_config_page()` code against fabricated sample data (real signal names/units/ranges from `core::SIGNAL_CATALOG`, varied threshold/custom-range states so checked/unchecked and filled/empty fields both show up) and writes a static `.html` file — good for a quick layout/CSS check, but it's not interactive: there's no server behind it, so `Save` doesn't do anything. For that, use the full standalone test recipe below instead.
+[`tools/web/dev_server.py`](../../tools/web/dev_server.py) stands in for the C3 on a laptop: it serves `web/index.html` straight from disk (edit, reload) and relays `/api/*` over a pseudo-terminal to the desktop simulator, which runs the real Teensy-side code — so previews show up in the simulator window.
 
 ```sh
-pio run -e web_preview
-.pio/build/web_preview/program /path/to/output.html
-open /path/to/output.html   # macOS
+pio run -e simulator
+python3 tools/web/dev_server.py --sim     # launches the simulator on the pty too
+open http://localhost:8080/
 ```
+
+It also answers the simulator's `CMD_AP_ENABLE`, so Settings → WiFi works. Note that a Save writes the simulator's `sim_config.bin`.
 
 ## Building and flashing
 
@@ -33,24 +51,10 @@ pio run -e esp32c3 -t upload
 
 First build downloads the `espressif32` platform/toolchain (one-time, ~1GB) — expect it to be slow.
 
-## Testing standalone (no Teensy, no display wiring)
+## Testing on hardware
 
-Since the relay link rides the same USB-CDC connection used to flash the board, the desktop `simulator` build can drive a real, physically-flashed C3 exactly like it would a real Teensy — no extra hardware needed:
-
-1. Flash it: `pio run -e esp32c3 -t upload`.
-2. Find its device path: `ls /dev/tty.usbmodem*` (macOS).
-3. Point the simulator's serial link at it and run: `MQB_REMOTE_SERIAL_PORT=/dev/tty.usbmodemXXXX pio run -e simulator -t exec` (see [`platform/simulator/src/simulator_serial_link.cpp`](../simulator/src/simulator_serial_link.cpp) — unset, this env var defaults to a no-op).
-4. In the simulator, navigate Settings → WiFi. This sends a real `CMD_AP_ENABLE` frame to the C3; the C3 actually stands up a SoftAP; the simulator only shows the QR code once a real `EVT_AP_READY` comes back over the wire.
-5. Join the AP from a phone (or a laptop — anything that can join an open Wi-Fi network) and hit `http://192.168.4.1/`. The form should show whatever's currently saved in the simulator's config file. Change something on-device first (e.g. a warning threshold) so you're editing real values, not just defaults.
-
-This is a full round trip through real firmware — not just a build check.
-
-## Testing the config form specifically
-
-With the setup above running:
-
-1. Confirm the form pre-fills with the simulator's actual current config.
-2. Submit an edit and confirm the `/save` → redirect shows the change reflected, then check the simulator's persisted config file on disk to confirm the write actually landed (not just round-tripped through the page).
-3. Toggle Metric/Imperial in the Signal Thresholds section and confirm a value entered in one system reads back correctly converted after reloading in the other (e.g. a Temp threshold set to 200°F should read back as ~93.3°C).
-4. Try the custom display-range fields — there's no touchscreen equivalent to cross-check against (`core::SignalConfig::use_custom_range` has no on-device UI), so this is the first place to confirm it actually persists and round-trips.
-5. Force a rejected save (e.g. edit a `<select>`'s value via browser devtools to something out of range) and confirm it surfaces as an error banner rather than a blank or crashed page.
+1. Flash both: `pio run -e esp32c3 -t upload`, `pio run -e teensymm -t upload`.
+2. On the dash, Settings → WiFi. Join the AP from a phone and open the address on the screen (or scan the QR code).
+3. As the page loads, the dash should switch to the dashboard showing the same numbers as the mock. Change something: it should follow within a fraction of a second.
+4. **Discard** — the dash returns to the saved config. Change something again, then close the WiFi screen on the dash (tap the dashboard, then X) — the dash goes back to the saved config and live values. Same again, but lock the phone instead.
+5. **Save**, then power-cycle the dash: the change survives.

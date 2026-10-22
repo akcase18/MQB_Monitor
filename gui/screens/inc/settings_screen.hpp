@@ -106,6 +106,18 @@ namespace gui
 
             void open();
 
+            /**
+             * Replaces the values this screen was built or last opened
+             * with, for when the config changed behind its back (a phone-
+             * side edit). Without it, the next exit's commit would write
+             * the stale values straight back over the new ones.
+             */
+            void set_values(uint8_t           day_brightness_pct,
+                            uint8_t           night_brightness_pct,
+                            uint8_t           num_panels,
+                            uint32_t          accent_color,
+                            LayoutOrientation orientation);
+
             lv_obj_t *screen() const
             {
                 return screen_;
@@ -127,6 +139,8 @@ namespace gui
              * Done — see CommitCallback. */
             void commit_pending();
 
+            /** Pushes the cached values below into every widget. */
+            void sync_widgets();
             void refresh_theme_swatch();
             /** Sets the toggle button's glyph to match showing_night_. */
             void refresh_day_night_icon();

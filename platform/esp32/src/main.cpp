@@ -2,11 +2,11 @@
  * @file main.cpp
  * @brief ESP32-C3 relay firmware entry point: RelayApp (relay_app.hpp)
  * over the UART to the Teensy. Everything the relay does -- SoftAP
- * up/down for gui::WirelessSetupScreen's QR-code flow, the phone-facing
- * config form relaying REQ_GET_STATE/REQ_APPLY_CONFIG -- lives in
- * RelayApp; this file is only the transport. See platform/esp32/README.md
- * for how to test this against the desktop simulator with no Teensy or
- * display wiring at all.
+ * up/down for gui::WirelessSetupScreen's QR-code flow, the phone
+ * configurator (ConfigWebHandler, config_web.hpp) relaying its REQ_*
+ * config messages -- lives in RelayApp; this file is only the transport.
+ * See platform/esp32/README.md for working on the page against the
+ * desktop simulator with no C3 or Teensy at all.
  *
  * The relay link runs on Serial1 (UART) wired to the Teensy's Serial2,
  * leaving native USB-CDC free for flashing and debug logs. It used to run

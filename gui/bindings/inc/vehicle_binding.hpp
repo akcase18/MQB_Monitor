@@ -66,8 +66,20 @@ namespace gui
             void apply_warning_change(uint16_t signal_id,
                                       const WarningThresholdViewModel &vm);
 
+            /**
+             * Shows `values` on every panel in place of the live store, or
+             * the live store again for nullptr. For the phone's preview
+             * session, whose mock shows sample values the panel should
+             * match rather than contradict.
+             */
+            void set_value_override(const core::SignalStore *values)
+            {
+                override_ = values;
+            }
+
         private:
-            core::SignalStore &signals_;
+            core::SignalStore       &signals_;
+            const core::SignalStore *override_ = nullptr;
             core::ConfigStore &config_;
     };
 

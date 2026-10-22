@@ -8,9 +8,8 @@
  * this is a deliberate scoping of what gets *recorded*, which is also what
  * keeps write volume low enough for a useful retention window -- see
  * core/logging/README.md.) On-change only (see sample()) -- a gap for a
- * given signal
- * simply means it still held its last-logged value, so this loses nothing
- * relative to logging every poll, while using flash/write-cycles
+ * given signal simply means it still held its last-logged value, so this loses
+ * nothing relative to logging every poll, while using flash/write-cycles
  * proportional to how much is actually happening rather than a fixed tick
  * rate.
  *
@@ -73,9 +72,9 @@ namespace core
      * Nothing in the catalog sits between 20ms and 100ms
      * (signal_catalog.generated.inc), so this coarsens exactly the 20ms
      * group it's meant to and leaves every other signal alone. */
-    constexpr uint32_t LOG_MIN_INTERVAL_MS = 50;  /* was 40 before the
-                                                   * 2026-08-25 cadence
-                                                   * floor -- see below */
+    constexpr uint32_t LOG_MIN_INTERVAL_MS = 50; /* was 40 before the
+                                                  * 2026-08-25 cadence
+                                                  * floor -- see below */
 
     /** Writes `path` as `/log_%03u.bin` for `chunk_index` (0..CHUNK_COUNT-1)
      * into `out` (must be at least CHUNK_PATH_LEN bytes) -- shared between
@@ -83,7 +82,7 @@ namespace core
      * LOGDUMP handler) so the naming convention lives in exactly one
      * place. */
     constexpr size_t CHUNK_PATH_LEN = 16;
-    void              chunk_path(uint16_t chunk_index, char *out);
+    void             chunk_path(uint16_t chunk_index, char *out);
 
     class Logger
     {
@@ -95,7 +94,7 @@ namespace core
              * test/test_core_logging). */
             explicit Logger(IStorage &backing,
                             uint32_t  chunk_size_bytes = CHUNK_SIZE_BYTES,
-                            uint16_t  chunk_count       = CHUNK_COUNT);
+                            uint16_t  chunk_count      = CHUNK_COUNT);
 
             /**
              * Call after `backing`'s own begin() (the composition root
@@ -178,7 +177,7 @@ namespace core
             /** Read-only status for a USB/wireless retrieval command to
              * report back (see src/main.cpp's LOGSTATUS handler) --
              * doesn't affect capture/rotation in any way. */
-            bool     is_ready() const
+            bool is_ready() const
             {
                 return ready_;
             }
@@ -257,8 +256,8 @@ namespace core
              * all rather than scaling with BUFFER_CAPACITY -- so a
              * smaller buffer recovers real headroom without meaningfully
              * hurting flush batching. */
-            static constexpr uint16_t BUFFER_CAPACITY    = 512;
-            static constexpr uint32_t FLUSH_INTERVAL_MS  = 5000;
+            static constexpr uint16_t BUFFER_CAPACITY   = 512;
+            static constexpr uint32_t FLUSH_INTERVAL_MS = 5000;
 
             void flush();
             void start_new_chunk();
@@ -300,7 +299,7 @@ namespace core
              * in_display_set_ is whether the signal was on a panel during
              * the previous sample() call -- see sample()'s doc comment on
              * priming. */
-            uint32_t last_seen_ms_[SIGNAL_CATALOG_COUNT]   = {};
+            uint32_t last_seen_ms_[SIGNAL_CATALOG_COUNT] = {};
             float    last_value_[SIGNAL_CATALOG_COUNT];
             bool     in_display_set_[SIGNAL_CATALOG_COUNT] = {};
 
@@ -337,8 +336,8 @@ namespace core
              * first flush that has something to put in them, so that
              * neither booting nor stopping a capture on a chunk boundary
              * costs a ring slot -- see begin(). */
-            bool     chunk_open_          = false;
-            uint32_t last_flush_ms_       = 0;
+            bool     chunk_open_    = false;
+            uint32_t last_flush_ms_ = 0;
     };
 
 } // namespace core

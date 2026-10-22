@@ -94,11 +94,12 @@ namespace gui
         /* Index-keyed, not id-keyed: catalog_idx is already resolved
          * above, and the id-keyed accessors would each re-scan the whole
          * catalog to arrive back at it. */
-        const core::SignalValue &value = signals_.get_at(catalog_idx);
+        const core::SignalStore &store
+            = override_ != nullptr ? *override_ : signals_;
+        const core::SignalValue &value = store.get_at(catalog_idx);
         if (value.has_data)
         {
-            float display
-                = signals_.get_display_value_at(catalog_idx, is_metric);
+            float display = store.get_display_value_at(catalog_idx, is_metric);
             snprintf(vm.value_str,
                      sizeof(vm.value_str),
                      "%.*f",

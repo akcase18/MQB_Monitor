@@ -1,86 +1,51 @@
 /**
  * @file config_web.hpp
- * @brief Phone-facing wireless config form. Relays GET "/" into a
- * REQ_GET_STATE round trip (RelayLink::send_request_and_wait()) and
- * renders the result as a plain server-rendered HTML <form> — see the
- * Phase 5 plan (immutable-jingling-balloon.md) for why this is
- * form-urlencoded POST rather than a JSON/JS app. POST "/save" parses the
- * submitted body straight into the wire structs and relays a
- * REQ_APPLY_CONFIG, then redirects back to "/" (POST-redirect-GET) with a
- * status banner.
+ * @brief Phone-facing wireless configurator. Serves one static page
+ * (platform/esp32/web/index.html, gzipped into the firmware at build time
+ * by tools/web/embed_web.py) and a tiny relay API behind it:
  *
- * remote::protocol's wire structs are reused directly (RelayLink already
- * links remote::protocol) rather than re-deriving a parallel schema here.
- * MAX_PANELS_CAP/MAX_SIGNALS_CAP below are *not* assumed equal to
- * core::MAX_PANELS/core::SIGNAL_CATALOG_COUNT -- platform/esp32 has zero
- * core:: dependency (see unit_labels.hpp's file doc comment for why); the
- * real counts come off the wire on every request (RESP_STATE's
- * panel_count/signal_count fields) and these caps only bound local
- * array/stack sizing against a malformed reply.
+ *   GET  /api/state    REQ_GET_STATE       -> RESP_STATE payload, as hex
+ *   POST /api/preview  REQ_PREVIEW_CONFIG  <- hex body, -> ApplyResult
+ *   POST /api/save     REQ_APPLY_CONFIG    <- hex body, -> ApplyResult
+ *   POST /api/revert   REQ_REVERT_PREVIEW               -> ApplyResult
+ *
+ * The C3 does no decoding of its own: the page encodes and decodes
+ * remote::protocol's records itself and the Teensy validates every
+ * batch, so this side is a pipe between HTTP and the UART frame link.
+ * That keeps the C3 free of any copy of the Teensy's tables (units,
+ * accent presets, the signal catalog) -- the page is the only consumer of
+ * the decoded state, so the decoding lives with it.
+ *
+ * Hex rather than raw bytes because WebServer hands a POST body back as
+ * an Arduino String, which is not safe to fill with NULs.
  */
 #pragma once
 
 #include <WebServer.h>
 
-#include "config_page_render.hpp"
 #include "relay_link.hpp"
 #include "remote_protocol.hpp"
 
 namespace esp32
 {
-    constexpr uint8_t MAX_PANELS_CAP  = 8;
-    constexpr uint8_t MAX_SIGNALS_CAP = 40;
-
     class ConfigWebHandler
     {
         public:
             explicit ConfigWebHandler(RelayLink &relay);
 
-            /** Registers GET "/" and POST "/save" on `server`. Must be
-             * called before `server` starts handling requests. */
+            /** Registers every route above on `server`. Must be called
+             * before `server` starts handling requests. */
             void attach(WebServer &server);
 
         private:
-            void handle_get();
-            void handle_post();
-
-            /** Sends REQ_GET_STATE and decodes the RESP_STATE reply into
-             * the settings_/panels_/catalog_/signal_cfg_ members below.
-             * Any wire panel/signal count beyond MAX_PANELS_CAP/
-             * MAX_SIGNALS_CAP is still fully consumed (to keep the decode
-             * cursor in sync for the rest of the payload) but not stored.
-             *
-             * @returns false on a relay timeout/desync -- callers should
-             * render an error page rather than a half-populated form.
-             */
-            bool fetch_state();
-
-            /** Streams the full HTML page for the currently-populated
-             * settings_/panels_/catalog_/signal_cfg_ state via chunked
-             * server.sendContent() calls -- deliberately not one giant
-             * String, to keep peak heap use down for a ~130-field form.
-             * `status_msg` (nullable) renders as a banner at the top. Thin
-             * wrapper around render_config_page() (config_page_render.hpp)
-             * -- see that file's doc comment for why the actual markup
-             * lives there instead of here.
-             */
-            void render_page(const char *status_msg);
-
-            static void webserver_write_cb(void *ctx, const char *chunk);
+            void handle_page();
+            void handle_state();
+            /** Relays the hex body of the current POST as `type` and
+             * answers with the one-byte ApplyResult, as a decimal digit. */
+            void handle_change(remote::protocol::MsgType type);
 
             RelayLink &relay_;
-            WebServer *server_    = nullptr;
-            bool       is_metric_ = true;
-
-            remote::protocol::SettingsWire settings_ {};
-
-            uint8_t                     panel_count_ = 0;
-            remote::protocol::PanelWire panels_[MAX_PANELS_CAP] {};
-
-            uint16_t signal_count_ = 0;
-            remote::protocol::SignalCatalogEntryWire
-                                               catalog_[MAX_SIGNALS_CAP] {};
-            remote::protocol::SignalConfigWire signal_cfg_[MAX_SIGNALS_CAP] {};
+            WebServer *server_ = nullptr;
     };
 
 } // namespace esp32

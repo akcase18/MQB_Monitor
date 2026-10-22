@@ -43,9 +43,9 @@ namespace remote::protocol
      =========================================================================*/
 
     constexpr uint8_t FRAME_SYNC = 0xA5;
-    /* Comfortably above RESP_STATE's worst-case ~1223-byte payload (22
-     * signals' worth of catalog + config), with headroom for catalog
-     * growth. */
+    /* Comfortably above RESP_STATE's worst-case ~1224-byte payload (22
+     * signals' worth of catalog + config, then the preview flag), with
+     * headroom for catalog growth. */
     constexpr uint16_t FRAME_MAX_PAYLOAD = 1536;
     /* ~3x the worst-case transfer time at a conservative 115200 baud. */
     constexpr uint32_t FRAME_TIMEOUT_MS = 300;
@@ -60,6 +60,17 @@ namespace remote::protocol
         RESP_APPLY_RESULT = 0x04, /* Teensy -> C3 */
         RESP_ERROR
         = 0x05, /* Teensy -> C3, fallback for malformed/unknown REQ_* */
+        /* REQ_APPLY_CONFIG's payload, then a u16 count and that many f32
+         * values (metric, one per catalog signal, NaN = no value) for the
+         * panel to show in place of live ones. Applied to the live config
+         * but never saved. The first one starts a preview session and
+         * snapshots the saved config; REQ_APPLY_CONFIG saves whatever is
+         * live without ending the session, and REQ_REVERT_PREVIEW (or the
+         * AP going down) restores the last save and ends it. Both answer
+         * with RESP_APPLY_RESULT. RESP_STATE's trailing byte reports the
+         * session: bit 0 = active, bit 1 = unsaved changes. */
+        REQ_PREVIEW_CONFIG = 0x06, /* C3 -> Teensy */
+        REQ_REVERT_PREVIEW = 0x07, /* C3 -> Teensy, empty payload */
 
         CMD_AP_ENABLE   = 0x10, /* Teensy -> C3 */
         EVT_AP_READY    = 0x11, /* C3 -> Teensy, async */
@@ -73,6 +84,7 @@ namespace remote::protocol
         ErrSignalCountMismatch = 1,
         ErrInvalidSignal       = 2,
         ErrInvalidEnum         = 3,
+        ErrTruncated           = 4,
     };
 
     /** Standard CRC-16/CCITT-FALSE: poly 0x1021, init 0xFFFF, no reflect,

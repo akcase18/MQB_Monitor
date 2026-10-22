@@ -1,0 +1,1212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>MQB Monitor</title>
+<!--
+  Phone configurator, served by the ESP32-C3 (platform/esp32/src/config_web.cpp)
+  and gzipped into its firmware by tools/web/embed_web.py. Self-contained on
+  purpose: a phone joined to the dash's access point has no internet, so
+  nothing here can come from a CDN.
+
+  The C3 only relays bytes, so this page speaks remote::protocol's records
+  itself (see remote/protocol/inc/remote_protocol.hpp) and mirrors a few small
+  tables from the Teensy firmware. Keep these in step with their sources:
+    UNITS             core/vehicle/src/signal_catalog.cpp (unit_label,
+                      unit_decimals, unit_convert_to_imperial/_to_metric)
+    ACCENTS           gui/theme/src/theme.cpp (ACCENT_PRESETS)
+    computeLayout()   gui/screens/src/layout.cpp, plus InfoScreen::rebuild()'s
+                      grid tracks
+    the dash mock     gui/widgets/src/panel_widget.cpp and THEME_DEFAULT
+-->
+<style>
+:root {
+  --bg: #f2f3f5;
+  --surface: #ffffff;
+  --text: #16181b;
+  --muted: #646b75;
+  --line: #dfe2e6;
+  --control: #eceef1;
+  --danger: #c62828;
+  --accent: #4caf50;
+  --on-accent: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e0f11;
+    --surface: #181a1d;
+    --text: #eceef0;
+    --muted: #979ea8;
+    --line: #2a2d32;
+    --control: #24272b;
+    --danger: #ef5350;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e0f11; --surface: #181a1d; --text: #eceef0; --muted: #979ea8;
+  --line: #2a2d32; --control: #24272b; --danger: #ef5350;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  padding-bottom: calc(84px + env(safe-area-inset-bottom));
+}
+button, input, select { font: inherit; color: inherit; }
+
+/* ---- Top: title, status, and the dash mock (sticky, so edits below stay
+   in view of what they change) ---- */
+.top {
+  position: sticky; top: 0; z-index: 5;
+  background: var(--bg);
+  padding: calc(10px + env(safe-area-inset-top)) 16px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.titlebar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; max-width: 560px; margin: 0 auto 10px;
+}
+.titlebar h1 { margin: 0; font-size: 1.05rem; font-weight: 650; letter-spacing: .01em; }
+.status {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: .8rem; color: var(--muted); white-space: nowrap;
+}
+.status::before {
+  content: ""; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--muted);
+}
+.status[data-kind="live"] { color: var(--text); }
+.status[data-kind="live"]::before { background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
+.status[data-kind="error"] { color: var(--danger); }
+.status[data-kind="error"]::before { background: var(--danger); }
+
+.stage { display: flex; flex-direction: column; align-items: center; }
+.dash-frame {
+  position: relative; overflow: hidden;
+  border-radius: 10px;
+  background: #000;
+  box-shadow: 0 0 0 1px #2c2c2c, 0 6px 20px rgba(0,0,0,.25);
+}
+.dash {
+  position: absolute; left: 0; top: 0;
+  transform-origin: 0 0;
+  display: grid;
+  padding: 3px; gap: 3px;               /* Metrics::screen_margin / panel_gap */
+  background: #000;
+  font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color: #fff;
+}
+.tabs {
+  display: flex; gap: 2px; max-width: 560px; margin: 12px auto 0;
+  background: var(--control); border-radius: 10px; padding: 3px;
+}
+.tabs button {
+  flex: 1; border: 0; background: transparent; border-radius: 8px;
+  padding: 8px 10px; font-size: .95rem; cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tabs button[aria-selected="true"] { background: var(--surface); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+.pane-hint { margin: 16px 0 0; font-size: .85rem; color: var(--muted); }
+
+/* ---- One mock panel. Logical pixels throughout; the whole .dash is
+   scaled to fit. ---- */
+.p {
+  position: relative; overflow: hidden;
+  border: 2px solid #757575;             /* palette.panel_border */
+  border-radius: 10px;
+  background: #000;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.p.warn-hi { background: #b71c1c; }       /* palette.warn_hi */
+.p.warn-lo { background: #0d47a1; }       /* palette.warn_lo */
+.p.sel::after {
+  content: ""; position: absolute; inset: 0;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 3px #fff;
+  pointer-events: none;
+}
+.p .cap {
+  position: absolute; left: 4px; right: 4px; bottom: 4px;
+  text-align: center; font-weight: 400; line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.p .val {
+  position: absolute; transform: translate(-50%, -50%);
+  font-weight: 700; line-height: 1.3; white-space: nowrap;
+}
+.p .unit {
+  position: absolute; left: calc(100% + 3px); top: 2px;
+  font-size: 11px; font-weight: 400; line-height: 1.3;
+}
+.p svg, .p .bar { position: absolute; }
+.p .bar { border-radius: 999px; background: #404040; padding: 2px; }
+.p .bar > div { height: 100%; border-radius: 999px; background: var(--accent); }
+
+/* ---- Sections ---- */
+main { max-width: 560px; margin: 0 auto; padding: 4px 16px 0; }
+section { padding: 18px 0 6px; border-bottom: 1px solid var(--line); }
+section:last-child { border-bottom: none; }
+section > h2 {
+  margin: 0 0 4px; font-size: .74rem; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+}
+section > h2.editing-name {
+  font-size: 1.15rem; font-weight: 650; margin: 0 0 6px;
+  letter-spacing: 0; text-transform: none; color: var(--text);
+}
+
+.row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; min-height: 52px; padding: 6px 0;
+}
+.row > label, .row > .lbl { flex: none; }
+.row .sub { display: block; font-size: .78rem; color: var(--muted); }
+.row.stack { flex-direction: column; align-items: stretch; gap: 8px; }
+
+select {
+  min-width: 0; max-width: 62%;
+  appearance: none; -webkit-appearance: none;
+  background: var(--control) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23888' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 12px center;
+  border: 0; border-radius: 10px; padding: 10px 34px 10px 12px;
+}
+
+.seg {
+  display: inline-flex; background: var(--control); border-radius: 10px; padding: 3px; gap: 2px;
+}
+.seg button {
+  border: 0; background: transparent; border-radius: 8px;
+  padding: 7px 12px; min-width: 40px; font-size: .92rem; cursor: pointer;
+}
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+
+.num {
+  width: 5.6em; text-align: right;
+  background: var(--control); border: 0; border-radius: 10px; padding: 9px 10px;
+}
+.num:disabled { opacity: .45; }
+.unit-tag { color: var(--muted); font-size: .9rem; min-width: 2.6em; }
+.inline { display: inline-flex; align-items: center; gap: 8px; }
+
+/* Switch */
+.sw { position: relative; display: inline-flex; align-items: center; gap: 12px; cursor: pointer; }
+.sw input { position: absolute; opacity: 0; width: 0; height: 0; }
+.sw .track {
+  width: 44px; height: 26px; border-radius: 13px; background: var(--control);
+  box-shadow: inset 0 0 0 1px var(--line);
+  position: relative; transition: background .15s; flex: none;
+}
+.sw .track::after {
+  content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px;
+  border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.35);
+  transition: transform .15s;
+}
+.sw input:checked + .track { background: var(--accent); box-shadow: none; }
+.sw input:checked + .track::after { transform: translateX(18px); }
+.sw input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.range-head { display: flex; justify-content: space-between; font-size: .92rem; }
+.range-head output { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.swatches button {
+  width: 32px; height: 32px; border-radius: 50%; border: 0; cursor: pointer; padding: 0;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
+}
+.swatches button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--text); }
+
+/* ---- Bottom actions ---- */
+.actions {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 6;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  border-top: 1px solid var(--line);
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+}
+.actions-inner { display: flex; gap: 10px; max-width: 560px; margin: 0 auto; }
+.actions button {
+  flex: 1; border: 0; border-radius: 12px; padding: 14px; font-weight: 600; cursor: pointer;
+}
+#discard { background: var(--control); flex: 0 0 34%; }
+#save { background: var(--accent); color: var(--on-accent); }
+.actions button:disabled { opacity: .4; cursor: default; }
+
+.toast {
+  position: fixed; left: 50%; bottom: calc(88px + env(safe-area-inset-bottom)); z-index: 7;
+  transform: translateX(-50%) translateY(8px); opacity: 0;
+  background: var(--text); color: var(--bg);
+  padding: 9px 14px; border-radius: 10px; font-size: .88rem;
+  transition: opacity .2s, transform .2s; pointer-events: none; max-width: calc(100% - 32px);
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+.loading main, .loading .actions { visibility: hidden; }
+.fail { text-align: center; padding: 40px 16px; color: var(--muted); }
+.fail button { margin-top: 12px; border: 0; border-radius: 10px; padding: 10px 16px; background: var(--control); }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body class="loading">
+
+<div class="top">
+  <div class="titlebar">
+    <h1>MQB Monitor</h1>
+    <span class="status" id="status" data-kind="idle">Connecting…</span>
+  </div>
+  <div class="stage">
+    <div class="dash-frame" id="dash-frame"><div class="dash" id="dash"></div></div>
+  </div>
+  <div class="tabs" role="tablist" aria-label="Edit">
+    <button type="button" role="tab" id="tab-dash" aria-controls="pane-dash">Dash</button>
+    <button type="button" role="tab" id="tab-panel" aria-controls="pane-panel">Panel</button>
+  </div>
+</div>
+
+<div class="fail" id="fail" hidden>
+  <p>Can't reach the dash.</p>
+  <button id="retry" type="button">Try again</button>
+</div>
+
+<main>
+  <div id="pane-dash" role="tabpanel" aria-labelledby="tab-dash">
+    <p class="pane-hint">Tap a panel in the preview to change what it shows.</p>
+  <section aria-labelledby="h-layout">
+    <h2 id="h-layout">Layout</h2>
+    <div class="row">
+      <span class="lbl">Panels</span>
+      <div class="seg" id="count" role="group" aria-label="Panel count"></div>
+    </div>
+    <div class="row">
+      <span class="lbl">Orientation<span class="sub">Applies after the dash restarts</span></span>
+      <div class="seg" id="orient" role="group" aria-label="Orientation">
+        <button type="button" data-v="0">Landscape</button>
+        <button type="button" data-v="1">Portrait</button>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-theme">
+    <h2 id="h-theme">Theme</h2>
+    <div class="row stack">
+      <div class="swatches" id="accent" role="group" aria-label="Accent color"></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-bright">
+    <h2 id="h-bright">Brightness</h2>
+    <div class="row stack">
+      <div class="range-head"><label for="day">Day</label><output id="day-out"></output></div>
+      <input type="range" id="day" min="0" max="100" step="1">
+    </div>
+    <div class="row stack">
+      <div class="range-head"><label for="night">Night</label><output id="night-out"></output></div>
+      <input type="range" id="night" min="0" max="100" step="1">
+    </div>
+  </section>
+  </div>
+
+  <div id="pane-panel" role="tabpanel" aria-labelledby="tab-panel" hidden>
+  <section aria-labelledby="h-panel">
+    <h2 id="h-panel" class="editing-name"></h2>
+
+    <div class="row">
+      <label for="signal">Signal</label>
+      <select id="signal"></select>
+    </div>
+    <div class="row" id="units-row">
+      <span class="lbl">Units</span>
+      <div class="seg" id="units" role="group" aria-label="Units"></div>
+    </div>
+    <div class="row">
+      <span class="lbl">Display</span>
+      <div class="seg" id="mode" role="group" aria-label="Display">
+        <button type="button" data-v="0">Digital</button>
+        <button type="button" data-v="1">Bar</button>
+        <button type="button" data-v="2">Gauge</button>
+      </div>
+    </div>
+    <div class="row" id="scale-row">
+      <label class="sw"><input type="checkbox" id="use-custom"><span class="track"></span>
+        <span>Custom scale<span class="sub" id="scale-default"></span></span></label>
+      <span class="inline" id="scale-inputs">
+        <input class="num" id="custom-min" type="number" inputmode="decimal" step="any" aria-label="Scale minimum">
+        <span>–</span>
+        <input class="num" id="custom-max" type="number" inputmode="decimal" step="any" aria-label="Scale maximum">
+      </span>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-warn">
+    <h2 id="h-warn">Warnings</h2>
+    <div class="row">
+      <label class="sw"><input type="checkbox" id="use-hi"><span class="track"></span><span>High</span></label>
+      <span class="inline"><input class="num" id="hi" type="number" inputmode="decimal" step="any" aria-label="High warning at"><span class="unit-tag" data-unit></span></span>
+    </div>
+    <div class="row">
+      <label class="sw"><input type="checkbox" id="use-lo"><span class="track"></span><span>Low</span></label>
+      <span class="inline"><input class="num" id="lo" type="number" inputmode="decimal" step="any" aria-label="Low warning at"><span class="unit-tag" data-unit></span></span>
+    </div>
+    <div class="row stack">
+      <div class="range-head"><label for="sample">Try a value</label><output id="sample-out"></output></div>
+      <input type="range" id="sample" min="0" max="1000" step="1">
+    </div>
+  </section>
+
+  </div>
+</main>
+
+<div class="actions">
+  <div class="actions-inner">
+    <button type="button" id="discard" disabled>Discard</button>
+    <button type="button" id="save" disabled>Save</button>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+
+/* ========================================================================
+ * Tables mirrored from the Teensy firmware -- see the comment in <head>.
+ * ====================================================================== */
+
+/* core::UnitType, by wire ordinal. */
+const UNITS = [
+  /* None     */ { m: "",    i: "",      dm: 0, di: 0, toI: v => v,                 toM: v => v },
+  /* Degrees  */ { m: "°",   i: "°",     dm: 0, di: 0, toI: v => v,                 toM: v => v },
+  /* Percent  */ { m: "%",   i: "%",     dm: 0, di: 0, toI: v => v,                 toM: v => v },
+  /* Pressure */ { m: "bar", i: "psi",   dm: 2, di: 1, toI: v => v * 14.5038,       toM: v => v / 14.5038 },
+  /* RPM      */ { m: "rpm", i: "rpm",   dm: 0, di: 0, toI: v => v,                 toM: v => v },
+  /* Speed    */ { m: "kph", i: "mph",   dm: 0, di: 0, toI: v => v / 1.609,         toM: v => v * 1.609 },
+  /* Temp     */ { m: "°C",  i: "°F",    dm: 0, di: 0, toI: v => v * 1.8 + 32,      toM: v => (v - 32) / 1.8 },
+  /* Torque   */ { m: "Nm",  i: "lb-ft", dm: 0, di: 0, toI: v => v * 0.7375621493,  toM: v => v / 0.7375621493 },
+  /* Volume   */ { m: "L",   i: "gal",   dm: 1, di: 1, toI: v => v / 3.785,         toM: v => v * 3.785 },
+];
+const unitOf = t => UNITS[t] || UNITS[0];
+
+/* gui::ACCENT_PRESETS. The Teensy resets anything else to the first one at
+ * boot, so the page offers exactly these. */
+const ACCENTS = [0x4CAF50, 0x00BCD4, 0x2196F3, 0x9C27B0, 0xE91E63,
+                 0xF44336, 0xFF9800, 0xFFC107, 0x9E9E9E];
+
+const MAX_PANELS = 6;
+const RESULT_TEXT = ["", "Signal list mismatch", "Unknown signal", "Invalid setting", "Incomplete request"];
+
+/* ========================================================================
+ * Wire format -- remote::protocol, little-endian, hex over HTTP.
+ * ====================================================================== */
+
+function hexToBytes(hex) {
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.substr(2 * i, 2), 16);
+  return out;
+}
+function bytesToHex(bytes) {
+  let s = "";
+  for (const b of bytes) s += (b < 16 ? "0" : "") + b.toString(16);
+  return s;
+}
+
+class Reader {
+  constructor(bytes) { this.v = new DataView(bytes.buffer); this.p = 0; this.bytes = bytes; }
+  u8()  { return this.v.getUint8(this.p++); }
+  u16() { const x = this.v.getUint16(this.p, true); this.p += 2; return x; }
+  u32() { const x = this.v.getUint32(this.p, true); this.p += 4; return x; }
+  f32() { const x = this.v.getFloat32(this.p, true); this.p += 4; return x; }
+  str(n) {
+    const raw = this.bytes.subarray(this.p, this.p + n); this.p += n;
+    const end = raw.indexOf(0);
+    return new TextDecoder().decode(end < 0 ? raw : raw.subarray(0, end));
+  }
+  more() { return this.p < this.bytes.length; }
+}
+
+class Writer {
+  constructor(cap) { this.buf = new ArrayBuffer(cap); this.v = new DataView(this.buf); this.p = 0; }
+  u8(x)  { this.v.setUint8(this.p++, x); }
+  u16(x) { this.v.setUint16(this.p, x, true); this.p += 2; }
+  u32(x) { this.v.setUint32(this.p, x >>> 0, true); this.p += 4; }
+  f32(x) { this.v.setFloat32(this.p, x, true); this.p += 4; }
+  bytes() { return new Uint8Array(this.buf, 0, this.p); }
+}
+
+/* RESP_STATE -- RemoteConfigServer::handle_get_state(). */
+function decodeState(bytes) {
+  const r = new Reader(bytes);
+  const s = {
+    settings: { day: r.u8(), night: r.u8(), count: r.u8(), orient: r.u8(), accent: r.u32() },
+    panels: [], catalog: [], signals: [], previewActive: false, unsaved: false,
+  };
+  const nPanels = r.u8();
+  for (let i = 0; i < nPanels; i++) s.panels.push({ id: r.u16(), imperial: r.u8() === 1, mode: r.u8() });
+  const nSignals = r.u16();
+  for (let i = 0; i < nSignals; i++) {
+    s.catalog.push({ id: r.u16(), name: r.str(24), unit: r.u8(), min: r.f32(), max: r.f32() });
+  }
+  for (let i = 0; i < nSignals; i++) {
+    s.signals.push({ lo: r.f32(), hi: r.f32(), useLo: r.u8() !== 0, useHi: r.u8() !== 0,
+                     useCustom: r.u8() !== 0, cmin: r.f32(), cmax: r.f32() });
+  }
+  if (r.more()) {
+    const flags = r.u8();
+    s.previewActive = (flags & 1) !== 0;
+    s.unsaved = (flags & 2) !== 0;
+  }
+  return s;
+}
+
+/* REQ_APPLY_CONFIG -- RemoteConfigServer::apply_to_live(). With `values`
+ * (metric, one per signal, NaN for none) it's a REQ_PREVIEW_CONFIG, whose
+ * values the dash shows in place of live ones. */
+function encodeConfig(s, values) {
+  const w = new Writer(2048);
+  w.u8(s.settings.day); w.u8(s.settings.night); w.u8(s.settings.count);
+  w.u8(s.settings.orient); w.u32(s.settings.accent);
+  for (const p of s.panels) { w.u16(p.id); w.u8(p.imperial ? 1 : 0); w.u8(p.mode); }
+  w.u16(s.signals.length);
+  for (const c of s.signals) {
+    w.f32(c.lo); w.f32(c.hi);
+    w.u8(c.useLo ? 1 : 0); w.u8(c.useHi ? 1 : 0); w.u8(c.useCustom ? 1 : 0);
+    w.f32(c.cmin); w.f32(c.cmax);
+  }
+  if (values) {
+    w.u16(values.length);
+    for (const v of values) w.f32(v);
+  }
+  return w.bytes();
+}
+
+/* ========================================================================
+ * Layout -- a port of gui::compute_layout() / compute_prominence_ranks().
+ * ====================================================================== */
+
+const BAND_UNITS = 6, HERO_COLSPAN = 4, STACK_COLSPAN = BAND_UNITS - HERO_COLSPAN;
+
+function computeLayout(count, vertical) {
+  count = Math.max(1, Math.min(MAX_PANELS, count));
+  const slot = (col, row, colspan, rowspan, large) => ({ col, row, colspan, rowspan, large });
+  let out = [];
+  if (count === 5 && vertical) {
+    return [slot(0, 0, 1, 1, false), slot(1, 0, 1, 1, false), slot(0, 1, 1, 1, false),
+            slot(1, 1, 1, 1, false), slot(0, 2, 2, 1, true)];
+  }
+  if (count <= 2) {
+    const span = BAND_UNITS / count;
+    for (let i = 0; i < count; i++) out.push(slot(i * span, 0, span, 2, true));
+  } else if (count === 3) {
+    out = [slot(0, 0, STACK_COLSPAN, 1, false), slot(0, 1, STACK_COLSPAN, 1, false),
+           slot(STACK_COLSPAN, 0, HERO_COLSPAN, 2, true)];
+  } else {
+    const small = Math.ceil(count / 2), large = count - small;
+    const band = (n, row, isLarge) => {
+      const span = Math.floor(BAND_UNITS / n);
+      for (let i = 0; i < n; i++) out.push(slot(i * span, row, span, 1, isLarge));
+    };
+    band(small, 0, false);
+    band(large, 1, true);
+    if (count === 4) out.forEach(s => (s.large = true));
+    if (count === 6) out.forEach(s => (s.large = false));
+  }
+  if (vertical) {
+    out = out.map(s => slot(s.row, s.col, s.rowspan, s.colspan, s.large));
+  }
+  return out;
+}
+
+function isHero(s) {
+  const hi = Math.max(s.colspan, s.rowspan), lo = Math.min(s.colspan, s.rowspan);
+  return lo === 2 && hi >= 4;
+}
+
+function prominenceRanks(slots) {
+  const ranks = new Array(slots.length);
+  let rank = 0;
+  for (let pass = 0; pass < 3; pass++) {
+    slots.forEach((s, i) => {
+      const tier = isHero(s) ? 0 : s.large ? 1 : 2;
+      if (tier === pass) ranks[i] = rank++;
+    });
+  }
+  return ranks;
+}
+
+/* InfoScreen::rebuild()'s grid tracks. */
+function gridTracks(count, vertical) {
+  if (count === 5 && vertical) return { cols: "1fr 1fr", rows: "1fr 1fr 1fr" };
+  const band = "repeat(6, 1fr)";
+  const split = count === 5 ? "45fr 55fr" : "1fr 1fr";
+  return vertical ? { cols: split, rows: band } : { cols: band, rows: split };
+}
+
+/* ========================================================================
+ * Dash mock -- PanelWidget, in logical pixels.
+ * ====================================================================== */
+
+const FONT = { dataSm: 30, dataMd: 38, dataLg: 46, dataXl: 56, dataHero: 56, dataMega: 96,
+               labelSm: 14, labelLg: 16, unit: 11 };
+const LINE = 1.3;                         /* ≈ the JetBrains Mono fonts' line height */
+const GLYPH_W = 0.6;                      /* monospace advance, em */
+const ARC = { small: 104, large: 128, hero: 180, width: 7, inset: 2 };
+const BAR_H = 18, BAR_H_HERO = 28, BAR_GAP = 6, NUDGE = 8;
+
+function worstReadoutWidth(size) {
+  const v = size * GLYPH_W, u = FONT.unit * GLYPH_W;
+  return Math.max(5 * v + 3 + 3 * u, 4 * v + 3 + 5 * u);
+}
+
+function valueFont(mode, large, hero, contentW) {
+  if (hero) return mode === 0 ? FONT.dataMega : FONT.dataHero;
+  if (mode !== 0) return FONT.dataSm;
+  if (!large) return FONT.dataMd;
+  for (const f of [FONT.dataXl, FONT.dataLg]) if (worstReadoutWidth(f) <= contentW) return f;
+  return FONT.dataMd;
+}
+
+function arcPath(cx, cy, r, a0, a1) {
+  const rad = a => (a * Math.PI) / 180;
+  const sweep = ((a1 - a0) % 360 + 360) % 360;
+  const x0 = cx + r * Math.cos(rad(a0)), y0 = cy + r * Math.sin(rad(a0));
+  const x1 = cx + r * Math.cos(rad(a1)), y1 = cy + r * Math.sin(rad(a1));
+  return `M${x0.toFixed(2)} ${y0.toFixed(2)} A${r} ${r} 0 ${sweep > 180 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+}
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+
+/* Draws one panel's contents into `box` (already sized w x h). */
+function drawPanel(box, vm, w, h) {
+  box.replaceChildren();
+  box.classList.toggle("warn-hi", vm.warnHi);
+  box.classList.toggle("warn-lo", !vm.warnHi && vm.warnLo);
+
+  const cw = w - 12, ch = h - 12;          /* minus border 2 + pad 4, each side */
+  const cx = 4 + cw / 2, cy = 4 + ch / 2;  /* relative to the padding box */
+  const capSize = vm.large ? FONT.labelLg : FONT.labelSm;
+  const offset = -Math.round((capSize * LINE + 8) / 2) + NUDGE;
+
+  box.append(Object.assign(el("div", "cap", vm.name), { style: `font-size:${capSize}px` }));
+
+  const size = valueFont(vm.mode, vm.large, vm.hero, cw);
+  const val = el("div", "val", vm.value);
+  val.style.fontSize = size + "px";
+  const unit = vm.unit && vm.mode !== 2 ? el("span", "unit", vm.unit) : null;
+  if (unit) val.append(unit);
+
+  /* VehicleBinding clamps before PanelWidget sees it, so the dash never
+   * shows PanelWidget's out-of-range tint either. */
+  const pct = Math.max(0, Math.min(1, vm.pct));
+  const fill = "var(--accent)";
+
+  if (vm.mode === 1) {                       /* Bar */
+    const bh = vm.hero ? BAR_H_HERO : BAR_H;
+    const bw = cw * 0.8;
+    const dataH = size * LINE;
+    const barCy = cy + offset + (dataH + BAR_GAP) / 2;
+    const bar = el("div", "bar");
+    Object.assign(bar.style, { width: bw + "px", height: bh + "px",
+                               left: cx - bw / 2 + "px", top: barCy - bh / 2 + "px" });
+    const ind = el("div");
+    ind.style.width = pct * 100 + "%";
+    ind.style.background = fill;
+    bar.append(ind);
+    box.append(bar);
+    val.style.left = cx + "px";
+    val.style.top = barCy - bh / 2 - BAR_GAP - dataH / 2 + "px";
+  } else if (vm.mode === 2) {                /* Gauge */
+    const d = vm.hero ? ARC.hero : vm.large ? ARC.large : ARC.small;
+    const trackW = ARC.width + 2 * ARC.inset;
+    const r = d / 2;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("width", d); svg.setAttribute("height", d);
+    svg.setAttribute("viewBox", `0 0 ${d} ${d}`);
+    Object.assign(svg.style, { left: cx - r + "px", top: cy + offset - r + "px" });
+    const path = (rad, a1, color, width) => {
+      const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      p.setAttribute("d", arcPath(r, r, rad, 135, a1));
+      p.setAttribute("fill", "none"); p.setAttribute("stroke", color);
+      p.setAttribute("stroke-width", width); p.setAttribute("stroke-linecap", "round");
+      return p;
+    };
+    svg.append(path(r - trackW / 2, 45, "#404040", trackW));
+    if (pct > 0.004) svg.append(path(r - ARC.inset - ARC.width / 2, 135 + 270 * pct, fill, ARC.width));
+    box.append(svg);
+    val.style.left = cx + "px";
+    val.style.top = cy + offset + "px";
+  } else {                                   /* Digital */
+    val.style.left = cx + "px";
+    val.style.top = cy + offset + "px";
+  }
+  box.append(val);
+}
+
+/* ========================================================================
+ * State
+ * ====================================================================== */
+
+let state = null;         /* decoded RESP_STATE, edited in place */
+let selected = 0;         /* priority rank being edited */
+let tab = "dash";         /* "dash" or "panel" */
+let savedHex = null;      /* the config as last saved; null if unknown */
+const samples = new Map();/* signal index -> metric value the mock (and dash) show */
+
+const $ = id => document.getElementById(id);
+
+function sigIndex(id) { return state.catalog.findIndex(c => c.id === id); }
+
+function effectiveRange(i) {
+  const c = state.signals[i], spec = state.catalog[i];
+  return c.useCustom && c.cmin < c.cmax ? [c.cmin, c.cmax] : [spec.min, spec.max];
+}
+
+/* fround: the dash gets these as f32, and has to land on the same digits. */
+function sampleFor(i) {
+  if (!samples.has(i)) {
+    const [a, b] = [state.catalog[i].min, state.catalog[i].max];
+    samples.set(i, Math.fround(a + (b - a) * 0.62));
+  }
+  return samples.get(i);
+}
+
+function setSample(i, v) { samples.set(i, Math.fround(v)); }
+
+function allSamples() { return state.catalog.map((_, i) => sampleFor(i)); }
+
+function isDirty() { return savedHex === null || bytesToHex(encodeConfig(state)) !== savedHex; }
+
+function fmt(v, decimals) {
+  const s = v.toFixed(decimals);
+  return s === "-0" || /^-0\.0*$/.test(s) ? s.slice(1) : s;
+}
+
+/* A panel's readout, as SignalStore::get_display_value_at() and
+ * VehicleBinding format it: Pressure/Volume round, everything else
+ * truncates toward zero. */
+function readout(i, metric, imperial) {
+  const type = state.catalog[i].unit;
+  const v = shown(i, metric, imperial);
+  const d = decimals(i, imperial);
+  if (type === 3 || type === 8) {
+    const k = Math.pow(10, d);
+    return fmt(Math.floor(v * k + 0.5) / k, d);
+  }
+  return fmt(Math.trunc(v), d);
+}
+
+/* Metric value -> the units/precision a panel shows it in. */
+function shown(i, metric, imperial) {
+  const u = unitOf(state.catalog[i].unit);
+  return imperial ? u.toI(metric) : metric;
+}
+function decimals(i, imperial) {
+  const u = unitOf(state.catalog[i].unit);
+  return imperial ? u.di : u.dm;
+}
+function unitLabel(i, imperial) {
+  const u = unitOf(state.catalog[i].unit);
+  return imperial ? u.i : u.m;
+}
+
+function panelVm(rank, slot) {
+  const p = state.panels[rank];
+  const i = sigIndex(p.id);
+  if (i < 0) return { name: "?", unit: "", value: "--", mode: p.mode, large: slot.large,
+                      hero: isHero(slot), pct: 0, warnLo: false, warnHi: false };
+  const c = state.signals[i];
+  const v = sampleFor(i);
+  const [lo, hi] = effectiveRange(i);
+  return {
+    name: state.catalog[i].name,
+    unit: unitLabel(i, p.imperial),
+    value: readout(i, v, p.imperial),
+    mode: p.mode,
+    large: slot.large,
+    hero: isHero(slot),
+    pct: hi > lo ? (v - lo) / (hi - lo) : 0,
+    warnLo: c.useLo && v <= c.lo,
+    warnHi: c.useHi && v >= c.hi,
+  };
+}
+
+/* ========================================================================
+ * Rendering
+ * ====================================================================== */
+
+function hex6(n) { return "#" + n.toString(16).padStart(6, "0"); }
+
+function renderDash() {
+  const s = state.settings;
+  const vertical = s.orient === 1;
+  const W = vertical ? 320 : 480, H = vertical ? 480 : 320;
+  const slots = computeLayout(s.count, vertical);
+  const ranks = prominenceRanks(slots);
+  const tracks = gridTracks(s.count, vertical);
+
+  const dash = $("dash");
+  Object.assign(dash.style, { width: W + "px", height: H + "px",
+                              gridTemplateColumns: tracks.cols, gridTemplateRows: tracks.rows });
+
+  /* Scale to the space available: the page width, and for portrait not so
+   * tall that the editor below gets crowded out. */
+  const availW = Math.min(document.querySelector(".top").clientWidth - 32, 528);
+  if (availW <= 0) return;
+  const availH = Math.max(180, window.innerHeight * (vertical ? 0.42 : 0.36));
+  const k = Math.min(availW / W, availH / H);
+  dash.style.transform = `scale(${k})`;
+  Object.assign($("dash-frame").style, { width: W * k + "px", height: H * k + "px" });
+
+  dash.replaceChildren();
+  /* Panel boxes are sized by the grid, so place them first and draw their
+   * contents once the browser has measured them. */
+  const boxes = slots.map((slot, i) => {
+    const b = el("div", "p");
+    b.style.gridColumn = `${slot.col + 1} / span ${slot.colspan}`;
+    b.style.gridRow = `${slot.row + 1} / span ${slot.rowspan}`;
+    b.dataset.rank = ranks[i];
+    b.classList.toggle("sel", tab === "panel" && ranks[i] === selected);
+    b.setAttribute("role", "button");
+    b.setAttribute("aria-label", "Edit panel " + (ranks[i] + 1));
+    dash.append(b);
+    return b;
+  });
+  boxes.forEach((b, i) => drawPanel(b, panelVm(ranks[i], slots[i]), b.offsetWidth, b.offsetHeight));
+
+}
+
+function setSeg(group, value) {
+  for (const b of group.querySelectorAll("button")) {
+    b.setAttribute("aria-pressed", String(b.dataset.v === String(value)));
+  }
+}
+
+function renderEditor() {
+  const p = state.panels[selected];
+  const i = sigIndex(p.id);
+  const spec = state.catalog[i];
+  const c = state.signals[i];
+  const u = unitOf(spec.unit);
+
+  $("h-panel").textContent = spec.name;
+  $("signal").value = String(p.id);
+
+  const hasImperial = u.m !== u.i;
+  $("units-row").hidden = !hasImperial;
+  if (hasImperial) {
+    $("units").replaceChildren(...[u.m, u.i].map((text, v) => {
+      const b = el("button", null, text);
+      b.type = "button"; b.dataset.v = String(v);
+      return b;
+    }));
+    setSeg($("units"), p.imperial ? 1 : 0);
+  }
+  setSeg($("mode"), p.mode);
+
+  const dec = decimals(i, p.imperial);
+  const label = unitLabel(i, p.imperial);
+  const show = v => fmt(shown(i, v, p.imperial), dec);
+  const unitSuffix = label ? " " + label : "";
+
+  $("scale-row").hidden = p.mode === 0;
+  $("use-custom").checked = c.useCustom;
+  $("scale-default").textContent = `Default ${show(spec.min)} – ${show(spec.max)}${unitSuffix}`;
+  $("scale-inputs").hidden = !c.useCustom;
+  const [rmin, rmax] = effectiveRange(i);
+  setNum($("custom-min"), show(c.useCustom ? c.cmin : spec.min));
+  setNum($("custom-max"), show(c.useCustom ? c.cmax : spec.max));
+
+  $("use-hi").checked = c.useHi;
+  $("use-lo").checked = c.useLo;
+  $("hi").disabled = !c.useHi;
+  $("lo").disabled = !c.useLo;
+  setNum($("hi"), show(c.useHi ? c.hi : rmax));
+  setNum($("lo"), show(c.useLo ? c.lo : rmin));
+  for (const t of document.querySelectorAll("[data-unit]")) t.textContent = label;
+
+  const v = sampleFor(i);
+  $("sample").value = String(Math.round(((v - rmin) / (rmax - rmin || 1)) * 1000));
+  $("sample-out").textContent = readout(i, v, p.imperial) + unitSuffix;
+}
+
+/* Leaves a field alone while it's being typed in, so re-rendering on every
+ * keystroke doesn't reformat the number under the cursor. */
+function setNum(input, text) {
+  if (document.activeElement !== input) input.value = text;
+}
+
+function renderSettings() {
+  const s = state.settings;
+  setSeg($("count"), s.count);
+  setSeg($("orient"), s.orient);
+  for (const b of $("accent").children) b.setAttribute("aria-pressed", String(Number(b.dataset.v) === s.accent));
+  $("day").value = s.day; $("day-out").textContent = s.day + "%";
+  $("night").value = s.night; $("night-out").textContent = s.night + "%";
+  document.documentElement.style.setProperty("--accent", hex6(s.accent));
+  document.documentElement.style.setProperty("--on-accent", s.accent === 0xFFC107 ? "#1a1a1a" : "#ffffff");
+}
+
+function renderActions() {
+  const dirty = isDirty();
+  $("save").disabled = !dirty || busy;
+  $("discard").disabled = !dirty || busy;
+  if (!$("status").dataset.error) {
+    setStatus(dirty ? "live" : "idle", dirty ? "Unsaved changes" : "Saved");
+  }
+}
+
+function renderTabs() {
+  const name = state.catalog[sigIndex(state.panels[selected].id)].name;
+  $("tab-panel").textContent = "Panel · " + name;
+  for (const [id, key] of [["tab-dash", "dash"], ["tab-panel", "panel"]]) {
+    $(id).setAttribute("aria-selected", String(tab === key));
+  }
+  $("pane-dash").hidden = tab !== "dash";
+  $("pane-panel").hidden = tab !== "panel";
+}
+
+function render() {
+  renderTabs();
+  renderSettings();
+  renderDash();
+  renderEditor();
+  renderActions();
+}
+
+let toastTimer = 0;
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 2200);
+}
+
+function setStatus(kind, text) {
+  const s = $("status");
+  s.dataset.kind = kind;
+  s.textContent = text;
+}
+
+/* An error stays up until a request succeeds. */
+function setError(text) {
+  $("status").dataset.error = "1";
+  setStatus("error", text);
+}
+function clearError() {
+  delete $("status").dataset.error;
+  renderActions();
+}
+
+/* ========================================================================
+ * Talking to the dash
+ * ====================================================================== */
+
+async function request(method, path, body) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 4000);
+  try {
+    const r = await fetch(path, { method, body, signal: ctl.signal, cache: "no-store",
+                                  headers: body ? { "Content-Type": "text/plain" } : undefined });
+    if (!r.ok) throw new Error(r.status + " " + (await r.text()));
+    return await r.text();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function load() {
+  const hex = await request("GET", "/api/state");
+  state = decodeState(hexToBytes(hex.trim()));
+  /* Reloading mid-session: the dash holds edits this page never saw
+   * saved, so there's no saved config to compare against. */
+  savedHex = state.unsaved ? null : bytesToHex(encodeConfig(state));
+  if (selected >= state.settings.count) selected = 0;
+}
+
+/* While this page is open the dash is in a preview session: it shows this
+ * page's config and its sample values, so the two always match. Previews
+ * go out as the user edits -- coalesced so a dragged slider sends a
+ * handful rather than one per pixel, and never more than one at a time
+ * over the dash's serial link -- and again every KEEPALIVE_MS, since the
+ * dash ends a session that falls silent (REMOTE_SESSION_TIMEOUT_MS). */
+const KEEPALIVE_MS = 20000;
+let previewTimer = 0, previewInFlight = null, previewQueued = false, busy = false;
+let lastPreviewAt = 0;
+
+function changed() {
+  render();
+  schedulePreview();
+}
+
+function schedulePreview() {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(sendPreview, 120);
+}
+
+async function sendPreview() {
+  if (previewInFlight) { previewQueued = true; return; }
+  previewInFlight = (async () => {
+    try {
+      const body = bytesToHex(encodeConfig(state, allSamples()));
+      const result = Number(await request("POST", "/api/preview", body));
+      lastPreviewAt = Date.now();
+      if (result === 0) clearError();
+      else setError(RESULT_TEXT[result] || "Rejected");
+    } catch (e) {
+      setError("Dash not responding");
+    }
+  })();
+  await previewInFlight;
+  previewInFlight = null;
+  if (previewQueued) { previewQueued = false; sendPreview(); }
+}
+
+async function flushPreviews() {
+  clearTimeout(previewTimer);
+  while (previewInFlight) await previewInFlight;
+}
+
+async function save() {
+  busy = true; renderActions();
+  try {
+    await flushPreviews();
+    const result = Number(await request("POST", "/api/save", bytesToHex(encodeConfig(state))));
+    if (result !== 0) { setError(RESULT_TEXT[result] || "Rejected"); return; }
+    savedHex = bytesToHex(encodeConfig(state));
+    clearError();
+    toast("Saved to the dash");
+  } catch (e) {
+    setError("Dash not responding");
+  } finally {
+    busy = false; renderActions();
+  }
+}
+
+/* Ending the session puts the dash back to its last save; a fresh one
+ * then picks the mock's values up again. */
+async function discard() {
+  busy = true; renderActions();
+  try {
+    await flushPreviews();
+    await request("POST", "/api/revert", "");
+    await load();
+    render();
+    await sendPreview();
+    toast("Changes discarded");
+  } catch (e) {
+    setError("Dash not responding");
+  } finally {
+    busy = false; renderActions();
+  }
+}
+
+/* Leaving the page (switching apps, locking the phone, closing the tab)
+ * hands the dash back to live values. Unsaved edits stay here and go back
+ * to the dash on return. */
+function endSession() {
+  clearTimeout(previewTimer);
+  if (navigator.sendBeacon) navigator.sendBeacon("/api/revert", "");
+}
+
+/* ========================================================================
+ * Wiring
+ * ====================================================================== */
+
+function buildStatic() {
+  const sel = $("signal");
+  const names = state.catalog.map(c => c.name);
+  sel.replaceChildren(...state.catalog.map(c => {
+    /* Two signals can share a name (Fuel in L and in %); the unit tells
+     * them apart. */
+    const dup = names.filter(n => n === c.name).length > 1;
+    const u = unitOf(c.unit).m;
+    return Object.assign(el("option", null, dup && u ? `${c.name} (${u})` : c.name), { value: String(c.id) });
+  }));
+
+  $("count").replaceChildren(...Array.from({ length: state.panels.length }, (_, k) => {
+    const b = el("button", null, String(k + 1));
+    b.type = "button"; b.dataset.v = String(k + 1);
+    return b;
+  }));
+
+  $("accent").replaceChildren(...ACCENTS.map(c => {
+    const b = el("button");
+    b.type = "button"; b.dataset.v = String(c);
+    b.style.background = hex6(c);
+    b.setAttribute("aria-label", "Accent " + hex6(c));
+    return b;
+  }));
+}
+
+function current() {
+  const p = state.panels[selected];
+  const i = sigIndex(p.id);
+  return { p, i, c: state.signals[i], spec: state.catalog[i] };
+}
+
+/* Number field -> metric, or null if it isn't a number. */
+function readMetric(input, i, imperial) {
+  const v = parseFloat(input.value);
+  if (!Number.isFinite(v)) return null;
+  return imperial ? unitOf(state.catalog[i].unit).toM(v) : v;
+}
+
+function wire() {
+  $("dash").addEventListener("click", e => {
+    const box = e.target.closest(".p");
+    if (!box) return;
+    selected = Number(box.dataset.rank);
+    tab = "panel";
+    render();
+    window.scrollTo(0, 0);
+  });
+  $("tab-dash").addEventListener("click", () => { tab = "dash"; render(); });
+  $("tab-panel").addEventListener("click", () => { tab = "panel"; render(); });
+
+  $("signal").addEventListener("change", e => {
+    const id = Number(e.target.value);
+    const { p } = current();
+    /* A signal already on another visible panel trades places with this
+     * one's, rather than showing twice. */
+    const other = state.panels.findIndex((q, r) => r !== selected && r < state.settings.count && q.id === id);
+    if (other >= 0) {
+      state.panels[other].id = p.id;
+      toast("Swapped with the other panel");
+    }
+    p.id = id;
+    changed();
+  });
+
+  $("units").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    current().p.imperial = b.dataset.v === "1";
+    changed();
+  });
+  $("mode").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    current().p.mode = Number(b.dataset.v);
+    changed();
+  });
+
+  $("use-custom").addEventListener("change", e => {
+    const { c, spec } = current();
+    c.useCustom = e.target.checked;
+    if (c.useCustom && !(c.cmin < c.cmax)) { c.cmin = spec.min; c.cmax = spec.max; }
+    changed();
+  });
+  for (const [id, key] of [["custom-min", "cmin"], ["custom-max", "cmax"]]) {
+    $(id).addEventListener("input", e => {
+      const { p, i, c } = current();
+      const v = readMetric(e.target, i, p.imperial);
+      if (v === null) return;
+      c[key] = v;
+      changed();
+    });
+  }
+
+  for (const side of ["hi", "lo"]) {
+    const flag = side === "hi" ? "useHi" : "useLo";
+    $("use-" + side).addEventListener("change", e => {
+      const { p, i, c } = current();
+      c[flag] = e.target.checked;
+      /* Turning a warning on starts it at whatever the field shows. */
+      if (c[flag]) {
+        const v = readMetric($(side), i, p.imperial);
+        if (v !== null) c[side] = v;
+      }
+      changed();
+    });
+    $(side).addEventListener("input", e => {
+      const { p, i, c } = current();
+      const v = readMetric(e.target, i, p.imperial);
+      if (v === null) return;
+      c[side] = v;
+      changed();
+    });
+  }
+
+  /* Not part of the config -- only what the mock and the dash show. */
+  $("sample").addEventListener("input", e => {
+    const { i } = current();
+    const [lo, hi] = effectiveRange(i);
+    setSample(i, lo + (hi - lo) * (Number(e.target.value) / 1000));
+    renderDash();
+    renderEditor();
+    schedulePreview();
+  });
+
+  $("count").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    state.settings.count = Number(b.dataset.v);
+    if (selected >= state.settings.count) selected = 0;
+    changed();
+  });
+  $("orient").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    state.settings.orient = Number(b.dataset.v);
+    changed();
+  });
+  $("accent").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    state.settings.accent = Number(b.dataset.v);
+    changed();
+  });
+  for (const k of ["day", "night"]) {
+    $(k).addEventListener("input", e => {
+      state.settings[k] = Number(e.target.value);
+      changed();
+    });
+  }
+
+  $("save").addEventListener("click", save);
+  $("discard").addEventListener("click", discard);
+
+  document.addEventListener("visibilitychange", () => {
+    if (!state) return;
+    if (document.visibilityState === "hidden") endSession();
+    else sendPreview();
+  });
+  window.addEventListener("pagehide", () => state && endSession());
+  setInterval(() => {
+    if (state && document.visibilityState === "visible" && Date.now() - lastPreviewAt >= KEEPALIVE_MS) {
+      sendPreview();
+    }
+  }, 5000);
+  $("retry").addEventListener("click", start);
+
+  let resizeTimer = 0;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => state && renderDash(), 100);
+  });
+}
+
+async function start() {
+  $("fail").hidden = true;
+  setStatus("idle", "Connecting…");
+  try {
+    await load();
+    buildStatic();
+    document.body.classList.remove("loading");
+    render();
+    sendPreview();
+  } catch (e) {
+    setError("Not connected");
+    $("fail").hidden = false;
+  }
+}
+
+wire();
+start();
+</script>
+</body>
+</html>
