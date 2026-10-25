@@ -20,6 +20,7 @@
 #include <Arduino.h>
 #include <Stream.h>
 
+#include "dash_s3_ota.hpp"
 #include "freertos/FreeRTOS.h"
 #include "freertos/stream_buffer.h"
 #include "freertos/task.h"
@@ -106,7 +107,10 @@ namespace
     void relay_task(void *)
     {
         static PipeStream      pipe;
-        static esp32::RelayApp app(pipe);
+        /* The C3 relay plus the dash's firmware updater (dash_s3_ota.hpp),
+         * which the C3 never had. */
+        static DashS3Updater   updater;
+        static esp32::RelayApp app(pipe, &updater);
         app.begin();
         for (;;)
         {

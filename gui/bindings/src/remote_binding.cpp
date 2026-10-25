@@ -1,13 +1,17 @@
 #include "remote_binding.hpp"
+#include "mem_placement.hpp"
 
 #include <stdio.h>
 
 namespace gui
 {
     using remote::server::ApState;
+    using remote::server::OtaState;
 
-    RemoteBinding::RemoteBinding(remote::server::RemoteApController &ap)
+    RemoteBinding::RemoteBinding(remote::server::RemoteApController  &ap,
+                                 remote::server::RemoteOtaController &ota)
         : ap_(ap)
+        , ota_(ota)
     {
     }
 
@@ -60,6 +64,35 @@ namespace gui
                 break;
         }
 
+        return vm;
+    }
+
+    FLASHMEM FirmwareUpdateViewModel RemoteBinding::build_update_view_model() const
+    {
+        FirmwareUpdateViewModel vm;
+        vm.percent = ota_.percent();
+        snprintf(vm.version, sizeof(vm.version), "%s", ota_.version());
+
+        switch (ota_.state())
+        {
+            case OtaState::Receiving:
+                vm.phase = FirmwareUpdatePhase::Receiving;
+                break;
+            case OtaState::Ready:
+                vm.phase = FirmwareUpdatePhase::Ready;
+                break;
+            case OtaState::Installing:
+                vm.phase = FirmwareUpdatePhase::Installing;
+                break;
+            case OtaState::Armed:
+            case OtaState::Idle:
+            case OtaState::Requested:
+            default:
+                vm.phase = FirmwareUpdatePhase::Waiting;
+                vm.upload_failed
+                    = ota_.last_result() != remote::protocol::OtaResult::Ok;
+                break;
+        }
         return vm;
     }
 

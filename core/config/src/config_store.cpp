@@ -56,6 +56,12 @@ namespace core
             return;
         }
 
+        if (header.version > CURRENT_VERSION)
+        {
+            set_defaults();
+            return;
+        }
+
         backing_.read(0, &config_, sizeof(config_));
     }
 

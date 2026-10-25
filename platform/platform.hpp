@@ -492,3 +492,46 @@ Platform &platform_get();
  * durable on return, so a ConfigStore::save() right before is enough.
  */
 [[noreturn]] void platform_restart();
+
+/*==============================================================================
+ * FIRMWARE
+ *
+ * Hooks for firmware updates taken in the field. Only the ESP32-S3 dash
+ * has them (A/B app slots with bootloader rollback -- see
+ * platform/dash_s3/OTA_PLAN.md); on every other board each is a no-op
+ * that reports nothing to do.
+ =============================================================================*/
+
+/** Version strings, NUL included, are at most this long. */
+constexpr size_t FIRMWARE_VERSION_LEN = 32;
+
+/** The running firmware's version, for showing the user. Never null. */
+const char *platform_firmware_version();
+
+/**
+ * Declares the running firmware good. A freshly installed update boots
+ * on probation: any reset before this is called -- a crash, the hang
+ * watchdog, the power going -- boots the previous firmware instead. Call
+ * once the app has been running normally long enough to be trusted.
+ * Harmless to call again, or on firmware that wasn't just installed.
+ */
+void platform_firmware_healthy();
+
+/**
+ * Reports an update that didn't take: the board installed one, and then
+ * came back up on its previous firmware (the new one never declared
+ * itself healthy, or failed to boot at all). True once, on the first
+ * call after such a boot, with the version that failed copied into
+ * `version` (`cap` bytes, always terminated; empty if it wasn't
+ * recorded); false ever after.
+ */
+bool platform_take_failed_update(char *version, size_t cap);
+
+/**
+ * Turns the main-loop hang watchdog on or off. While it's on, loop() has
+ * to come back around within a few seconds or the board resets, which
+ * is what turns an update that hangs into a rollback rather than a dead
+ * dash. Turn it off around anything that blocks on purpose for longer --
+ * a full log dump or erase -- and back on afterwards.
+ */
+void platform_hang_watchdog(bool enabled);

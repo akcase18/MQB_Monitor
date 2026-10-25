@@ -362,4 +362,21 @@ namespace remote::protocol
         return get_bytes(p, out.ip, sizeof(out.ip));
     }
 
+    FLASHMEM uint8_t *encode_ota_begin(uint8_t *p, const OtaBeginWire &v)
+    {
+        p = put_u32(p, v.total_bytes);
+        p = put_bytes(p, v.version, sizeof(v.version));
+        return p;
+    }
+
+    FLASHMEM const uint8_t *decode_ota_begin(const uint8_t *p,
+                                             OtaBeginWire  &out)
+    {
+        p = get_u32(p, out.total_bytes);
+        p = get_bytes(p, out.version, sizeof(out.version));
+        /* From the wire, so not trusted to be terminated. */
+        out.version[sizeof(out.version) - 1] = '\0';
+        return p;
+    }
+
 } // namespace remote::protocol

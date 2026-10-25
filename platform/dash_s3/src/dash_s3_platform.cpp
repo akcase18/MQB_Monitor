@@ -7,6 +7,7 @@
 
 #include "platform.hpp"
 
+#include <esp_heap_caps.h>
 #include <esp_system.h>
 
 #include "dash_s3_can.hpp"
@@ -64,8 +65,32 @@ namespace
     }
 } // namespace
 
+/* Internal RAM is what the Wi-Fi stack's transmit buffers come out of,
+ * and with the SoftAP up there is only ~24KB of it to spare: the banded
+ * draw buffers (DRAW_BUF_DIVISOR) and every LVGL object live there too.
+ * Run short and the phone's page stalls mid-send and never finishes
+ * loading -- which is what 4KB of always-resident update screen did.
+ *
+ * The SDK's default sends every malloc() up to 4096 bytes to internal RAM.
+ * This lowers that to 2048, so the larger rarely-touched buffers -- the
+ * config store's 4KB EEPROM mirror, the Wi-Fi screen's ~2.2KB QR canvas --
+ * land in PSRAM instead. Smaller allocations (LVGL's objects, styles and
+ * per-frame draw tasks) stay internal, so rendering is unaffected.
+ * Must run before the config store first opens, i.e. before setup() gets
+ * past platform_get(). */
+#ifndef DASH_S3_INTERNAL_MALLOC_LIMIT
+    #define DASH_S3_INTERNAL_MALLOC_LIMIT 2048
+#endif
+constexpr size_t INTERNAL_MALLOC_LIMIT = DASH_S3_INTERNAL_MALLOC_LIMIT;
+
 Platform &platform_get()
 {
+    static bool s_heap_tuned = [] {
+        heap_caps_malloc_extmem_enable(INTERNAL_MALLOC_LIMIT);
+        return true;
+    }();
+    (void)s_heap_tuned;
+
     static Platform s_platform {
         active_can(),                 DashS3Display::instance(),
         DASH_S3_ACTIVE_TOUCH,         Esp32ConfigStore::instance(),

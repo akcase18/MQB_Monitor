@@ -23,12 +23,36 @@
 
 namespace esp32
 {
+    /**
+     * Board-specific additions to the relay -- more routes on the web
+     * server, more frame types off the link. The S3 dash's firmware
+     * updater (platform/dash_s3/src/dash_s3_ota.cpp) is one; the C3 has
+     * none. Runs on the relay's own task, like everything else here.
+     */
+    class RelayExtension
+    {
+        public:
+            virtual ~RelayExtension() = default;
+
+            /** Registers routes on `server` and keeps `link` for sending
+             * events. Called once, from RelayApp::begin(). */
+            virtual void attach(WebServer &server, RelayLink &link) = 0;
+
+            /** Offered every frame RelayApp doesn't handle itself. */
+            virtual void on_frame(remote::protocol::MsgType type,
+                                  const uint8_t            *payload,
+                                  uint16_t                  len)
+                = 0;
+    };
+
     class RelayApp
     {
         public:
             /** `stream` is the link to the dash side: whatever carries
-             * remote::protocol frames to and from remote::server. */
-            explicit RelayApp(Stream &stream);
+             * remote::protocol frames to and from remote::server.
+             * `extension`, if any, must outlive this. */
+            explicit RelayApp(Stream         &stream,
+                              RelayExtension *extension = nullptr);
 
             /** Brings Wi-Fi to AP mode (idle, nothing broadcasting) and
              * starts the web server. Call once, from the task that will
@@ -41,6 +65,7 @@ namespace esp32
              * this call invokes. */
             void poll(uint32_t now_ms);
 
+
         private:
             static void on_frame(void                     *ctx,
                                  remote::protocol::MsgType type,
@@ -51,6 +76,7 @@ namespace esp32
             RelayLink        link_;
             WebServer        server_;
             ConfigWebHandler web_;
+            RelayExtension  *extension_;
     };
 
 } // namespace esp32

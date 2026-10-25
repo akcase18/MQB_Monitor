@@ -68,3 +68,25 @@ void platform_restart()
     perror("platform_restart: exec failed");
     exit(1);
 }
+
+/* No field updates on this board -- see platform.hpp's FIRMWARE section. */
+const char *platform_firmware_version()
+{
+    return "simulator";
+}
+
+void platform_firmware_healthy()
+{
+}
+
+bool platform_take_failed_update(char *version, size_t cap)
+{
+    (void)version;
+    (void)cap;
+    return false;
+}
+
+void platform_hang_watchdog(bool enabled)
+{
+    (void)enabled;
+}

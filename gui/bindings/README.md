@@ -1,6 +1,6 @@
 # gui/bindings/
 
-`VehicleBinding` — the sole bridge between `core::` vehicle data and the `gui::` presentation layer — plus `RemoteBinding`, the analogous bridge between `remote::server`'s AP lifecycle and `gui::WirelessSetupScreen`. This is the only code in `gui/` allowed to include a `core/*` or `remote/*` header alongside a `gui/widgets`/`gui/screens` header.
+`VehicleBinding` — the sole bridge between `core::` vehicle data and the `gui::` presentation layer — plus `RemoteBinding`, the analogous bridge between `remote::server`'s AP lifecycle and firmware updates and `gui::WirelessSetupScreen`/`gui::FirmwareUpdateScreen`. This is the only code in `gui/` allowed to include a `core/*` or `remote/*` header alongside a `gui/widgets`/`gui/screens` header.
 
 ## Files
 
@@ -12,9 +12,10 @@
 
   Also translates between `core::` and `gui::` versions of the same concept that are kept deliberately separate (e.g. `core::DisplayMode` ↔ `gui::DisplayMode`, `core::UnitSystem` ↔ a plain `is_metric` bool) — the `gui::` side never depends on `core::` types directly, even here; the translation happens inline.
 
-- **`inc/remote_binding.hpp`** / **`src/remote_binding.cpp`** — `RemoteBinding(remote::server::RemoteApController &)`:
+- **`inc/remote_binding.hpp`** / **`src/remote_binding.cpp`** — `RemoteBinding(remote::server::RemoteApController &, remote::server::RemoteOtaController &)`:
   - `activate()` / `deactivate()` — pass straight through to `RemoteApController`.
   - `build_view_model()` — maps `ApState` (`Idle`/`Activating`/`Active`/`Deactivating`) to a `gui::WirelessSetupViewModel` (`gui/screens/wireless_setup_screen.hpp`) — `Deactivating` folds into `Activating`'s "please wait" phase rather than getting its own, since it's brief and only ever entered by the user's own close (X) tap. While `Active`, also builds the `qr_payload`/`url_text` (`"http://<ip>"`, the config page — the AP is deliberately open, no password, so there's no Wi-Fi-join string to encode) from `RemoteApController::ssid()`/`ip_text()`.
+  - `build_update_view_model()` — maps `OtaState` to a `gui::FirmwareUpdateViewModel` (phase, percent, incoming version) for `FirmwareUpdateScreen`. Only meaningful while an update is under way.
 
 ## Usage
 

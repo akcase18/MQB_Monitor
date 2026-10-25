@@ -13,6 +13,7 @@ Hardware abstraction: seven interfaces that everything in [core/](../core/README
   - `IStorage` — `begin()`/`is_present()`/`format()`, then stream-style `open(path, mode)`/`is_open()`/`close()`/`read()`/`write()`/`exists()`/`remove()`. One file open at a time. Deliberately medium-agnostic — see `teensy/` below for why there are two implementations of it. One informational query breaks that agnosticism on purpose, for the Logging screen's status readout: `medium()` (a `StorageMedium` — Flash/SdCard/HostDirectory), so the screen can say where logs are actually going. No capacity or free-space query is offered — the log ring's own budget is what bounds recording, and a free-space query would walk the filesystem on both real backends.
   - `IClock` — `millis()`, monotonic milliseconds since boot.
   - `Platform { ICanBus &can; IDisplay &display; ITouch &touch; IConfigStore &config_store; IClock &clock; ISerialLink &serial; IStorage &storage; }` and `Platform &platform_get()` — implemented once per board, returning that board's singleton instances.
+  - Free functions each board implements alongside it: `platform_restart()`, plus the FIRMWARE hooks for field updates — `platform_firmware_version()`, `platform_firmware_healthy()`, `platform_take_failed_update()` and `platform_hang_watchdog()`. Only [dash_s3/](dash_s3/README.md#firmware-updates) does anything with the FIRMWARE hooks; the other boards implement them as no-ops.
 
 ## Board-agnostic implementations
 
@@ -28,4 +29,4 @@ Hardware abstraction: seven interfaces that everything in [core/](../core/README
 
 ## Adding a new board
 
-Create `platform/<board>/{inc,src}/`, implement the interfaces (one class each, matching the existing boards' `<Board>CanBus`/`<Board>Display`/`<Board>Touch`/`<Board>ConfigStore`/`<Board>Clock`/`<Board>SerialLink`/`<Board>Storage` naming), implement `platform_get()` returning a `Platform` built from those singletons, and add a new `[env:<board>]` to `platformio.ini` with a `build_src_filter` that includes only that board's `platform/<board>/src` (and excludes every other board's). Nothing in `core/` or `gui/` needs to change.
+Create `platform/<board>/{inc,src}/`, implement the interfaces (one class each, matching the existing boards' `<Board>CanBus`/`<Board>Display`/`<Board>Touch`/`<Board>ConfigStore`/`<Board>Clock`/`<Board>SerialLink`/`<Board>Storage` naming), implement `platform_get()` returning a `Platform` built from those singletons (plus `platform_restart()` and the FIRMWARE hooks — no-ops are fine), and add a new `[env:<board>]` to `platformio.ini` with a `build_src_filter` that includes only that board's `platform/<board>/src` (and excludes every other board's). Nothing in `core/` or `gui/` needs to change.

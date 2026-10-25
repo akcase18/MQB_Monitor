@@ -24,8 +24,10 @@
 #include "remote_ap_controller.hpp"
 #include "remote_config_link.hpp"
 #include "remote_config_server.hpp"
+#include "remote_ota_controller.hpp"
 
 #include "configurator_screen.hpp"
+#include "firmware_update_screen.hpp"
 #include "info_screen.hpp"
 #include "logging_screen.hpp"
 #include "orientation_screen.hpp"
@@ -41,6 +43,7 @@
 
 #include <lvgl.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 #ifdef ARDUINO
@@ -92,6 +95,15 @@ namespace
      * pass with no rate limit, so there is headroom for it. */
     constexpr uint32_t TOUCH_POLL_MS              = 10;
     constexpr uint32_t WIRELESS_SCREEN_REFRESH_MS = 500;
+    /* Firmware update screen: quick enough that the bar visibly moves
+     * through a ~15s upload and the Install popup follows the upload's
+     * end without a noticeable gap. */
+    constexpr uint32_t FIRMWARE_UPDATE_REFRESH_MS = 200;
+    /* How long a freshly installed firmware has to run normally -- loop()
+     * coming round under the hang watchdog, frames reaching the panel --
+     * before it is declared good and the previous one stops being the
+     * fallback (see platform_firmware_healthy()). */
+    constexpr uint32_t FIRMWARE_HEALTHY_AFTER_MS = 10 * 1000;
     /* Slower than the info screen's: nothing here changes faster than
      * once a minute except the capture toggle, which repaints itself on
      * press rather than waiting for this. */
@@ -134,6 +146,15 @@ namespace
 #ifndef DRAW_BUF_DIVISOR
     #define DRAW_BUF_DIVISOR 10
 #endif
+
+    /* core::Logger's ring, in CHUNK_SIZE_BYTES chunks. A board with less
+     * room for logs than the default 13MiB sets it from platformio.ini --
+     * env:dash_s3 does, to fit its second OTA app slot. The ring never
+     * asks the storage how big it is (see TODO.md), so this has to agree
+     * with the partition by hand. */
+#ifndef LOG_CHUNK_COUNT
+    #define LOG_CHUNK_COUNT core::CHUNK_COUNT
+#endif
     alignas(4) uint16_t s_draw_buf_1[(LCD_HORZ * LCD_VERT) / DRAW_BUF_DIVISOR];
     alignas(4) uint16_t s_draw_buf_2[(LCD_HORZ * LCD_VERT) / DRAW_BUF_DIVISOR];
 
@@ -157,6 +178,7 @@ namespace
             remote::server::RemoteConfigServer remote_server;
             remote::server::RemoteConfigLink   remote_link;
             remote::server::RemoteApController remote_ap;
+            remote::server::RemoteOtaController remote_ota;
 
             gui::VehicleBinding vehicle_binding;
             gui::RemoteBinding  remote_binding;
@@ -170,6 +192,7 @@ namespace
             gui::ThemePickerScreen   theme_picker_screen;
             gui::OrientationScreen   orientation_screen;
             gui::WirelessSetupScreen wireless_setup_screen;
+            gui::FirmwareUpdateScreen firmware_update_screen;
             /* Not built by build_screens() -- created and destroyed around
              * each sniffer session (see enter_sniff()). */
             gui::SnifferScreen sniffer_screen;
@@ -177,17 +200,22 @@ namespace
             const char *signal_names[core::SIGNAL_CATALOG_COUNT];
             uint16_t    signal_ids[core::SIGNAL_CATALOG_COUNT];
 
-            explicit Composition(Platform &platform)
+            /* FLASHMEM: runs once, and its member initializers are a
+             * kilobyte of code RAM1 can't spare. */
+            FLASHMEM explicit Composition(Platform &platform)
                 : config_store(platform.config_store)
                 , uds_client(platform.can, CAN_TX_ID, CAN_RX_ID)
                 , uds_poller(uds_client, platform.clock)
                 , scheduler(platform.clock)
-                , logger(platform.storage)
+                , logger(platform.storage,
+                         core::CHUNK_SIZE_BYTES,
+                         LOG_CHUNK_COUNT)
                 , remote_server(config_store, signal_store)
                 , remote_link(platform.serial, remote_server)
                 , remote_ap(remote_link, platform.clock)
+                , remote_ota(remote_link)
                 , vehicle_binding(signal_store, config_store)
-                , remote_binding(remote_ap)
+                , remote_binding(remote_ap, remote_ota)
             {
                 for (uint16_t i = 0; i < core::SIGNAL_CATALOG_COUNT; i++)
                 {
@@ -602,6 +630,15 @@ namespace
     {
         (void)ctx;
         Composition &app = composition();
+
+        /* Paused for a firmware update. The relay is erasing and writing
+         * flash on the other core, which stalls this one on every
+         * operation anyway, and an update ends in a restart. */
+        if (app.remote_ota.state() != remote::server::OtaState::Idle)
+        {
+            return;
+        }
+
         app.logger.sample(app.signal_store,
                           app.config_store.get(),
                           platform_get().clock.millis());
@@ -680,15 +717,18 @@ namespace
 
     /* Request/response pairs are handled internally by
      * RemoteConfigLink::poll(); this only ever sees the async EVT_*
-     * messages (EVT_AP_READY/EVT_AP_DISABLED). */
+     * messages -- the AP's and a firmware update's. Each controller
+     * ignores the other's. */
     FLASHMEM void remote_evt_cb(void                     *ctx,
                                 remote::protocol::MsgType type,
                                 const uint8_t            *payload,
                                 uint16_t                  len)
     {
         (void)ctx;
-        composition().remote_ap.on_event(
-            type, payload, len, platform_get().clock.millis());
+        Composition &app = composition();
+        uint32_t     now = platform_get().clock.millis();
+        app.remote_ap.on_event(type, payload, len, now);
+        app.remote_ota.on_event(type, payload, len, now);
     }
 
     /* Registered once at remote::server::AP_IDLE_CHECK_PERIOD_MS via
@@ -710,6 +750,10 @@ namespace
         if (was_active && !active)
         {
             revert_remote_preview();
+            /* Update mode lives on the AP too: the phone that asked for
+             * it is gone. Each is a no-op outside its own state. */
+            app.remote_ota.decline();
+            app.remote_ota.leave();
         }
         was_active = active;
 
@@ -1007,6 +1051,17 @@ namespace
         app.info_screen.set_logging_active(enabled && app.logger.is_ready());
     }
 
+    /** core::Logger::erase(), with the hang watchdog off around it:
+     * reformatting the whole log partition can block for longer than the
+     * watchdog allows. noinline: its callers sit in ITCM, and GCC would
+     * otherwise inline it right back there. */
+    FLASHMEM __attribute__((noinline)) void erase_logs()
+    {
+        platform_hang_watchdog(false);
+        composition().logger.erase();
+        platform_hang_watchdog(true);
+    }
+
     /* Fired once LoggingScreen's erase popup is confirmed -- the GUI
      * counterpart of the LOGCLEAR serial command below, and the same one
      * call.
@@ -1034,7 +1089,7 @@ namespace
             app.info_screen.set_logging_active(false);
         }
 
-        app.logger.erase();
+        erase_logs();
         app.logging_screen.refresh(build_logging_view_model());
     }
 
@@ -1064,8 +1119,12 @@ namespace
     {
         if (len == 7 && memcmp(cmd, "LOGDUMP", 7) == 0)
         {
+            /* Megabytes over USB: far longer than the hang watchdog
+             * allows loop() -- and blocking here is the point. */
+            platform_hang_watchdog(false);
+
             IStorage &storage = platform_get().storage;
-            for (uint16_t i = 0; i < core::CHUNK_COUNT; i++)
+            for (uint16_t i = 0; i < LOG_CHUNK_COUNT; i++)
             {
                 char path[core::CHUNK_PATH_LEN];
                 core::chunk_path(i, path);
@@ -1082,6 +1141,8 @@ namespace
                 }
                 storage.close();
             }
+
+            platform_hang_watchdog(true);
         }
         else if (len == 8 && memcmp(cmd, "LOGCLEAR", 8) == 0)
         {
@@ -1094,7 +1155,7 @@ namespace
              * silently changing a persisted setting out from under the
              * user over a debug serial link is a surprise the GUI's own
              * confirmation popup doesn't have to be. */
-            composition().logger.erase();
+            erase_logs();
         }
         else if (len == 9 && memcmp(cmd, "LOGSTATUS", 9) == 0)
         {
@@ -1739,6 +1800,212 @@ namespace
             composition().remote_binding.build_view_model());
     }
 
+    FLASHMEM void firmware_install_cb(void *ctx);
+    FLASHMEM void firmware_leave_cb(void *ctx);
+
+    /* Takes the update screen down -- it exists only in update mode (see
+     * firmware_update_screen.hpp for what it cost to keep). If it's
+     * showing, back to the Wi-Fi screen the phone is connected over. */
+    FLASHMEM void leave_firmware_update()
+    {
+        Composition &app = composition();
+        if (lv_screen_active() == app.firmware_update_screen.screen())
+        {
+            app.wireless_setup_screen.open(
+                app.remote_binding.build_view_model(),
+                app.settings_screen.screen());
+        }
+        app.firmware_update_screen.destroy();
+    }
+
+    FLASHMEM void open_firmware_update_screen()
+    {
+        Composition &app = composition();
+        app.firmware_update_screen.create(runtime_theme(),
+                                          firmware_install_cb,
+                                          nullptr,
+                                          firmware_leave_cb,
+                                          nullptr);
+        app.firmware_update_screen.open(
+            app.remote_binding.build_update_view_model());
+    }
+
+    /* Fired by the Install popup. The relay switches app slots and
+     * restarts the board; the screen says so in the meantime. */
+    FLASHMEM void firmware_install_cb(void *ctx)
+    {
+        (void)ctx;
+        Composition &app = composition();
+        app.remote_ota.install(platform_get().clock.millis());
+        app.firmware_update_screen.refresh(
+            app.remote_binding.build_update_view_model());
+    }
+
+    /* Fired by the update screen's X and the Install popup's Cancel: out
+     * of update mode. A verified image stays unused in the spare slot
+     * until the next upload overwrites it. */
+    FLASHMEM void firmware_leave_cb(void *ctx)
+    {
+        (void)ctx;
+        composition().remote_ota.leave();
+        leave_firmware_update();
+    }
+
+    /*------------------------------------------------------------------
+     * The "Update firmware?" popup -- the phone asking for update mode,
+     * put to whoever is in the car. Same shape as the sniffer's request
+     * (request_sniff()): Cancel/Start, and a countdown ring for the
+     * automatic decline (OTA_REQUEST_TIMEOUT_MS).
+     *-----------------------------------------------------------------*/
+
+    lv_obj_t *s_ota_request_popup = nullptr;
+    lv_obj_t *s_ota_request_ring  = nullptr; /* the popup's countdown */
+
+    FLASHMEM void close_update_request_popup()
+    {
+        if (s_ota_request_popup != nullptr)
+        {
+            lv_msgbox_close_async(s_ota_request_popup);
+            s_ota_request_popup = nullptr;
+            s_ota_request_ring  = nullptr; /* goes with it */
+        }
+    }
+
+    FLASHMEM void update_request_start_cb(lv_event_t *e)
+    {
+        (void)e;
+        close_update_request_popup();
+        composition().remote_ota.accept(platform_get().clock.millis());
+        open_firmware_update_screen();
+    }
+
+    FLASHMEM void update_request_cancel_cb(lv_event_t *e)
+    {
+        (void)e;
+        close_update_request_popup();
+        composition().remote_ota.decline();
+    }
+
+    FLASHMEM void open_update_request_popup()
+    {
+        gui::ConfirmPopup popup
+            = gui::create_confirm_popup(runtime_theme(),
+                                        "Update firmware?",
+                                        "From your phone.",
+                                        "Start");
+        lv_obj_add_event_cb(popup.confirm_btn,
+                            update_request_start_cb,
+                            LV_EVENT_CLICKED,
+                            nullptr);
+        lv_obj_add_event_cb(popup.cancel_btn,
+                            update_request_cancel_cb,
+                            LV_EVENT_CLICKED,
+                            nullptr);
+        s_ota_request_popup = popup.mbox;
+        s_ota_request_ring  = gui::add_popup_countdown(
+            popup,
+            runtime_theme(),
+            remote::server::OTA_REQUEST_TIMEOUT_MS / 100);
+    }
+
+    /* Follows RemoteOtaController: the request popup while the phone is
+     * asking, then the update screen for as long as update mode lasts --
+     * put back up if anything else loads over it -- and back to the Wi-Fi
+     * screen when it ends. Also keeps the AP's idle timeout from cutting
+     * off update mode underneath it; the X is the way out, or
+     * remote::server::OTA_WAIT_TIMEOUT_MS if nothing is ever sent. */
+    FLASHMEM void firmware_update_task(void *ctx)
+    {
+        (void)ctx;
+        Composition &app = composition();
+        uint32_t     now = platform_get().clock.millis();
+        app.remote_ota.tick(now);
+
+        if (app.remote_ota.state() == remote::server::OtaState::Requested)
+        {
+            if (s_ota_request_popup == nullptr)
+            {
+                open_update_request_popup();
+            }
+            else
+            {
+                /* Tenths of a second, like the sniffer's ring. */
+                uint32_t waited = now - app.remote_ota.state_entered_ms();
+                uint32_t left   = waited < remote::server::OTA_REQUEST_TIMEOUT_MS
+                                      ? remote::server::OTA_REQUEST_TIMEOUT_MS
+                                            - waited
+                                      : 0;
+                lv_arc_set_value(s_ota_request_ring, left / 100);
+            }
+        }
+        else
+        {
+            /* Answered, or timed out (tick() just declined it). */
+            close_update_request_popup();
+        }
+
+        lv_obj_t *screen  = app.firmware_update_screen.screen();
+        bool      showing = screen != nullptr && lv_screen_active() == screen;
+        if (!app.remote_ota.in_update_mode())
+        {
+            if (screen != nullptr)
+            {
+                leave_firmware_update();
+            }
+            return;
+        }
+
+        app.remote_ap.note_activity(now);
+        if (showing)
+        {
+            app.firmware_update_screen.refresh(
+                app.remote_binding.build_update_view_model());
+        }
+        else
+        {
+            open_firmware_update_screen();
+        }
+    }
+
+    /* Ends a new firmware's probation (platform_firmware_healthy()) once
+     * it has run FIRMWARE_HEALTHY_AFTER_MS -- this task's first run --
+     * with frames reaching the panel. Until then any reset, the hang
+     * watchdog's included, rolls the update back. Runs on after that, but
+     * the platform call does nothing a second time. */
+    FLASHMEM void firmware_health_task(void *ctx)
+    {
+        (void)ctx;
+        if (last_flush_ms() != 0)
+        {
+            platform_firmware_healthy();
+        }
+    }
+
+    FLASHMEM void close_notice_cb(lv_event_t *e)
+    {
+        lv_msgbox_close_async(static_cast<lv_obj_t *>(lv_event_get_user_data(e)));
+    }
+
+    /* The board came back up on its old firmware after an update. Said
+     * once, over whatever screen boot lands on. */
+    FLASHMEM void show_failed_update_notice()
+    {
+        char failed[FIRMWARE_VERSION_LEN];
+        if (!platform_take_failed_update(failed, sizeof(failed)))
+        {
+            return;
+        }
+
+        char body[16 + FIRMWARE_VERSION_LEN];
+        snprintf(body, sizeof(body), "Still on %s", platform_firmware_version());
+
+        gui::ConfirmPopup popup = gui::create_confirm_popup(
+            runtime_theme(), "Update failed", body, "OK");
+        lv_obj_set_hidden(popup.cancel_btn, true);
+        lv_obj_add_event_cb(
+            popup.confirm_btn, close_notice_cb, LV_EVENT_CLICKED, popup.mbox);
+    }
+
     void info_screen_gesture_cb(lv_event_t *e)
     {
         if (lv_event_get_code(e) != LV_EVENT_GESTURE)
@@ -1876,6 +2143,9 @@ namespace
         lv_obj_delete(app.theme_picker_screen.screen());
         lv_obj_delete(app.orientation_screen.screen());
         lv_obj_delete(app.wireless_setup_screen.screen());
+        /* Not built by build_screens(): firmware_update_task builds it
+         * again against the new theme if update mode is still on. */
+        app.firmware_update_screen.destroy();
 
         return transition;
     }
@@ -2047,6 +2317,10 @@ FLASHMEM void setup()
     app.scheduler.every(LOG_SAMPLE_PERIOD_MS, logging_sample_task, nullptr);
     app.scheduler.every(
         LOGGING_SCREEN_REFRESH_MS, refresh_logging_screen_task, nullptr);
+    app.scheduler.every(
+        FIRMWARE_UPDATE_REFRESH_MS, firmware_update_task, nullptr);
+    app.scheduler.every(
+        FIRMWARE_HEALTHY_AFTER_MS, firmware_health_task, nullptr);
 
     /* Arms the backstop for the boot blank. The panel is already dark
      * (TeensyDisplay::begin() holds the pin low) and display_flush_cb's
@@ -2076,6 +2350,13 @@ FLASHMEM void setup()
     {
         lv_screen_load(app.info_screen.screen());
     }
+
+    show_failed_update_notice();
+
+    /* Last, so nothing above -- the first LittleFS mount after a
+     * partition change can format it -- runs against it. From here on a
+     * loop() that stops coming round resets the board. */
+    platform_hang_watchdog(true);
 }
 
 void loop()

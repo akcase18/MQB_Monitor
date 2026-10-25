@@ -2,7 +2,8 @@
  * @file test_main.cpp
  * @brief Host-buildable coverage for core/config: defaults on blank
  * storage, full round trip, partial (panel/signal) writes, unknown-version
- * migration fallback, and core/vehicle's evaluate_warning(). Run with
+ * migration fallback, a newer version left alone after a rollback, and
+ * core/vehicle's evaluate_warning(). Run with
  * `pio test -e simulator`.
  */
 #include <string.h>
@@ -213,6 +214,34 @@ void test_unrecognized_version_resets_to_defaults()
     TEST_ASSERT_EQUAL_UINT8(5, store.get().settings.num_panels);
 }
 
+void test_newer_version_loads_defaults_without_overwriting()
+{
+    FakeConfigStore backing;
+
+    /* Settings saved by newer firmware, then the board rolled back to
+     * this one: a layout this build doesn't know, behind a valid magic. */
+    core::ConfigHeader header {
+        core::ConfigStore::MAGIC_NUMBER,
+        static_cast<uint8_t>(core::ConfigStore::CURRENT_VERSION + 1)
+    };
+    backing.write(0, &header, sizeof(header));
+    uint8_t future_settings = 77;
+    backing.write(sizeof(header), &future_settings, 1);
+
+    core::ConfigStore store(backing);
+    store.load();
+    TEST_ASSERT_EQUAL_UINT8(5, store.get().settings.num_panels);
+
+    /* Still there for the newer firmware, should it be reinstalled. */
+    core::ConfigHeader stored {};
+    uint8_t            stored_settings = 0;
+    backing.read(0, &stored, sizeof(stored));
+    backing.read(sizeof(stored), &stored_settings, 1);
+    TEST_ASSERT_EQUAL_UINT8(core::ConfigStore::CURRENT_VERSION + 1,
+                            stored.version);
+    TEST_ASSERT_EQUAL_UINT8(77, stored_settings);
+}
+
 void test_evaluate_warning()
 {
     core::WarningThresholds thresholds { 10.0f, 90.0f, true, true };
@@ -256,6 +285,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_save_signal_only_writes_that_slot);
     RUN_TEST(test_custom_range_defaults_off_and_round_trips_via_save_signal);
     RUN_TEST(test_unrecognized_version_resets_to_defaults);
+    RUN_TEST(test_newer_version_loads_defaults_without_overwriting);
     RUN_TEST(test_evaluate_warning);
     return UNITY_END();
 }

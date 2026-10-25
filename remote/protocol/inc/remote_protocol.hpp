@@ -51,6 +51,9 @@ namespace remote::protocol
     constexpr uint32_t FRAME_TIMEOUT_MS = 300;
 
     constexpr uint8_t WIRE_NAME_LEN = 24; /* matches gui::PANEL_NAME_LEN */
+    /* A firmware version string plus NUL -- matches the dash's update
+     * descriptor (platform/dash_s3/inc/dash_s3_firmware.hpp). */
+    constexpr uint8_t WIRE_VERSION_LEN = 32;
 
     enum class MsgType : uint8_t
     {
@@ -76,6 +79,30 @@ namespace remote::protocol
         EVT_AP_READY    = 0x11, /* C3 -> Teensy, async */
         CMD_AP_DISABLE  = 0x12, /* Teensy -> C3 */
         EVT_AP_DISABLED = 0x13, /* C3 -> Teensy, best-effort ack */
+
+        /* Firmware update -- the ESP32-S3 dash only, whose relay writes
+         * an uploaded image into the inactive app slot itself (see
+         * platform/dash_s3/OTA_PLAN.md). These keep the panel informed,
+         * and carry the two things the relay must not decide alone:
+         * someone in the car agreeing to update mode, and tapping
+         * Install. The relay refuses uploads outside update mode.
+         * EVT_OTA_BEGIN goes out only once an upload has passed its
+         * identity check, so a rejected file never reaches the panel;
+         * every BEGIN ends in an EVT_OTA_RESULT. */
+        EVT_OTA_BEGIN    = 0x20, /* relay -> dash: OtaBeginWire */
+        EVT_OTA_PROGRESS = 0x21, /* relay -> dash: u32 bytes written */
+        EVT_OTA_RESULT   = 0x22, /* relay -> dash: u8 OtaResult */
+        /* dash -> relay, empty: boot the image the last EVT_OTA_RESULT
+         * Ok reported. The relay restarts the board; a failure to switch
+         * slots comes back as another EVT_OTA_RESULT. */
+        CMD_OTA_COMMIT = 0x23,
+        /* Update mode. The phone asks (EVT_OTA_REQUEST, empty); the
+         * panel answers CMD_OTA_ARM (empty) once someone taps Start, or
+         * CMD_OTA_DISARM (empty) if they decline. DISARM also ends update
+         * mode later on, and drops any image still awaiting a commit. */
+        EVT_OTA_REQUEST = 0x24, /* relay -> dash */
+        CMD_OTA_ARM     = 0x25, /* dash -> relay */
+        CMD_OTA_DISARM  = 0x26, /* dash -> relay */
     };
 
     enum class ApplyResult : uint8_t
@@ -85,6 +112,18 @@ namespace remote::protocol
         ErrInvalidSignal       = 2,
         ErrInvalidEnum         = 3,
         ErrTruncated           = 4,
+    };
+
+    enum class OtaResult : uint8_t
+    {
+        Ok               = 0, /* written and verified, awaiting a commit */
+        ErrNotFirmware   = 1, /* not a firmware image for this dash */
+        ErrWrongHardware = 2, /* a dash image built for other hardware */
+        ErrTooLarge      = 3, /* bigger than an app slot */
+        ErrFlash         = 4, /* a flash write or slot switch failed */
+        ErrCorrupt       = 5, /* failed the image's checksum/SHA-256 */
+        ErrInterrupted   = 6, /* the upload stopped partway */
+        ErrNotArmed      = 7, /* update mode wasn't agreed to on the panel */
     };
 
     /** Standard CRC-16/CCITT-FALSE: poly 0x1021, init 0xFFFF, no reflect,
@@ -256,5 +295,14 @@ namespace remote::protocol
     };
     uint8_t       *encode_ap_ready(uint8_t *p, const ApReadyWire &v);
     const uint8_t *decode_ap_ready(const uint8_t *p, ApReadyWire &out);
+
+    struct OtaBeginWire
+    {
+            uint32_t total_bytes                = 0;
+            char     version[WIRE_VERSION_LEN] = "";
+    };
+    constexpr uint16_t OTA_BEGIN_BYTES = 4 + WIRE_VERSION_LEN;
+    uint8_t       *encode_ota_begin(uint8_t *p, const OtaBeginWire &v);
+    const uint8_t *decode_ota_begin(const uint8_t *p, OtaBeginWire &out);
 
 } // namespace remote::protocol

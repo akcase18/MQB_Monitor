@@ -8,10 +8,11 @@ namespace esp32
 {
     using remote::protocol::MsgType;
 
-    RelayApp::RelayApp(Stream &stream)
+    RelayApp::RelayApp(Stream &stream, RelayExtension *extension)
         : link_(stream),
           server_(80),
-          web_(link_)
+          web_(link_),
+          extension_(extension)
     {
     }
 
@@ -30,6 +31,10 @@ namespace esp32
         WiFi.softAPdisconnect(true);
 
         web_.attach(server_);
+        if (extension_ != nullptr)
+        {
+            extension_->attach(server_, link_);
+        }
         server_.begin();
     }
 
@@ -44,7 +49,6 @@ namespace esp32
                             const uint8_t *payload,
                             uint16_t       len)
     {
-        (void)len;
         auto *self = static_cast<RelayApp *>(ctx);
 
         switch (type)
@@ -70,6 +74,10 @@ namespace esp32
                 break;
 
             default:
+                if (self->extension_ != nullptr)
+                {
+                    self->extension_->on_frame(type, payload, len);
+                }
                 break;
         }
     }

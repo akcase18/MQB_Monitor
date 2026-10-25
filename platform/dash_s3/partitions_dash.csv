@@ -1,13 +1,19 @@
-# Dash on a 16MB ESP32-S3 (N16R8). No OTA: one factory app slot, the rest
-# is the LittleFS log ring. The `spiffs` subtype/label is what
-# LittleFS.begin() mounts by default; the filesystem inside is LittleFS.
-# 0xDF0000 = 13.94MiB, i.e. the same ~1MiB headroom over core::Logger's
-# 13MiB ring that the Teensy's 14MiB region has. Sums to 0x1000000.
+# Dash on a 16MB ESP32-S3 (N16R8). Two 2MB app slots for OTA (see
+# OTA_PLAN.md), the rest is the LittleFS log ring. The `spiffs`
+# subtype/label is what LittleFS.begin() mounts by default; the filesystem
+# inside is LittleFS. 0xBF0000 = 11.94MiB, i.e. the same ~1MiB headroom
+# over core::Logger's 11MiB ring (LOG_CHUNK_COUNT=44 in platformio.ini)
+# that the Teensy's 14MiB region has over its 13MiB one. Sums to
+# 0x1000000.
 #
-# If the app ever outgrows 2MB, take from `spiffs` -- and shrink the ring
-# to match via core::Logger's constructor arguments in src/main.cpp,
-# because the ring does not consult the backend for capacity (TODO.md).
+# A slot only has to hold one image, so 2MB keeps the same growth room
+# the single `factory` slot had. If the app ever outgrows it, take from
+# `spiffs` -- and shrink the ring to match via LOG_CHUNK_COUNT, because the
+# ring does not consult the backend for capacity (TODO.md). Changing this
+# table needs a USB flash; OTA can't move partitions.
 # Name,    Type, SubType, Offset,   Size
 nvs,       data, nvs,     0x9000,   0x5000
-factory,   app,  factory, 0x10000,  0x200000
-spiffs,    data, spiffs,  0x210000, 0xDF0000
+otadata,   data, ota,     0xE000,   0x2000
+app0,      app,  ota_0,   0x10000,  0x200000
+app1,      app,  ota_1,   0x210000, 0x200000
+spiffs,    data, spiffs,  0x410000, 0xBF0000

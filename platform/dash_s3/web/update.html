@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Firmware update</title>
+<!--
+  Firmware upload page, served by the dash at /update
+  (platform/dash_s3/src/dash_s3_ota.cpp) and gzipped into its firmware by
+  tools/web/embed_web.py. Self-contained for the same reason as the config
+  page: a phone on the dash's access point has no internet.
+
+  Opening it asks the dash for update mode (POST /api/update/request),
+  which someone has to agree to on the dash; it polls /api/update/status
+  for the answer, and the file picker stays locked until then. Then it
+  sends the .bin as the raw POST body. The dash checks it and writes it to
+  its spare app slot, but nothing is installed until Install is tapped on
+  the dash itself. The header check below only previews the version; the
+  dash's own check is the one that counts. Keep FW_ID in step with
+  platform/dash_s3/inc/dash_s3_firmware.hpp.
+-->
+<style>
+:root {
+  --bg: #f2f3f5; --surface: #ffffff; --text: #16181b; --muted: #646b75;
+  --line: #dfe2e6; --control: #eceef1; --danger: #c62828;
+  --accent: #4caf50; --on-accent: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e0f11; --surface: #181a1d; --text: #eceef0; --muted: #979ea8;
+    --line: #2a2d32; --control: #24272b; --danger: #ef5350;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e0f11; --surface: #181a1d; --text: #eceef0; --muted: #979ea8;
+  --line: #2a2d32; --control: #24272b; --danger: #ef5350;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+button, input { font: inherit; color: inherit; }
+main {
+  max-width: 560px; margin: 0 auto;
+  padding: calc(14px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
+}
+.titlebar { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+h1 { margin: 0; font-size: 1.05rem; font-weight: 650; }
+.titlebar a { color: var(--muted); font-size: .9rem; text-decoration: none; }
+.current { margin: 2px 0 18px; font-size: .85rem; color: var(--muted); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+.pick { position: relative; display: block; }
+.pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.pick span {
+  display: block; text-align: center; padding: 12px; border-radius: 10px;
+  background: var(--control); font-weight: 600;
+}
+.file { margin: 12px 0 0; min-height: 1.45em; overflow-wrap: anywhere; }
+.file .sub { display: block; font-size: .85rem; color: var(--muted); }
+.file.bad { color: var(--danger); }
+#send {
+  width: 100%; margin-top: 16px; border: 0; border-radius: 12px; padding: 14px;
+  background: var(--accent); color: var(--on-accent); font-weight: 600; cursor: pointer;
+}
+#send:disabled { opacity: .4; cursor: default; }
+.bar { height: 8px; margin-top: 16px; border-radius: 999px; background: var(--control); overflow: hidden; }
+.bar > div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+.msg { margin: 10px 0 0; font-size: .92rem; }
+.msg.bad { color: var(--danger); }
+.mode { margin: 0 0 14px; }
+#ask {
+  margin-left: 6px; border: 0; border-radius: 8px; padding: 4px 10px;
+  background: var(--control); font-size: .88rem; cursor: pointer;
+}
+.card.locked .pick { opacity: .4; pointer-events: none; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <div class="titlebar">
+    <h1>Firmware update</h1>
+    <a href="/">Settings</a>
+  </div>
+  <p class="current" id="current">&nbsp;</p>
+  <p class="msg mode" id="mode" role="status" aria-live="polite"></p>
+
+  <div class="card locked" id="card">
+    <label class="pick"><input type="file" id="file" accept=".bin,application/octet-stream" disabled><span>Choose firmware.bin</span></label>
+    <p class="file" id="file-info"></p>
+    <button type="button" id="send" disabled>Send to dash</button>
+    <div class="bar" id="bar" hidden><div id="bar-fill"></div></div>
+    <p class="msg" id="msg" role="status" aria-live="polite"></p>
+  </div>
+</main>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+
+/* The update descriptor every dash image carries -- see
+ * dash_s3_firmware.hpp. Offsets are into the .bin. */
+const FW_ID = { offset: 288, magic: "MQB-DASH-S3", magicLen: 16, variantLen: 16, versionLen: 32 };
+const FW_ID_END = FW_ID.offset + FW_ID.magicLen + FW_ID.variantLen + FW_ID.versionLen;
+
+let chosen = null, sending = false, armed = false;
+
+function text(bytes, at, len) {
+  let s = "";
+  for (let i = at; i < at + len && bytes[i] !== 0; i++) s += String.fromCharCode(bytes[i]);
+  return s;
+}
+
+async function inspect(file) {
+  const head = new Uint8Array(await file.slice(0, FW_ID_END).arrayBuffer());
+  if (head.length < FW_ID_END || head[0] !== 0xE9) return null;
+  if (text(head, FW_ID.offset, FW_ID.magicLen) !== FW_ID.magic) return null;
+  return { version: text(head, FW_ID.offset + FW_ID.magicLen + FW_ID.variantLen, FW_ID.versionLen) };
+}
+
+function show(el, message, bad) {
+  el.textContent = message;
+  el.classList.toggle("bad", !!bad);
+}
+
+function setProgress(fraction) {
+  $("bar").hidden = false;
+  $("bar-fill").style.width = Math.round(fraction * 100) + "%";
+}
+
+$("file").addEventListener("change", async () => {
+  const file = $("file").files[0];
+  chosen = null;
+  $("send").disabled = true;
+  $("bar").hidden = true;
+  show($("msg"), "");
+  if (!file) { show($("file-info"), ""); return; }
+
+  const id = await inspect(file).catch(() => null);
+  if (!id) {
+    show($("file-info"), "That isn't a firmware file for this dash.", true);
+    return;
+  }
+  chosen = file;
+  $("file-info").classList.remove("bad");
+  $("file-info").textContent = "";
+  $("file-info").append(id.version || "Unknown version");
+  const sub = document.createElement("span");
+  sub.className = "sub";
+  sub.textContent = file.name + " · " + (file.size / 1048576).toFixed(2) + " MB";
+  $("file-info").append(sub);
+  $("send").disabled = !armed;
+});
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function ask(method, path) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 4000);
+  try {
+    const r = await fetch(path, { method, cache: "no-store", signal: ctl.signal });
+    if (!r.ok) throw new Error(String(r.status));
+    return (await r.text()).trim();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/* Update mode has to be agreed to on the dash. Asks, then polls for the
+ * answer, a little past the dash's own 30s timeout. */
+async function enterUpdateMode() {
+  let mode = await ask("POST", "/api/update/request");
+  const deadline = Date.now() + 35000;
+  while (mode === "pending" && Date.now() < deadline) {
+    await sleep(500);
+    mode = await ask("GET", "/api/update/status");
+  }
+  return mode;
+}
+
+/* Shows where update mode stands, with a way to ask again when it's
+ * off. Picking and sending a file is only possible while it's on. */
+function setMode(on, message, bad) {
+  armed = on;
+  $("card").classList.toggle("locked", !on);
+  $("file").disabled = !on || sending;
+  $("send").disabled = !on || !chosen || sending;
+  $("mode").textContent = message;
+  $("mode").classList.toggle("bad", !!bad);
+  if (!on && bad) {
+    const again = document.createElement("button");
+    again.type = "button";
+    again.id = "ask";
+    again.textContent = "Ask again";
+    again.addEventListener("click", askDash);
+    $("mode").append(again);
+  }
+}
+
+async function askDash() {
+  setMode(false, "Tap Start on the dash to allow the update…");
+  let mode;
+  try {
+    mode = await enterUpdateMode();
+  } catch (e) {
+    setMode(false, "Lost the connection to the dash.", true);
+    return;
+  }
+  if (mode === "armed") {
+    setMode(true, "Update mode is on. Choose the firmware file.");
+  } else {
+    setMode(false, mode === "declined" ? "Cancelled on the dash." : "The dash didn't answer.", true);
+  }
+}
+
+$("send").addEventListener("click", () => {
+  if (!chosen || sending || !armed) return;
+  sending = true;
+  $("send").disabled = true;
+  $("file").disabled = true;
+  setProgress(0);
+  show($("msg"), "Sending…");
+
+  const finish = (message, bad) => {
+    sending = false;
+    $("file").disabled = !armed;
+    $("send").disabled = !armed || !chosen;
+    show($("msg"), message, bad);
+  };
+
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", "/update");
+  xhr.setRequestHeader("Content-Type", "application/octet-stream");
+  xhr.upload.onprogress = e => {
+    if (!e.lengthComputable) return;
+    setProgress(e.loaded / e.total);
+    /* The last of it is still being written and checked on the dash. */
+    if (e.loaded >= e.total) show($("msg"), "Checking…");
+  };
+  xhr.onload = () => {
+    if (xhr.status === 200) {
+      setProgress(1);
+      finish("Sent " + xhr.responseText.trim() + ". Tap Install on the dash to finish.");
+      return;
+    }
+    $("bar").hidden = true;
+    if (xhr.status === 403) {
+      /* Update mode ended on the dash (its X, or the wait timed out). */
+      setMode(false, "Update mode is off on the dash.", true);
+    }
+    finish(xhr.responseText.trim() || "The dash refused the file.", true);
+  };
+  xhr.onerror = () => {
+    $("bar").hidden = true;
+    finish("Lost the connection to the dash. Try again.", true);
+  };
+  xhr.send(chosen);
+});
+
+/* One request at a time -- the dash's server serves them one by one. */
+ask("GET", "/api/version")
+  .then(v => { $("current").textContent = "Currently running " + v; })
+  .catch(() => { $("current").textContent = ""; })
+  .then(askDash);
+</script>
+</body>
+</html>

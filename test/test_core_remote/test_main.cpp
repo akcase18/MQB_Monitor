@@ -4,8 +4,9 @@
  * CRC known-answer vector, frame encode/decode round trips (including
  * corrupted-byte resync and stalled-frame timeout), RemoteConfigServer's
  * REQ_GET_STATE/REQ_APPLY_CONFIG handling (byte-exact field assertions and
- * validation/clamping), and RemoteConfigLink/RemoteApController against a
- * fake ISerialLink. Run with `pio test -e simulator`.
+ * validation/clamping), and RemoteConfigLink/RemoteApController/
+ * RemoteOtaController against a fake ISerialLink. Run with
+ * `pio test -e simulator`.
  */
 #include <math.h>
 #include <string.h>
@@ -14,6 +15,7 @@
 #include "remote_ap_controller.hpp"
 #include "remote_config_link.hpp"
 #include "remote_config_server.hpp"
+#include "remote_ota_controller.hpp"
 #include "remote_protocol.hpp"
 
 namespace
@@ -1139,6 +1141,290 @@ void test_ap_controller_reactivate_from_deactivating_resends_enable()
     TEST_ASSERT_TRUE(MsgType::CMD_AP_ENABLE == resent.type);
 }
 
+/*==============================================================================
+ * FIRMWARE UPDATE
+ =============================================================================*/
+
+namespace
+{
+    /* Everything a RemoteOtaController needs, wired as main.cpp does. */
+    struct OtaFixture
+    {
+            FakeConfigStore     backing;
+            core::ConfigStore   config { backing };
+            core::SignalStore   signals;
+            RemoteConfigServer  server { config, signals };
+            FakeSerialLink      link;
+            RemoteConfigLink    remote_link { link, server };
+            RemoteOtaController ota { remote_link };
+
+            void begin(uint32_t total, const char *version, uint32_t now_ms)
+            {
+                OtaBeginWire wire {};
+                wire.total_bytes = total;
+                strncpy(wire.version, version, sizeof(wire.version) - 1);
+                uint8_t payload[OTA_BEGIN_BYTES];
+                encode_ota_begin(payload, wire);
+                ota.on_event(
+                    MsgType::EVT_OTA_BEGIN, payload, sizeof(payload), now_ms);
+            }
+
+            void progress(uint32_t written, uint32_t now_ms)
+            {
+                uint8_t payload[4];
+                put_u32(payload, written);
+                ota.on_event(MsgType::EVT_OTA_PROGRESS,
+                             payload,
+                             sizeof(payload),
+                             now_ms);
+            }
+
+            void result(OtaResult result, uint32_t now_ms)
+            {
+                uint8_t payload = static_cast<uint8_t>(result);
+                ota.on_event(MsgType::EVT_OTA_RESULT, &payload, 1, now_ms);
+            }
+
+            void request(uint32_t now_ms)
+            {
+                ota.on_event(MsgType::EVT_OTA_REQUEST, nullptr, 0, now_ms);
+            }
+
+            /* Into update mode, as the panel's Start does, discarding
+             * the CMD_OTA_ARM it sends. */
+            void arm(uint32_t now_ms)
+            {
+                request(now_ms);
+                ota.accept(now_ms);
+                link.clear_write();
+            }
+
+            /* The one frame the controller last wrote; clears it. */
+            DecodedFrame take_sent()
+            {
+                DecodedFrame sent
+                    = decode_one_frame(link.write_buf_, link.write_len_);
+                link.clear_write();
+                return sent;
+            }
+    };
+} // namespace
+
+void test_ota_begin_round_trips()
+{
+    OtaBeginWire in {};
+    in.total_bytes = 1220736;
+    strncpy(in.version, "v1.2-3-gabc1234-dirty", sizeof(in.version) - 1);
+
+    uint8_t  buf[OTA_BEGIN_BYTES];
+    uint8_t *end = encode_ota_begin(buf, in);
+    TEST_ASSERT_EQUAL(OTA_BEGIN_BYTES, end - buf);
+
+    OtaBeginWire out {};
+    decode_ota_begin(buf, out);
+    TEST_ASSERT_EQUAL_UINT32(1220736, out.total_bytes);
+    TEST_ASSERT_EQUAL_STRING("v1.2-3-gabc1234-dirty", out.version);
+
+    /* An unterminated version off the wire still decodes to a string. */
+    memset(buf + 4, 'x', WIRE_VERSION_LEN);
+    decode_ota_begin(buf, out);
+    TEST_ASSERT_EQUAL(WIRE_VERSION_LEN - 1, strlen(out.version));
+}
+
+void test_ota_controller_request_then_upload_then_install()
+{
+    OtaFixture f;
+    TEST_ASSERT_TRUE(OtaState::Idle == f.ota.state());
+
+    /* The phone asks; nothing goes to the relay until the panel agrees. */
+    f.request(0);
+    TEST_ASSERT_TRUE(OtaState::Requested == f.ota.state());
+    TEST_ASSERT_FALSE(f.ota.in_update_mode());
+    TEST_ASSERT_EQUAL(0, f.link.write_len_);
+
+    f.ota.accept(0);
+    TEST_ASSERT_TRUE(OtaState::Armed == f.ota.state());
+    TEST_ASSERT_TRUE(f.ota.in_update_mode());
+    TEST_ASSERT_TRUE(MsgType::CMD_OTA_ARM == f.take_sent().type);
+
+    f.begin(1000, "v2.0", 10);
+    TEST_ASSERT_TRUE(OtaState::Receiving == f.ota.state());
+    TEST_ASSERT_EQUAL_STRING("v2.0", f.ota.version());
+    TEST_ASSERT_EQUAL_UINT8(0, f.ota.percent());
+
+    f.progress(500, 100);
+    TEST_ASSERT_EQUAL_UINT8(50, f.ota.percent());
+
+    f.result(OtaResult::Ok, 200);
+    TEST_ASSERT_TRUE(OtaState::Ready == f.ota.state());
+    TEST_ASSERT_EQUAL_UINT8(100, f.ota.percent());
+    TEST_ASSERT_EQUAL(0, f.link.write_len_); /* nothing commits on its own */
+
+    f.ota.install(300);
+    TEST_ASSERT_TRUE(OtaState::Installing == f.ota.state());
+    DecodedFrame sent = f.take_sent();
+    TEST_ASSERT_TRUE(MsgType::CMD_OTA_COMMIT == sent.type);
+    TEST_ASSERT_EQUAL_UINT16(0, sent.payload_len);
+}
+
+void test_ota_controller_upload_needs_update_mode()
+{
+    OtaFixture f;
+
+    /* An upload the relay somehow reported outside update mode is not
+     * shown, let alone installable. */
+    f.begin(1000, "v2.0", 0);
+    f.result(OtaResult::Ok, 10);
+    TEST_ASSERT_TRUE(OtaState::Idle == f.ota.state());
+    f.ota.install(20);
+    TEST_ASSERT_EQUAL(0, f.link.write_len_);
+
+    /* Asked but not yet agreed to: still nothing. */
+    f.request(30);
+    f.begin(1000, "v2.0", 40);
+    TEST_ASSERT_TRUE(OtaState::Requested == f.ota.state());
+}
+
+void test_ota_controller_decline_and_request_timeout()
+{
+    OtaFixture f;
+
+    f.request(0);
+    f.ota.decline();
+    TEST_ASSERT_TRUE(OtaState::Idle == f.ota.state());
+    TEST_ASSERT_TRUE(MsgType::CMD_OTA_DISARM == f.take_sent().type);
+
+    /* Nobody answers the popup: it declines on its own. */
+    f.request(1000);
+    f.ota.tick(1000 + OTA_REQUEST_TIMEOUT_MS - 1);
+    TEST_ASSERT_TRUE(OtaState::Requested == f.ota.state());
+    f.ota.tick(1000 + OTA_REQUEST_TIMEOUT_MS + 1);
+    TEST_ASSERT_TRUE(OtaState::Idle == f.ota.state());
+    TEST_ASSERT_TRUE(MsgType::CMD_OTA_DISARM == f.take_sent().type);
+}
+
+void test_ota_controller_repeat_request_while_armed_rearms()
+{
+    OtaFixture f;
+    f.arm(0);
+
+    f.request(10);
+    TEST_ASSERT_TRUE(OtaState::Armed == f.ota.state());
+    TEST_ASSERT_TRUE(MsgType::CMD_OTA_ARM == f.take_sent().type);
+}
+
+void test_ota_controller_failed_upload_waits_for_another()
+{
+    OtaFixture f;
+    f.arm(0);
+
+    f.begin(1000, "v2.0", 0);
+    f.ota.install(10);
+    TEST_ASSERT_TRUE(OtaState::Receiving == f.ota.state());
+
+    f.result(OtaResult::ErrCorrupt, 20);
+    TEST_ASSERT_TRUE(OtaState::Armed == f.ota.state());
+    TEST_ASSERT_TRUE(OtaResult::ErrCorrupt == f.ota.last_result());
+    f.ota.install(30);
+    TEST_ASSERT_EQUAL(0, f.link.write_len_);
+
+    /* The next try starts clean. */
+    f.begin(1000, "v2.1", 40);
+    TEST_ASSERT_TRUE(OtaState::Receiving == f.ota.state());
+    TEST_ASSERT_TRUE(OtaResult::Ok == f.ota.last_result());
+}
+
+void test_ota_controller_leave_ends_update_mode()
+{
+    OtaFixture f;
+
+    /* From waiting... */
+    f.arm(0);
+    f.ota.leave();
+    TEST_ASSERT_TRUE(OtaState::Idle == f.ota.state());
+    TEST_ASSERT_TRUE(MsgType::CMD_OTA_DISARM == f.take_sent().type);
+
+    /* ...and from Ready, leaving the image unused. */
+    f.arm(10);
+    f.begin(1000, "v2.0", 10);
+    f.result(OtaResult::Ok, 20);
+    f.ota.leave();
+    TEST_ASSERT_TRUE(OtaState::Idle == f.ota.state());
+    TEST_ASSERT_TRUE(MsgType::CMD_OTA_DISARM == f.take_sent().type);
+
+    /* Not mid-upload: there's no clean way out of that. */
+    f.arm(30);
+    f.begin(1000, "v2.0", 30);
+    f.ota.leave();
+    TEST_ASSERT_TRUE(OtaState::Receiving == f.ota.state());
+    TEST_ASSERT_EQUAL(0, f.link.write_len_);
+}
+
+void test_ota_controller_failed_commit_waits_for_another()
+{
+    OtaFixture f;
+    f.arm(0);
+    f.begin(1000, "v2.0", 0);
+    f.result(OtaResult::Ok, 10);
+    f.ota.install(20);
+    f.take_sent();
+
+    f.result(OtaResult::ErrFlash, 30);
+    TEST_ASSERT_TRUE(OtaState::Armed == f.ota.state());
+    TEST_ASSERT_TRUE(OtaResult::ErrFlash == f.ota.last_result());
+}
+
+void test_ota_controller_timeouts_fall_back()
+{
+    OtaFixture f;
+    f.arm(0);
+
+    /* Progress keeps a slow upload alive... */
+    f.begin(1000, "v2.0", 0);
+    f.progress(100, OTA_STALL_TIMEOUT_MS - 1);
+    f.ota.tick(OTA_STALL_TIMEOUT_MS + 1);
+    TEST_ASSERT_TRUE(OtaState::Receiving == f.ota.state());
+
+    /* ...but one that goes silent is given up on. */
+    f.ota.tick(2 * OTA_STALL_TIMEOUT_MS);
+    TEST_ASSERT_TRUE(OtaState::Armed == f.ota.state());
+    TEST_ASSERT_TRUE(OtaResult::ErrInterrupted == f.ota.last_result());
+
+    /* A commit the board never acts on doesn't strand the panel. */
+    f.begin(1000, "v2.0", 0);
+    f.result(OtaResult::Ok, 0);
+    f.ota.install(0);
+    f.ota.tick(OTA_INSTALL_TIMEOUT_MS - 1);
+    TEST_ASSERT_TRUE(OtaState::Installing == f.ota.state());
+    f.ota.tick(OTA_INSTALL_TIMEOUT_MS + 1);
+    TEST_ASSERT_TRUE(OtaState::Armed == f.ota.state());
+
+    /* Ready waits on the person in the car as long as it takes. */
+    f.begin(1000, "v2.0", 0);
+    f.result(OtaResult::Ok, 0);
+    f.ota.tick(10 * OTA_WAIT_TIMEOUT_MS);
+    TEST_ASSERT_TRUE(OtaState::Ready == f.ota.state());
+}
+
+void test_ota_controller_update_mode_gives_up_waiting()
+{
+    OtaFixture f;
+    f.arm(1000);
+
+    f.ota.tick(1000 + OTA_WAIT_TIMEOUT_MS - 1);
+    TEST_ASSERT_TRUE(OtaState::Armed == f.ota.state());
+    f.ota.tick(1000 + OTA_WAIT_TIMEOUT_MS + 1);
+    TEST_ASSERT_TRUE(OtaState::Idle == f.ota.state());
+    TEST_ASSERT_TRUE(MsgType::CMD_OTA_DISARM == f.take_sent().type);
+
+    /* A failed upload restarts the wait. */
+    f.arm(0);
+    f.begin(1000, "v2.0", 0);
+    f.result(OtaResult::ErrCorrupt, OTA_WAIT_TIMEOUT_MS);
+    f.ota.tick(OTA_WAIT_TIMEOUT_MS + 10);
+    TEST_ASSERT_TRUE(OtaState::Armed == f.ota.state());
+}
+
 int main(int argc, char **argv)
 {
     (void)argc;
@@ -1170,5 +1456,15 @@ int main(int argc, char **argv)
     RUN_TEST(test_ap_controller_activity_restarts_idle_timeout);
     RUN_TEST(test_ap_controller_activate_timeout_falls_back_to_idle);
     RUN_TEST(test_ap_controller_reactivate_from_deactivating_resends_enable);
+    RUN_TEST(test_ota_begin_round_trips);
+    RUN_TEST(test_ota_controller_request_then_upload_then_install);
+    RUN_TEST(test_ota_controller_upload_needs_update_mode);
+    RUN_TEST(test_ota_controller_decline_and_request_timeout);
+    RUN_TEST(test_ota_controller_repeat_request_while_armed_rearms);
+    RUN_TEST(test_ota_controller_failed_upload_waits_for_another);
+    RUN_TEST(test_ota_controller_leave_ends_update_mode);
+    RUN_TEST(test_ota_controller_failed_commit_waits_for_another);
+    RUN_TEST(test_ota_controller_timeouts_fall_back);
+    RUN_TEST(test_ota_controller_update_mode_gives_up_waiting);
     return UNITY_END();
 }

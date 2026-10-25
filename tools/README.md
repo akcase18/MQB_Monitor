@@ -22,6 +22,12 @@ support firmware development but don't ship on any board.
   python3 tools/gen_catalog.py --check  # CI guard: fail if the .inc/count are stale
   ```
 
+- **[`fw_version.py`](fw_version.py)** — PlatformIO pre-build script for the
+  `env:dash_s3` family. It writes `git describe --tags --always --dirty` into a
+  generated `fw_version.h` that the dash's firmware update descriptor is built
+  from (see [platform/dash_s3](../platform/dash_s3/README.md#firmware-updates)).
+  Tag releases to get readable versions.
+
 - **[`monitor/`](monitor/)** — the **MQB Monitor**, a Mac (PySide6) app that
   passively watches UDS traffic between an OBDEleven and the car via a USB
   SLCAN sniffer (a standalone Teensy 4.0, or the dash itself in sniffer

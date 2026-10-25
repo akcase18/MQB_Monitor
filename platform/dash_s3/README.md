@@ -2,7 +2,7 @@
 
 The dash product's board layer on an ESP32-S3: the same 480×320 ILI9488 panel, FT6236 touch controller and CAN link the Teensy MicroMod drives on the v3 PCB, re-driven from one chip — and, since the S3 has its own Wi-Fi, the ESP32-C3 relay's job too, so it is one board rather than two. Built by `[env:dash_s3]`, which pairs it with the same `src/main.cpp`, `core/`, `gui/` and `remote/` sources as `env:teensymm`. **Nothing above `platform/` knows this board by name**: the one accommodation, `src/main.cpp` asking `IDisplay::get_frame_buffers()` for whole-screen buffers and rendering DIRECT when it gets them, is a generic hook that only this board's display answers.
 
-The MCU-level half (clock, NVS config store, LittleFS storage) lives in **[esp32_common/](../esp32_common/README.md)**, so a second S3 board only writes what it wires differently. This directory is the board-level half: display, touch, CAN, the in-process wireless relay, the pin map and the partition table.
+The MCU-level half (clock, NVS config store, LittleFS storage) lives in **[esp32_common/](../esp32_common/README.md)**, so a second S3 board only writes what it wires differently. This directory is the board-level half: display, touch, CAN, the in-process wireless relay and its firmware updater, the pin map and the partition table.
 
 **[esp32/](../esp32/README.md)** is the ESP32-**C3** Wi-Fi relay the *Teensy* talks to over a UART. This board has no C3: it compiles that directory's relay (`esp32::RelayApp` — everything but the C3's `main.cpp`) into its own firmware and runs it on a second task, with an in-memory pipe where the UART was. `remote/server` on the dash side and the relay on the other are unchanged and still speak `remote/protocol` to each other; they just share a chip.
 
@@ -36,6 +36,20 @@ Every pin is a `-D` with a default, in **`inc/dash_s3_pins.hpp`**. The defaults 
 | LCD TE | — (`-1`) | 47 | Unsynchronised push on the PCB. |
 | Touch SDA / SCL / RST | 1 / 2 / 11 | 13 / 14 / 21 | FT6236 at 0x38, INT (IO12 on the PCB) unused. |
 | CAN TX / RX | 47 / 48 | 41 / 42 | To an external 3.3 V transceiver. |
+
+## Firmware updates
+
+Over Wi-Fi from a phone, with the panel confirming before anything is installed. The design and its reasoning are in **[OTA_PLAN.md](OTA_PLAN.md)**.
+
+1. **Once, over USB:** `pio run -e dash_s3 -t upload`. This writes the A/B partition table. Existing logs are lost this once; settings live in NVS and survive.
+2. Build the update: `pio run -e dash_s3` produces `.pio/build/dash_s3/firmware.bin`. Its version is `git describe` at build time (`tools/fw_version.py`), so tag releases for readable names.
+3. On the panel, open Settings → Wi-Fi. Join the AP and open `http://192.168.4.1/update`, or use the **Update** link at the bottom of the config page.
+4. Opening the page makes the panel ask **Update firmware?** (30 s countdown). Tap **Start** and the panel goes into update mode; the page's file picker unlocks only then, and uploads are refused without that tap. Update mode gives up after 5 minutes with nothing sent.
+5. Choose `firmware.bin` (the page shows its version) and tap **Send to dash**.
+6. The panel shows progress, then asks **Install and restart?**. Nothing changes until Install is tapped there. A failed upload leaves the panel waiting for another try; the X while waiting (or Cancel on the Install popup) leaves update mode.
+7. The new firmware gets 10 s to prove itself, with frames reaching the panel and `loop()` coming round under a 5 s hang watchdog. A crash, a hang or a power cut before then boots the previous firmware, which says **Update failed — Still on *version***.
+
+A file built for the C3, for another project, or for the other dash hardware (`DASH_S3_HW_VARIANT`: `pcb` vs `devkit`) is refused before anything is written. USB always works as a fallback, since the S3's download mode is in ROM.
 
 ## Stress test without a car
 
@@ -78,7 +92,10 @@ JP1 has no CTP reset pin — the breakout handles it on-board, so `DASH_S3_PIN_T
 ## Files
 
 - **`inc/dash_s3_pins.hpp`** — every pin, overridable. Start here.
-- **`partitions_dash.csv`** — 16 MB, no OTA: a 2 MB factory app and a 13.94 MB LittleFS partition, the same ~1 MB of headroom over `core::Logger`'s 13 MB ring that the Teensy has. Moving to two 2 MB OTA slots is planned — see **[OTA_PLAN.md](OTA_PLAN.md)**.
+- **`partitions_dash.csv`** — 16 MB: two 2 MB OTA app slots and an 11.94 MB LittleFS partition, the same ~1 MB of headroom over `core::Logger`'s ring that the Teensy has. The ring is 11 MB here (`LOG_CHUNK_COUNT=44` in `platformio.ini`) rather than the Teensy's 13 MB, about 2.5 hours of worst-case retention instead of 3.
+- **`dash_s3_firmware.*`** — which firmware this is, and the board side of rollback. Every image carries a `DashS3FirmwareId` (magic, hardware variant, version) in `.rodata_custom_desc`, at byte 288 of the `.bin`, which is how an upload is identified from its first chunk. It also overrides the Arduino core's `verifyRollbackLater()` so a new image boots on probation. It implements `platform.hpp`'s FIRMWARE hooks: `platform_firmware_healthy()` ends the probation, `platform_take_failed_update()` reports a rollback once (from an NVS note written at install), and `platform_hang_watchdog()` is the Arduino loop watchdog.
+- **`dash_s3_ota.*`** — `DashS3Updater`, the relay-side updater, plugged into `esp32::RelayApp` as a `RelayExtension`. It serves `/update` and `/api/version`, streams a raw `POST /update` body into the inactive slot with `esp_ota_*`, and reports to the panel over `EVT_OTA_*`. Only `CMD_OTA_COMMIT` from the panel switches slots. Arduino's `Update` library isn't used because its `end()` switches slots itself.
+- **`web/update.html`** — the upload page, gzipped in by `tools/web/embed_web.py`.
 - **`dash_s3_display.*`** — `DashS3Display`, an ILI9488 driver written directly against ESP-IDF's `esp_lcd` i80 panel-IO layer rather than a display library. The init sequence, MADCTL rotation values and byte order are ported from `lib/ILI948x_t4_mm`, so what shows up should match the Teensy pixel for pixel. Two contracts carry over from the Teensy driver: a push blocks only on the *previous* DMA transfer, then issues and returns (which is what lets `src/main.cpp` call `lv_display_flush_ready` synchronously), and the backlight comes up **off** and stays off until `main.cpp` has seen a real frame land.
 
   Unlike the Teensy it renders **whole-frame, not in bands**: `get_frame_buffers()` hands LVGL two full-screen RGB565 buffers in PSRAM (64-byte aligned, which is what the i80 driver needs to DMA out of PSRAM; it write-backs the cache itself) and `main.cpp` runs `LV_DISPLAY_RENDER_MODE_DIRECT` against them. `flush()` then only records which rows a pass touched; `flush_end()` hands that row band to a small push task, which waits for the panel's next **TE** rising edge and issues one DMA. Render time is never visible and the write starts at the top of the blanking interval ahead of the scan, which is what removed the wipe and tear lines that band-by-band pushing showed on screen-wide changes. **Whole-frame is on only when `DASH_S3_PIN_LCD_TE` is set** (the default follows it; `-D DASH_S3_FRAME_BUFFERS=0/1` forces it). Without TE the push lands mid-scan and tears anyway, and on the PCB's quad PSRAM whole-frame was the slower path: a full redraw took ~57 ms, against ~33–46 ms banded from internal SRAM with fifth-of-a-screen bands (`DRAW_BUF_DIVISOR=5`). With TE configured but unwired (`DASH_S3_PIN_LCD_TE=-1`, or just no wire) the task pushes after a 50 ms timeout and says so once on the console.

@@ -248,6 +248,8 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 .loading main, .loading .actions { visibility: hidden; }
+.fw { margin: 20px 0 0; text-align: center; font-size: .8rem; color: var(--muted); }
+.fw a { color: inherit; }
 .fail { text-align: center; padding: 40px 16px; color: var(--muted); }
 .fail button { margin-top: 12px; border: 0; border-radius: 10px; padding: 10px 16px; background: var(--control); }
 [hidden] { display: none !important; }
@@ -360,6 +362,10 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
   </section>
 
   </div>
+
+  <!-- Only the S3 dash takes firmware updates; shown once it answers
+       /api/version (platform/dash_s3/src/dash_s3_ota.cpp). -->
+  <p class="fw" id="fw" hidden>Firmware <span id="fw-ver"></span> · <a href="/update">Update</a></p>
 </main>
 
 <div class="actions">
@@ -1190,6 +1196,12 @@ function wire() {
   });
 }
 
+function showFirmware() {
+  return request("GET", "/api/version")
+    .then(v => { $("fw-ver").textContent = v.trim(); $("fw").hidden = false; })
+    .catch(() => {});
+}
+
 async function start() {
   $("fail").hidden = true;
   setStatus("idle", "Connecting…");
@@ -1198,6 +1210,11 @@ async function start() {
     buildStatic();
     document.body.classList.remove("loading");
     render();
+    /* Before the first preview, not alongside it: the dash serves one
+     * request at a time, and a second one in flight makes the phone open
+     * another connection, which the dash's server can sit on for
+     * seconds. */
+    await showFirmware();
     sendPreview();
   } catch (e) {
     setError("Not connected");

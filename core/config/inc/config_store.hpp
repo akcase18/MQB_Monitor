@@ -35,7 +35,12 @@ namespace core
             /**
              * Loads from backing storage. Unrecognized magic -> defaults
              * (and persists them). Older version -> migrate() (and persists
-             * the result). Current version -> full load.
+             * the result). Current version -> full load. Newer version --
+             * written by firmware this board has since rolled back from
+             * (an OTA update, see platform/dash_s3/OTA_PLAN.md) -> defaults,
+             * NOT persisted: a layout this build doesn't know can't be
+             * read safely, but leaving it in place means reinstalling the
+             * newer firmware finds it again, until something here saves.
              */
             void load();
 

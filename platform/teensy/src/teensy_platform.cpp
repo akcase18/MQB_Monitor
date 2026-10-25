@@ -96,3 +96,26 @@ void platform_restart()
     {
     }
 }
+
+/* No field updates on this board -- see platform.hpp's FIRMWARE section.
+ * FLASHMEM: none of these is on a hot path, and RAM1 code is tight. */
+FLASHMEM const char *platform_firmware_version()
+{
+    return "teensy";
+}
+
+FLASHMEM void platform_firmware_healthy()
+{
+}
+
+FLASHMEM bool platform_take_failed_update(char *version, size_t cap)
+{
+    (void)version;
+    (void)cap;
+    return false;
+}
+
+FLASHMEM void platform_hang_watchdog(bool enabled)
+{
+    (void)enabled;
+}
