@@ -7,6 +7,8 @@
 
 #include "platform.hpp"
 
+#include <esp_system.h>
+
 #include "dash_s3_can.hpp"
 #include "dash_s3_display.hpp"
 #include "dash_s3_wireless.hpp"
@@ -71,4 +73,9 @@ Platform &platform_get()
         Esp32Storage::instance(),
     };
     return s_platform;
+}
+
+void platform_restart()
+{
+    esp_restart();
 }

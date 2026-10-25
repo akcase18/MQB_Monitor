@@ -13,7 +13,8 @@ class SimulatorDisplay : public IDisplay
         static SimulatorDisplay &instance();
 
         void begin() override;
-        void set_orientation(DisplayOrientation orientation) override;
+        void set_orientation(DisplayOrientation orientation,
+                             bool               flipped) override;
         void get_resolution(uint16_t &width, uint16_t &height) const override;
         void flush(int32_t         x1,
                    int32_t         y1,
@@ -34,12 +35,18 @@ class SimulatorDisplay : public IDisplay
     private:
         SimulatorDisplay() = default;
 
+        /** Copies the whole texture to the window. */
+        void present();
+
         /* Opaque to keep SDL2 out of this header, matching how platform/
          * vendor headers stay confined to the .cpp files. */
         void *window_   = nullptr;
         void *renderer_ = nullptr;
         void *texture_  = nullptr;
 
-        uint16_t width_  = 480;
-        uint16_t height_ = 320;
+        uint16_t width_   = 480;
+        uint16_t height_  = 320;
+        bool     flipped_ = false;
+        /* See set_backlight(). */
+        bool shown_ = false;
 };

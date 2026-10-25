@@ -18,7 +18,8 @@ class DashS3Display : public IDisplay
         static DashS3Display &instance();
 
         void begin() override;
-        void set_orientation(DisplayOrientation orientation) override;
+        void set_orientation(DisplayOrientation orientation,
+                             bool               flipped) override;
         void get_resolution(uint16_t &width, uint16_t &height) const override;
         void flush(int32_t         x1,
                    int32_t         y1,

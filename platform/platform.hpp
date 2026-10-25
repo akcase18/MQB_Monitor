@@ -154,12 +154,20 @@ class IDisplay
         virtual void begin() = 0;
 
         /**
-         * Rotates the panel to match the given orientation. Changes what
-         * get_resolution() reports (width/height swap). Called once at
-         * boot, right after begin() -- orientation changes take effect
-         * on next boot, not live.
+         * Rotates the panel to match the given orientation, plus a further
+         * 180 degrees when `flipped` -- the same panel mounted the other
+         * way up. Changes what get_resolution() reports (width/height
+         * swap between Landscape and Portrait; `flipped` never changes
+         * it). Called at boot, right after begin(). A Landscape/Portrait
+         * change still only takes effect on the next boot (the
+         * lv_display_t is sized once), but `flipped` alone may be changed
+         * live by calling this again with the same orientation -- the
+         * caller owns hiding and redrawing the frame that lands on the
+         * panel mid-change.
          */
-        virtual void set_orientation(DisplayOrientation orientation) = 0;
+        virtual void set_orientation(DisplayOrientation orientation,
+                                     bool               flipped)
+            = 0;
 
         /**
          * Reports the panel's current resolution (post-rotation).
@@ -248,6 +256,17 @@ struct TouchPoint
         bool    pressed;
 };
 
+/**
+ * Rotates an already-oriented touch point 180 degrees within a
+ * `width` x `height` screen -- what every ITouch applies on top of its
+ * own Landscape/Portrait transform when set_orientation() says `flipped`.
+ */
+inline void flip_touch_point(TouchPoint &point, uint16_t width, uint16_t height)
+{
+    point.x = static_cast<int16_t>((width - 1) - point.x);
+    point.y = static_cast<int16_t>((height - 1) - point.y);
+}
+
 class ITouch
 {
     public:
@@ -258,10 +277,13 @@ class ITouch
         /**
          * Tells the touch driver which way the panel is currently
          * rotated, so raw controller coordinates can be remapped to
-         * match. Called once at boot, right after begin() -- orientation
-         * changes take effect on next boot, not live.
+         * match. Called at boot, right after begin(), and again live
+         * whenever IDisplay::set_orientation() is -- same arguments, same
+         * rules.
          */
-        virtual void set_orientation(DisplayOrientation orientation) = 0;
+        virtual void set_orientation(DisplayOrientation orientation,
+                                     bool               flipped)
+            = 0;
 
         /**
          * Polls touch controller. Fills `out` if data is available.
@@ -461,3 +483,12 @@ struct Platform
  * @returns The board's Platform instance.
  */
 Platform &platform_get();
+
+/**
+ * Restarts the board from the top, as if power-cycled -- how an
+ * orientation change (boot-time-only, see IDisplay::set_orientation)
+ * takes effect without the user pulling power. Never returns. Anything
+ * that must survive has to be persisted first; IConfigStore writes are
+ * durable on return, so a ConfigStore::save() right before is enough.
+ */
+[[noreturn]] void platform_restart();

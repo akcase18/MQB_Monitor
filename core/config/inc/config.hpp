@@ -62,6 +62,22 @@ namespace core
              * that should burn flash write-cycles on every commute, so
              * this defaults off and is toggled from SettingsScreen. */
             bool logging_enabled;
+            /* Whether each layout is turned a further 180 degrees -- the
+             * panel mounted the other way up. One per layout, since
+             * which way is down in one says nothing about the other.
+             * Picked on OrientationScreen for whichever layout is active,
+             * applied live (unlike orientation, which needs a restart).
+             * These and the flag below sit in what was padding before
+             * accent_color, so a config saved before they existed reads
+             * them as false and every other field stays put -- no
+             * version bump needed. */
+            bool flipped_horizontal;
+            bool flipped_vertical;
+            /* One-shot, not a preference: set just before a layout
+             * change restarts the board, so the next boot lands back on
+             * OrientationScreen instead of the dashboard, then cleared by
+             * that boot. */
+            bool open_orientation_on_boot;
             /* Packed 0xRRGGBB — one of gui::ACCENT_PRESETS, picked via
              * SettingsScreen's Theme row. Stored as a raw value rather than
              * an lv_color_t so core:: stays LVGL-free; gui/bindings

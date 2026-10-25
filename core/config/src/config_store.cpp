@@ -7,6 +7,12 @@
 namespace core
 {
 
+    /* flipped_horizontal/flipped_vertical and open_orientation_on_boot
+     * were added into padding without a version bump (see config.hpp);
+     * this is what makes that safe. */
+    static_assert(offsetof(Settings, accent_color) == 12,
+                  "Settings layout moved -- bump CURRENT_VERSION");
+
     namespace
     {
         size_t priority_offset(uint8_t rank)
@@ -95,6 +101,9 @@ namespace core
         config_.settings.num_panels       = 5;
         config_.settings.orientation      = LayoutOrientation::Horizontal;
         config_.settings.logging_enabled  = false; /* opt-in, see config.hpp */
+        config_.settings.flipped_horizontal = false;
+        config_.settings.flipped_vertical   = false;
+        config_.settings.open_orientation_on_boot = false;
         config_.settings.accent_color
             = 0x4CAF50; /* green, gui::ACCENT_PRESETS[0] */
 

@@ -19,7 +19,7 @@
  * at once and the button itself shows the result, so there's nothing
  * deferred for a Done step to commit. Erase works the same way, behind
  * the shared Cancel/Confirm popup (screen_helpers' create_confirm_popup)
- * that rotating the display already sits behind — the two changes on this
+ * that switching the display layout already sits behind — the two changes on this
  * device that shouldn't happen on one stray press.
  *
  * The status readout is four caption-over-value tiles rather than four
@@ -145,8 +145,8 @@ namespace gui
             lv_obj_t *erase_btn_ = nullptr;
             lv_obj_t *erase_lbl_ = nullptr;
             /* Live only while the confirm popup is up; both its handlers
-             * close it and clear this, the same lifetime SettingsScreen's
-             * orientation popup has. */
+             * close it and clear this, the same lifetime
+             * OrientationScreen's layout popup has. */
             lv_obj_t *erase_confirm_mbox_ = nullptr;
 
             /* Value halves of the four status tiles; their captions

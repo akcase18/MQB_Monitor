@@ -78,6 +78,15 @@ namespace
         = MADCTL_MX | MADCTL_MY | MADCTL_MV | MADCTL_BGR;       /* 0xE8 */
     constexpr uint8_t MADCTL_PORTRAIT = MADCTL_MX | MADCTL_BGR; /* 0x48 */
 
+    /* The same two mountings turned 180 degrees (IDisplay::
+     * set_orientation's `flipped`) -- MX and MY both toggled, i.e. the
+     * Teensy's setRotation(1) and setRotation(2). Touch follows via
+     * flip_touch_point() rather than a new transform. */
+    constexpr uint8_t MADCTL_LANDSCAPE_FLIPPED
+        = MADCTL_LANDSCAPE ^ (MADCTL_MX | MADCTL_MY); /* 0x28 */
+    constexpr uint8_t MADCTL_PORTRAIT_FLIPPED
+        = MADCTL_PORTRAIT ^ (MADCTL_MX | MADCTL_MY); /* 0x88 */
+
     /* Whole-frame rendering (see the file comment) only pays for itself
      * when the push can wait for TE: without it the push lands mid-scan
      * and tears anyway, while rendering into PSRAM and DMAing out of it
@@ -540,17 +549,22 @@ void DashS3Display::begin()
     Serial.println("ILI9488 Initialized");
 }
 
-void DashS3Display::set_orientation(DisplayOrientation orientation)
+void DashS3Display::set_orientation(DisplayOrientation orientation,
+                                    bool               flipped)
 {
+    /* cmd() waits out any in-flight colour transfer first, so a live flip
+     * can't interleave with a frame still going out. */
     if (orientation == DisplayOrientation::Portrait)
     {
-        cmd(CMD_MADCTL, { MADCTL_PORTRAIT });
+        cmd(CMD_MADCTL,
+            { flipped ? MADCTL_PORTRAIT_FLIPPED : MADCTL_PORTRAIT });
         width_  = LCD_VERT;
         height_ = LCD_HORZ;
     }
     else
     {
-        cmd(CMD_MADCTL, { MADCTL_LANDSCAPE });
+        cmd(CMD_MADCTL,
+            { flipped ? MADCTL_LANDSCAPE_FLIPPED : MADCTL_LANDSCAPE });
         width_  = LCD_HORZ;
         height_ = LCD_VERT;
     }

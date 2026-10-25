@@ -12,9 +12,13 @@ class SimulatorTouch : public ITouch
         static SimulatorTouch &instance();
 
         void begin() override;
-        void set_orientation(DisplayOrientation orientation) override;
+        void set_orientation(DisplayOrientation orientation,
+                             bool               flipped) override;
         bool read(TouchPoint &out) override;
 
     private:
         SimulatorTouch() = default;
+
+        DisplayOrientation orientation_ = DisplayOrientation::Landscape;
+        bool               flipped_     = false;
 };

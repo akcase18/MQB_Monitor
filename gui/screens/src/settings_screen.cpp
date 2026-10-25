@@ -3,7 +3,6 @@
 
 #include <stdio.h>
 
-#include "layout.hpp"
 #include "screen_helpers.hpp"
 #include "screen_transition.hpp"
 
@@ -117,7 +116,6 @@ namespace gui
                               uint8_t      initial_night_brightness_pct,
                               uint8_t      initial_num_panels,
                               uint32_t     initial_accent_color,
-                              LayoutOrientation initial_orientation,
                               CommitCallback    commit_cb,
                               void             *commit_ctx,
                               DoneCallback      done_cb,
@@ -128,15 +126,13 @@ namespace gui
                               void                     *pick_theme_ctx,
                               PickWirelessCallback      pick_wireless_cb,
                               void                     *pick_wireless_ctx,
-                              OrientationConfirmCallback orientation_confirm_cb,
-                              void                      *orientation_confirm_ctx)
+                              PickOrientationCallback   pick_orientation_cb,
+                              void                     *pick_orientation_ctx)
     {
-        theme_                = &theme;
         day_brightness_pct_   = initial_day_brightness_pct;
         night_brightness_pct_ = initial_night_brightness_pct;
         num_panels_           = initial_num_panels;
         accent_color_         = initial_accent_color;
-        orientation_          = initial_orientation;
         commit_cb_            = commit_cb;
         commit_ctx_           = commit_ctx;
         done_cb_              = done_cb;
@@ -147,8 +143,8 @@ namespace gui
         pick_theme_ctx_       = pick_theme_ctx;
         pick_wireless_cb_     = pick_wireless_cb;
         pick_wireless_ctx_    = pick_wireless_ctx;
-        orientation_confirm_cb_  = orientation_confirm_cb;
-        orientation_confirm_ctx_ = orientation_confirm_ctx;
+        pick_orientation_cb_  = pick_orientation_cb;
+        pick_orientation_ctx_ = pick_orientation_ctx;
 
         screen_ = create_screen(theme);
 
@@ -284,11 +280,31 @@ namespace gui
                              - BRIGHTNESS_SLIDER_BTN_GAP;
 
         brightness_slider_ = lv_slider_create(brightness_row);
-        lv_obj_set_width(brightness_slider_, slider_width);
+
+        /* The knob overhangs the track's ends by its radius. In Portrait
+         * the track starts at the row's left edge, where the row clips
+         * children, so at 0% half the knob was cut off -- inset by that
+         * overhang. Asked of the slider itself via the same event LVGL
+         * uses to size its own draw area, rather than re-derived: an
+         * earlier height/2 + knob-pad estimate missed lv_slider's +2
+         * rounding margin and still clipped the knob's edge. Landscape
+         * needs none: the label gap there is already wider than the
+         * overhang. */
+        int32_t knob_overhang = 0;
+        if (portrait)
+        {
+            lv_obj_update_layout(brightness_slider_);
+            lv_obj_send_event(brightness_slider_,
+                              LV_EVENT_REFR_EXT_DRAW_SIZE,
+                              &knob_overhang);
+        }
+
+        lv_obj_set_width(brightness_slider_, slider_width - knob_overhang);
         lv_obj_align(
             brightness_slider_,
             LV_ALIGN_LEFT_MID,
-            portrait ? 0 : brightness_label_width + BRIGHTNESS_LABEL_GAP,
+            portrait ? knob_overhang
+                     : brightness_label_width + BRIGHTNESS_LABEL_GAP,
             0);
         lv_slider_set_range(brightness_slider_, 0, 100);
         lv_obj_set_style_bg_color(
@@ -409,65 +425,39 @@ namespace gui
         lv_obj_align_to(
             theme_swatch_, theme_row.chevron, LV_ALIGN_OUT_LEFT_MID, -12, 0);
 
-        /* Orientation row: a label plus a compact toggle button (matching
-         * the Day/Night button's styling), not a navigation row — there's
-         * nowhere to hand off to, the button IS the control. A plain tap
-         * opens the confirm/cancel popup below rather than applying the
-         * flip immediately — that popup is what guards against a stray
-         * tap actually changing anything, so the button itself doesn't
-         * need a long-press to do the same job twice. */
+        /* Orientation row: tappable, hands off to OrientationScreen —
+         * same shape as the Theme row beside it. No current-value preview
+         * like Theme's swatch: the screen being the right way up already
+         * says which layout is active. */
         if (portrait)
         {
             create_divider(
                 screen_, theme, PORTRAIT_THEME_ORIENTATION_DIVIDER_Y);
         }
 
-        lv_obj_t *orientation_row = lv_obj_create(screen_);
-        lv_obj_remove_style_all(orientation_row);
-        lv_obj_set_size(orientation_row,
+        ListRow orientation_row
+            = create_list_row(screen_, theme, "Orientation");
+        lv_obj_set_size(orientation_row.btn,
                         portrait ? theme_row_width : half_row_width,
                         compact_row_height);
-        lv_obj_align(orientation_row,
+        lv_obj_align(orientation_row.btn,
                      LV_ALIGN_TOP_LEFT,
                      portrait ? SCREEN_MARGIN
                               : SCREEN_MARGIN + half_row_width
                                     + ORIENTATION_ROW_GAP,
                      portrait ? PORTRAIT_ORIENTATION_ROW_Y : THEME_ROW_Y);
-
-        lv_obj_t *orientation_label = lv_label_create(orientation_row);
-        lv_label_set_text(orientation_label, "Orientation");
-        lv_obj_set_style_text_color(orientation_label, theme.palette.fg, 0);
-        lv_obj_set_style_text_font(
-            orientation_label, theme.typography.label_lg, 0);
         /* In Portrait this row is full-width like Theme's, so it matches
          * Theme's flush-left label (no left pad needed). Landscape's pad
          * is still needed there — see ORIENTATION_LABEL_LEFT_PAD's
          * comment above. */
-        lv_obj_align(orientation_label,
+        lv_obj_align(orientation_row.label,
                      LV_ALIGN_LEFT_MID,
                      portrait ? 0 : ORIENTATION_LABEL_LEFT_PAD,
                      0);
-
-        orientation_btn_ = lv_btn_create(orientation_row);
-        lv_obj_set_size(orientation_btn_, compact_row_height, compact_row_height);
-        lv_obj_align(orientation_btn_, LV_ALIGN_RIGHT_MID, 0, 0);
-        lv_obj_set_style_bg_color(orientation_btn_, theme.palette.bg, 0);
-        lv_obj_set_style_bg_opa(orientation_btn_, LV_OPA_COVER, 0);
-        lv_obj_set_style_radius(orientation_btn_, 8, 0);
-        lv_obj_set_style_border_width(
-            orientation_btn_, theme.metrics.panel_border_width, 0);
-        lv_obj_set_style_border_color(
-            orientation_btn_, theme.palette.panel_border, 0);
-        lv_obj_set_style_shadow_width(orientation_btn_, 0, 0);
-        lv_obj_set_style_bg_color(
-            orientation_btn_, theme.palette.accent, LV_STATE_PRESSED);
-        lv_obj_add_event_cb(
-            orientation_btn_, orientation_clicked_cb, LV_EVENT_CLICKED, this);
-
-        orientation_lbl_ = lv_label_create(orientation_btn_);
-        lv_obj_set_style_text_font(orientation_lbl_, theme.typography.title, 0);
-        lv_obj_set_style_text_color(orientation_lbl_, theme.palette.fg, 0);
-        lv_obj_center(orientation_lbl_);
+        lv_obj_add_event_cb(orientation_row.btn,
+                            pick_orientation_cb_handler,
+                            LV_EVENT_CLICKED,
+                            this);
 
         create_divider(
             screen_, theme, portrait ? PORTRAIT_DIVIDER3_Y : DIVIDER3_Y);
@@ -488,6 +478,13 @@ namespace gui
                      portrait ? PORTRAIT_WIRELESS_ROW_Y : WIRELESS_ROW_Y);
         lv_obj_add_event_cb(
             wireless_row.btn, pick_wireless_cb_handler, LV_EVENT_CLICKED, this);
+
+        /* open() syncs too, but it isn't the only way in: after a layout
+         * restart, OrientationScreen's X loads this screen directly. Left
+         * unsynced, the Day/Night glyph and swatch showed defaults, and
+         * the slider's 0 would have been committed as the brightness on
+         * the way out. */
+        sync_widgets();
     }
 
     void SettingsScreen::open()
@@ -496,17 +493,15 @@ namespace gui
         slide_screen_in(screen_, LV_SCR_LOAD_ANIM_OVER_BOTTOM, 220);
     }
 
-    FLASHMEM void SettingsScreen::set_values(uint8_t           day_brightness_pct,
-                                    uint8_t           night_brightness_pct,
-                                    uint8_t           num_panels,
-                                    uint32_t          accent_color,
-                                    LayoutOrientation orientation)
+    FLASHMEM void SettingsScreen::set_values(uint8_t  day_brightness_pct,
+                                    uint8_t  night_brightness_pct,
+                                    uint8_t  num_panels,
+                                    uint32_t accent_color)
     {
         day_brightness_pct_   = day_brightness_pct;
         night_brightness_pct_ = night_brightness_pct;
         num_panels_           = num_panels;
         accent_color_         = accent_color;
-        orientation_          = orientation;
         sync_widgets();
     }
 
@@ -528,7 +523,6 @@ namespace gui
             panel_count_matrix_, selected, LV_BUTTONMATRIX_CTRL_CHECKED);
 
         refresh_theme_swatch();
-        refresh_orientation_label();
     }
 
     void SettingsScreen::refresh_theme_swatch()
@@ -542,13 +536,6 @@ namespace gui
     {
         lv_label_set_text(day_night_icon_lbl_,
                           showing_night_ ? ICON_MOON : ICON_SUN);
-    }
-
-    void SettingsScreen::refresh_orientation_label()
-    {
-        lv_label_set_text(orientation_lbl_,
-                          orientation_ == LayoutOrientation::Horizontal ? "H"
-                                                                        : "V");
     }
 
     void SettingsScreen::capture_slider_value()
@@ -637,58 +624,18 @@ namespace gui
         }
     }
 
-    void SettingsScreen::orientation_clicked_cb(lv_event_t *e)
+    FLASHMEM void SettingsScreen::pick_orientation_cb_handler(lv_event_t *e)
     {
         auto *self = static_cast<SettingsScreen *>(lv_event_get_user_data(e));
-        const Theme &theme = *self->theme_;
 
-        self->pending_orientation_
-            = self->orientation_ == LayoutOrientation::Horizontal
-                  ? LayoutOrientation::Vertical
-                  : LayoutOrientation::Horizontal;
+        /* Same reason as the Theme row: a layout change there restarts
+         * the board, so anything not persisted by now is gone. */
+        self->commit_pending();
 
-        /* Rotating the panel only takes effect on the next boot (see
-         * platform.hpp's DisplayOrientation) -- a silent flip with no
-         * visible effect until some future restart would look broken, so
-         * this asks first rather than applying it immediately. */
-        ConfirmPopup popup = create_confirm_popup(
-            theme,
-            self->pending_orientation_ == LayoutOrientation::Vertical
-                ? "Switch to Vertical?"
-                : "Switch to Horizontal?",
-            "Restart required to apply.",
-            "Confirm");
-
-        lv_obj_add_event_cb(
-            popup.confirm_btn, orientation_confirm_cb, LV_EVENT_CLICKED, self);
-        lv_obj_add_event_cb(
-            popup.cancel_btn, orientation_cancel_cb, LV_EVENT_CLICKED, self);
-
-        self->orientation_confirm_mbox_ = popup.mbox;
-    }
-
-    void SettingsScreen::orientation_confirm_cb(lv_event_t *e)
-    {
-        auto *self = static_cast<SettingsScreen *>(lv_event_get_user_data(e));
-        self->orientation_ = self->pending_orientation_;
-        self->refresh_orientation_label();
-        lv_msgbox_close_async(self->orientation_confirm_mbox_);
-        self->orientation_confirm_mbox_ = nullptr;
-
-        /* Persisted right here, not deferred to Done — see the file doc
-         * comment for why. */
-        if (self->orientation_confirm_cb_ != nullptr)
+        if (self->pick_orientation_cb_ != nullptr)
         {
-            self->orientation_confirm_cb_(self->orientation_confirm_ctx_,
-                                          self->orientation_);
+            self->pick_orientation_cb_(self->pick_orientation_ctx_);
         }
-    }
-
-    void SettingsScreen::orientation_cancel_cb(lv_event_t *e)
-    {
-        auto *self = static_cast<SettingsScreen *>(lv_event_get_user_data(e));
-        lv_msgbox_close_async(self->orientation_confirm_mbox_);
-        self->orientation_confirm_mbox_ = nullptr;
     }
 
     void SettingsScreen::commit_pending()

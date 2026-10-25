@@ -15,6 +15,11 @@ namespace
     int16_t s_x       = 0;
     int16_t s_y       = 0;
     bool    s_pressed = false;
+
+    /* Must track simulator_display.cpp's window size -- only needed to
+     * rotate a click 180 degrees within it. */
+    constexpr uint16_t SIM_HOR_RES = 480;
+    constexpr uint16_t SIM_VER_RES = 320;
 } // namespace
 
 SimulatorTouch &SimulatorTouch::instance()
@@ -28,13 +33,16 @@ void SimulatorTouch::begin()
     SDL_InitSubSystem(SDL_INIT_VIDEO);
 }
 
-void SimulatorTouch::set_orientation(DisplayOrientation orientation)
+void SimulatorTouch::set_orientation(DisplayOrientation orientation,
+                                     bool               flipped)
 {
-    /* No-op -- SDL mouse events already report coordinates in the live
-     * window's pixel space, and SimulatorDisplay::set_orientation()
-     * resizes that window before it's ever created (see
-     * simulator_display.cpp), so there's nothing left to remap here. */
-    (void)orientation;
+    /* Landscape/Portrait needs no remap -- SDL mouse events already
+     * report coordinates in the live window's pixel space, and
+     * SimulatorDisplay::set_orientation() resizes that window to match.
+     * A flip does: the window shows the frame rotated 180 degrees, so a
+     * click has to be rotated back into it (see read()). */
+    orientation_ = orientation;
+    flipped_     = flipped;
 }
 
 bool SimulatorTouch::read(TouchPoint &out)
@@ -80,5 +88,16 @@ bool SimulatorTouch::read(TouchPoint &out)
     out.x       = s_x;
     out.y       = s_y;
     out.pressed = s_pressed;
+    if (flipped_)
+    {
+        if (orientation_ == DisplayOrientation::Portrait)
+        {
+            flip_touch_point(out, SIM_VER_RES, SIM_HOR_RES);
+        }
+        else
+        {
+            flip_touch_point(out, SIM_HOR_RES, SIM_VER_RES);
+        }
+    }
     return s_pressed;
 }

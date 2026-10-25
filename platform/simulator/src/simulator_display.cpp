@@ -71,12 +71,18 @@ void SimulatorDisplay::begin()
     int win_y = SDL_WINDOWPOS_CENTERED;
     load_saved_position(win_x, win_y);
 
+    /* Hidden until the first set_backlight() -- the stand-in for the
+     * panel's boot blank. Shown straight away, the window appeared at
+     * Landscape size, visibly resized itself once set_orientation() ran,
+     * and lost the presents made while that resize was in flight: a
+     * static screen (OrientationScreen, landed on after a layout
+     * restart) then stayed partly black, since nothing redraws it. */
     SDL_Window *window = SDL_CreateWindow("MQB Monitor Simulator",
                                           win_x,
                                           win_y,
                                           width_,
                                           height_,
-                                          SDL_WINDOW_SHOWN);
+                                          SDL_WINDOW_HIDDEN);
 
     SDL_Renderer *renderer
         = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
@@ -96,8 +102,13 @@ void SimulatorDisplay::begin()
     signal(SIGINT, handle_terminating_signal);
 }
 
-void SimulatorDisplay::set_orientation(DisplayOrientation orientation)
+void SimulatorDisplay::set_orientation(DisplayOrientation orientation,
+                                       bool               flipped)
 {
+    /* Drawn upside-down in the window (see flush()), so a flip is visible
+     * on a dev host the way it would be on a panel left mounted as-is. */
+    flipped_ = flipped;
+
     if (orientation == DisplayOrientation::Portrait)
     {
         width_  = SIM_VER_RES;
@@ -165,16 +176,42 @@ void SimulatorDisplay::flush(
                       pixels,
                       rect.w * static_cast<int>(sizeof(uint16_t)));
 
+    present();
+}
+
+void SimulatorDisplay::present()
+{
     SDL_Renderer *renderer = static_cast<SDL_Renderer *>(renderer_);
-    SDL_RenderCopy(
-        renderer, static_cast<SDL_Texture *>(texture_), nullptr, nullptr);
+    SDL_RenderCopyEx(renderer,
+                     static_cast<SDL_Texture *>(texture_),
+                     nullptr,
+                     nullptr,
+                     flipped_ ? 180.0 : 0.0,
+                     nullptr,
+                     SDL_FLIP_NONE);
     SDL_RenderPresent(renderer);
 }
 
 void SimulatorDisplay::set_backlight(uint8_t pct)
 {
-    /* No real backlight to dim on a dev host. */
+    /* No real backlight to dim on a dev host, but the first call is when
+     * the panel would first light up -- the frame is finished by now, so
+     * the window appears showing it rather than building it. Re-presented
+     * once shown, since presents to a hidden window aren't kept.
+     *
+     * Raised too: macOS only brings a newly shown window forward if the
+     * process launching it is frontmost (cooperative activation), so
+     * without this it opened behind everything -- after a restart as
+     * well as from a terminal. */
     (void)pct;
+    if (!shown_ && window_ != nullptr)
+    {
+        SDL_Window *window = static_cast<SDL_Window *>(window_);
+        SDL_ShowWindow(window);
+        SDL_RaiseWindow(window);
+        shown_ = true;
+        present();
+    }
 }
 
 void SimulatorDisplay::set_backlight_off()
@@ -182,5 +219,7 @@ void SimulatorDisplay::set_backlight_off()
     /* Nothing to switch off either -- which also means the transitions
      * this hides on real hardware (see IDisplay::set_backlight_off) stay
      * fully visible here. That's the useful behavior for a dev host:
-     * blanking the window would hide the very rebuild being worked on. */
+     * blanking the window would hide the very rebuild being worked on.
+     * Only boot is hidden (see begin()), since there's nothing to watch
+     * there but a window resizing itself. */
 }

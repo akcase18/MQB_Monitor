@@ -99,9 +99,8 @@ namespace gui
      * `body`, and a footer tall enough to tap without looking.
      *
      * Used for the two changes that shouldn't happen on a single stray
-     * press -- rotating the display (which only takes effect on the next
-     * boot, so a silent flip looks broken) and erasing the log store
-     * (which isn't undoable at all).
+     * press -- switching the display's layout (which restarts the board)
+     * and erasing the log store (which isn't undoable at all).
      *
      * @param confirm_text What the committing button says. Naming the
      *                     action ("Erase") rather than saying "Confirm"

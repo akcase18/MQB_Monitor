@@ -47,9 +47,11 @@ void TeensyTouch::begin()
     SPI1.begin();
 }
 
-void TeensyTouch::set_orientation(DisplayOrientation orientation)
+void TeensyTouch::set_orientation(DisplayOrientation orientation,
+                                  bool               flipped)
 {
     orientation_ = orientation;
+    flipped_     = flipped;
     if (orientation == DisplayOrientation::Portrait)
     {
         width_  = 320;
@@ -165,6 +167,10 @@ bool TeensyTouch::read(TouchPoint &out)
      * actually communicates press/release to LVGL. */
     out.x = (x_val_ * width_) / 4095;
     out.y = (y_val_ * height_) / 4095;
+    if (flipped_)
+    {
+        flip_touch_point(out, width_, height_);
+    }
 
     return pressed;
 }

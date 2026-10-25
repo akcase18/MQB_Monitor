@@ -39,6 +39,14 @@ namespace
     constexpr uint8_t ROTATION_LANDSCAPE = 3;
     constexpr uint8_t ROTATION_PORTRAIT  = 0;
 
+    /* Each mounting's 180-degree partner -- the same orientation with the
+     * panel the other way up (IDisplay::set_orientation's `flipped`).
+     * MADCTL[1] (MV) vs MADCTL[3] (MX|MY|MV) and MADCTL[0] (MX) vs
+     * MADCTL[2] (MY) each differ by exactly MX^MY, which is a 180-degree
+     * turn. Touch follows via flip_touch_point(), not a new transform. */
+    constexpr uint8_t ROTATION_LANDSCAPE_FLIPPED = 1;
+    constexpr uint8_t ROTATION_PORTRAIT_FLIPPED  = 2;
+
     /* Backlight PWM -> the CTRL pin (pin 4 of the SC-70-5) of the
      * TPS61169DCKR WLED boost driver, replacing the v2 board's
      * PWM-into-a-breakout-board arrangement.
@@ -148,17 +156,22 @@ void TeensyDisplay::begin()
     s_lcd.setBitDepth(16);
 }
 
-void TeensyDisplay::set_orientation(DisplayOrientation orientation)
+void TeensyDisplay::set_orientation(DisplayOrientation orientation,
+                                    bool               flipped)
 {
+    /* setRotation() waits out any in-flight DMA before sending MADCTL,
+     * so a live flip can't interleave with a frame still going out. */
     if (orientation == DisplayOrientation::Portrait)
     {
-        s_lcd.setRotation(ROTATION_PORTRAIT);
+        s_lcd.setRotation(flipped ? ROTATION_PORTRAIT_FLIPPED
+                                  : ROTATION_PORTRAIT);
         width_  = LCD_VERT;
         height_ = LCD_HORZ;
     }
     else
     {
-        s_lcd.setRotation(ROTATION_LANDSCAPE);
+        s_lcd.setRotation(flipped ? ROTATION_LANDSCAPE_FLIPPED
+                                  : ROTATION_LANDSCAPE);
         width_  = LCD_HORZ;
         height_ = LCD_VERT;
     }

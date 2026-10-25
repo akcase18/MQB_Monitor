@@ -28,6 +28,7 @@
 #include "configurator_screen.hpp"
 #include "info_screen.hpp"
 #include "logging_screen.hpp"
+#include "orientation_screen.hpp"
 #include "remote_binding.hpp"
 #include "screen_helpers.hpp"
 #include "settings_screen.hpp"
@@ -167,6 +168,7 @@ namespace
             gui::WarningConfigScreen warning_screen;
             gui::SettingsScreen      settings_screen;
             gui::ThemePickerScreen   theme_picker_screen;
+            gui::OrientationScreen   orientation_screen;
             gui::WirelessSetupScreen wireless_setup_screen;
             /* Not built by build_screens() -- created and destroyed around
              * each sniffer session (see enter_sniff()). */
@@ -220,14 +222,14 @@ namespace
      * The panel-grid orientation actually in effect on the physical
      * display right now -- set once in setup() from whatever
      * settings.orientation held at boot, and never touched again for the
-     * life of the process. settings.orientation, by contrast, gets
-     * overwritten the moment Done is pressed after a toggle (see
-     * settings_done_cb()) even though the physical panel hasn't rotated
-     * yet (orientation is boot-time-only, see platform.hpp's
-     * DisplayOrientation) -- anywhere InfoScreen gets rebuilt live must
-     * read this, not settings.orientation, or a second toggle in the
-     * same session would reflow against tomorrow's orientation on
-     * today's still-unrotated canvas.
+     * life of the process. A local layout change restarts the board (see
+     * orientation_layout_confirm_cb()), but a phone-side one only
+     * rewrites settings.orientation, leaving it ahead of the physical
+     * panel until the next boot (orientation is boot-time-only, see
+     * platform.hpp's DisplayOrientation) -- anywhere InfoScreen gets
+     * rebuilt live must read this, not settings.orientation, or it would
+     * reflow against tomorrow's orientation on today's still-unrotated
+     * canvas.
      */
     core::LayoutOrientation &active_orientation()
     {
@@ -258,6 +260,16 @@ namespace
         return orientation == gui::LayoutOrientation::Vertical
                    ? DisplayOrientation::Portrait
                    : DisplayOrientation::Landscape;
+    }
+
+    /** The 180-degree flag belonging to `orientation` -- each layout
+     * keeps its own, so rotating one never turns the other over. */
+    bool &flipped_for(core::Settings &settings,
+                      core::LayoutOrientation orientation)
+    {
+        return orientation == core::LayoutOrientation::Vertical
+                   ? settings.flipped_vertical
+                   : settings.flipped_horizontal;
     }
 
     /*------------------------------------------------------------------
@@ -836,10 +848,8 @@ namespace
 
         core::Settings &settings = composition().config_store.get().settings;
 
-        /* Orientation isn't touched here — it's persisted immediately by
-         * settings_orientation_confirm_cb() the moment Confirm is pressed
-         * on the popup (see SettingsScreen's file doc comment for why:
-         * the popup itself already reads as the commit step). */
+        /* Orientation isn't touched here — OrientationScreen persists
+         * its own changes (see the orientation_* callbacks below). */
         settings.day_brightness   = day_brightness_pct;
         settings.night_brightness = night_brightness_pct;
         settings.num_panels       = num_panels;
@@ -862,20 +872,79 @@ namespace
         lv_screen_load(composition().info_screen.screen());
     }
 
-    /* Fired the moment Confirm is pressed on SettingsScreen's orientation
-     * popup — persisted right away rather than waiting for Settings'
-     * own Done, so a power-cycle before Done is ever pressed doesn't lose
-     * the change the popup just told the user was committed. Mirrors
-     * theme_picker_done_cb()'s same immediate-persist pattern for accent
-     * color. Still boot-time-only to actually apply — see
-     * settings_done_cb()'s comment on active_orientation(). */
-    void settings_orientation_confirm_cb(void                  *ctx,
-                                         gui::LayoutOrientation orientation)
+    FLASHMEM void settings_pick_orientation_cb(void *ctx)
+    {
+        (void)ctx;
+        Composition &app = composition();
+        /* active_orientation(), not settings.orientation -- the screen
+         * should show the layout the panel is actually in, not one a
+         * phone has staged for the next boot. */
+        app.orientation_screen.open(to_gui_orientation(active_orientation()),
+                                    app.settings_screen.screen());
+    }
+
+    /* Fired when Confirm is pressed on OrientationScreen's layout popup.
+     * Swapping width and height can't happen live -- the lv_display_t and
+     * every screen are sized from it once, at boot -- so this persists
+     * the pick and restarts, which is what the popup told the user. */
+    FLASHMEM void orientation_layout_confirm_cb(void                  *ctx,
+                                       gui::LayoutOrientation orientation)
     {
         (void)ctx;
         core::Settings &settings = composition().config_store.get().settings;
         settings.orientation     = to_core_orientation(orientation);
+        /* Comes back up on OrientationScreen, so the result can be checked
+         * (or undone) without navigating back to it. */
+        settings.open_orientation_on_boot = true;
         composition().config_store.save();
+
+        /* Dark from here on: the reset itself, then boot, which keeps the
+         * panel off until its first frames have landed in the new
+         * orientation (see BacklightState). */
+        platform_get().display.set_backlight_off();
+        platform_restart();
+    }
+
+    /* Fired on every tap of OrientationScreen's Rotate 180. Unlike a
+     * layout change this applies live: a 180-degree turn keeps the
+     * resolution, so nothing needs rebuilding -- the panel and touch are
+     * re-rotated in place and the current screen redrawn. */
+    FLASHMEM void orientation_rotate_cb(void *ctx)
+    {
+        (void)ctx;
+        core::Settings &settings = composition().config_store.get().settings;
+        /* active_orientation(), not settings.orientation: the flag to
+         * toggle is the one for the layout the panel is actually in. */
+        bool &flipped = flipped_for(settings, active_orientation());
+        flipped       = !flipped;
+        composition().config_store.save();
+
+        /* What's in the panel's GRAM is upside down the moment MADCTL
+         * changes, until the redraw below replaces it -- not something to
+         * show. */
+        blank_backlight();
+
+        DisplayOrientation orientation
+            = to_display_orientation(to_gui_orientation(active_orientation()));
+        platform_get().display.set_orientation(orientation, flipped);
+        platform_get().touch.set_orientation(orientation, flipped);
+
+        /* Redrawn now rather than on the next refresh tick, so the quiet
+         * test below starts counting from a flush that has actually
+         * happened -- otherwise the watchdog could find the display
+         * "quiet" before the redraw even began and light the stale
+         * frame. Safe from an event handler: flush completes
+         * synchronously (display_flush_cb calls flush_ready itself). */
+        lv_obj_invalidate(lv_screen_active());
+        lv_refr_now(nullptr);
+
+        /* No load animation to wait out here, so straight to the same
+         * quiet-period settle the theme rebuild ends on. Guarded for
+         * STRESS_TEST builds, where blank_backlight() leaves it lit. */
+        if (backlight_state() == BacklightState::Blanked)
+        {
+            backlight_state() = BacklightState::Settling;
+        }
     }
 
     /** Snapshot of everything LoggingScreen shows, assembled from the
@@ -922,7 +991,7 @@ namespace
 
     /* Fired the moment LoggingScreen's toggle is tapped. Persisted right
      * away (same immediate-commit pattern as
-     * settings_orientation_confirm_cb/theme_picker_done_cb) and pushed
+     * orientation_rotate_cb/theme_picker_done_cb) and pushed
      * straight to InfoScreen's status glyph, which is where the user sees
      * whether capture is running once this screen is closed.
      * core::Logger itself needs no notification -- it reads
@@ -1576,8 +1645,9 @@ namespace
      *
      * Orientation is NOT applied and cannot be -- it is boot-time-only
      * (see platform.hpp's DisplayOrientation). The phone's own mock shows
-     * it; the panel rotates on the next restart, exactly as it does for a
-     * local orientation change. */
+     * it; the panel rotates on the next restart. Unlike a local layout
+     * change this doesn't restart on its own, since that would drop the
+     * phone's session mid-edit. */
     FLASHMEM void remote_config_event_cb(
         void                                           *ctx,
         remote::server::RemoteConfigServer::ConfigEvent event)
@@ -1625,8 +1695,7 @@ namespace
         app.settings_screen.set_values(settings.day_brightness,
                                        settings.night_brightness,
                                        settings.num_panels,
-                                       settings.accent_color,
-                                       to_gui_orientation(settings.orientation));
+                                       settings.accent_color);
 
         /* The phone's own edits (and its Discard) land on the dashboard,
          * which is what they change. A revert because the session ended
@@ -1742,7 +1811,6 @@ namespace
                                  settings.night_brightness,
                                  settings.num_panels,
                                  settings.accent_color,
-                                 to_gui_orientation(settings.orientation),
                                  settings_commit_cb,
                                  nullptr,
                                  settings_done_cb,
@@ -1753,11 +1821,16 @@ namespace
                                  nullptr,
                                  settings_pick_wireless_cb,
                                  nullptr,
-                                 settings_orientation_confirm_cb,
+                                 settings_pick_orientation_cb,
                                  nullptr);
         app.logging_screen.init(
             theme, logging_toggle_cb, nullptr, logging_erase_cb, nullptr);
         app.theme_picker_screen.init(theme, theme_picker_done_cb, nullptr);
+        app.orientation_screen.init(theme,
+                                    orientation_layout_confirm_cb,
+                                    nullptr,
+                                    orientation_rotate_cb,
+                                    nullptr);
         app.wireless_setup_screen.init(theme, wireless_deactivate_cb, nullptr);
 
         lv_obj_add_event_cb(app.info_screen.screen(),
@@ -1771,8 +1844,9 @@ namespace
 
         /* active_orientation(), not settings.orientation -- this runs
          * again from rebuild_screens_for_theme_change() mid-session, by
-         * which point settings.orientation may already hold a staged
-         * pick that hasn't taken effect yet (see settings_done_cb()). */
+         * which point settings.orientation may already hold a phone's
+         * staged pick that hasn't taken effect yet (see
+         * active_orientation()). */
         app.info_screen.rebuild(settings.num_panels,
                                 to_gui_orientation(active_orientation()));
     }
@@ -1800,6 +1874,7 @@ namespace
         lv_obj_delete(app.logging_screen.screen());
         lv_obj_delete(app.settings_screen.screen());
         lv_obj_delete(app.theme_picker_screen.screen());
+        lv_obj_delete(app.orientation_screen.screen());
         lv_obj_delete(app.wireless_setup_screen.screen());
 
         return transition;
@@ -1873,9 +1948,10 @@ FLASHMEM void setup()
         = to_display_orientation(to_gui_orientation(settings.orientation));
 
     platform.display.begin();
-    platform.display.set_orientation(orientation);
+    bool flipped = flipped_for(settings, settings.orientation);
+    platform.display.set_orientation(orientation, flipped);
     platform.touch.begin();
-    platform.touch.set_orientation(orientation);
+    platform.touch.set_orientation(orientation, flipped);
     platform.can.begin(CAN_TX_ID, CAN_RX_ID, CAN_BAUD);
     platform.serial.begin(REMOTE_SERIAL_BAUD);
     platform.storage.begin();
@@ -1980,7 +2056,26 @@ FLASHMEM void setup()
      * since it creates an lv_timer. */
     begin_backlight_wait();
 
-    lv_screen_load(app.info_screen.screen());
+    if (settings.open_orientation_on_boot)
+    {
+        /* Cleared first, so a crash on the way up can't make every later
+         * boot land here too. */
+        settings.open_orientation_on_boot = false;
+        app.config_store.save();
+
+        app.orientation_screen.open(to_gui_orientation(active_orientation()),
+                                    app.settings_screen.screen());
+
+        /* A static screen never produces the BOOT_SETTLE_PASSES the
+         * dashboard does, so it settles like orientation_rotate_cb: draw
+         * it now, then light once the display goes quiet. */
+        lv_refr_now(nullptr);
+        backlight_state() = BacklightState::Settling;
+    }
+    else
+    {
+        lv_screen_load(app.info_screen.screen());
+    }
 }
 
 void loop()

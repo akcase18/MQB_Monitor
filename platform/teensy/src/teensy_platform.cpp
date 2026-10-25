@@ -4,6 +4,9 @@
  */
 
 #include "platform.hpp"
+
+#include <Arduino.h>
+
 #include "teensy_can.hpp"
 #include "teensy_clock.hpp"
 #include "teensy_config_store.hpp"
@@ -80,4 +83,16 @@ Platform &platform_get()
         TEENSY_ACTIVE_STORAGE,
     };
     return s_platform;
+}
+
+void platform_restart()
+{
+    /* SYSRESETREQ through the ARM AIRCR register (0x05FA is the write
+     * key) -- the same full-chip reset the bootloader's own reboot uses.
+     * The reset lands within a few cycles; the loop just satisfies
+     * [[noreturn]]. */
+    SCB_AIRCR = 0x05FA0004;
+    for (;;)
+    {
+    }
 }

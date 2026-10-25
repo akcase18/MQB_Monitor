@@ -51,9 +51,12 @@ namespace
      * always runs along the long edge, whichever way the display is
      * rotated -- see read(). Must track teensy_display.cpp's LCD_HORZ;
      * duplicated here rather than shared since ITouch::set_orientation()
-     * only passes the orientation enum, not a resolution, same as the
+     * doesn't pass a resolution, same as the
      * dormant resistive driver (teensy_touch.hpp) already does. */
     constexpr uint16_t LCD_HORZ = 480;
+    /* The short edge -- only needed to rotate a point 180 degrees within
+     * the screen (see flip_touch_point()). */
+    constexpr uint16_t LCD_VERT = 320;
 } // namespace
 
 TeensyCapTouch &TeensyCapTouch::instance()
@@ -62,9 +65,11 @@ TeensyCapTouch &TeensyCapTouch::instance()
     return s_instance;
 }
 
-void TeensyCapTouch::set_orientation(DisplayOrientation orientation)
+void TeensyCapTouch::set_orientation(DisplayOrientation orientation,
+                                    bool               flipped)
 {
     orientation_ = orientation;
+    flipped_     = flipped;
 }
 
 bool TeensyCapTouch::read_reg(uint8_t reg, uint8_t &val)
@@ -197,11 +202,19 @@ bool TeensyCapTouch::read(TouchPoint &out)
     {
         out.x = x_val_;
         out.y = y_val_;
+        if (flipped_)
+        {
+            flip_touch_point(out, LCD_VERT, LCD_HORZ);
+        }
     }
     else
     {
         out.x = static_cast<int16_t>((LCD_HORZ - 1) - y_val_);
         out.y = x_val_;
+        if (flipped_)
+        {
+            flip_touch_point(out, LCD_HORZ, LCD_VERT);
+        }
     }
 
     return pressed;
