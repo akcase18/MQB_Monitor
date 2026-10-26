@@ -248,6 +248,11 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 .loading main, .loading .actions { visibility: hidden; }
+.btn {
+  border: 0; border-radius: 10px; padding: 9px 14px;
+  background: var(--control); font-size: .92rem; cursor: pointer;
+}
+.btn:disabled { opacity: .4; cursor: default; }
 .fw { margin: 20px 0 0; text-align: center; font-size: .8rem; color: var(--muted); }
 .fw a { color: inherit; }
 .fail { text-align: center; padding: 40px 16px; color: var(--muted); }
@@ -311,6 +316,18 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
       <div class="range-head"><label for="night">Night</label><output id="night-out"></output></div>
       <input type="range" id="night" min="0" max="100" step="1">
     </div>
+  </section>
+
+  <section aria-labelledby="h-backup">
+    <h2 id="h-backup">Backup</h2>
+    <div class="row">
+      <span class="lbl">Settings file</span>
+      <span class="inline">
+        <button type="button" class="btn" id="export">Download</button>
+        <button type="button" class="btn" id="import">Load</button>
+      </span>
+    </div>
+    <input type="file" id="import-file" accept=".json,application/json" hidden>
   </section>
   </div>
 
@@ -447,7 +464,8 @@ class Writer {
 function decodeState(bytes) {
   const r = new Reader(bytes);
   const s = {
-    settings: { day: r.u8(), night: r.u8(), count: r.u8(), orient: r.u8(), accent: r.u32() },
+    settings: { day: r.u8(), night: r.u8(), count: r.u8(), orient: r.u8(), accent: r.u32(),
+                flips: r.u8() },
     panels: [], catalog: [], signals: [], previewActive: false, unsaved: false,
   };
   const nPanels = r.u8();
@@ -474,7 +492,7 @@ function decodeState(bytes) {
 function encodeConfig(s, values) {
   const w = new Writer(2048);
   w.u8(s.settings.day); w.u8(s.settings.night); w.u8(s.settings.count);
-  w.u8(s.settings.orient); w.u32(s.settings.accent);
+  w.u8(s.settings.orient); w.u32(s.settings.accent); w.u8(s.settings.flips);
   for (const p of s.panels) { w.u16(p.id); w.u8(p.imperial ? 1 : 0); w.u8(p.mode); }
   w.u16(s.signals.length);
   for (const c of s.signals) {
@@ -864,6 +882,7 @@ function renderActions() {
   const dirty = isDirty();
   $("save").disabled = !dirty || busy;
   $("discard").disabled = !dirty || busy;
+  $("import").disabled = busy;
   if (!$("status").dataset.error) {
     setStatus(dirty ? "live" : "idle", dirty ? "Unsaved changes" : "Saved");
   }
@@ -1024,6 +1043,112 @@ function endSession() {
 }
 
 /* ========================================================================
+ * Settings file -- the config as readable JSON. Signals go by id, never by
+ * position, so a file still loads after the catalog gains or loses one;
+ * values are metric whatever a panel shows them in. Loading only edits
+ * this page, the same as a tap would, so the dash previews it and Save
+ * keeps it. The flip bits ride along with no control here: they're set on
+ * the dash, but a backup that dropped them would turn a panel upside down.
+ * ====================================================================== */
+
+const FILE_FORMAT = "mqb-monitor-config";
+const FILE_VERSION = 1;
+const MODE_NAMES = ["digital", "bar", "gauge"];
+
+/* The shortest decimal that reads back as the same float32 -- 0.3, not
+ * 0.30000001192092896. */
+function f32Text(v) {
+  for (let p = 1; p < 9; p++) {
+    const t = Number(v.toPrecision(p));
+    if (Math.fround(t) === v) return t;
+  }
+  return Number(v.toPrecision(9));
+}
+
+function exportConfig() {
+  const s = state.settings;
+  const file = {
+    format: FILE_FORMAT,
+    version: FILE_VERSION,
+    firmware: $("fw-ver").textContent || undefined,
+    exported: new Date().toISOString(),
+    settings: {
+      panels: s.count,
+      orientation: s.orient === 1 ? "portrait" : "landscape",
+      flipLandscape: (s.flips & 1) !== 0,
+      flipPortrait: (s.flips & 2) !== 0,
+      accent: hex6(s.accent),
+      dayBrightness: s.day,
+      nightBrightness: s.night,
+    },
+    panels: state.panels.map(p => ({
+      signal: p.id, name: state.catalog[sigIndex(p.id)].name,
+      units: p.imperial ? "imperial" : "metric", display: MODE_NAMES[p.mode],
+    })),
+    signals: state.signals.map((c, i) => ({
+      id: state.catalog[i].id, name: state.catalog[i].name,
+      warnLow: c.useLo, low: f32Text(c.lo), warnHigh: c.useHi, high: f32Text(c.hi),
+      customScale: c.useCustom, scaleMin: f32Text(c.cmin), scaleMax: f32Text(c.cmax),
+    })),
+  };
+  const blob = new Blob([JSON.stringify(file, null, 2) + "\n"], { type: "application/json" });
+  const a = el("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `mqb-monitor-config-${file.exported.slice(0, 10)}.json`;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+/* Anything missing or out of range keeps what the page has now; the dash
+ * checks the result again before taking it. */
+function importConfig(text) {
+  let f = null;
+  try { f = JSON.parse(text); } catch (e) { /* reported below */ }
+  if (!f || f.format !== FILE_FORMAT) { toast("Not a settings file"); return; }
+  if (f.version > FILE_VERSION) { toast("Saved by newer firmware"); return; }
+
+  const int = (v, lo, hi, d) => Number.isInteger(v) ? Math.max(lo, Math.min(hi, v)) : d;
+  const bool = (v, d) => typeof v === "boolean" ? v : d;
+  const num = (v, d) => Number.isFinite(v) ? Math.fround(v) : d;
+
+  const s = state.settings, fs = f.settings || {};
+  s.day = int(fs.dayBrightness, 0, 100, s.day);
+  s.night = int(fs.nightBrightness, 0, 100, s.night);
+  s.count = int(fs.panels, 1, state.panels.length, s.count);
+  if (fs.orientation === "landscape" || fs.orientation === "portrait") {
+    s.orient = fs.orientation === "portrait" ? 1 : 0;
+  }
+  s.flips = (bool(fs.flipLandscape, (s.flips & 1) !== 0) ? 1 : 0)
+          | (bool(fs.flipPortrait, (s.flips & 2) !== 0) ? 2 : 0);
+  const accent = typeof fs.accent === "string" ? parseInt(fs.accent.replace("#", ""), 16) : NaN;
+  if (ACCENTS.includes(accent)) s.accent = accent;
+
+  let skipped = 0;
+  (Array.isArray(f.panels) ? f.panels : []).slice(0, state.panels.length).forEach((fp, r) => {
+    if (!fp || sigIndex(fp.signal) < 0) { skipped++; return; }
+    const p = state.panels[r];
+    p.id = fp.signal;
+    if (fp.units === "metric" || fp.units === "imperial") p.imperial = fp.units === "imperial";
+    if (MODE_NAMES.includes(fp.display)) p.mode = MODE_NAMES.indexOf(fp.display);
+  });
+  for (const fc of Array.isArray(f.signals) ? f.signals : []) {
+    const i = fc ? sigIndex(fc.id) : -1;
+    if (i < 0) { skipped++; continue; }
+    const c = state.signals[i];
+    c.useLo = bool(fc.warnLow, c.useLo);       c.lo = num(fc.low, c.lo);
+    c.useHi = bool(fc.warnHigh, c.useHi);      c.hi = num(fc.high, c.hi);
+    c.useCustom = bool(fc.customScale, c.useCustom);
+    c.cmin = num(fc.scaleMin, c.cmin);         c.cmax = num(fc.scaleMax, c.cmax);
+  }
+
+  if (selected >= s.count) selected = 0;
+  changed();
+  toast(skipped ? `Loaded, ${skipped} unknown skipped. Save to keep it.` : "Loaded. Save to keep it.");
+}
+
+/* ========================================================================
  * Wiring
  * ====================================================================== */
 
@@ -1175,6 +1300,13 @@ function wire() {
 
   $("save").addEventListener("click", save);
   $("discard").addEventListener("click", discard);
+  $("export").addEventListener("click", exportConfig);
+  $("import").addEventListener("click", () => $("import-file").click());
+  $("import-file").addEventListener("change", async e => {
+    const file = e.target.files[0];
+    e.target.value = ""; /* so picking the same file again still fires */
+    if (file) importConfig(await file.text());
+  });
 
   document.addEventListener("visibilitychange", () => {
     if (!state) return;

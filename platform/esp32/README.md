@@ -10,6 +10,8 @@ One static page, [`web/index.html`](web/index.html), with a mock of the dash at 
 
 While the page is open the dash is in a **preview session**: the Teensy applies the page's config to the live config without saving, and shows the mock's sample values in place of live ones, so the real screen and the mock always match. Every edit (and the Try-a-value slider) re-sends the preview. **Save** writes the config and the session carries on; **Discard** goes back to the last save. The session ends — live values and the saved config come back — when the page is hidden or closed, when the dash hears nothing from it for 60 s (the page pings every 20 s), when the WiFi screen is closed, or when the AP times out. Orientation is the exception to all of this — it's boot-time-only, so the mock shows it and the dash rotates on its next restart.
 
+**Backup** (Dash tab) downloads the config as a readable JSON file (`mqb-monitor-config-<date>.json`) and loads one back. Loading only edits the page, like any tap, so the dash previews it and **Save** keeps it. Signals are matched by id, so a file still loads after the catalog changes, and ones the dash doesn't know are skipped. The values are metric whatever the panels show. The file also carries the per-layout 180° flips, which the page has no control for (they're set on the dash), so restoring a backup doesn't turn the panel upside down. A preview, save or discard that changes the active layout's flip turns the panel over live, the same as the dash's own Rotate button. Logging on/off and the one-shot `open_orientation_on_boot` never reach the page, so they aren't in the file.
+
 The C3 decodes nothing. The page speaks `remote/protocol`'s records itself (hex over HTTP, since `WebServer` returns a POST body as an Arduino `String`, which can't hold NULs), and the Teensy validates every batch:
 
 | Route | Relays | Answers |
@@ -19,6 +21,8 @@ The C3 decodes nothing. The page speaks `remote/protocol`'s records itself (hex 
 | `POST /api/preview` | `REQ_PREVIEW_CONFIG` (hex body: config, then sample values) | `ApplyResult`, as a digit |
 | `POST /api/save` | `REQ_APPLY_CONFIG` (hex body) | `ApplyResult` |
 | `POST /api/revert` | `REQ_REVERT_PREVIEW` | `ApplyResult` |
+
+The settings record grew a flips byte (bit 0 the landscape layout, bit 1 portrait). There is no protocol version, so a C3 (which carries the page) and a Teensy built before that change won't understand each other: flash both from the same tree.
 
 That keeps every copy of the Teensy's tables out of the C3. The page does mirror a few (unit labels/conversions/decimals, the accent presets, `compute_layout()`, and `PanelWidget`'s geometry for the mock) — the comment at the top of `index.html` lists each one's source. Keep them in step when those change.
 

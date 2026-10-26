@@ -41,16 +41,27 @@ namespace core
              * NOT persisted: a layout this build doesn't know can't be
              * read safely, but leaving it in place means reinstalling the
              * newer firmware finds it again, until something here saves.
+             * The first save after that is always a full one: see
+             * save_priority().
              */
             void load();
 
             /** Writes the full config back to storage. */
             void save();
 
-            /** Writes only `priorities[rank]` back to storage. */
+            /**
+             * Writes only `priorities[rank]` back to storage -- or, if load()
+             * left a newer firmware's config in place, the whole config via
+             * save(). A partial write there would land at this layout's
+             * offset inside the newer one, under a header that still names
+             * the newer version, and that firmware would load it as valid.
+             */
             void save_priority(uint8_t rank);
 
-            /** Writes only the given signal's SignalConfig back to storage. */
+            /**
+             * Writes only the given signal's SignalConfig back to storage,
+             * with the same full-save fallback as save_priority().
+             */
             void save_signal(uint16_t signal_id);
 
         private:
@@ -59,6 +70,8 @@ namespace core
 
             IConfigStore &backing_;
             Config        config_ {};
+            /* Storage still holds a newer firmware's config (see load()). */
+            bool          stored_is_newer_ = false;
     };
 
 } // namespace core

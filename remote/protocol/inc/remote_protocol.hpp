@@ -239,6 +239,9 @@ namespace remote::protocol
             uint8_t  num_panels       = 0;
             uint8_t  orientation      = 0; /* 0=Horizontal, 1=Vertical */
             uint32_t accent_color     = 0;
+            /* Bit 0: the horizontal layout turned 180 degrees, bit 1: the
+             * vertical one (Settings::flipped_horizontal/_vertical). */
+            uint8_t  flips            = 0;
     };
     uint8_t       *encode_settings(uint8_t *p, const SettingsWire &v);
     const uint8_t *decode_settings(const uint8_t *p, SettingsWire &out);

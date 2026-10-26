@@ -2,8 +2,9 @@
  * @file test_main.cpp
  * @brief Host-buildable coverage for core/config: defaults on blank
  * storage, full round trip, partial (panel/signal) writes, unknown-version
- * migration fallback, a newer version left alone after a rollback, and
- * core/vehicle's evaluate_warning(). Run with
+ * migration fallback, a newer version left alone after a rollback (and
+ * replaced whole, never patched, by the first save), and core/vehicle's
+ * evaluate_warning(). Run with
  * `pio test -e simulator`.
  */
 #include <string.h>
@@ -242,6 +243,42 @@ void test_newer_version_loads_defaults_without_overwriting()
     TEST_ASSERT_EQUAL_UINT8(77, stored_settings);
 }
 
+void test_partial_save_over_newer_version_writes_whole_config()
+{
+    FakeConfigStore backing;
+
+    core::ConfigHeader header {
+        core::ConfigStore::MAGIC_NUMBER,
+        static_cast<uint8_t>(core::ConfigStore::CURRENT_VERSION + 1)
+    };
+    backing.write(0, &header, sizeof(header));
+
+    core::ConfigStore store(backing);
+    store.load();
+
+    /* A slot write alone would leave the newer header in place over
+     * this layout's bytes; it has to become a full save instead. */
+    store.get().priorities[3].signal_id = 7;
+    store.save_priority(3);
+
+    core::ConfigHeader stored {};
+    backing.read(0, &stored, sizeof(stored));
+    TEST_ASSERT_EQUAL_UINT8(core::ConfigStore::CURRENT_VERSION,
+                            stored.version);
+
+    core::ConfigStore store2(backing);
+    store2.load();
+    TEST_ASSERT_EQUAL_UINT16(7, store2.get().priorities[3].signal_id);
+    TEST_ASSERT_EQUAL_UINT8(5, store2.get().settings.num_panels);
+
+    /* Once it's this layout, partial writes are partial again. */
+    store2.get().signals[6].warn.use_hi = true;
+    store2.save_signal(22);
+    core::ConfigStore store3(backing);
+    store3.load();
+    TEST_ASSERT_TRUE(store3.get().signals[6].warn.use_hi);
+}
+
 void test_evaluate_warning()
 {
     core::WarningThresholds thresholds { 10.0f, 90.0f, true, true };
@@ -286,6 +323,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_custom_range_defaults_off_and_round_trips_via_save_signal);
     RUN_TEST(test_unrecognized_version_resets_to_defaults);
     RUN_TEST(test_newer_version_loads_defaults_without_overwriting);
+    RUN_TEST(test_partial_save_over_newer_version_writes_whole_config);
     RUN_TEST(test_evaluate_warning);
     return UNITY_END();
 }

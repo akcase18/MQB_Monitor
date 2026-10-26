@@ -949,19 +949,21 @@ namespace
         platform_restart();
     }
 
-    /* Fired on every tap of OrientationScreen's Rotate 180. Unlike a
-     * layout change this applies live: a 180-degree turn keeps the
-     * resolution, so nothing needs rebuilding -- the panel and touch are
-     * re-rotated in place and the current screen redrawn. */
-    FLASHMEM void orientation_rotate_cb(void *ctx)
+    /** Whether the panel is turned 180 degrees right now. Set at boot
+     * and by apply_panel_flip(), so a phone-side change can tell whether
+     * the flag it brings differs from what's on the glass. */
+    bool &panel_flipped()
     {
-        (void)ctx;
-        core::Settings &settings = composition().config_store.get().settings;
-        /* active_orientation(), not settings.orientation: the flag to
-         * toggle is the one for the layout the panel is actually in. */
-        bool &flipped = flipped_for(settings, active_orientation());
-        flipped       = !flipped;
-        composition().config_store.save();
+        static bool instance = false;
+        return instance;
+    }
+
+    /* Unlike a layout change, a 180-degree turn applies live: it keeps
+     * the resolution, so nothing needs rebuilding -- the panel and touch
+     * are re-rotated in place and the current screen redrawn. */
+    FLASHMEM void apply_panel_flip(bool flipped)
+    {
+        panel_flipped() = flipped;
 
         /* What's in the panel's GRAM is upside down the moment MADCTL
          * changes, until the redraw below replaces it -- not something to
@@ -989,6 +991,19 @@ namespace
         {
             backlight_state() = BacklightState::Settling;
         }
+    }
+
+    /* Fired on every tap of OrientationScreen's Rotate 180. */
+    FLASHMEM void orientation_rotate_cb(void *ctx)
+    {
+        (void)ctx;
+        core::Settings &settings = composition().config_store.get().settings;
+        /* active_orientation(), not settings.orientation: the flag to
+         * toggle is the one for the layout the panel is actually in. */
+        bool &flipped = flipped_for(settings, active_orientation());
+        flipped       = !flipped;
+        composition().config_store.save();
+        apply_panel_flip(flipped);
     }
 
     /** Snapshot of everything LoggingScreen shows, assembled from the
@@ -1708,7 +1723,9 @@ namespace
      * (see platform.hpp's DisplayOrientation). The phone's own mock shows
      * it; the panel rotates on the next restart. Unlike a local layout
      * change this doesn't restart on its own, since that would drop the
-     * phone's session mid-edit. */
+     * phone's session mid-edit. The 180-degree flip is applied, since it
+     * can be: the page has no control for it, but a config loaded from a
+     * file carries one, and a discard can put it back. */
     FLASHMEM void remote_config_event_cb(
         void                                           *ctx,
         remote::server::RemoteConfigServer::ConfigEvent event)
@@ -1741,6 +1758,13 @@ namespace
         remote_last_settings() = settings;
         apply_backlight(remote_showing_night() ? settings.night_brightness
                                                : settings.day_brightness);
+
+        bool flipped
+            = flipped_for(app.config_store.get().settings, active_orientation());
+        if (flipped != panel_flipped())
+        {
+            apply_panel_flip(flipped);
+        }
 
         /* A remote change can rewrite priorities[] and num_panels
          * wholesale, so the poller's request table has to follow it. */
@@ -2218,7 +2242,8 @@ FLASHMEM void setup()
         = to_display_orientation(to_gui_orientation(settings.orientation));
 
     platform.display.begin();
-    bool flipped = flipped_for(settings, settings.orientation);
+    bool flipped    = flipped_for(settings, settings.orientation);
+    panel_flipped() = flipped;
     platform.display.set_orientation(orientation, flipped);
     platform.touch.begin();
     platform.touch.set_orientation(orientation, flipped);

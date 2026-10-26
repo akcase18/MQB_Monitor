@@ -260,6 +260,7 @@ namespace remote::protocol
         p = put_u8(p, v.num_panels);
         p = put_u8(p, v.orientation);
         p = put_u32(p, v.accent_color);
+        p = put_u8(p, v.flips);
         return p;
     }
 
@@ -270,6 +271,7 @@ namespace remote::protocol
         p = get_u8(p, out.num_panels);
         p = get_u8(p, out.orientation);
         p = get_u32(p, out.accent_color);
+        p = get_u8(p, out.flips);
         return p;
     }
 

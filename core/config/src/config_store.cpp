@@ -41,6 +41,7 @@ namespace core
     {
         ConfigHeader header {};
         backing_.read(0, &header, sizeof(header));
+        stored_is_newer_ = false;
 
         if (header.magic != MAGIC_NUMBER)
         {
@@ -59,6 +60,7 @@ namespace core
         if (header.version > CURRENT_VERSION)
         {
             set_defaults();
+            stored_is_newer_ = true;
             return;
         }
 
@@ -70,12 +72,19 @@ namespace core
         config_.header.magic   = MAGIC_NUMBER;
         config_.header.version = CURRENT_VERSION;
         backing_.write(0, &config_, sizeof(config_));
+        stored_is_newer_ = false;
     }
 
     FLASHMEM void ConfigStore::save_priority(uint8_t rank)
     {
         if (rank >= MAX_PANELS)
         {
+            return;
+        }
+
+        if (stored_is_newer_)
+        {
+            save();
             return;
         }
 
@@ -89,6 +98,12 @@ namespace core
         int idx = signal_catalog_find(signal_id);
         if (idx < 0)
         {
+            return;
+        }
+
+        if (stored_is_newer_)
+        {
+            save();
             return;
         }
 

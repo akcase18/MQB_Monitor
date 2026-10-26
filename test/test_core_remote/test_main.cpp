@@ -330,6 +330,7 @@ void test_get_state_reports_defaults()
     TEST_ASSERT_EQUAL_UINT8(20, settings.night_brightness);
     TEST_ASSERT_EQUAL_UINT8(5, settings.num_panels);
     TEST_ASSERT_EQUAL_UINT8(0, settings.orientation); /* Horizontal */
+    TEST_ASSERT_EQUAL_UINT8(0, settings.flips);
 
     uint8_t panel_capacity = 0;
     p                      = get_u8(p, panel_capacity);
@@ -407,7 +408,10 @@ namespace
         settings.num_panels       = defaults.settings.num_panels;
         settings.orientation      = 0;
         settings.accent_color     = defaults.settings.accent_color;
-        p                         = encode_settings(p, settings);
+        settings.flips            = static_cast<uint8_t>(
+            (defaults.settings.flipped_horizontal ? 1 : 0)
+            | (defaults.settings.flipped_vertical ? 2 : 0));
+        p = encode_settings(p, settings);
 
         for (uint8_t i = 0; i < core::MAX_PANELS; i++)
         {
@@ -475,6 +479,42 @@ void test_apply_config_persists_valid_batch()
     core::ConfigStore reloaded(backing);
     reloaded.load();
     TEST_ASSERT_EQUAL_UINT8(100, reloaded.get().settings.day_brightness);
+}
+
+void test_apply_config_round_trips_flips()
+{
+    FakeConfigStore   backing;
+    core::ConfigStore config(backing);
+    config.load();
+    core::SignalStore signals;
+
+    RemoteConfigServer server(config, signals);
+
+    /* The settings record's last byte: only the vertical layout turned. */
+    uint8_t req[FRAME_MAX_PAYLOAD];
+    size_t  req_len = build_apply_payload(config.get(), req);
+    req[8]          = 2;
+
+    uint8_t resp[FRAME_MAX_PAYLOAD];
+    MsgType resp_type;
+    server.handle_request(MsgType::REQ_APPLY_CONFIG,
+                          req,
+                          static_cast<uint16_t>(req_len),
+                          resp,
+                          sizeof(resp),
+                          resp_type);
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ApplyResult::Ok), resp[0]);
+
+    core::ConfigStore reloaded(backing);
+    reloaded.load();
+    TEST_ASSERT_FALSE(reloaded.get().settings.flipped_horizontal);
+    TEST_ASSERT_TRUE(reloaded.get().settings.flipped_vertical);
+
+    server.handle_request(
+        MsgType::REQ_GET_STATE, nullptr, 0, resp, sizeof(resp), resp_type);
+    SettingsWire settings {};
+    decode_settings(resp, settings);
+    TEST_ASSERT_EQUAL_UINT8(2, settings.flips);
 }
 
 void test_apply_config_rejects_signal_count_mismatch()
@@ -657,9 +697,9 @@ void test_apply_config_keeps_lone_threshold_on_its_side()
     float   hi = 10.0f;
     uint8_t req[FRAME_MAX_PAYLOAD];
     size_t  req_len = build_apply_payload(config.get(), req, &lo, &hi);
-    /* Signal 0's record starts after settings (8), the panels (24) and
+    /* Signal 0's record starts after settings (9), the panels (24) and
      * the count (2); use_lo is its 9th byte. */
-    req[8 + 24 + 2 + 8] = 0;
+    req[9 + 24 + 2 + 8] = 0;
 
     uint8_t resp[16];
     MsgType resp_type;
@@ -1439,6 +1479,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_stalled_frame_times_out);
     RUN_TEST(test_get_state_reports_defaults);
     RUN_TEST(test_apply_config_persists_valid_batch);
+    RUN_TEST(test_apply_config_round_trips_flips);
     RUN_TEST(test_apply_config_rejects_signal_count_mismatch);
     RUN_TEST(test_apply_config_rejects_invalid_signal_id);
     RUN_TEST(test_apply_config_clamps_brightness_and_panel_count);

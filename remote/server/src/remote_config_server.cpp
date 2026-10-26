@@ -19,7 +19,7 @@ namespace remote::server
         /* Wire sizes of each record -- see the encode_*() functions in
          * remote_protocol.cpp. A config batch is settings, MAX_PANELS
          * panels, the signal count and one SignalConfigWire per signal. */
-        constexpr size_t SETTINGS_BYTES = 8;
+        constexpr size_t SETTINGS_BYTES = 9;
         constexpr size_t PANEL_BYTES    = 4;
         constexpr size_t SIGNAL_BYTES   = 19;
         constexpr size_t HEAD_LEN
@@ -64,7 +64,9 @@ namespace remote::server
                 || sa.night_brightness != sb.night_brightness
                 || sa.num_panels != sb.num_panels
                 || sa.orientation != sb.orientation
-                || sa.accent_color != sb.accent_color)
+                || sa.accent_color != sb.accent_color
+                || sa.flipped_horizontal != sb.flipped_horizontal
+                || sa.flipped_vertical != sb.flipped_vertical)
             {
                 return false;
             }
@@ -270,7 +272,10 @@ namespace remote::server
             = cfg.settings.orientation == core::LayoutOrientation::Vertical ? 1
                                                                             : 0;
         settings.accent_color = cfg.settings.accent_color;
-        p                     = protocol::encode_settings(p, settings);
+        settings.flips        = static_cast<uint8_t>(
+            (cfg.settings.flipped_horizontal ? 1 : 0)
+            | (cfg.settings.flipped_vertical ? 2 : 0));
+        p = protocol::encode_settings(p, settings);
 
         p = protocol::put_u8(p, core::MAX_PANELS);
         for (uint8_t i = 0; i < core::MAX_PANELS; i++)
@@ -401,6 +406,8 @@ namespace remote::server
                                         ? core::LayoutOrientation::Vertical
                                         : core::LayoutOrientation::Horizontal;
         cfg.settings.accent_color = settings.accent_color;
+        cfg.settings.flipped_horizontal = (settings.flips & 1) != 0;
+        cfg.settings.flipped_vertical   = (settings.flips & 2) != 0;
 
         for (uint8_t i = 0; i < core::MAX_PANELS; i++)
         {

@@ -15,9 +15,9 @@ The persisted configuration schema and its load/save/migrate logic, storage-agno
 
 - **`inc/config_store.hpp`** / **`src/config_store.cpp`** — `ConfigStore`:
   - `MAGIC_NUMBER` / `CURRENT_VERSION` (currently 6: v2 added `PanelConfig::display_mode`, v3 added `Settings::accent_color`, v4 added `SignalConfig`'s custom-range fields, v5 renamed `Config.panels[]` (screen-slot-indexed) to `Config.priorities[]` (priority-rank-indexed), v6 added `Settings::logging_enabled`) gate loading.
-  - `load()` — unrecognized magic → `set_defaults()` (and persists them); older version → `migrate()` (and persists the result); current version → full load.
+  - `load()` — unrecognized magic → `set_defaults()` (and persists them); older version → `migrate()` (and persists the result); current version → full load; newer version (firmware this board has rolled back from, see [platform/dash_s3/OTA_PLAN.md](../../platform/dash_s3/OTA_PLAN.md)) → defaults, **not** persisted, so reinstalling the newer firmware finds its config again — until something here saves.
   - `save()` — writes the entire `Config` back.
-  - `save_priority(rank)` / `save_signal(signal_id)` — partial writes, so e.g. reassigning one rank or editing one signal's thresholds doesn't rewrite the whole blob.
+  - `save_priority(rank)` / `save_signal(signal_id)` — partial writes, so e.g. reassigning one rank or editing one signal's thresholds doesn't rewrite the whole blob. Over a newer firmware's config they do a full `save()` instead: one record written at this layout's offset, under a header still naming the newer version, would load as valid there.
   - `set_defaults()` — day/night brightness 100%/20%, 5 active panels (rank 0 = Coolant Temp down through rank 4 = Intake Pressure Actual, with rank 5 = Engine Torque inactive by default), all warning thresholds off, green accent, logging off.
   - `migrate(old_version)` — since no device has shipped with saved config yet, every version bump so far just falls through to `set_defaults()` rather than preserving old fields. **Once a version actually ships with saved user config in the field, this needs real field-by-field migration keyed on `old_version` instead of a blanket reset.**
 
