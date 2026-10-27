@@ -75,12 +75,20 @@ namespace remote::server
                 return ip_text_;
             }
 
+            /** Phones joined to the AP, per the relay's EVT_AP_STATIONS.
+             * Always 0 unless state()==Active. */
+            uint8_t station_count() const
+            {
+                return state_ == ApState::Active ? stations_ : 0;
+            }
+
         private:
             RemoteConfigLink &link_;
             IClock           &clock_;
 
             ApState  state_            = ApState::Idle;
             uint32_t state_entered_ms_ = 0;
+            uint8_t  stations_         = 0;
 
             char ssid_[33]    = "";
             char ip_text_[16] = "";

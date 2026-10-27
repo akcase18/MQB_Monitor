@@ -941,6 +941,19 @@ void test_revert_restores_config_from_before_first_preview()
     server.revert_preview();
     TEST_ASSERT_EQUAL_UINT8(100, config.get().settings.day_brightness);
     TEST_ASSERT_EQUAL_UINT8(5, log.count);
+
+    /* The page closing reverts the same, but says so. */
+    req_len = build_payload_with_day(config.get(), 20, req);
+    send_change(server, MsgType::REQ_PREVIEW_CONFIG, req, req_len);
+    uint8_t left = REVERT_PAGE_LEFT;
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(ApplyResult::Ok),
+        send_change(server, MsgType::REQ_REVERT_PREVIEW, &left, 1));
+    TEST_ASSERT_EQUAL_UINT8(100, config.get().settings.day_brightness);
+    TEST_ASSERT_FALSE(server.preview_active());
+    TEST_ASSERT_EQUAL_UINT8(7, log.count);
+    TEST_ASSERT_TRUE(RemoteConfigServer::ConfigEvent::PageLeft
+                     == log.events[6]);
 }
 
 void test_rejected_preview_leaves_live_config_untouched()
@@ -1122,6 +1135,47 @@ void test_ap_controller_activity_restarts_idle_timeout()
 
     controller.tick(2 * AP_IDLE_TIMEOUT_MS);
     TEST_ASSERT_TRUE(ApState::Deactivating == controller.state());
+}
+
+void test_ap_controller_counts_stations_only_while_active()
+{
+    FakeConfigStore   backing;
+    core::ConfigStore config(backing);
+    config.load();
+    core::SignalStore signals;
+
+    RemoteConfigServer server(config, signals);
+    FakeSerialLink     link;
+    RemoteConfigLink   remote_link(link, server);
+    FakeClock          clock;
+    RemoteApController controller(remote_link, clock);
+
+    /* Before the AP is up, a stray count is ignored. */
+    uint8_t one = 1;
+    controller.activate();
+    controller.on_event(MsgType::EVT_AP_STATIONS, &one, 1, 0);
+    TEST_ASSERT_EQUAL_UINT8(0, controller.station_count());
+
+    ApReadyWire wire { { 10, 0, 0, 1 } };
+    uint8_t     payload[sizeof(ApReadyWire::ip)];
+    encode_ap_ready(payload, wire);
+    controller.on_event(MsgType::EVT_AP_READY, payload, sizeof(payload), 0);
+    TEST_ASSERT_EQUAL_UINT8(0, controller.station_count());
+
+    controller.on_event(MsgType::EVT_AP_STATIONS, &one, 1, 100);
+    TEST_ASSERT_EQUAL_UINT8(1, controller.station_count());
+
+    /* A phone joining is activity: the idle timeout runs from it. */
+    controller.tick(AP_IDLE_TIMEOUT_MS + 1);
+    TEST_ASSERT_TRUE(ApState::Active == controller.state());
+
+    /* Going down forgets the phones, and coming back up starts at 0. */
+    controller.deactivate();
+    TEST_ASSERT_EQUAL_UINT8(0, controller.station_count());
+    controller.on_event(MsgType::EVT_AP_DISABLED, nullptr, 0, 200);
+    controller.activate();
+    controller.on_event(MsgType::EVT_AP_READY, payload, sizeof(payload), 300);
+    TEST_ASSERT_EQUAL_UINT8(0, controller.station_count());
 }
 
 void test_ap_controller_activate_timeout_falls_back_to_idle()
@@ -1495,6 +1549,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_ap_controller_activate_sends_command_and_reaches_active);
     RUN_TEST(test_ap_controller_idle_timeout_disables);
     RUN_TEST(test_ap_controller_activity_restarts_idle_timeout);
+    RUN_TEST(test_ap_controller_counts_stations_only_while_active);
     RUN_TEST(test_ap_controller_activate_timeout_falls_back_to_idle);
     RUN_TEST(test_ap_controller_reactivate_from_deactivating_resends_enable);
     RUN_TEST(test_ota_begin_round_trips);

@@ -25,6 +25,13 @@ class DashS3Wireless : public ISerialLink
         size_t read(uint8_t *buf, size_t len) override;
         size_t write(const uint8_t *buf, size_t len) override;
 
+        /** Whether the relay task has got through start-up -- Wi-Fi
+         * initialised, the config and update pages registered -- and is
+         * still coming round. A new firmware isn't kept without it
+         * (platform_update_path_ready()): the next update arrives through
+         * it. */
+        bool relay_running() const;
+
     private:
         DashS3Wireless() = default;
 };

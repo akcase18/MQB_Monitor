@@ -23,10 +23,25 @@ support firmware development but don't ship on any board.
   ```
 
 - **[`fw_version.py`](fw_version.py)** — PlatformIO pre-build script for the
-  `env:dash_s3` family. It writes `git describe --tags --always --dirty` into a
-  generated `fw_version.h` that the dash's firmware update descriptor is built
-  from (see [platform/dash_s3](../platform/dash_s3/README.md#firmware-updates)).
-  Tag releases to get readable versions.
+  `env:dash_s3` family. It writes a generated `fw_version.h` that the dash's
+  firmware update descriptor is built from (see
+  [platform/dash_s3](../platform/dash_s3/README.md#firmware-updates)): the
+  version (`git describe --tags --always --dirty`; tag releases to get
+  readable versions), a CRC of the partition table, which the dash refuses
+  OTA images over, and the LittleFS partition's size.
+
+- **[`release.py`](release.py)** — builds a dash firmware release into
+  `releases/<tag>/`: each hardware variant's OTA file, its USB install files
+  and script, and a manifest that says whether it can go over the air. See
+  [platform/dash_s3](../platform/dash_s3/README.md#releases).
+
+  ```sh
+  git tag v1.2.0 && python3 tools/release.py
+  python3 tools/release.py --dev   # trial run from an untagged tree
+  ```
+
+- **[`partition_table.py`](partition_table.py)** — reads the ESP32 partition
+  CSV and computes its layout CRC, for both scripts above.
 
 - **[`monitor/`](monitor/)** — the **MQB Monitor**, a Mac (PySide6) app that
   passively watches UDS traffic between an OBDEleven and the car via a USB

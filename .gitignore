@@ -18,3 +18,7 @@ sim_sdcard/*
 # Default output path of the "Logs: Download to CSV…" VS Code task
 # (.vscode/tasks.json). Any other name you type is yours to manage.
 /log_export_out.csv
+
+# Built by tools/release.py; each release's folder goes up to the GitHub
+# release for its tag rather than into the repo.
+/releases/

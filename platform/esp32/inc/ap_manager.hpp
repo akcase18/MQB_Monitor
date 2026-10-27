@@ -24,6 +24,9 @@ namespace esp32
              * after enable() returns. */
             void get_ip(uint8_t ip_out[4]) const;
 
+            /** Phones joined to the AP; 0 while it's down. */
+            uint8_t station_count() const;
+
         private:
             bool enabled_ = false;
     };

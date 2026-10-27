@@ -20,9 +20,11 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "dash_s3_wireless.hpp"
 #include "esp_app_format.h"
 #include "esp_ota_ops.h"
 #include "fw_version.h" /* generated -- see tools/fw_version.py */
+#include "logger.hpp"
 #include "nvs.h"
 
 static_assert(FIRMWARE_ID_OFFSET
@@ -30,9 +32,22 @@ static_assert(FIRMWARE_ID_OFFSET
                          + sizeof(esp_image_segment_header_t)
                          + sizeof(esp_app_desc_t),
               "the update descriptor is no longer where uploads look for it");
-static_assert(sizeof(DASH_S3_HW_VARIANT)
+static_assert(sizeof(DASH_S3_BUILD_VARIANT)
                   <= sizeof(DashS3FirmwareId::hw_variant),
               "DASH_S3_HW_VARIANT is too long");
+static_assert(offsetof(DashS3FirmwareId, layout_tag)
+                  == 16 + 16 + FIRMWARE_VERSION_LEN,
+              "the layout fields moved -- the update page reads them too");
+
+/* The log ring has to fit the LittleFS partition with room for the
+ * filesystem's own blocks; nothing at run time checks (core::Logger
+ * never asks IStorage its capacity). Shrink LOG_CHUNK_COUNT in
+ * platformio.ini, or grow the partition, which then needs a USB flash. */
+static_assert(static_cast<uint64_t>(LOG_CHUNK_COUNT) * core::CHUNK_SIZE_BYTES
+                      + 512u * 1024u
+                  <= FW_FS_PARTITION_BYTES,
+              "the log ring doesn't fit partitions_dash.csv's LittleFS "
+              "partition");
 
 namespace
 {
@@ -42,8 +57,10 @@ namespace
     __attribute__((section(".rodata_custom_desc"), used))
     const DashS3FirmwareId s_firmware_id = {
         "MQB-DASH-S3",
-        DASH_S3_HW_VARIANT,
+        DASH_S3_BUILD_VARIANT,
         FW_VERSION,
+        { 'P', 'T', 'L', '1' },
+        FW_PARTITION_LAYOUT,
     };
 
     /* The install note: which slot was meant to boot, with what. Its own
@@ -116,6 +133,17 @@ FirmwareImageCheck dash_s3_check_image(const uint8_t *head,
         return FirmwareImageCheck::WrongHardware;
     }
 
+    uint32_t layout = LEGACY_PARTITION_LAYOUT;
+    if (memcmp(id.layout_tag, DASH_S3_LAYOUT_TAG, sizeof(id.layout_tag))
+        == 0)
+    {
+        layout = id.partition_layout;
+    }
+    if (layout != s_firmware_id.partition_layout)
+    {
+        return FirmwareImageCheck::NeedsUsb;
+    }
+
     memcpy(version, id.version, FIRMWARE_VERSION_LEN);
     version[FIRMWARE_VERSION_LEN - 1] = '\0';
     return FirmwareImageCheck::Ok;
@@ -137,6 +165,11 @@ void dash_s3_note_install(uint32_t slot_address, const char *version)
 const char *platform_firmware_version()
 {
     return s_firmware_id.version;
+}
+
+bool platform_update_path_ready()
+{
+    return DashS3Wireless::instance().relay_running();
 }
 
 void platform_firmware_healthy()

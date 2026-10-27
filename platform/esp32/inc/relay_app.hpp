@@ -67,6 +67,8 @@ namespace esp32
 
 
         private:
+            void report_stations(uint32_t now_ms);
+
             static void on_frame(void                     *ctx,
                                  remote::protocol::MsgType type,
                                  const uint8_t            *payload,
@@ -77,6 +79,9 @@ namespace esp32
             WebServer        server_;
             ConfigWebHandler web_;
             RelayExtension  *extension_;
+
+            uint8_t  reported_stations_  = 0;
+            uint32_t stations_checked_ms_ = 0;
     };
 
 } // namespace esp32

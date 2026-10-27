@@ -6,6 +6,8 @@
 
 #include "simulator_touch.hpp"
 
+#include "simulator_relay.hpp"
+
 #define SDL_MAIN_HANDLED
 #include <SDL2/SDL.h>
 #include <stdlib.h>
@@ -69,6 +71,17 @@ bool SimulatorTouch::read(TouchPoint &out)
                 if (event.button.button == SDL_BUTTON_LEFT)
                 {
                     s_pressed = false;
+                }
+                break;
+
+            /* This is the one SDL event pump, so the relay's keys come
+             * through here too (see simulator_relay.hpp). */
+            case SDL_KEYDOWN:
+                if (event.key.repeat == 0 && event.key.keysym.sym >= 'a'
+                    && event.key.keysym.sym <= 'z')
+                {
+                    SimulatorRelay::instance().on_key(
+                        static_cast<char>(event.key.keysym.sym));
                 }
                 break;
 

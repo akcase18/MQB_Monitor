@@ -8,6 +8,13 @@ namespace esp32
 {
     using remote::protocol::MsgType;
 
+    namespace
+    {
+        /* How often the station count is read. A phone leaving shows on
+         * the panel within this. */
+        constexpr uint32_t STATIONS_POLL_MS = 500;
+    } // namespace
+
     RelayApp::RelayApp(Stream &stream, RelayExtension *extension)
         : link_(stream),
           server_(80),
@@ -42,6 +49,26 @@ namespace esp32
     {
         link_.poll(on_frame, this, now_ms);
         server_.handleClient();
+        report_stations(now_ms);
+    }
+
+    /* Polled rather than taken from Wi-Fi's station events, which run on
+     * the Wi-Fi task: this way the count only ever goes out from the
+     * relay's own loop, like every other frame. */
+    void RelayApp::report_stations(uint32_t now_ms)
+    {
+        if (now_ms - stations_checked_ms_ < STATIONS_POLL_MS)
+        {
+            return;
+        }
+        stations_checked_ms_ = now_ms;
+
+        uint8_t count = ap_.station_count();
+        if (count != reported_stations_)
+        {
+            reported_stations_ = count;
+            link_.send_event(MsgType::EVT_AP_STATIONS, &count, 1);
+        }
     }
 
     void RelayApp::on_frame(void          *ctx,
@@ -57,6 +84,7 @@ namespace esp32
                 remote::protocol::ApEnableWire wire {};
                 remote::protocol::decode_ap_enable(payload, wire);
                 self->ap_.enable(wire.ssid, wire.password);
+                self->reported_stations_ = 0; /* the dash starts at 0 */
 
                 remote::protocol::ApReadyWire ready {};
                 self->ap_.get_ip(ready.ip);
@@ -70,6 +98,7 @@ namespace esp32
 
             case MsgType::CMD_AP_DISABLE:
                 self->ap_.disable();
+                self->reported_stations_ = 0;
                 self->link_.send_event(MsgType::EVT_AP_DISABLED, nullptr, 0);
                 break;
 

@@ -17,7 +17,7 @@
 #include "simulator_clock.hpp"
 #include "simulator_config_store.hpp"
 #include "simulator_display.hpp"
-#include "simulator_serial_link.hpp"
+#include "simulator_relay.hpp"
 #include "simulator_storage.hpp"
 #include "simulator_touch.hpp"
 
@@ -26,7 +26,7 @@ Platform &platform_get()
     static Platform s_platform {
         SimulatorCanBus::instance(), SimulatorDisplay::instance(),
         SimulatorTouch::instance(),  SimulatorConfigStore::instance(),
-        SimulatorClock::instance(),  SimulatorSerialLink::instance(),
+        SimulatorClock::instance(),  SimulatorRelay::instance(),
         SimulatorStorage::instance(),
     };
     return s_platform;
@@ -69,10 +69,16 @@ void platform_restart()
     exit(1);
 }
 
-/* No field updates on this board -- see platform.hpp's FIRMWARE section. */
+/* No field updates on this board -- see platform.hpp's FIRMWARE section.
+ * (SimulatorRelay fakes the update *screens*; nothing is installed.) */
 const char *platform_firmware_version()
 {
     return "simulator";
+}
+
+bool platform_update_path_ready()
+{
+    return true;
 }
 
 void platform_firmware_healthy()

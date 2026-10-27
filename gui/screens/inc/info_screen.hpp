@@ -55,6 +55,13 @@ namespace gui
              * clean state rather than stacking animations. */
             void set_logging_active(bool active);
 
+            /** Shows/hides "Tap screen to exit preview" along the top,
+             * for while a phone is previewing on the dashboard. The
+             * panels move down to make room rather than sit under it --
+             * every layout still fits (checked at both orientations).
+             * Cheap to repeat with the same value. */
+            void set_preview_banner(bool shown);
+
             lv_obj_t *screen() const
             {
                 return screen_;
@@ -71,6 +78,7 @@ namespace gui
 
             lv_obj_t    *screen_        = nullptr;
             lv_obj_t    *logging_led_   = nullptr;
+            lv_obj_t    *preview_lbl_   = nullptr;
             const Theme *theme_         = nullptr;
 
             PanelWidget panels_[MAX_PANELS];

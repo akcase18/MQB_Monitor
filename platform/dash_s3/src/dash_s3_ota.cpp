@@ -35,8 +35,12 @@ namespace
             case OtaResult::ErrNotFirmware:
                 return { 415, "That isn't a firmware file for this dash." };
             case OtaResult::ErrWrongHardware:
-                return { 409, "That firmware is built for different dash "
-                              "hardware." };
+                return { 409, "That firmware is for different dash "
+                              "hardware, or is a bench test build." };
+            case OtaResult::ErrNeedsUsb:
+                return { 409, "That firmware changes how the dash's flash "
+                              "is laid out, so it has to be installed "
+                              "over USB." };
             case OtaResult::ErrTooLarge:
                 return { 413, "That file is too big to be dash firmware." };
             case OtaResult::ErrCorrupt:
@@ -280,6 +284,9 @@ void DashS3Updater::take_bytes(const uint8_t *data, size_t len)
                 break;
             case FirmwareImageCheck::WrongHardware:
                 fail(OtaResult::ErrWrongHardware);
+                return;
+            case FirmwareImageCheck::NeedsUsb:
+                fail(OtaResult::ErrNeedsUsb);
                 return;
             case FirmwareImageCheck::NotFirmware:
             default:

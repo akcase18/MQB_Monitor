@@ -55,6 +55,9 @@ namespace remote::protocol
      * descriptor (platform/dash_s3/inc/dash_s3_firmware.hpp). */
     constexpr uint8_t WIRE_VERSION_LEN = 32;
 
+    /** REQ_REVERT_PREVIEW's optional payload byte. */
+    constexpr uint8_t REVERT_PAGE_LEFT = 1;
+
     enum class MsgType : uint8_t
     {
         REQ_GET_STATE     = 0x01, /* C3 -> Teensy */
@@ -73,12 +76,21 @@ namespace remote::protocol
          * with RESP_APPLY_RESULT. RESP_STATE's trailing byte reports the
          * session: bit 0 = active, bit 1 = unsaved changes. */
         REQ_PREVIEW_CONFIG = 0x06, /* C3 -> Teensy */
-        REQ_REVERT_PREVIEW = 0x07, /* C3 -> Teensy, empty payload */
+        /* C3 -> Teensy. Empty: the page's Discard. One byte,
+         * REVERT_PAGE_LEFT: the page is going away (closed, switched
+         * from, phone locked), so the panel goes back to the QR code
+         * rather than staying on the dashboard. */
+        REQ_REVERT_PREVIEW = 0x07,
 
         CMD_AP_ENABLE   = 0x10, /* Teensy -> C3 */
         EVT_AP_READY    = 0x11, /* C3 -> Teensy, async */
         CMD_AP_DISABLE  = 0x12, /* Teensy -> C3 */
         EVT_AP_DISABLED = 0x13, /* C3 -> Teensy, best-effort ack */
+        /* C3 -> Teensy, u8: how many phones are joined to the AP, sent
+         * whenever that changes while it's up. A phone that walks out of
+         * range counts until the AP deauths it (RelayApp's inactive
+         * time); one that leaves the network drops out at once. */
+        EVT_AP_STATIONS = 0x14,
 
         /* Firmware update -- the ESP32-S3 dash only, whose relay writes
          * an uploaded image into the inactive app slot itself (see
@@ -124,6 +136,7 @@ namespace remote::protocol
         ErrCorrupt       = 5, /* failed the image's checksum/SHA-256 */
         ErrInterrupted   = 6, /* the upload stopped partway */
         ErrNotArmed      = 7, /* update mode wasn't agreed to on the panel */
+        ErrNeedsUsb      = 8, /* built for another partition table */
     };
 
     /** Standard CRC-16/CCITT-FALSE: poly 0x1021, init 0xFFFF, no reflect,

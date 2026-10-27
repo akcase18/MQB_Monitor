@@ -104,6 +104,8 @@ const $ = id => document.getElementById(id);
  * dash_s3_firmware.hpp. Offsets are into the .bin. */
 const FW_ID = { offset: 288, magic: "MQB-DASH-S3", magicLen: 16, variantLen: 16, versionLen: 32 };
 const FW_ID_END = FW_ID.offset + FW_ID.magicLen + FW_ID.variantLen + FW_ID.versionLen;
+/* After those, a layout tag and the partition-table CRC, which only the
+ * dash checks -- the page doesn't know the dash's table. */
 
 let chosen = null, sending = false, armed = false;
 
@@ -117,7 +119,10 @@ async function inspect(file) {
   const head = new Uint8Array(await file.slice(0, FW_ID_END).arrayBuffer());
   if (head.length < FW_ID_END || head[0] !== 0xE9) return null;
   if (text(head, FW_ID.offset, FW_ID.magicLen) !== FW_ID.magic) return null;
-  return { version: text(head, FW_ID.offset + FW_ID.magicLen + FW_ID.variantLen, FW_ID.versionLen) };
+  return {
+    variant: text(head, FW_ID.offset + FW_ID.magicLen, FW_ID.variantLen),
+    version: text(head, FW_ID.offset + FW_ID.magicLen + FW_ID.variantLen, FW_ID.versionLen),
+  };
 }
 
 function show(el, message, bad) {
@@ -146,7 +151,11 @@ $("file").addEventListener("change", async () => {
   chosen = file;
   $("file-info").classList.remove("bad");
   $("file-info").textContent = "";
-  $("file-info").append(id.version || "Unknown version");
+  /* A stress build fakes its CAN data; the dash refuses it unless it's
+   * running one too, but say so before it's sent. */
+  const stress = id.variant.endsWith("-stress");
+  $("file-info").append((id.version || "Unknown version") + (stress ? " · bench test build" : ""));
+  $("file-info").classList.toggle("bad", stress);
   const sub = document.createElement("span");
   sub.className = "sub";
   sub.textContent = file.name + " · " + (file.size / 1048576).toFixed(2) + " MB";

@@ -509,6 +509,15 @@ constexpr size_t FIRMWARE_VERSION_LEN = 32;
 const char *platform_firmware_version();
 
 /**
+ * Whether what the next update depends on came up with this firmware
+ * (on the S3 dash: the relay task that serves the update page is
+ * running). A firmware that fails this would leave the board needing a
+ * USB flash to fix it, so it isn't declared healthy. True where there
+ * are no field updates.
+ */
+bool platform_update_path_ready();
+
+/**
  * Declares the running firmware good. A freshly installed update boots
  * on probation: any reset before this is called -- a crash, the hang
  * watchdog, the power going -- boots the previous firmware instead. Call

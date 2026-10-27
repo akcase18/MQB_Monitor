@@ -96,7 +96,8 @@ namespace gui
     /**
      * A Cancel/Confirm popup in this app's flat, dark styling rather than
      * lv_msgbox's default light-mode look: one-line `title`, one-line
-     * `body`, and a footer tall enough to tap without looking.
+     * `body` (or none, for null), and a footer tall enough to tap without
+     * looking.
      *
      * Used for the two changes that shouldn't happen on a single stray
      * press -- switching the display's layout (which restarts the board)

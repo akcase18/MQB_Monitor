@@ -42,14 +42,30 @@ Every pin is a `-D` with a default, in **`inc/dash_s3_pins.hpp`**. The defaults 
 Over Wi-Fi from a phone, with the panel confirming before anything is installed. The design and its reasoning are in **[OTA_PLAN.md](OTA_PLAN.md)**.
 
 1. **Once, over USB:** `pio run -e dash_s3 -t upload`. This writes the A/B partition table. Existing logs are lost this once; settings live in NVS and survive.
-2. Build the update: `pio run -e dash_s3` produces `.pio/build/dash_s3/firmware.bin`. Its version is `git describe` at build time (`tools/fw_version.py`), so tag releases for readable names.
+2. Build the update. For anything you hand out, tag the commit and run `python3 tools/release.py` (see [Releases](#releases)). For your own bench, `pio run -e dash_s3` produces `.pio/build/dash_s3/firmware.bin`, versioned by `git describe` at build time (`tools/fw_version.py`).
 3. On the panel, open Settings → Wi-Fi. Join the AP and open `http://192.168.4.1/update`, or use the **Update** link at the bottom of the config page.
 4. Opening the page makes the panel ask **Update firmware?** (30 s countdown). Tap **Start** and the panel goes into update mode; the page's file picker unlocks only then, and uploads are refused without that tap. Update mode gives up after 5 minutes with nothing sent.
-5. Choose `firmware.bin` (the page shows its version) and tap **Send to dash**.
+5. Choose the firmware file (the page shows its version, and marks a bench stress build) and tap **Send to dash**.
 6. The panel shows progress, then asks **Install and restart?**. Nothing changes until Install is tapped there. A failed upload leaves the panel waiting for another try; the X while waiting (or Cancel on the Install popup) leaves update mode.
-7. The new firmware gets 10 s to prove itself, with frames reaching the panel and `loop()` coming round under a 5 s hang watchdog. A crash, a hang or a power cut before then boots the previous firmware, which says **Update failed — Still on *version***.
+7. The new firmware gets 10 s to prove itself: frames reaching the panel, `loop()` coming round under a 5 s hang watchdog, and the Wi-Fi relay that serves the update page running. A crash, a hang, or a power cut before then boots the previous firmware, which says **Update failed — Still on *version***. So does a relay that never came up, at the next restart. Once proven, there's no going back from the panel: send the older file the same way, or flash it over USB.
 
-A file built for the C3, for another project, or for the other dash hardware (`DASH_S3_HW_VARIANT`: `pcb` vs `devkit`) is refused before anything is written. USB always works as a fallback, since the S3's download mode is in ROM.
+Refused before anything is written:
+
+- a file built for the C3, for another project, or for the other dash hardware (`DASH_S3_HW_VARIANT`: `pcb` vs `devkit`);
+- a bench stress build (`env:dash_s3_stress`), which marks its variant `pcb-stress` so it can't be mistaken for the real firmware — and a dash running one refuses real firmware over the air too;
+- firmware built for a different partition table. OTA only writes an app slot, so that kind of update has to go over USB; the page says so.
+
+USB always works as a fallback, since the S3's download mode is in ROM.
+
+## Releases
+
+`tools/release.py` builds what gets handed out. Tag a clean commit (`git tag v1.2.0`), run it, and upload `releases/v1.2.0/` to the GitHub release for that tag. It holds, per hardware variant:
+
+- `mqb-dash-s3-<variant>-<version>.bin` — the file to send from the phone;
+- `bootloader.bin`, `partitions.bin`, `boot_app0.bin` and `flash-usb.sh` — the same release over USB (`./flash-usb.sh /dev/cu.usbmodem…`, needs `pip install esptool`). It writes each file at its own offset, so the dash keeps its settings; one merged image would overwrite NVS;
+- `manifest.json` and `RELEASE.md` — sizes and SHA-256s, the partition layout and settings version, and, against the previous tag, whether this release needs USB (partition table changed), changes the stored settings layout, or ships a new bootloader (which only a USB install applies).
+
+`--dev` makes a trial release from an untagged or uncommitted tree, under `releases/dev-…`. `releases/` is git-ignored.
 
 ## Stress test without a car
 
@@ -93,7 +109,7 @@ JP1 has no CTP reset pin — the breakout handles it on-board, so `DASH_S3_PIN_T
 
 - **`inc/dash_s3_pins.hpp`** — every pin, overridable. Start here.
 - **`partitions_dash.csv`** — 16 MB: two 2 MB OTA app slots and an 11.94 MB LittleFS partition, the same ~1 MB of headroom over `core::Logger`'s ring that the Teensy has. The ring is 11 MB here (`LOG_CHUNK_COUNT=44` in `platformio.ini`) rather than the Teensy's 13 MB, about 2.5 hours of worst-case retention instead of 3.
-- **`dash_s3_firmware.*`** — which firmware this is, and the board side of rollback. Every image carries a `DashS3FirmwareId` (magic, hardware variant, version) in `.rodata_custom_desc`, at byte 288 of the `.bin`, which is how an upload is identified from its first chunk. It also overrides the Arduino core's `verifyRollbackLater()` so a new image boots on probation. It implements `platform.hpp`'s FIRMWARE hooks: `platform_firmware_healthy()` ends the probation, `platform_take_failed_update()` reports a rollback once (from an NVS note written at install), and `platform_hang_watchdog()` is the Arduino loop watchdog.
+- **`dash_s3_firmware.*`** — which firmware this is, and the board side of rollback. Every image carries a `DashS3FirmwareId` (magic, build variant, version, partition-layout CRC) in `.rodata_custom_desc`, at byte 288 of the `.bin`, which is how an upload is identified from its first chunk. Images from before the layout field carry no tag and count as the original A/B table (`LEGACY_PARTITION_LAYOUT`). It also overrides the Arduino core's `verifyRollbackLater()` so a new image boots on probation, and checks at compile time that the log ring fits the LittleFS partition. It implements `platform.hpp`'s FIRMWARE hooks: `platform_update_path_ready()` (the relay task is running, `DashS3Wireless::relay_running()`), `platform_firmware_healthy()` ends the probation, `platform_take_failed_update()` reports a rollback once (from an NVS note written at install), and `platform_hang_watchdog()` is the Arduino loop watchdog.
 - **`dash_s3_ota.*`** — `DashS3Updater`, the relay-side updater, plugged into `esp32::RelayApp` as a `RelayExtension`. It serves `/update` and `/api/version`, streams a raw `POST /update` body into the inactive slot with `esp_ota_*`, and reports to the panel over `EVT_OTA_*`. Only `CMD_OTA_COMMIT` from the panel switches slots. Arduino's `Update` library isn't used because its `end()` switches slots itself.
 - **`web/update.html`** — the upload page, gzipped in by `tools/web/embed_web.py`.
 - **`dash_s3_display.*`** — `DashS3Display`, an ILI9488 driver written directly against ESP-IDF's `esp_lcd` i80 panel-IO layer rather than a display library. The init sequence, MADCTL rotation values and byte order are ported from `lib/ILI948x_t4_mm`, so what shows up should match the Teensy pixel for pixel. Two contracts carry over from the Teensy driver: a push blocks only on the *previous* DMA transfer, then issues and returns (which is what lets `src/main.cpp` call `lv_display_flush_ready` synchronously), and the backlight comes up **off** and stays off until `main.cpp` has seen a real frame land.

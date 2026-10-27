@@ -20,6 +20,10 @@ namespace gui
         /* Half-period: lit this long, dark this long. Slow enough to
          * read as a deliberate recording light rather than an alarm. */
         constexpr uint32_t LOGGING_LED_BLINK_MS = 700;
+        /* The strip the preview banner takes off the top of the grid --
+         * room for one line of label_lg. 30 still fits every layout's
+         * readouts and gauges at either orientation. */
+        constexpr lv_coord_t PREVIEW_BANNER_HEIGHT = 26;
     } // namespace
 
     FLASHMEM void InfoScreen::init(const Theme       &theme,
@@ -70,6 +74,24 @@ namespace gui
                      -LOGGING_LED_MARGIN,
                      LOGGING_LED_MARGIN);
         lv_obj_add_flag(logging_led_, LV_OBJ_FLAG_HIDDEN);
+
+        /* Out of the grid like the LED. Not clickable, so a tap on it
+         * reaches the screen, which main.cpp listens on. Aligned against
+         * the content area, which starts under the banner's strip once
+         * it's shown -- hence the negative offset. Hidden until
+         * set_preview_banner(true). */
+        preview_lbl_ = lv_label_create(screen_);
+        lv_obj_add_flag(preview_lbl_, LV_OBJ_FLAG_IGNORE_LAYOUT);
+        lv_obj_set_style_text_color(preview_lbl_, theme.palette.fg, 0);
+        lv_obj_set_style_text_font(preview_lbl_, theme.typography.label_lg, 0);
+        lv_label_set_text(preview_lbl_, "Tap screen to exit preview");
+        lv_coord_t line_h = lv_font_get_line_height(theme.typography.label_lg);
+        lv_obj_align(preview_lbl_,
+                     LV_ALIGN_TOP_MID,
+                     0,
+                     -PREVIEW_BANNER_HEIGHT
+                         + (PREVIEW_BANNER_HEIGHT - line_h) / 2);
+        lv_obj_set_hidden(preview_lbl_, true);
     }
 
     void InfoScreen::rebuild(uint8_t count, LayoutOrientation orientation)
@@ -224,6 +246,28 @@ namespace gui
             lv_anim_delete(logging_led_, nullptr);
             lv_obj_add_flag(logging_led_, LV_OBJ_FLAG_HIDDEN);
         }
+    }
+
+    FLASHMEM void InfoScreen::set_preview_banner(bool shown)
+    {
+        if (lv_obj_is_hidden(preview_lbl_) != shown)
+        {
+            return;
+        }
+        lv_obj_set_hidden(preview_lbl_, !shown);
+        lv_obj_set_style_pad_top(
+            screen_,
+            theme_->metrics.screen_margin
+                + (shown ? PREVIEW_BANNER_HEIGHT : 0),
+            0);
+
+        /* Every panel just changed height: re-place their contents, as
+         * rebuild() does (see PanelWidget::set_visible()). */
+        for (uint8_t i = 0; i < num_panels_; i++)
+        {
+            panels_[i].set_visible(true);
+        }
+        refresh();
     }
 
     void InfoScreen::panel_clicked_cb(lv_event_t *e)

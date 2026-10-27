@@ -16,17 +16,17 @@ namespace gui
          * block in the space under the nav bar -- the same centring the
          * Wi-Fi screen's spinner block uses, so it sits right in either
          * orientation. */
-        constexpr lv_coord_t BAR_HEIGHT       = 14;
-        constexpr lv_coord_t BAR_SIDE_MARGIN  = 40;
+        constexpr lv_coord_t BAR_HEIGHT         = 14;
+        constexpr lv_coord_t BAR_SIDE_MARGIN    = 40;
         constexpr lv_coord_t STATUS_SIDE_MARGIN = 16;
-        constexpr lv_coord_t STATUS_TO_BAR    = 40;
-        constexpr lv_coord_t BAR_TO_PERCENT   = 26;
-        constexpr lv_coord_t PERCENT_TO_HINT  = 40;
+        constexpr lv_coord_t STATUS_TO_BAR      = 40;
+        constexpr lv_coord_t BAR_TO_PERCENT     = 26;
+        constexpr lv_coord_t PERCENT_TO_HINT    = 40;
         /* No bar while waiting, so the hint closes up under the status
          * line rather than leaving the bar's gap between them. */
         constexpr lv_coord_t STATUS_TO_HINT_WAITING = 36;
-        constexpr lv_coord_t BLOCK_HEIGHT     = STATUS_TO_BAR + BAR_TO_PERCENT
-                                            + PERCENT_TO_HINT + 24;
+        constexpr lv_coord_t BLOCK_HEIGHT
+            = STATUS_TO_BAR + BAR_TO_PERCENT + PERCENT_TO_HINT + 24;
 
         /* Matches PanelWidget's bar track. A hex value rather than an
          * lv_color_t global, whose dynamic initializer would land in
@@ -58,11 +58,12 @@ namespace gui
         create_nav_title(screen_, theme, "Firmware update");
         DoneButton close = create_close_button(screen_, theme);
         close_btn_       = close.btn;
-        lv_obj_add_event_cb(close_btn_, leave_clicked_cb, LV_EVENT_CLICKED, this);
+        lv_obj_add_event_cb(
+            close_btn_, leave_clicked_cb, LV_EVENT_CLICKED, this);
         create_divider(screen_, theme, HEADER_DIVIDER_Y);
 
         lv_coord_t body_height = theme.metrics.screen_height - HEADER_DIVIDER_Y;
-        lv_coord_t top         = HEADER_DIVIDER_Y + (body_height - BLOCK_HEIGHT) / 2;
+        lv_coord_t top = HEADER_DIVIDER_Y + (body_height - BLOCK_HEIGHT) / 2;
 
         /* One line, cut short with an ellipsis: a full 31-character
          * version runs past Portrait's 320px, and wrapped it would run
@@ -79,13 +80,14 @@ namespace gui
 
         bar_ = lv_bar_create(screen_);
         lv_bar_set_range(bar_, 0, 100);
-        lv_obj_set_size(bar_,
-                        theme.metrics.screen_width - 2 * BAR_SIDE_MARGIN,
-                        BAR_HEIGHT);
+        lv_obj_set_size(
+            bar_, theme.metrics.screen_width - 2 * BAR_SIDE_MARGIN, BAR_HEIGHT);
         lv_obj_align(bar_, LV_ALIGN_TOP_MID, 0, top + STATUS_TO_BAR);
-        lv_obj_set_style_bg_color(bar_, lv_color_hex(TRACK_COLOR), LV_PART_MAIN);
+        lv_obj_set_style_bg_color(
+            bar_, lv_color_hex(TRACK_COLOR), LV_PART_MAIN);
         lv_obj_set_style_bg_opa(bar_, LV_OPA_COVER, LV_PART_MAIN);
-        lv_obj_set_style_bg_color(bar_, theme.palette.accent, LV_PART_INDICATOR);
+        lv_obj_set_style_bg_color(
+            bar_, theme.palette.accent, LV_PART_INDICATOR);
 
         percent_lbl_ = lv_label_create(screen_);
         lv_obj_set_style_text_color(percent_lbl_, theme.palette.fg, 0);
@@ -99,8 +101,9 @@ namespace gui
         hint_lbl_ = lv_label_create(screen_);
         lv_obj_set_style_text_color(hint_lbl_, theme.palette.panel_border, 0);
         lv_obj_set_style_text_font(hint_lbl_, theme.typography.label_lg, 0);
-        hint_y_progress_ = top + STATUS_TO_BAR + BAR_TO_PERCENT + PERCENT_TO_HINT;
-        hint_y_waiting_  = top + STATUS_TO_HINT_WAITING;
+        hint_y_progress_
+            = top + STATUS_TO_BAR + BAR_TO_PERCENT + PERCENT_TO_HINT;
+        hint_y_waiting_ = top + STATUS_TO_HINT_WAITING;
     }
 
     FLASHMEM void FirmwareUpdateScreen::destroy()
@@ -130,7 +133,8 @@ namespace gui
         lv_screen_load(screen_);
     }
 
-    FLASHMEM void FirmwareUpdateScreen::refresh(const FirmwareUpdateViewModel &vm)
+    FLASHMEM void FirmwareUpdateScreen::refresh(
+        const FirmwareUpdateViewModel &vm)
     {
         set_view_model(vm);
     }
@@ -147,7 +151,8 @@ namespace gui
                     snprintf(status, sizeof(status), "Waiting for firmware");
                     break;
                 case FirmwareUpdatePhase::Receiving:
-                    snprintf(status, sizeof(status), "Receiving %s", vm.version);
+                    snprintf(
+                        status, sizeof(status), "Receiving %s", vm.version);
                     break;
                 case FirmwareUpdatePhase::Ready:
                     snprintf(status, sizeof(status), "%s is ready", vm.version);
@@ -159,9 +164,9 @@ namespace gui
             }
             lv_label_set_text(status_lbl_, status);
 
-            bool waiting    = vm.phase == FirmwareUpdatePhase::Waiting;
-            bool no_bar     = waiting
-                          || vm.phase == FirmwareUpdatePhase::Installing;
+            bool waiting = vm.phase == FirmwareUpdatePhase::Waiting;
+            bool no_bar
+                = waiting || vm.phase == FirmwareUpdatePhase::Installing;
             lv_obj_set_hidden(bar_, no_bar);
             lv_obj_set_hidden(percent_lbl_, no_bar);
             lv_obj_set_hidden(close_btn_, !waiting);
@@ -178,10 +183,8 @@ namespace gui
                                     install_clicked_cb,
                                     LV_EVENT_CLICKED,
                                     this);
-                lv_obj_add_event_cb(popup.cancel_btn,
-                                    leave_clicked_cb,
-                                    LV_EVENT_CLICKED,
-                                    this);
+                lv_obj_add_event_cb(
+                    popup.cancel_btn, leave_clicked_cb, LV_EVENT_CLICKED, this);
                 popup_ = popup.mbox;
             }
             else if (vm.phase != FirmwareUpdatePhase::Ready)
@@ -196,8 +199,8 @@ namespace gui
             if (vm.phase == FirmwareUpdatePhase::Waiting)
             {
                 /* Short enough for Portrait's 320px. */
-                hint = vm.upload_failed ? "Failed. Send it again."
-                                        : "Send it from your phone.";
+                hint = vm.upload_failed ? "Failed. Try upload again."
+                                        : "Upload new firmware file.";
             }
             lv_label_set_text(hint_lbl_, hint);
         }

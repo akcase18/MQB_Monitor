@@ -39,6 +39,7 @@
 #include "theme_picker_screen.hpp"
 #include "vehicle_binding.hpp"
 #include "warning_config_screen.hpp"
+#include "wifi_indicator.hpp"
 #include "wireless_setup_screen.hpp"
 
 #include <lvgl.h>
@@ -100,9 +101,10 @@ namespace
      * end without a noticeable gap. */
     constexpr uint32_t FIRMWARE_UPDATE_REFRESH_MS = 200;
     /* How long a freshly installed firmware has to run normally -- loop()
-     * coming round under the hang watchdog, frames reaching the panel --
-     * before it is declared good and the previous one stops being the
-     * fallback (see platform_firmware_healthy()). */
+     * coming round under the hang watchdog, frames reaching the panel,
+     * the relay up (platform_update_path_ready()) -- before it is declared
+     * good and the previous one stops being the fallback (see
+     * platform_firmware_healthy()). */
     constexpr uint32_t FIRMWARE_HEALTHY_AFTER_MS = 10 * 1000;
     /* Slower than the info screen's: nothing here changes faster than
      * once a minute except the capture toggle, which repaints itself on
@@ -175,24 +177,25 @@ namespace
             core::Scheduler    scheduler;
             core::Logger       logger;
 
-            remote::server::RemoteConfigServer remote_server;
-            remote::server::RemoteConfigLink   remote_link;
-            remote::server::RemoteApController remote_ap;
+            remote::server::RemoteConfigServer  remote_server;
+            remote::server::RemoteConfigLink    remote_link;
+            remote::server::RemoteApController  remote_ap;
             remote::server::RemoteOtaController remote_ota;
 
             gui::VehicleBinding vehicle_binding;
             gui::RemoteBinding  remote_binding;
 
-            gui::InfoScreen          info_screen;
-            gui::LoggingScreen       logging_screen;
-            gui::ConfiguratorScreen  configurator_screen;
-            gui::SignalPickerScreen  signal_picker_screen;
-            gui::WarningConfigScreen warning_screen;
-            gui::SettingsScreen      settings_screen;
-            gui::ThemePickerScreen   theme_picker_screen;
-            gui::OrientationScreen   orientation_screen;
-            gui::WirelessSetupScreen wireless_setup_screen;
+            gui::InfoScreen           info_screen;
+            gui::LoggingScreen        logging_screen;
+            gui::ConfiguratorScreen   configurator_screen;
+            gui::SignalPickerScreen   signal_picker_screen;
+            gui::WarningConfigScreen  warning_screen;
+            gui::SettingsScreen       settings_screen;
+            gui::ThemePickerScreen    theme_picker_screen;
+            gui::OrientationScreen    orientation_screen;
+            gui::WirelessSetupScreen  wireless_setup_screen;
             gui::FirmwareUpdateScreen firmware_update_screen;
+            gui::WifiIndicator        wifi_indicator;
             /* Not built by build_screens() -- created and destroyed around
              * each sniffer session (see enter_sniff()). */
             gui::SnifferScreen sniffer_screen;
@@ -207,9 +210,8 @@ namespace
                 , uds_client(platform.can, CAN_TX_ID, CAN_RX_ID)
                 , uds_poller(uds_client, platform.clock)
                 , scheduler(platform.clock)
-                , logger(platform.storage,
-                         core::CHUNK_SIZE_BYTES,
-                         LOG_CHUNK_COUNT)
+                , logger(
+                      platform.storage, core::CHUNK_SIZE_BYTES, LOG_CHUNK_COUNT)
                 , remote_server(config_store, signal_store)
                 , remote_link(platform.serial, remote_server)
                 , remote_ap(remote_link, platform.clock)
@@ -292,7 +294,7 @@ namespace
 
     /** The 180-degree flag belonging to `orientation` -- each layout
      * keeps its own, so rotating one never turns the other over. */
-    bool &flipped_for(core::Settings &settings,
+    bool &flipped_for(core::Settings         &settings,
                       core::LayoutOrientation orientation)
     {
         return orientation == core::LayoutOrientation::Vertical
@@ -672,6 +674,16 @@ namespace
         return local;
     }
 
+    /** Whether a revert in progress is for the phone having gone -- off
+     * the AP (phone_left()) or silent past REMOTE_SESSION_TIMEOUT_MS --
+     * and should land on the Wi-Fi screen's QR code, as the page closing
+     * does (ConfigEvent::PageLeft). */
+    bool &reverting_for_lost_phone()
+    {
+        static bool lost = false;
+        return lost;
+    }
+
     /** Throws away the phone's unsaved preview, if there is one. For when
      * the session ends without a Save: the panel's X, or the AP timing
      * out. */
@@ -715,6 +727,40 @@ namespace
         return night;
     }
 
+    /* The Wi-Fi glyph follows the AP: shown only while it's Active.
+     * Called wherever the AP state can change, and after a screen
+     * rebuild, which recreates the glyph hidden. */
+    FLASHMEM void sync_wifi_indicator()
+    {
+        Composition &app = composition();
+        app.wifi_indicator.set_state(
+            app.remote_ap.state() == remote::server::ApState::Active,
+            app.remote_ap.station_count() > 0);
+    }
+
+    /* The last phone left the AP, which stays up. Whatever it was
+     * previewing goes, and the dashboard it left behind -- previewing, or
+     * back on live values after its page closed -- gives way to the QR
+     * code, ready for the next one. Anywhere else, someone at the panel
+     * is using it: stay put. */
+    FLASHMEM void phone_left()
+    {
+        Composition &app = composition();
+        if (app.remote_server.preview_active())
+        {
+            /* remote_config_event_cb does the navigating. */
+            reverting_for_lost_phone() = true;
+            revert_remote_preview();
+            reverting_for_lost_phone() = false;
+        }
+        else if (lv_screen_active() == app.info_screen.screen())
+        {
+            app.wireless_setup_screen.open(
+                app.remote_binding.build_view_model(),
+                app.settings_screen.screen());
+        }
+    }
+
     /* Request/response pairs are handled internally by
      * RemoteConfigLink::poll(); this only ever sees the async EVT_*
      * messages -- the AP's and a firmware update's. Each controller
@@ -725,10 +771,20 @@ namespace
                                 uint16_t                  len)
     {
         (void)ctx;
-        Composition &app = composition();
-        uint32_t     now = platform_get().clock.millis();
+        Composition &app    = composition();
+        uint32_t     now    = platform_get().clock.millis();
+        uint8_t      phones = app.remote_ap.station_count();
         app.remote_ap.on_event(type, payload, len, now);
         app.remote_ota.on_event(type, payload, len, now);
+        sync_wifi_indicator();
+
+        /* Only while the AP is still up: its going down zeroes the count
+         * too, and has its own handling (remote_ap_idle_check_task). */
+        if (phones > 0 && app.remote_ap.station_count() == 0
+            && app.remote_ap.state() == remote::server::ApState::Active)
+        {
+            phone_left();
+        }
     }
 
     /* Registered once at remote::server::AP_IDLE_CHECK_PERIOD_MS via
@@ -739,14 +795,14 @@ namespace
         (void)ctx;
         Composition &app = composition();
         app.remote_ap.tick(platform_get().clock.millis());
+        sync_wifi_indicator();
 
         /* The AP timed out (or otherwise went down) with the phone's
          * edits still unsaved -- nobody is left to Save them. Keyed on the
-         * AP *leaving* Active rather than on it not being Active, so a
-         * preview from tools/web/dev_server.py (which needs no AP) isn't
-         * thrown away a second after it lands. */
+         * AP *leaving* Active rather than on it not being Active, so this
+         * runs once per AP session, not on every check while it's down. */
         static bool was_active = false;
-        bool        active = app.remote_ap.state() == remote::server::ApState::Active;
+        bool active = app.remote_ap.state() == remote::server::ApState::Active;
         if (was_active && !active)
         {
             revert_remote_preview();
@@ -761,7 +817,9 @@ namespace
             && platform_get().clock.millis() - remote_last_request_ms()
                    > REMOTE_SESSION_TIMEOUT_MS)
         {
+            reverting_for_lost_phone() = true;
             revert_remote_preview();
+            reverting_for_lost_phone() = false;
         }
     }
 
@@ -931,8 +989,8 @@ namespace
      * Swapping width and height can't happen live -- the lv_display_t and
      * every screen are sized from it once, at boot -- so this persists
      * the pick and restarts, which is what the popup told the user. */
-    FLASHMEM void orientation_layout_confirm_cb(void                  *ctx,
-                                       gui::LayoutOrientation orientation)
+    FLASHMEM void orientation_layout_confirm_cb(
+        void *ctx, gui::LayoutOrientation orientation)
     {
         (void)ctx;
         core::Settings &settings = composition().config_store.get().settings;
@@ -1398,8 +1456,8 @@ namespace
         lv_obj_add_event_cb(
             popup.cancel_btn, sniff_cancel_cb, LV_EVENT_CLICKED, nullptr);
 
-        s_sniff_popup      = popup.mbox;
-        s_sniff_ring       = gui::add_popup_countdown(
+        s_sniff_popup = popup.mbox;
+        s_sniff_ring  = gui::add_popup_countdown(
             popup, runtime_theme(), SNIFF_CONFIRM_TIMEOUT_MS / 100);
         s_sniff_state      = SniffState::Pending;
         s_sniff_pending_ms = platform_get().clock.millis();
@@ -1416,14 +1474,12 @@ namespace
         uint32_t   elapsed = now - s_sniff_rate_ms;
 
         gui::SnifferViewModel vm;
-        vm.channel = !s_sniff_session.is_open()
-                         ? gui::SnifferChannel::Closed
+        vm.channel = !s_sniff_session.is_open() ? gui::SnifferChannel::Closed
                      : s_sniff_session.is_listen_only()
                          ? gui::SnifferChannel::ListenOnly
                          : gui::SnifferChannel::Normal;
-        vm.frames_per_sec = elapsed == 0 ? 0
-                                         : (stats.rx - s_sniff_rate_rx) * 1000u
-                                               / elapsed;
+        vm.frames_per_sec
+            = elapsed == 0 ? 0 : (stats.rx - s_sniff_rate_rx) * 1000u / elapsed;
         vm.total_frames   = stats.rx;
         vm.dropped_frames = stats.dropped;
         composition().sniffer_screen.refresh(vm);
@@ -1457,8 +1513,8 @@ namespace
                && can.sniff_read(frame))
         {
             char   line[core::slcan::ENCODED_MAX];
-            size_t n
-                = core::slcan::encode(frame, s_sniff_session.timestamps(), line);
+            size_t n = core::slcan::encode(
+                frame, s_sniff_session.timestamps(), line);
             Serial.write(reinterpret_cast<const uint8_t *>(line), n);
         }
     }
@@ -1502,10 +1558,10 @@ namespace
             {
                 /* Tenths of a second; lv_arc_set_value() ignores a repeat,
                  * so this redraws the ring ten times a second at most. */
-                lv_arc_set_value(s_sniff_ring,
-                                 (SNIFF_CONFIRM_TIMEOUT_MS
-                                  - (now - s_sniff_pending_ms))
-                                     / 100);
+                lv_arc_set_value(
+                    s_sniff_ring,
+                    (SNIFF_CONFIRM_TIMEOUT_MS - (now - s_sniff_pending_ms))
+                        / 100);
             }
             return false;
         }
@@ -1607,11 +1663,18 @@ namespace
         return accent;
     }
 
-    /** Where a queued rebuild lands: the dashboard, or SettingsScreen. */
-    bool &rebuild_to_dashboard()
+    /** Where a queued rebuild lands. */
+    enum class RebuildTarget : uint8_t
     {
-        static bool to_dashboard = false;
-        return to_dashboard;
+        Settings,
+        Dashboard,
+        Wireless, /* the QR code, after the phone left -- phone_left() */
+    };
+
+    RebuildTarget &rebuild_target()
+    {
+        static RebuildTarget target = RebuildTarget::Settings;
+        return target;
     }
 
     bool &rebuild_pending()
@@ -1626,9 +1689,9 @@ namespace
      * tapping through swatches) cost one rebuild, landing wherever the
      * last one asked for.
      */
-    FLASHMEM void request_rebuild(bool to_dashboard)
+    FLASHMEM void request_rebuild(RebuildTarget target)
     {
-        rebuild_to_dashboard() = to_dashboard;
+        rebuild_target() = target;
         if (rebuild_pending())
         {
             return;
@@ -1663,7 +1726,7 @@ namespace
         settings.accent_color    = accent_color;
         composition().config_store.save();
 
-        request_rebuild(false);
+        request_rebuild(RebuildTarget::Settings);
     }
 
     /* The other half of theme_picker_done_cb's blank_backlight(). Fires
@@ -1727,15 +1790,14 @@ namespace
      * can be: the page has no control for it, but a config loaded from a
      * file carries one, and a discard can put it back. */
     FLASHMEM void remote_config_event_cb(
-        void                                           *ctx,
-        remote::server::RemoteConfigServer::ConfigEvent event)
+        void *ctx, remote::server::RemoteConfigServer::ConfigEvent event)
     {
         (void)ctx;
         using Event = remote::server::RemoteConfigServer::ConfigEvent;
 
         Composition          &app      = composition();
         const core::Settings &settings = app.config_store.get().settings;
-        uint32_t now = platform_get().clock.millis();
+        uint32_t              now      = platform_get().clock.millis();
         app.remote_ap.note_activity(now);
         remote_last_request_ms() = now;
 
@@ -1759,8 +1821,8 @@ namespace
         apply_backlight(remote_showing_night() ? settings.night_brightness
                                                : settings.day_brightness);
 
-        bool flipped
-            = flipped_for(app.config_store.get().settings, active_orientation());
+        bool flipped = flipped_for(app.config_store.get().settings,
+                                   active_orientation());
         if (flipped != panel_flipped())
         {
             apply_panel_flip(flipped);
@@ -1772,7 +1834,8 @@ namespace
 
         /* The phone's mock shows sample values; the panel shows the same
          * ones for as long as the phone is driving it. */
-        app.vehicle_binding.set_value_override(app.remote_server.preview_values());
+        app.vehicle_binding.set_value_override(
+            app.remote_server.preview_values());
 
         /* Kept in step even mid-preview: SettingsScreen commits its own
          * copy of these on every exit, which would otherwise write stale
@@ -1783,22 +1846,42 @@ namespace
                                        settings.accent_color);
 
         /* The phone's own edits (and its Discard) land on the dashboard,
-         * which is what they change. A revert because the session ended
-         * stays put -- the panel's X is already on its way back to
-         * Settings. */
-        bool to_dashboard = !reverting_locally()
-                            || lv_screen_active() == app.info_screen.screen();
+         * which is what they change. A session that ended because the
+         * phone went -- its page closed, it left the AP, it fell silent --
+         * goes back to the QR code, ready for it to come back: the
+         * dashboard it was driving would otherwise just drop to live
+         * values with no sign of why. The panel's X ends it too, but stays
+         * put: it's already on its way back to Settings. */
+        bool phone_gone = reverting_for_lost_phone()
+                          || event == Event::PageLeft;
+        bool to_dashboard
+            = !phone_gone
+              && (!reverting_locally()
+                  || lv_screen_active() == app.info_screen.screen());
+        RebuildTarget target = phone_gone     ? RebuildTarget::Wireless
+                               : to_dashboard ? RebuildTarget::Dashboard
+                                              : RebuildTarget::Settings;
+
+        app.info_screen.set_preview_banner(
+            app.remote_server.preview_active());
 
         if (settings.accent_color != built_accent())
         {
-            request_rebuild(to_dashboard);
+            request_rebuild(target);
             return;
         }
 
         app.info_screen.rebuild(settings.num_panels,
                                 to_gui_orientation(active_orientation()));
         app.info_screen.refresh();
-        if (to_dashboard)
+        if (target == RebuildTarget::Wireless
+            && lv_screen_active() != app.wireless_setup_screen.screen())
+        {
+            app.wireless_setup_screen.open(
+                app.remote_binding.build_view_model(),
+                app.settings_screen.screen());
+        }
+        else if (to_dashboard)
         {
             lv_screen_load(app.info_screen.screen());
         }
@@ -1809,6 +1892,7 @@ namespace
         (void)ctx;
         composition().remote_binding.deactivate();
         revert_remote_preview();
+        sync_wifi_indicator();
     }
 
     /* Registered at a modest cadence (see WIRELESS_SCREEN_REFRESH_MS) so
@@ -1912,11 +1996,8 @@ namespace
 
     FLASHMEM void open_update_request_popup()
     {
-        gui::ConfirmPopup popup
-            = gui::create_confirm_popup(runtime_theme(),
-                                        "Update firmware?",
-                                        "From your phone.",
-                                        "Start");
+        gui::ConfirmPopup popup = gui::create_confirm_popup(
+            runtime_theme(), "Update firmware?", NULL, "Start");
         lv_obj_add_event_cb(popup.confirm_btn,
                             update_request_start_cb,
                             LV_EVENT_CLICKED,
@@ -1955,10 +2036,10 @@ namespace
             {
                 /* Tenths of a second, like the sniffer's ring. */
                 uint32_t waited = now - app.remote_ota.state_entered_ms();
-                uint32_t left   = waited < remote::server::OTA_REQUEST_TIMEOUT_MS
-                                      ? remote::server::OTA_REQUEST_TIMEOUT_MS
-                                            - waited
-                                      : 0;
+                uint32_t left
+                    = waited < remote::server::OTA_REQUEST_TIMEOUT_MS
+                          ? remote::server::OTA_REQUEST_TIMEOUT_MS - waited
+                          : 0;
                 lv_arc_set_value(s_ota_request_ring, left / 100);
             }
         }
@@ -1993,13 +2074,14 @@ namespace
 
     /* Ends a new firmware's probation (platform_firmware_healthy()) once
      * it has run FIRMWARE_HEALTHY_AFTER_MS -- this task's first run --
-     * with frames reaching the panel. Until then any reset, the hang
-     * watchdog's included, rolls the update back. Runs on after that, but
-     * the platform call does nothing a second time. */
+     * with frames reaching the panel and the relay that serves the update
+     * page up, so the next update can get in. Until then any reset, the
+     * hang watchdog's included, rolls the update back. Runs on after
+     * that, but the platform call does nothing a second time. */
     FLASHMEM void firmware_health_task(void *ctx)
     {
         (void)ctx;
-        if (last_flush_ms() != 0)
+        if (last_flush_ms() != 0 && platform_update_path_ready())
         {
             platform_firmware_healthy();
         }
@@ -2007,7 +2089,8 @@ namespace
 
     FLASHMEM void close_notice_cb(lv_event_t *e)
     {
-        lv_msgbox_close_async(static_cast<lv_obj_t *>(lv_event_get_user_data(e)));
+        lv_msgbox_close_async(
+            static_cast<lv_obj_t *>(lv_event_get_user_data(e)));
     }
 
     /* The board came back up on its old firmware after an update. Said
@@ -2021,13 +2104,29 @@ namespace
         }
 
         char body[16 + FIRMWARE_VERSION_LEN];
-        snprintf(body, sizeof(body), "Still on %s", platform_firmware_version());
+        snprintf(
+            body, sizeof(body), "Still on %s", platform_firmware_version());
 
         gui::ConfirmPopup popup = gui::create_confirm_popup(
             runtime_theme(), "Update failed", body, "OK");
         lv_obj_set_hidden(popup.cancel_btn, true);
         lv_obj_add_event_cb(
             popup.confirm_btn, close_notice_cb, LV_EVENT_CLICKED, popup.mbox);
+    }
+
+    /* A tap on the dashboard that isn't on a panel: the gaps, and the
+     * preview banner's strip. Only means something mid-preview, where it
+     * is what the banner promises. */
+    FLASHMEM void info_screen_clicked_cb(lv_event_t *e)
+    {
+        (void)e;
+        /* A swipe that started off a panel -- see
+         * InfoScreen::panel_clicked_cb. */
+        if (lv_indev_get_gesture_dir(lv_indev_active()) != LV_DIR_NONE)
+        {
+            return;
+        }
+        divert_to_wireless_if_previewing();
     }
 
     void info_screen_gesture_cb(lv_event_t *e)
@@ -2080,6 +2179,7 @@ namespace
                              nullptr);
         app.info_screen.set_logging_active(settings.logging_enabled
                                            && app.logger.is_ready());
+        app.info_screen.set_preview_banner(app.remote_server.preview_active());
         app.configurator_screen.init(theme,
                                      app.signal_names,
                                      app.signal_ids,
@@ -2123,10 +2223,16 @@ namespace
                                     orientation_rotate_cb,
                                     nullptr);
         app.wireless_setup_screen.init(theme, wireless_deactivate_cb, nullptr);
+        app.wifi_indicator.init(theme);
+        sync_wifi_indicator();
 
         lv_obj_add_event_cb(app.info_screen.screen(),
                             info_screen_gesture_cb,
                             LV_EVENT_GESTURE,
+                            nullptr);
+        lv_obj_add_event_cb(app.info_screen.screen(),
+                            info_screen_clicked_cb,
+                            LV_EVENT_CLICKED,
                             nullptr);
         lv_obj_add_event_cb(app.settings_screen.screen(),
                             settings_screen_loaded_cb,
@@ -2170,6 +2276,7 @@ namespace
         /* Not built by build_screens(): firmware_update_task builds it
          * again against the new theme if update mode is still on. */
         app.firmware_update_screen.destroy();
+        app.wifi_indicator.destroy();
 
         return transition;
     }
@@ -2201,7 +2308,7 @@ namespace
         lv_obj_t *transition = destroy_screens();
         build_screens();
 
-        if (rebuild_to_dashboard())
+        if (rebuild_target() == RebuildTarget::Dashboard)
         {
             /* The dashboard has no load animation to wait out, and never
              * goes quiet (its readouts refresh constantly), so it settles
@@ -2209,6 +2316,20 @@ namespace
             lv_screen_load(composition().info_screen.screen());
             boot_passes()     = 0;
             backlight_state() = BacklightState::AwaitingBootPasses;
+        }
+        else if (rebuild_target() == RebuildTarget::Wireless)
+        {
+            Composition &app = composition();
+            app.wireless_setup_screen.open(
+                app.remote_binding.build_view_model(),
+                app.settings_screen.screen());
+            /* A still screen once its load animation ends, so the same
+             * quiet-period settle as Settings. Guarded for STRESS_TEST
+             * builds, where blank_backlight() leaves it lit. */
+            if (backlight_state() == BacklightState::Blanked)
+            {
+                backlight_state() = BacklightState::Settling;
+            }
         }
         else
         {

@@ -75,8 +75,6 @@ namespace remote::server
                                                uint16_t       len,
                                                uint32_t       now_ms)
     {
-        (void)len;
-
         switch (type)
         {
             case MsgType::EVT_AP_READY: {
@@ -97,8 +95,20 @@ namespace remote::server
 
                 state_            = ApState::Active;
                 state_entered_ms_ = now_ms;
+                stations_         = 0;
                 break;
             }
+
+            case MsgType::EVT_AP_STATIONS:
+                if (state_ != ApState::Active || len < 1)
+                {
+                    return;
+                }
+                /* A phone joining or leaving counts as activity, so the
+                 * idle timeout runs from the last of either. */
+                stations_         = payload[0];
+                state_entered_ms_ = now_ms;
+                break;
 
             case MsgType::EVT_AP_DISABLED:
                 if (state_ == ApState::Deactivating)

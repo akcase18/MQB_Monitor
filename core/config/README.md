@@ -19,7 +19,7 @@ The persisted configuration schema and its load/save/migrate logic, storage-agno
   - `save()` — writes the entire `Config` back.
   - `save_priority(rank)` / `save_signal(signal_id)` — partial writes, so e.g. reassigning one rank or editing one signal's thresholds doesn't rewrite the whole blob. Over a newer firmware's config they do a full `save()` instead: one record written at this layout's offset, under a header still naming the newer version, would load as valid there.
   - `set_defaults()` — day/night brightness 100%/20%, 5 active panels (rank 0 = Coolant Temp down through rank 4 = Intake Pressure Actual, with rank 5 = Engine Torque inactive by default), all warning thresholds off, green accent, logging off.
-  - `migrate(old_version)` — since no device has shipped with saved config yet, every version bump so far just falls through to `set_defaults()` rather than preserving old fields. **Once a version actually ships with saved user config in the field, this needs real field-by-field migration keyed on `old_version` instead of a blanket reset.**
+  - `migrate(old_version)` — versions before 6 never left the bench, so they fall through to `set_defaults()`. Dashes in the field hold v6 settings, so the next layout change needs a real step here that converts v6. A `static_assert` in `config_store.cpp` pins `sizeof(Config)` and its key offsets to `CURRENT_VERSION`, so a changed layout — including a signal added to the catalog, which grows `signals[]` — doesn't compile until the version is bumped and those numbers updated, which is the prompt to write that step.
 
 ## Usage
 

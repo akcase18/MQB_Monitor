@@ -13,6 +13,19 @@ namespace core
     static_assert(offsetof(Settings, accent_color) == 12,
                   "Settings layout moved -- bump CURRENT_VERSION");
 
+    /* The stored layout for CURRENT_VERSION. Dashes in the field hold
+     * real settings now, so changing it -- a field added, moved or
+     * resized, or a signal added to the catalog, which grows signals[] --
+     * needs a CURRENT_VERSION bump and a migrate() step that carries the
+     * old values across. Without the step, load() would reset everyone's
+     * settings; without the bump, it would misread them. Update these
+     * numbers with it. */
+    static_assert(ConfigStore::CURRENT_VERSION == 6 && sizeof(Config) == 620
+                      && offsetof(Config, signals) == 92
+                      && sizeof(SignalConfig) == 24,
+                  "Config's stored layout changed -- bump CURRENT_VERSION "
+                  "and add a migrate() step for the old one");
+
     namespace
     {
         size_t priority_offset(uint8_t rank)
@@ -154,11 +167,11 @@ namespace core
 
     FLASHMEM void ConfigStore::migrate(uint8_t old_version)
     {
-        /* No device has shipped with saved config yet, so every version
-         * bump so far just resets to defaults rather than converting old
-         * fields — matching the old EEPROM_Handler's fallback for unknown
-         * versions. Once something has actually shipped, this needs real
-         * field-by-field migration keyed on old_version instead. */
+        /* Versions before 6 never left the bench, so they just reset to
+         * defaults -- matching the old EEPROM_Handler's fallback for
+         * unknown versions. From 6 on, add a step here per version that
+         * converts the old layout instead; the static_assert at the top
+         * of this file is what forces the issue. */
         (void)old_version;
         set_defaults();
     }

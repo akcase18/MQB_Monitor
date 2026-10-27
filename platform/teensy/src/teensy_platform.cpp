@@ -108,6 +108,11 @@ FLASHMEM void platform_firmware_healthy()
 {
 }
 
+FLASHMEM bool platform_update_path_ready()
+{
+    return true;
+}
+
 FLASHMEM bool platform_take_failed_update(char *version, size_t cap)
 {
     (void)version;

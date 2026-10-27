@@ -206,9 +206,14 @@ namespace gui
         lv_obj_set_style_bg_color(header, theme.palette.bg, 0);
         lv_obj_set_style_bg_opa(header, LV_OPA_COVER, 0);
 
-        lv_obj_t *body = lv_msgbox_add_text(popup.mbox, body_text);
-        lv_obj_set_style_text_color(body, theme.palette.fg, 0);
-        lv_obj_set_style_text_font(body, theme.typography.label_lg, 0);
+        /* No body at all for a null one -- lv_label_set_text(nullptr)
+         * would keep the new label's placeholder ("Text"). */
+        if (body_text != nullptr)
+        {
+            lv_obj_t *body = lv_msgbox_add_text(popup.mbox, body_text);
+            lv_obj_set_style_text_color(body, theme.palette.fg, 0);
+            lv_obj_set_style_text_font(body, theme.typography.label_lg, 0);
+        }
 
         /* Cancel added first, Confirm second -- lv_msgbox's footer is a
          * left-to-right flex row, so this puts Confirm on the right. */

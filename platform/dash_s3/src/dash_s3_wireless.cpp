@@ -53,6 +53,13 @@ namespace
     StreamBufferHandle_t s_to_relay = nullptr;
     StreamBufferHandle_t s_to_dash  = nullptr;
 
+    /* When the relay task last came round, once it's past begin(); 0
+     * until then. Written by that task alone. */
+    volatile uint32_t s_relay_alive_ms = 0;
+    /* Far longer than one pass (a millisecond, or a blocking config
+     * request's few hundred), far shorter than anyone waits for Keep. */
+    constexpr uint32_t RELAY_STALL_MS = 2000;
+
     /* The relay's end of the pipe, in the shape RelayLink wants. peek()
      * is implemented for Stream's contract though RelayLink never calls
      * it. */
@@ -114,7 +121,9 @@ namespace
         app.begin();
         for (;;)
         {
-            app.poll(millis());
+            uint32_t now     = millis();
+            s_relay_alive_ms = now == 0 ? 1 : now;
+            app.poll(now);
             vTaskDelay(1);
         }
     }
@@ -169,4 +178,10 @@ size_t DashS3Wireless::write(const uint8_t *buf, size_t len)
         return 0;
     }
     return xStreamBufferSend(s_to_relay, buf, len, WRITE_TIMEOUT);
+}
+
+bool DashS3Wireless::relay_running() const
+{
+    uint32_t alive = s_relay_alive_ms;
+    return alive != 0 && millis() - alive < RELAY_STALL_MS;
 }

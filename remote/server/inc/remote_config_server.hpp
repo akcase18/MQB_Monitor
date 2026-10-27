@@ -56,6 +56,10 @@ namespace remote::server
                 /* The preview session ended: the live config is back to
                  * what was last saved, and live values are back. */
                 Reverted,
+                /* As Reverted, but because the page went away (a
+                 * REQ_REVERT_PREVIEW carrying REVERT_PAGE_LEFT) rather
+                 * than the phone's Discard. */
+                PageLeft,
             };
 
             using ConfigCallback = void (*)(void *ctx, ConfigEvent event);
@@ -131,6 +135,8 @@ namespace remote::server
              * config batch into preview_values_. */
             void read_preview_values(const uint8_t *p, size_t len);
             void notify(ConfigEvent event);
+            /** revert_preview(), reporting `event`. */
+            void end_preview(ConfigEvent event);
 
             core::ConfigStore &config_;
             core::SignalStore &signals_;

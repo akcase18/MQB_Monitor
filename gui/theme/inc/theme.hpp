@@ -80,6 +80,8 @@ namespace gui
                                               * built-in symbol font has
                                               * nothing celestial in its
                                               * curated icon subset */
+            const lv_font_t *symbol_sm; /* WifiIndicator's glyph --
+                                         * built-in, like symbol_lg */
     };
 
     struct Metrics

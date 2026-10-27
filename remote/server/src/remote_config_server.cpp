@@ -166,6 +166,11 @@ namespace remote::server
 
     FLASHMEM void RemoteConfigServer::revert_preview()
     {
+        end_preview(ConfigEvent::Reverted);
+    }
+
+    FLASHMEM void RemoteConfigServer::end_preview(ConfigEvent event)
+    {
         if (!preview_active_)
         {
             return;
@@ -173,7 +178,7 @@ namespace remote::server
         config_.get()   = saved_before_preview_;
         preview_active_ = false;
         unsaved_        = false;
-        notify(ConfigEvent::Reverted);
+        notify(event);
     }
 
     FLASHMEM void RemoteConfigServer::notify(ConfigEvent event)
@@ -191,7 +196,8 @@ namespace remote::server
     {
         if (req_type == MsgType::REQ_REVERT_PREVIEW)
         {
-            revert_preview();
+            bool left = len >= 1 && payload[0] == protocol::REVERT_PAGE_LEFT;
+            end_preview(left ? ConfigEvent::PageLeft : ConfigEvent::Reverted);
             return ApplyResult::Ok;
         }
 

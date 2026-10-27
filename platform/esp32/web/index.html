@@ -1035,11 +1035,12 @@ async function discard() {
 }
 
 /* Leaving the page (switching apps, locking the phone, closing the tab)
- * hands the dash back to live values. Unsaved edits stay here and go back
- * to the dash on return. */
+ * hands the dash back to its last save, and the panel back to the QR
+ * code. Unsaved edits stay here and go back to the dash on return. The
+ * body is REVERT_PAGE_LEFT, which is what tells this apart from Discard. */
 function endSession() {
   clearTimeout(previewTimer);
-  if (navigator.sendBeacon) navigator.sendBeacon("/api/revert", "");
+  if (navigator.sendBeacon) navigator.sendBeacon("/api/revert", "01");
 }
 
 /* ========================================================================
@@ -1145,7 +1146,7 @@ function importConfig(text) {
 
   if (selected >= s.count) selected = 0;
   changed();
-  toast(skipped ? `Loaded, ${skipped} unknown skipped. Save to keep it.` : "Loaded. Save to keep it.");
+  toast(skipped ? `Loaded, ${skipped} unknown skipped. Save to keep changes.` : "Loaded. Save to keep changes.");
 }
 
 /* ========================================================================
