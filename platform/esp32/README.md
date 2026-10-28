@@ -49,6 +49,8 @@ pio run -e esp32c3 -t upload
 
 First build downloads the `espressif32` platform/toolchain (one-time, ~1GB) — expect it to be slow.
 
+Releases come from `tools/release.py`, which puts this firmware in `releases/<version>/esp32c3/` with a `flash-usb.sh`, next to the Teensy `.hex` built from the same tree (see [platform/dash_s3](../dash_s3/README.md#releases)).
+
 ## Testing on hardware
 
 1. Flash both: `pio run -e esp32c3 -t upload`, `pio run -e teensymm -t upload`.

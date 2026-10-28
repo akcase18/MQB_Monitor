@@ -7,6 +7,8 @@
 
 #include <Arduino.h>
 
+#include "fw_version.h"
+
 #include "teensy_can.hpp"
 #include "teensy_clock.hpp"
 #include "teensy_config_store.hpp"
@@ -97,11 +99,13 @@ void platform_restart()
     }
 }
 
-/* No field updates on this board -- see platform.hpp's FIRMWARE section.
+/* No field updates on this board -- see platform.hpp's FIRMWARE section --
+ * but it is release hardware, so it carries the `git describe` version
+ * tools/fw_version.py stamps.
  * FLASHMEM: none of these is on a hot path, and RAM1 code is tight. */
 FLASHMEM const char *platform_firmware_version()
 {
-    return "teensy";
+    return FW_VERSION;
 }
 
 FLASHMEM void platform_firmware_healthy()

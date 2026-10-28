@@ -2203,6 +2203,7 @@ namespace
                                       nullptr);
         app.warning_screen.init(theme, warning_done_cb, nullptr);
         app.settings_screen.init(theme,
+                                 platform_firmware_version(),
                                  settings.day_brightness,
                                  settings.night_brightness,
                                  settings.num_panels,

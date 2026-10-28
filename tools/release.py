@@ -1,32 +1,44 @@
 #!/usr/bin/env python3
-"""Builds a dash firmware release into releases/<version>/: the OTA file
-for each dash hardware variant, everything needed to install it over USB
-instead, and a manifest saying what it is and whether it can go over the
-air at all.
+"""Builds a firmware release into releases/<version>/ for the release
+hardware -- the ESP32-S3 dash PCB (env:dash_s3), and the Teensy dash: the
+Teensy MicroMod (env:teensymm) and its ESP32-C3 Wi-Fi relay
+(env:esp32c3). Out come the S3 dash's OTA file and everything needed to
+install it over USB instead, the Teensy's .hex, the C3's USB install, and
+a manifest saying what it is and whether the S3 dash can take it over the
+air at all. Every other env (the S3 dev kit, stress builds, the
+simulator) is never released.
+
+The Teensy and the C3 go out together because there is no protocol
+version between them (platform/esp32/README.md): both have to come from
+the same tree.
 
     git tag v1.2.0 && python3 tools/release.py
     python3 tools/release.py --dev      # untagged or uncommitted: a trial run
 
 A real release has to be built from a clean tree at a tag, so the version
-the dash shows (tools/fw_version.py stamps `git describe`) is that tag.
+the dashes show (tools/fw_version.py stamps `git describe`) is that tag.
 --dev drops the requirement and files the build under releases/dev-<describe>/.
 
-What comes out, per variant (pcb, devkit):
+What comes out:
 
-    <variant>/mqb-dash-s3-<variant>-<version>.bin   send this from the phone
-    <variant>/bootloader.bin, partitions.bin, boot_app0.bin
-    <variant>/flash-usb.sh                          USB install, same files
+    dash_s3/mqb-dash-s3-<version>.bin     send this from the phone
+    dash_s3/bootloader.bin, partitions.bin, boot_app0.bin
+    dash_s3/flash-usb.sh                  USB install, same files
+    teensymm/mqb-teensymm-<version>.hex   open in Teensy Loader
+    esp32c3/mqb-esp32c3-<version>.bin     the Teensy dash's C3 relay
+    esp32c3/bootloader.bin, partitions.bin, boot_app0.bin
+    esp32c3/flash-usb.sh                  USB install, the only way in
 
 plus manifest.json (sizes, SHA-256s, partition layout, config version) and
 RELEASE.md, a summary to paste into the GitHub release.
 
-The USB install writes each file at its own offset, as `pio run -t upload`
+The USB installs write each file at its own offset, as `pio run -t upload`
 does, rather than one merged image: esptool's merge_bin pads the gaps with
-0xFF, and one of those gaps is the NVS partition holding the dash's
-settings.
+0xFF, and on the S3 dash one of those gaps is the NVS partition holding its
+settings. (The C3 keeps nothing, but is installed the same way.)
 
-Compared with the previous tag, a release is marked as needing USB when its
-partition table differs (OTA only ever writes an app slot -- the dash
+Compared with the previous tag, the dash's build is marked as needing USB
+when its partition table differs (OTA only ever writes an app slot -- the dash
 refuses such an image, see dash_s3_firmware.hpp), and flagged when the
 stored settings layout (core::ConfigStore::CURRENT_VERSION) or the
 bootloader changed.
@@ -52,15 +64,25 @@ from partition_table import layout_crc, parse_rows, partition_rows  # noqa: E402
 PARTITIONS = "platform/dash_s3/partitions_dash.csv"
 CONFIG_STORE = "core/config/inc/config_store.hpp"
 
-# Release builds only: the stress builds fake their CAN data and are never
-# distributed (the dash refuses them anyway -- DASH_S3_BUILD_VARIANT).
-VARIANTS = {"pcb": "dash_s3", "devkit": "dash_s3_devkit"}
+# The only release hardware. The dev kit and the stress builds are never
+# distributed (the dash refuses a stress build anyway --
+# DASH_S3_BUILD_VARIANT).
+DASH_ENV = "dash_s3"
+DASH_HW_VARIANT = "pcb"  # dash_s3_firmware.hpp's DASH_S3_HW_VARIANT default
+TEENSY_ENV = "teensymm"
+C3_ENV = "esp32c3"
 
 # What `pio run -e dash_s3 -t upload` passes esptool (Arduino turns the
 # board's qio into dio for the bootloader header).
 ESPTOOL_FLASH_ARGS = "--flash_mode dio --flash_freq 80m --flash_size 16MB"
 BOOTLOADER_OFFSET = 0x0
 PARTITION_TABLE_OFFSET = 0x8000
+
+# The same for `pio run -e esp32c3 -t upload`: the XIAO's 4MB flash and the
+# Arduino default partition table, so the offsets are fixed.
+C3_ESPTOOL_FLASH_ARGS = "--flash_mode dio --flash_freq 80m --flash_size 4MB"
+C3_OTADATA_OFFSET = 0xE000
+C3_APP_OFFSET = 0x10000
 BOOT_APP0 = os.path.expanduser(
     "~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin"
 )
@@ -122,6 +144,23 @@ def firmware_id(path):
     return text(raw[16:32]), text(raw[32:64])
 
 
+def stamped_version(build, image):
+    """FW_VERSION a Teensy or C3 image was built with, or None. Neither
+    carries an update descriptor to read it back from, so this goes by
+    the header fw_version.py generated. It is only rewritten when the
+    version changes, so a header newer than the image means the build
+    that stamped it failed."""
+    header = os.path.join(build, "fw_gen", "fw_version.h")
+    image_path = os.path.join(build, image)
+    if not (os.path.exists(header) and os.path.exists(image_path)):
+        return None
+    if os.path.getmtime(header) > os.path.getmtime(image_path):
+        return None
+    with open(header) as f:
+        m = re.search(r'#define FW_VERSION "([^"]*)"', f.read())
+    return m.group(1) if m else None
+
+
 def offsets(rows):
     """(otadata offset, first app slot offset) from the partition rows."""
     ota = next(o for _, t, st, o, _, _ in rows if t == "data" and st == "ota")
@@ -129,11 +168,20 @@ def offsets(rows):
     return ota, app
 
 
-def flash_script(app_name, ota_offset, app_offset):
-    return """#!/bin/sh
+DASH_FLASH_INTRO = """\
 # USB install of this dash firmware. Keeps the dash's settings (NVS) and,
 # unless the partition table changed, its logs (LittleFS): each file goes
-# to its own offset and nothing else is touched.
+# to its own offset and nothing else is touched."""
+
+C3_FLASH_INTRO = """\
+# USB install of the Teensy dash's C3 Wi-Fi relay. Flash the Teensy from
+# the same release: the two share no protocol version. The C3 keeps no
+# settings of its own (the Teensy holds them)."""
+
+
+def flash_script(chip, flash_args, intro, app_name, ota_offset, app_offset):
+    return """#!/bin/sh
+%s
 #
 #   ./flash-usb.sh /dev/cu.usbmodemXXXX
 #
@@ -142,14 +190,14 @@ def flash_script(app_name, ota_offset, app_offset):
 set -e
 [ -n "$1" ] || { echo "usage: $0 <serial port>"; exit 1; }
 cd "$(dirname "$0")"
-python3 -m esptool --chip esp32s3 --port "$1" --baud 460800 \\
+python3 -m esptool --chip %s --port "$1" --baud 460800 \\
     --before default_reset --after hard_reset \\
     write_flash -z %s \\
     0x%x bootloader.bin \\
     0x%x partitions.bin \\
     0x%x boot_app0.bin \\
     0x%x %s
-""" % (ESPTOOL_FLASH_ARGS, BOOTLOADER_OFFSET, PARTITION_TABLE_OFFSET, ota_offset, app_offset, app_name)
+""" % (intro, chip, flash_args, BOOTLOADER_OFFSET, PARTITION_TABLE_OFFSET, ota_offset, app_offset, app_name)
 
 
 def main():
@@ -175,10 +223,7 @@ def main():
         shutil.rmtree(out)
 
     if not args.no_build:
-        cmd = ["pio", "run"]
-        for env in VARIANTS.values():
-            cmd += ["-e", env]
-        subprocess.run(cmd, cwd=ROOT, check=True)
+        subprocess.run(["pio", "run", "-e", DASH_ENV, "-e", TEENSY_ENV, "-e", C3_ENV], cwd=ROOT, check=True)
 
     layout, rows = layout_at(None)
     ota_offset, app_offset = offsets(rows)
@@ -206,7 +251,7 @@ def main():
         "previous": prev,
         "needs_usb": False,
         "notes": [],
-        "variants": {},
+        "builds": {},
     }
 
     if prev_layout is not None and prev_layout != layout:
@@ -216,7 +261,7 @@ def main():
             | {r[0] for r in rows if r not in prev_rows}
         )
         manifest["notes"].append(
-            "Partition table changed since %s (%s): USB only. A dash running firmware "
+            "Dash partition table changed since %s (%s): USB only. A dash running firmware "
             "with the layout check refuses it over the air; an older one would take it "
             "and misbehave. Logs are lost if the LittleFS partition moved." % (prev, ", ".join(changed))
         )
@@ -226,76 +271,135 @@ def main():
             "ConfigStore::migrate() carries them. A phone-page backup first is cheap." % (prev_cfg, cfg_version)
         )
 
-    for variant, env in VARIANTS.items():
-        build = os.path.join(ROOT, ".pio", "build", env)
-        firmware = os.path.join(build, "firmware.bin")
-        built_variant, built_version = firmware_id(firmware)
-        if built_variant != variant or built_version != version[:FW_VERSION_MAX]:
+    # Check every build before writing anything, so a stale one never
+    # leaves a half-packaged release behind.
+    build = os.path.join(ROOT, ".pio", "build", DASH_ENV)
+    firmware = os.path.join(build, "firmware.bin")
+    built_variant, built_version = firmware_id(firmware)
+    if built_variant != DASH_HW_VARIANT or built_version != version[:FW_VERSION_MAX]:
+        sys.exit(
+            "%s holds %s/%s, not %s/%s -- rebuild (drop --no-build)."
+            % (os.path.relpath(firmware, ROOT), built_variant, built_version, DASH_HW_VARIANT, version)
+        )
+    teensy_build = os.path.join(ROOT, ".pio", "build", TEENSY_ENV)
+    c3_build = os.path.join(ROOT, ".pio", "build", C3_ENV)
+    for stamped_build, image in ((teensy_build, "firmware.hex"), (c3_build, "firmware.bin")):
+        built_version = stamped_version(stamped_build, image)
+        if built_version != version[:FW_VERSION_MAX]:
             sys.exit(
-                "%s holds %s/%s, not %s/%s -- rebuild (drop --no-build)."
-                % (os.path.relpath(firmware, ROOT), built_variant, built_version, variant, version)
+                "%s was built as %s, not %s -- rebuild (drop --no-build)."
+                % (os.path.relpath(stamped_build, ROOT), built_version, version)
             )
 
-        dest = os.path.join(out, variant)
-        os.makedirs(dest)
-        app_name = "mqb-dash-s3-%s-%s.bin" % (variant, version)
-        files = {
-            app_name: firmware,
-            "bootloader.bin": os.path.join(build, "bootloader.bin"),
-            "partitions.bin": os.path.join(build, "partitions.bin"),
-            "boot_app0.bin": BOOT_APP0,
-        }
-        for name, src in files.items():
-            shutil.copyfile(src, os.path.join(dest, name))
-        script = os.path.join(dest, "flash-usb.sh")
-        with open(script, "w") as f:
-            f.write(flash_script(app_name, ota_offset, app_offset))
-        os.chmod(script, 0o755)
+    # The dash: its OTA file, plus the same release over USB.
+    dest = os.path.join(out, DASH_ENV)
+    os.makedirs(dest)
+    app_name = "mqb-dash-s3-%s.bin" % version
+    files = {
+        app_name: firmware,
+        "bootloader.bin": os.path.join(build, "bootloader.bin"),
+        "partitions.bin": os.path.join(build, "partitions.bin"),
+        "boot_app0.bin": BOOT_APP0,
+    }
+    for name, src in files.items():
+        shutil.copyfile(src, os.path.join(dest, name))
+    script = os.path.join(dest, "flash-usb.sh")
+    with open(script, "w") as f:
+        f.write(flash_script("esp32s3", ESPTOOL_FLASH_ARGS, DASH_FLASH_INTRO, app_name, ota_offset, app_offset))
+    os.chmod(script, 0o755)
 
-        info = {
-            "env": env,
-            "ota": app_name,
-            "files": {
-                name: {"size": os.path.getsize(os.path.join(dest, name)), "sha256": sha256(os.path.join(dest, name))}
-                for name in files
-            },
-            "usb_offsets": {
-                "bootloader.bin": "0x%x" % BOOTLOADER_OFFSET,
-                "partitions.bin": "0x%x" % PARTITION_TABLE_OFFSET,
-                "boot_app0.bin": "0x%x" % ota_offset,
-                app_name: "0x%x" % app_offset,
-            },
-        }
-        manifest["variants"][variant] = info
+    info = {
+        "env": DASH_ENV,
+        "install": app_name,
+        "files": {
+            name: {"size": os.path.getsize(os.path.join(dest, name)), "sha256": sha256(os.path.join(dest, name))}
+            for name in files
+        },
+        "usb_offsets": {
+            "bootloader.bin": "0x%x" % BOOTLOADER_OFFSET,
+            "partitions.bin": "0x%x" % PARTITION_TABLE_OFFSET,
+            "boot_app0.bin": "0x%x" % ota_offset,
+            app_name: "0x%x" % app_offset,
+        },
+    }
+    manifest["builds"][DASH_ENV] = info
 
-        old = (prev_manifest or {}).get("variants", {}).get(variant)
-        if old and old["files"]["bootloader.bin"]["sha256"] != info["files"]["bootloader.bin"]["sha256"]:
-            manifest["notes"].append(
-                "%s: the bootloader changed since %s. OTA never replaces it; the new app runs "
-                "on the old one, and a USB install brings it up to date." % (variant, prev)
-            )
+    old = (prev_manifest or {}).get("builds", {}).get(DASH_ENV)
+    if old and old["files"]["bootloader.bin"]["sha256"] != info["files"]["bootloader.bin"]["sha256"]:
+        manifest["notes"].append(
+            "Dash: the bootloader changed since %s. OTA never replaces it; the new app runs "
+            "on the old one, and a USB install brings it up to date." % prev
+        )
+
+    # The Teensy: one .hex, installed over USB with PJRC's Teensy Loader.
+    dest = os.path.join(out, TEENSY_ENV)
+    os.makedirs(dest)
+    hex_name = "mqb-teensymm-%s.hex" % version
+    shutil.copyfile(os.path.join(teensy_build, "firmware.hex"), os.path.join(dest, hex_name))
+    manifest["builds"][TEENSY_ENV] = {
+        "env": TEENSY_ENV,
+        "install": hex_name,
+        "files": {
+            hex_name: {"size": os.path.getsize(os.path.join(dest, hex_name)), "sha256": sha256(os.path.join(dest, hex_name))}
+        },
+    }
+
+    # The Teensy's C3 relay: USB only, laid out like the dash's USB install.
+    dest = os.path.join(out, C3_ENV)
+    os.makedirs(dest)
+    c3_app = "mqb-esp32c3-%s.bin" % version
+    files = {
+        c3_app: os.path.join(c3_build, "firmware.bin"),
+        "bootloader.bin": os.path.join(c3_build, "bootloader.bin"),
+        "partitions.bin": os.path.join(c3_build, "partitions.bin"),
+        "boot_app0.bin": BOOT_APP0,
+    }
+    for name, src in files.items():
+        shutil.copyfile(src, os.path.join(dest, name))
+    script = os.path.join(dest, "flash-usb.sh")
+    with open(script, "w") as f:
+        f.write(flash_script("esp32c3", C3_ESPTOOL_FLASH_ARGS, C3_FLASH_INTRO, c3_app, C3_OTADATA_OFFSET, C3_APP_OFFSET))
+    os.chmod(script, 0o755)
+    manifest["builds"][C3_ENV] = {
+        "env": C3_ENV,
+        "install": c3_app,
+        "files": {
+            name: {"size": os.path.getsize(os.path.join(dest, name)), "sha256": sha256(os.path.join(dest, name))}
+            for name in files
+        },
+        "usb_offsets": {
+            "bootloader.bin": "0x%x" % BOOTLOADER_OFFSET,
+            "partitions.bin": "0x%x" % PARTITION_TABLE_OFFSET,
+            "boot_app0.bin": "0x%x" % C3_OTADATA_OFFSET,
+            c3_app: "0x%x" % C3_APP_OFFSET,
+        },
+    }
 
     with open(os.path.join(out, "manifest.json"), "w") as f:
         json.dump(manifest, f, indent=2)
         f.write("\n")
 
-    lines = ["# Dash firmware %s" % version, ""]
-    lines.append(
-        "**Install over USB only** (see notes)."
-        if manifest["needs_usb"]
-        else "Installs over the air: Settings → Wi-Fi on the dash, then the **Update** page on the phone."
-    )
+    lines = ["# Firmware %s" % version, "", "| Hardware | Firmware | SHA-256 |", "| --- | --- | --- |"]
+    for name, env in (("ESP32-S3 dash", DASH_ENV), ("Teensy dash: Teensy", TEENSY_ENV), ("Teensy dash: C3 relay", C3_ENV)):
+        info = manifest["builds"][env]
+        lines.append("| %s | `%s/%s` | `%s` |" % (name, env, info["install"], info["files"][info["install"]]["sha256"][:16]))
+    lines.append("")
+    if manifest["needs_usb"]:
+        lines.append(
+            "**ESP32-S3 dash:** install over USB only (see notes): `%s/flash-usb.sh <port>`. "
+            "It keeps the dash's settings." % DASH_ENV
+        )
+    else:
+        lines.append(
+            "**ESP32-S3 dash:** installs over the air: Settings → Wi-Fi on the dash, then the "
+            "**Update** page on the phone. Over USB instead: `%s/flash-usb.sh <port>`. "
+            "It keeps the dash's settings." % DASH_ENV
+        )
     lines += [
         "",
-        "| Hardware | %s | SHA-256 |" % ("Firmware" if manifest["needs_usb"] else "Send from the phone"),
-        "| --- | --- | --- |",
-    ]
-    for variant, info in manifest["variants"].items():
-        lines.append("| %s | `%s` | `%s` |" % (variant, info["ota"], info["files"][info["ota"]]["sha256"][:16]))
-    lines += [
-        "",
-        "%s: `<variant>/flash-usb.sh <port>`. It keeps the dash's settings."
-        % ("Install" if manifest["needs_usb"] else "Over USB instead"),
+        "**Teensy dash:** over USB only, and flash both boards from this release (they share no "
+        "protocol version). Teensy: open the `.hex` in PJRC's Teensy Loader and press the program "
+        "button. C3 relay: `%s/flash-usb.sh <port>`." % C3_ENV,
     ]
     if manifest["notes"]:
         lines += ["", "## Notes", ""] + ["- " + n for n in manifest["notes"]]

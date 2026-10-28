@@ -59,10 +59,12 @@ USB always works as a fallback, since the S3's download mode is in ROM.
 
 ## Releases
 
-`tools/release.py` builds what gets handed out. Tag a clean commit (`git tag v1.2.0`), run it, and upload `releases/v1.2.0/` to the GitHub release for that tag. It holds, per hardware variant:
+`tools/release.py` builds what gets handed out, for the release hardware only: this PCB (`env:dash_s3`) and the Teensy dash (`env:teensymm` and its C3 relay, `env:esp32c3`). The dev kit and stress builds are never released. Tag a clean commit (`git tag v1.2.0`), run it, and upload `releases/v1.2.0/` to the GitHub release for that tag. It holds:
 
-- `mqb-dash-s3-<variant>-<version>.bin` — the file to send from the phone;
+- `dash_s3/mqb-dash-s3-<version>.bin` — the file to send from the phone;
 - `bootloader.bin`, `partitions.bin`, `boot_app0.bin` and `flash-usb.sh` — the same release over USB (`./flash-usb.sh /dev/cu.usbmodem…`, needs `pip install esptool`). It writes each file at its own offset, so the dash keeps its settings; one merged image would overwrite NVS;
+- `teensymm/mqb-teensymm-<version>.hex` — the Teensy build, installed over USB with PJRC's Teensy Loader;
+- `esp32c3/` — the Teensy dash's C3 relay, laid out like the USB files above (`flash-usb.sh` included). Flash it alongside the Teensy from the same release, since the two share no protocol version;
 - `manifest.json` and `RELEASE.md` — sizes and SHA-256s, the partition layout and settings version, and, against the previous tag, whether this release needs USB (partition table changed), changes the stored settings layout, or ships a new bootloader (which only a USB install applies).
 
 `--dev` makes a trial release from an untagged or uncommitted tree, under `releases/dev-…`. `releases/` is git-ignored.

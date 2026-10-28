@@ -19,6 +19,7 @@
  */
 #include <Arduino.h>
 
+#include "fw_version.h"
 #include "relay_app.hpp"
 #include "remote_protocol.hpp"
 
@@ -46,8 +47,11 @@ namespace
 
 void setup()
 {
-    /* USB-CDC is debug output only -- the relay is on Serial1. */
+    /* USB-CDC is debug output only -- the relay is on Serial1. The
+     * version is what tools/fw_version.py stamped; it has to match the
+     * Teensy's, since the two share no protocol version. */
     Serial.begin(115200);
+    Serial.print("MQB relay " FW_VERSION "\n");
 
     /* The default RX ring is 256 bytes, but RESP_STATE's payload alone can
      * exceed 1200, and RelayLink only drains the port once per loop() pass

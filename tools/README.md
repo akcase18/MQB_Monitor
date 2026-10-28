@@ -23,16 +23,22 @@ support firmware development but don't ship on any board.
   ```
 
 - **[`fw_version.py`](fw_version.py)** — PlatformIO pre-build script for the
-  `env:dash_s3` family. It writes a generated `fw_version.h` that the dash's
-  firmware update descriptor is built from (see
-  [platform/dash_s3](../platform/dash_s3/README.md#firmware-updates)): the
-  version (`git describe --tags --always --dirty`; tag releases to get
-  readable versions), a CRC of the partition table, which the dash refuses
-  OTA images over, and the LittleFS partition's size.
+  release hardware, the `env:dash_s3` family, `env:teensymm` and
+  `env:esp32c3`. It writes a
+  generated `fw_version.h` with the version (`git describe --tags --always
+  --dirty`; tag releases to get readable versions), which both boards show
+  on the Settings screen. On the dash it also holds what the firmware update
+  descriptor is checked against (see
+  [platform/dash_s3](../platform/dash_s3/README.md#firmware-updates)): a CRC
+  of the partition table, which the dash refuses OTA images over, and the
+  LittleFS partition's size.
 
-- **[`release.py`](release.py)** — builds a dash firmware release into
-  `releases/<tag>/`: each hardware variant's OTA file, its USB install files
-  and script, and a manifest that says whether it can go over the air. See
+- **[`release.py`](release.py)** — builds a firmware release for the
+  release hardware only, `env:dash_s3` (the S3 dash PCB) and the Teensy
+  dash (`env:teensymm` plus its C3 relay, `env:esp32c3`), into
+  `releases/<tag>/`: the S3 dash's OTA file, its USB install files and
+  script, the Teensy's `.hex`, the C3's USB install, and a manifest that
+  says whether the S3 dash can take it over the air. See
   [platform/dash_s3](../platform/dash_s3/README.md#releases).
 
   ```sh

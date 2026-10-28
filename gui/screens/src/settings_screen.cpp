@@ -19,6 +19,13 @@ namespace gui
          * own distinct row instead of blurring into the next one. */
         constexpr lv_coord_t HEADER_DIVIDER_Y = 50;
 
+        /* Firmware version beside the title: the gap from "Settings",
+         * and a lift that puts its baseline on the title's (the bold
+         * title font descends further below its baseline than label_sm
+         * does). */
+        constexpr lv_coord_t VERSION_TITLE_GAP      = 10;
+        constexpr lv_coord_t VERSION_BASELINE_NUDGE = -3;
+
         constexpr lv_coord_t BRIGHTNESS_ROW_Y          = 70;
         constexpr lv_coord_t BRIGHTNESS_ROW_HEIGHT     = 40;
         constexpr lv_coord_t BRIGHTNESS_LABEL_GAP      = 24;
@@ -112,6 +119,7 @@ namespace gui
     } // namespace
 
     FLASHMEM void SettingsScreen::init(const Theme &theme,
+                              const char  *firmware_version,
                               uint8_t      initial_day_brightness_pct,
                               uint8_t      initial_night_brightness_pct,
                               uint8_t      initial_num_panels,
@@ -152,10 +160,36 @@ namespace gui
 
         /* Nav bar: title + close, standing in for the bottom-right
          * checkmark other screens use (see the file doc comment). */
-        create_nav_title(screen_, theme, "Settings");
+        lv_obj_t *title = create_nav_title(screen_, theme, "Settings");
 
         DoneButton close = create_close_button(screen_, theme);
         lv_obj_add_event_cb(close.btn, done_cb_handler, LV_EVENT_CLICKED, this);
+
+        /* Firmware version, small and dimmed, bottom-aligned with the
+         * title. Dotted off short of the close button so a long `git
+         * describe` string can't run under it in Portrait. */
+        lv_obj_t *version = lv_label_create(screen_);
+        lv_label_set_text(version, firmware_version);
+        lv_obj_set_style_text_font(version, theme.typography.label_sm, 0);
+        lv_obj_set_style_text_color(version, theme.palette.fg, 0);
+        lv_obj_set_style_text_opa(version, LV_OPA_60, 0);
+        lv_obj_align_to(version,
+                        title,
+                        LV_ALIGN_OUT_RIGHT_BOTTOM,
+                        VERSION_TITLE_GAP,
+                        VERSION_BASELINE_NUDGE);
+        lv_obj_update_layout(close.btn);
+        lv_coord_t version_max_w = lv_obj_get_x(close.btn)
+                                   - VERSION_TITLE_GAP
+                                   - lv_obj_get_x(version);
+        if (lv_obj_get_width(version) > version_max_w)
+        {
+            lv_label_set_long_mode(version, LV_LABEL_LONG_DOT);
+            /* DOT needs a fixed height too, or the label just wraps. */
+            lv_obj_set_size(version,
+                            version_max_w,
+                            lv_obj_get_height(version));
+        }
 
         create_divider(screen_, theme, HEADER_DIVIDER_Y);
 

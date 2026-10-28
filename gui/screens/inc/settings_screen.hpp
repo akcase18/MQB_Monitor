@@ -66,7 +66,9 @@ namespace gui
             /** Fired when the Orientation row is tapped. */
             using PickOrientationCallback = void (*)(void *ctx);
 
+            /** firmware_version is shown small beside the title. */
             void init(const Theme              &theme,
+                      const char               *firmware_version,
                       uint8_t                   initial_day_brightness_pct,
                       uint8_t                   initial_night_brightness_pct,
                       uint8_t                   initial_num_panels,
