@@ -88,7 +88,7 @@ const SignalSpec SIGNAL_CATALOG[] = {
       1,
       transform_default,
       0.0f,
-      7000.0f },
+      7500.0f },
     /* Engine Torque */
     { 8,
       "Engine Torque",
@@ -118,7 +118,7 @@ const SignalSpec SIGNAL_CATALOG[] = {
       1,
       transform_default,
       0.0f,
-      70.0f },
+      55.0f },
     /* Fuel */
     { 11,
       "Fuel",

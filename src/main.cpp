@@ -200,6 +200,9 @@ namespace
              * each sniffer session (see enter_sniff()). */
             gui::SnifferScreen sniffer_screen;
 
+            /* Catalog names as the picker lists them -- see
+             * core::signal_catalog_label(). */
+            char signal_labels[core::SIGNAL_CATALOG_COUNT][32];
             const char *signal_names[core::SIGNAL_CATALOG_COUNT];
             uint16_t    signal_ids[core::SIGNAL_CATALOG_COUNT];
 
@@ -221,7 +224,9 @@ namespace
             {
                 for (uint16_t i = 0; i < core::SIGNAL_CATALOG_COUNT; i++)
                 {
-                    signal_names[i] = core::SIGNAL_CATALOG[i].name;
+                    core::signal_catalog_label(
+                        i, signal_labels[i], sizeof(signal_labels[i]));
+                    signal_names[i] = signal_labels[i];
                     signal_ids[i]   = core::SIGNAL_CATALOG[i].id;
                 }
             }

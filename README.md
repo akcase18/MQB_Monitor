@@ -35,10 +35,7 @@ Built on a Teensy MicroMod, [LVGL](https://lvgl.io/) for the UI, and a from-scra
 
 Running in the car and working well — CAN polling, panel display, warning thresholds, and settings all confirmed on real hardware and real vehicle data.
 
-Outstanding hardware work:
-- The board/enclosure needs a physical redesign to be smaller and more heat-resistant for permanent in-car mounting.
-
-Software TODO list, including deferred features (automatic day/night switching, additional signal sources, data logging, etc.), is tracked in [TODO.md](TODO.md).
+Software TODO list, including deferred features, is tracked in [TODO.md](TODO.md).
 
 ## Building
 

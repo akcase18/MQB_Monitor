@@ -172,7 +172,7 @@
       "cycle_time_ms": 50,
       "transform": "default",
       "display_min": 0.0,
-      "display_max": 7000.0,
+      "display_max": 7500.0,
       "requests": [
         {
           "byte1": "0x20",
@@ -235,7 +235,7 @@
       "cycle_time_ms": 5000,
       "transform": "default",
       "display_min": 0.0,
-      "display_max": 70.0,
+      "display_max": 55.0,
       "requests": [
         {
           "byte1": "0x22",

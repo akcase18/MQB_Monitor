@@ -91,10 +91,25 @@ namespace core
     int signal_catalog_find(uint16_t id);
 
     /**
+     * Writes SIGNAL_CATALOG[index]'s name as a signal list shows it into
+     * `buf`: the name, plus " (<unit_tag>)" when another signal shares it
+     * (Fuel by volume and in %). Truncates to fit `len`.
+     */
+    void signal_catalog_label(size_t index, char *buf, size_t len);
+
+    /**
      * @returns The unit label to display alongside a signal's value, e.g.
      * "[bar]"/"[psi]" for Pressure depending on `is_metric`.
      */
     const char *unit_label(UnitType type, bool is_metric);
+
+    /**
+     * @returns A short name for the unit type that reads the same in either
+     * unit system ("vol", "temp", "%"), for telling apart signals that share
+     * a name — see signal_catalog_label(). Mirrored by the phone
+     * configurator's UNITS table (platform/esp32/web/index.html).
+     */
+    const char *unit_tag(UnitType type);
 
     /**
      * @returns How many decimal places to display a value with, for the given

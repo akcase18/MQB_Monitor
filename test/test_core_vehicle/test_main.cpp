@@ -7,6 +7,8 @@
  * property the real bus has and SimulatorCanBus does not: a response takes
  * time, so requests can outrun answers. Run with `pio test -e simulator`.
  */
+#include <stdio.h>
+#include <string.h>
 #include <unity.h>
 
 #include "scheduler.hpp"
@@ -370,6 +372,36 @@ void test_unit_convert_round_trips()
         float imperial   = core::unit_convert_to_imperial(type, metric);
         float round_trip = core::unit_convert_to_metric(type, imperial);
         TEST_ASSERT_FLOAT_WITHIN(0.001f, metric, round_trip);
+    }
+}
+
+void test_signal_catalog_label_tags_only_shared_names()
+{
+    char label[32];
+    for (size_t i = 0; i < core::SIGNAL_CATALOG_COUNT; i++)
+    {
+        const core::SignalSpec &spec = core::SIGNAL_CATALOG[i];
+        size_t                  same = 0;
+        for (size_t k = 0; k < core::SIGNAL_CATALOG_COUNT; k++)
+        {
+            same += strcmp(core::SIGNAL_CATALOG[k].name, spec.name) == 0;
+        }
+
+        core::signal_catalog_label(i, label, sizeof(label));
+        if (same == 1)
+        {
+            TEST_ASSERT_EQUAL_STRING(spec.name, label);
+        }
+        else
+        {
+            char expected[32];
+            snprintf(expected,
+                     sizeof(expected),
+                     "%s (%s)",
+                     spec.name,
+                     core::unit_tag(spec.unit_type));
+            TEST_ASSERT_EQUAL_STRING(expected, label);
+        }
     }
 }
 
@@ -768,6 +800,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_signal_catalog_display_ranges_are_valid);
     RUN_TEST(test_resolve_display_range_defaults_and_override);
     RUN_TEST(test_unit_convert_round_trips);
+    RUN_TEST(test_signal_catalog_label_tags_only_shared_names);
     RUN_TEST(test_scheduler_fires_due_tasks);
     RUN_TEST(test_poller_only_requests_displayed_signals);
     RUN_TEST(test_poller_asks_for_nothing_outside_the_displayed_panels);

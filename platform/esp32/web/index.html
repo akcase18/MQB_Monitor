@@ -14,8 +14,9 @@
   The C3 only relays bytes, so this page speaks remote::protocol's records
   itself (see remote/protocol/inc/remote_protocol.hpp) and mirrors a few small
   tables from the Teensy firmware. Keep these in step with their sources:
-    UNITS             core/vehicle/src/signal_catalog.cpp (unit_label,
-                      unit_decimals, unit_convert_to_imperial/_to_metric)
+    UNITS             core/vehicle/src/signal_catalog.cpp (unit_tag,
+                      unit_label, unit_decimals,
+                      unit_convert_to_imperial/_to_metric)
     ACCENTS           gui/theme/src/theme.cpp (ACCENT_PRESETS)
     computeLayout()   gui/screens/src/layout.cpp, plus InfoScreen::rebuild()'s
                       grid tracks
@@ -402,15 +403,15 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 
 /* core::UnitType, by wire ordinal. */
 const UNITS = [
-  /* None     */ { m: "",    i: "",      dm: 0, di: 0, toI: v => v,                 toM: v => v },
-  /* Degrees  */ { m: "°",   i: "°",     dm: 0, di: 0, toI: v => v,                 toM: v => v },
-  /* Percent  */ { m: "%",   i: "%",     dm: 0, di: 0, toI: v => v,                 toM: v => v },
-  /* Pressure */ { m: "bar", i: "psi",   dm: 2, di: 1, toI: v => v * 14.5038,       toM: v => v / 14.5038 },
-  /* RPM      */ { m: "rpm", i: "rpm",   dm: 0, di: 0, toI: v => v,                 toM: v => v },
-  /* Speed    */ { m: "kph", i: "mph",   dm: 0, di: 0, toI: v => v / 1.609,         toM: v => v * 1.609 },
-  /* Temp     */ { m: "°C",  i: "°F",    dm: 0, di: 0, toI: v => v * 1.8 + 32,      toM: v => (v - 32) / 1.8 },
-  /* Torque   */ { m: "Nm",  i: "lb-ft", dm: 0, di: 0, toI: v => v * 0.7375621493,  toM: v => v / 0.7375621493 },
-  /* Volume   */ { m: "L",   i: "gal",   dm: 1, di: 1, toI: v => v / 3.785,         toM: v => v * 3.785 },
+  /* None     */ { tag: "",       m: "",    i: "",      dm: 0, di: 0, toI: v => v,                 toM: v => v },
+  /* Degrees  */ { tag: "°",      m: "°",   i: "°",     dm: 0, di: 0, toI: v => v,                 toM: v => v },
+  /* Percent  */ { tag: "%",      m: "%",   i: "%",     dm: 0, di: 0, toI: v => v,                 toM: v => v },
+  /* Pressure */ { tag: "press",  m: "bar", i: "psi",   dm: 2, di: 1, toI: v => v * 14.5038,       toM: v => v / 14.5038 },
+  /* RPM      */ { tag: "rpm",    m: "rpm", i: "rpm",   dm: 0, di: 0, toI: v => v,                 toM: v => v },
+  /* Speed    */ { tag: "speed",  m: "kph", i: "mph",   dm: 0, di: 0, toI: v => v / 1.609,         toM: v => v * 1.609 },
+  /* Temp     */ { tag: "temp",   m: "°C",  i: "°F",    dm: 0, di: 0, toI: v => v * 1.8 + 32,      toM: v => (v - 32) / 1.8 },
+  /* Torque   */ { tag: "torque", m: "Nm",  i: "lb-ft", dm: 0, di: 0, toI: v => v * 0.7375621493,  toM: v => v / 0.7375621493 },
+  /* Volume   */ { tag: "vol",    m: "L",   i: "gal",   dm: 1, di: 1, toI: v => v / 3.785,         toM: v => v * 3.785 },
 ];
 const unitOf = t => UNITS[t] || UNITS[0];
 
@@ -1154,14 +1155,13 @@ function importConfig(text) {
  * ====================================================================== */
 
 function buildStatic() {
-  const sel = $("signal");
   const names = state.catalog.map(c => c.name);
-  sel.replaceChildren(...state.catalog.map(c => {
-    /* Two signals can share a name (Fuel in L and in %); the unit tells
-     * them apart. */
+  $("signal").replaceChildren(...state.catalog.map(c => {
+    /* Labelled as the dash's picker labels them -- see
+     * core::signal_catalog_label(). */
     const dup = names.filter(n => n === c.name).length > 1;
-    const u = unitOf(c.unit).m;
-    return Object.assign(el("option", null, dup && u ? `${c.name} (${u})` : c.name), { value: String(c.id) });
+    const t = unitOf(c.unit).tag;
+    return Object.assign(el("option", null, dup && t ? `${c.name} (${t})` : c.name), { value: String(c.id) });
   }));
 
   $("count").replaceChildren(...Array.from({ length: state.panels.length }, (_, k) => {

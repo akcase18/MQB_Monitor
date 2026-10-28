@@ -16,6 +16,11 @@
  */
 #include "signal_catalog.hpp"
 
+#include <stdio.h>
+#include <string.h>
+
+#include "mem_placement.hpp"
+
 namespace core
 {
 
@@ -82,6 +87,28 @@ namespace core
         return -1;
     }
 
+    /* FLASHMEM: runs once, building the picker's name table at boot. */
+    FLASHMEM void signal_catalog_label(size_t index, char *buf, size_t len)
+    {
+        const SignalSpec &spec = SIGNAL_CATALOG[index];
+
+        bool shared = false;
+        for (size_t i = 0; i < SIGNAL_CATALOG_COUNT && !shared; i++)
+        {
+            shared = i != index && strcmp(SIGNAL_CATALOG[i].name, spec.name) == 0;
+        }
+
+        const char *tag = shared ? unit_tag(spec.unit_type) : "";
+        if (tag[0] != '\0')
+        {
+            snprintf(buf, len, "%s (%s)", spec.name, tag);
+        }
+        else
+        {
+            snprintf(buf, len, "%s", spec.name);
+        }
+    }
+
     const char *unit_label(UnitType type, bool is_metric)
     {
         switch (type)
@@ -102,6 +129,32 @@ namespace core
                 return is_metric ? "Nm" : "lb-ft";
             case UnitType::Volume:
                 return is_metric ? "L" : "gal";
+            case UnitType::None:
+            default:
+                return "";
+        }
+    }
+
+    FLASHMEM const char *unit_tag(UnitType type)
+    {
+        switch (type)
+        {
+            case UnitType::Degrees:
+                return "°";
+            case UnitType::Percent:
+                return "%";
+            case UnitType::Pressure:
+                return "press";
+            case UnitType::RPM:
+                return "rpm";
+            case UnitType::Speed:
+                return "speed";
+            case UnitType::Temp:
+                return "temp";
+            case UnitType::Torque:
+                return "torque";
+            case UnitType::Volume:
+                return "vol";
             case UnitType::None:
             default:
                 return "";
