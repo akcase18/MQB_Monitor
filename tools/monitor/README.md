@@ -74,6 +74,8 @@ always comes up as a normal dash.
 .venv/bin/python run.py --port /dev/tty.usbmodemXXXX
 .venv/bin/python run.py --demo        # GUI on synthesized traffic, no hardware
 .venv/bin/python run.py --selftest    # headless engine check (needs only pyserial)
+.venv/bin/python run.py --fit 43      # fit a signal's stored points, search its payload
+.venv/bin/python run.py --summary captures/<file>.csv  # what a dongle did to each module
 .venv/bin/python run.py --active      # open the bus in NORMAL mode (can TX) — see below
 ```
 
@@ -81,14 +83,18 @@ always comes up as a normal dash.
 unknown DID and a multi-frame response) so you can explore the whole UI with
 nothing plugged in.
 
-## The registry: active vs. WIP
+## The registry: active, internal and WIP
 
 Every signal ever defined lives in one file, `signals.json`, tagged with a
 `status`:
 
-- **Active** — compiled into the firmware (`tools/gen_catalog.py` filters to
-  active-only). Shows up in the Signals watchlist picker, and the live
-  engine decodes its DID automatically wherever it appears in Traffic.
+- **Active** — compiled into the firmware and offered on the dash. Shows up
+  in the Signals watchlist picker, and the live engine decodes its DID
+  automatically wherever it appears in Traffic.
+- **Internal** — compiled into the firmware for its own use, never offered
+  as a panel or on the phone page (Dim Ctrl, which drives Auto brightness).
+  Everything else is as for Active: watchlist, live decode, Fake Car, and
+  the same firmware checks on save.
 - **WIP** — not compiled, and not auto-decoded. The live engine treats a WIP
   signal's DID exactly like an undiscovered one ("unknown, log it raw") until
   you flip it to Active — so a guessed offset/scale never quietly shows up
@@ -126,13 +132,11 @@ entries into, so reordering active signals changes the firmware's
 "All", since a filtered view skips entries and isn't the registry's real,
 contiguous order.
 
-This is safe today because no device has shipped with saved config yet
-(`ConfigStore::migrate()` is currently a no-op — see
-[core/vehicle/README.md](../../core/vehicle/README.md)). Once one has,
-`Config::signals[]` in flash is indexed by this same compiled order, so
-reordering active signals after that point would misalign already-saved
-per-signal warning thresholds on any device that already updated — a
-migration would need to handle that first.
+Reordering, promoting and demoting are all safe for dashes that already
+hold saved settings: each saved per-signal record carries its signal id, and
+the dash matches them up again on its next boot (see
+[core/config/README.md](../../core/config/README.md)). The dash keeps
+settings for up to 64 active signals; `gen_catalog.py` refuses more.
 
 ## The five tabs
 
@@ -150,10 +154,10 @@ migration would need to handle that first.
   (auto-scroll off freezes the view without losing anything — the underlying
   capture keeps running). **Save Log…** exports to CSV: decoded messages
   (honors the filter) or raw CAN frames (everything).
-- **Registry** — every signal, active and WIP alike, in one table — the
+- **Registry** — every signal, whatever its status, in one table — the
   birds-eye view for reviewing what's actually validated. Filter (All/Active
-  only/WIP only), **Toggle Status** for a fast bulk flip without opening the
-  editor, **Edit…** for anything else, **New Signal…** to hand-enter one you
+  only/Internal only/WIP only), **Set Status** (Active/Internal/WIP) for a
+  fast bulk change without opening the editor, **Edit…** for anything else, **New Signal…** to hand-enter one you
   already know about, **New Compound Signal…** to build a computed signal
   from two existing direct ones (sum/difference/average/min/max — see below),
   **Move Up**/**Move Down** to reorder (filter must be "All" — see below),
@@ -175,6 +179,117 @@ The signal editor (opened from Learn/WIP/Registry) is one dialog with a
 **Status** combo (Active/WIP) and a single Save button — that combo *is* the
 two-stage toggle, whichever tab you opened it from.
 
+Its right half is for working out the decode:
+
+- **Payload bytes** — the newest payload as byte cells; bytes that changed
+  between samples are tinted amber. Click a byte, or drag across up to four,
+  to choose which bytes this signal reads (with Signed, and Bits from/count
+  for a flag or nibble inside a byte). **Auto** goes back to the legacy
+  decode (u8, or s16 from bytes 0–1). A pick that reads exactly what Auto
+  reads is saved as Auto, which the firmware already compiles.
+- **Live** — while the DID is answering, its current payload and what it
+  decodes to right now.
+- **Points** — raw → true-value pairs kept with the signal. **Add from Live**
+  freezes the payload on the bus as a new row and puts you in its Value cell
+  to type what the phone shows; **Add Row** is for typing one in. Values go
+  in the signal's metric unit (or a label, for an Enum). Each row shows its
+  raw value, what the current offset/scale makes of it, and the error, green
+  when it's within the precision you wrote the value down at.
+- **Fit** works out offset/scale from every point (or, for an Enum, the value
+  → label table) and says how well it fits; if the points aren't a straight
+  line it asks before using the closest fit. **Find Field…** tries every byte
+  range in the payload, in both byte orders and with a few flag bits masked
+  off the top or bottom (a 14-bit value under two status bits, say), and
+  lists the best matches to pick from. Neither
+  changes anything until you Save.
+
+**New Field on DID…** (Registry and WIP tabs) starts a new signal on the
+selected signal's DID and module, for a DID that packs several values into
+one response: pick the other bytes, and the dash still sends one request
+for all of them. The editor lists which bytes other signals already read.
+
+The editor also sets the signal's **ECU** — the module the DID belongs to
+(Engine, Transmission, or Custom tx/rx CAN ids). Learn and WIP pre-fill it
+from the traffic when the DID has been seen answered, and the Learn, WIP and
+Registry tables all show it. Learn lists a DID once per module that answers
+it, since the same DID number means different things in different modules.
+While connected to the car, a WIP signal with no ECU yet gets it filled in
+(and `signals.json` saved) as soon as its DID is answered by exactly one
+module; a DID answered by several is left for the editor, which asks which
+one. Demo traffic never fills anything in. Learn keeps each DID's distinct
+payloads (up to 50, with how often each was seen) rather than the last few
+repeats, and saving a WIP signal stores those. Choosing **Unit: Enum** swaps the display range
+for a value → label table (e.g. 0 = 1st, 8 = Shifting); the Signals tab and
+Traffic log then show the label. Saving a signal **Active** or **Internal**
+first checks it against what the firmware can compile (`tools/gen_catalog.py`)
+alongside the other compiled signals: it needs an ECU, an Enum's labels have to fit the dash
+(15 characters, plain ASCII), and no two modules may share a request or
+response id.
+
+## Recording and replaying
+
+**● Rec** in the top bar (enabled while connected) writes every raw frame
+from then on to `tools/monitor/captures/<YYYY-MM-DD_HHMMSS>.csv` — gitignored,
+since drives stay local. The button shows the frame count while recording;
+click it again, or Disconnect, to stop. Captures of demo traffic get a
+`_demo` suffix.
+
+A capture is the same CSV as Traffic's raw **Save Log…**, plus an `epoch_s`
+wall-clock column (to line it up with a phone screen recording) and a `#`
+header line naming the source. **Source → Replay capture…** then Connect
+plays one back — or a raw Save Log — through the whole app in **real time**
+or **all at once**: Signals, Traffic, Learn and the editor's live line all
+see it as if it were the bus. Replaying clears the traffic seen so far.
+Replaying a capture from the car can fill in WIP signals' ECUs just like
+the live bus; a demo capture never does.
+
+## Fake car
+
+The **Fake Car** tab answers the OBDEleven dongle as if the Mac were the car,
+so you choose exactly what a signal sends and read off what the phone makes
+of it, with no timing to line up. The dongle plugs into a **bench** OBD
+socket wired to the dash or sniffer's CAN bus (12 V on pin 16, ground on 4/5,
+CAN-H on 6, CAN-L on 14, 120 Ω at each end) — never into the car, where the
+real modules would answer too. Connect with **Listen-only unchecked** (the
+fake car has to transmit), then **Start Fake Car**. It needs the Teensy dash
+or the standalone Teensy sniffer (the S3 dash has no sniffer mode).
+
+- Every single-request registry signal with a module is listed, and its
+  module answers. **Filter** narrows the list by name, id, module or DID.
+  A signal the recording answered is answered from it (as of **Answer as
+  at**); any other gets a stand-in payload (a stored sample, else zeros).
+  Changing a signal's value fakes it — its row turns blue — and **Reset**
+  hands it back to the recording.
+- Set what it sends by **Value** (in its units), **Raw** field value, **State**
+  (an Enum's label), or the **Payload** bytes directly. **Should show** is what
+  the phone ought to display if the signal's offset/scale are right.
+- **Sweep raw** steps the raw value from/to/step, by hand (◀ Step / Step ▶)
+  or **Auto every** few seconds.
+- Type what the phone shows and press Enter (or **Add Point**) to save it,
+  with the payload being sent, as a point on the signal (source `emulator`).
+  **Points** lists every point on the signal, and below it the best field and
+  scale/offset (or state mapping) the search finds for them, green once three
+  points agree. **Use This Fit** saves it on the signal — no trip to the
+  Registry needed.
+- **Load Recording…** takes a capture of the dongle talking to the real car
+  (● Rec while connecting OBDEleven to it). Everything not being faked —
+  the connect handshake, identification, sessions, other DIDs — is answered
+  exactly as the car answered, as of the **Answer as at** moment. Without a
+  recording only the faked DIDs, tester present and session control are
+  answered, which may not be enough for the app to connect. Frames the car
+  sends on its own throughout the recording (the gateway's 0x17F00010
+  heartbeat) are repeated at their recorded rate while the fake car runs; the
+  recording line shows which. Only modules the dongle talked to in the
+  recording exist — open every module you'll want on the bench while
+  recording.
+- **What the dongle asked** lists every request and how it was answered:
+  anything amber is something the fake car couldn't answer.
+
+**Source → Simulated dongle** tries all of it with no hardware: a pretend
+dongle asks for each faked DID in turn, and the answers show up in Signals,
+Traffic and Learn like the real bus. Whatever the fake car sends never fills
+in a WIP signal's ECU.
+
 ## Passive vs. active
 
 By default everything is **passive** — the app only listens. `--active` opens
@@ -187,9 +302,14 @@ bus; passive monitoring between the OBDEleven and the car needs listen-only.
 | File | Role |
 |------|------|
 | `run.py` | entry point / CLI |
-| `mqb_monitor/catalog.py` | loads/saves the `signals.json` registry; **firmware-accurate** decode; active-only DID index |
+| `mqb_monitor/catalog.py` | loads/saves the `signals.json` registry; **firmware-accurate** decode; compiled-only (active + internal) DID index |
 | `mqb_monitor/uds.py` | ISO-TP reassembly + UDS message parsing |
-| `mqb_monitor/sources.py` | SLCAN serial source + hardware-free demo source |
+| `mqb_monitor/sources.py` | SLCAN serial source, hardware-free demo source, capture replay |
+| `mqb_monitor/emulator.py` | the fake car: recording → answers, overrides, ISO-TP both ways, simulated dongle |
+| `mqb_monitor/fake_car_tab.py` | the Fake Car tab |
+| `mqb_monitor/capture.py` | the capture file format: writer (Record) and reader (replay) |
+| `mqb_monitor/decode_panel.py` | the signal editor's decode side: byte strip, live payload, points table, Fit / Find Field |
+| `mqb_monitor/solver.py` | fits offset/scale (or an enum table) to a signal's stored points; searches a payload for the field they match |
 | `mqb_monitor/session.py` | the engine: frames → decode → signal/unknown state (thread-safe, GUI-agnostic) |
 | `mqb_monitor/theme.py` | dark/blue-accent Fusion theme (palette + QSS) |
 | `mqb_monitor/gui.py` | the PySide6 window: sidebar shell + five tabs + the signal editor dialog |

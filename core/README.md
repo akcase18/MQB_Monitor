@@ -18,7 +18,7 @@ Every collection in `core/` is a fixed-size array sized by a `constexpr` count k
 core/time    → platform/platform.hpp (IClock)
 core/can     → platform/platform.hpp (ICanBus)
 core/vehicle → core/can (UdsRequestSpec)
-core/config  → core/vehicle (SIGNAL_CATALOG_COUNT, WarningThresholds), platform/platform.hpp (IConfigStore)
+core/config  → core/vehicle (SIGNAL_CATALOG, WarningThresholds), platform/platform.hpp (IConfigStore)
 core/logging → core/vehicle (SIGNAL_CATALOG, SignalStore), core/config (Config — which signals are on screen, so which get logged), platform/platform.hpp (IStorage)
 ```
 

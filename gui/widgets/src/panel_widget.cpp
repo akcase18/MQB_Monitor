@@ -1,6 +1,7 @@
 #include "panel_widget.hpp"
 #include "mem_placement.hpp"
 
+#include <math.h>
 #include <string.h>
 
 namespace gui
@@ -8,13 +9,21 @@ namespace gui
 
     namespace
     {
-        /* Sized to contain a 4-character value (the font each tier's
-         * Bar/Gauge readout uses) without the digits poking out past the
-         * ring — a real bug where "3212" at 40px overflowed an 80px arc. */
-        constexpr lv_coord_t ARC_SIZE_SMALL = 104;
-        constexpr lv_coord_t ARC_SIZE_LARGE = 128;
-        constexpr lv_coord_t ARC_SIZE_HERO  = 180;
-        constexpr lv_coord_t ARC_WIDTH      = 7;
+        /**
+         * Everything below runs only from resize_contents() (FLASHMEM,
+         * like it: none of it is on the per-refresh path).
+         *
+         * Everything below is sized from the panel's own content box, not
+         * from a tier: cells run from 144x128 (landscape 5-panel's top
+         * row) to 462x302 (one panel), and a size that suits one tier's
+         * smallest cell wastes most of its biggest.
+         */
+
+        /* The Gauge's fill stroke scales with the ring (diameter / 14)
+         * between these, so a big ring doesn't look spindly. */
+        constexpr lv_coord_t ARC_WIDTH_MIN     = 7;
+        constexpr lv_coord_t ARC_WIDTH_MAX     = 16;
+        constexpr lv_coord_t ARC_WIDTH_DIVISOR = 14;
 
         /* Both graphics draw their track wider than their fill and push the
          * fill in by the difference, leaving a strip of track color ringing
@@ -24,29 +33,65 @@ namespace gui
          * paints the whole panel blue/red (see set_view_model) and the
          * accent is itself user-selectable to blue or red. */
         constexpr lv_coord_t INDICATOR_INSET = 2;
-        constexpr lv_coord_t ARC_TRACK_WIDTH = ARC_WIDTH + 2 * INDICATOR_INSET;
 
-        constexpr lv_coord_t BAR_HEIGHT      = 18;
-        constexpr lv_coord_t BAR_HEIGHT_HERO = 28;
-        constexpr lv_coord_t BAR_DATA_GAP    = 6;
+        /**
+         * The 270-degree ring's drawn height, as a percentage of its
+         * diameter: the top half plus down to sin(45°) of the radius where
+         * the ends sit, plus the ends' round caps. The rest of its box,
+         * under the gap at the bottom, may overlap the caption.
+         */
+        constexpr lv_coord_t ARC_DRAWN_HEIGHT_PCT = 88;
 
-        /* Every mode positions exactly one "anchor" element at the
-         * button's center (offset up to leave room for the label's fixed
-         * slot below); any companion element (a Bar's value, a Gauge's
-         * centered value) is then placed relative to that anchor. This
-         * keeps the label's position the only thing that never depends on
-         * which mode/tier is active — previously the label flowed
-         * directly after the graphic in a flex column, so its height
-         * shifted the label around from panel to panel. */
+        /* The ring shrinks to this much of the room it could fill, so it
+         * doesn't run into the panel's edges -- but only as far as its
+         * value still fits inside (see gauge_diameter()). */
+        constexpr lv_coord_t ARC_FILL_PCT = 92;
+
+        /* Clear space between a Gauge's value and the inside of its ring,
+         * each side. */
+        constexpr lv_coord_t GAUGE_TEXT_MARGIN = 4;
+
+        /* The Bar's height is a tenth of the room above the caption,
+         * between these. */
+        constexpr lv_coord_t BAR_HEIGHT_MIN     = 18;
+        constexpr lv_coord_t BAR_HEIGHT_MAX     = 32;
+        constexpr lv_coord_t BAR_HEIGHT_DIVISOR = 10;
+        constexpr lv_coord_t BAR_WIDTH_PCT      = 85;
+        /* Between the value's digits and the bar, at least. */
+        constexpr lv_coord_t BAR_DATA_GAP_MIN = 8;
+
+        /* Clear space either side of words (an Enum's label). A number's
+         * worst case is rarely shown, so it may use the full width; words
+         * at full width would always touch the edges. */
+        constexpr lv_coord_t TEXT_SIDE_MARGIN = 6;
+
+        /* Between the value and its unit tag. */
+        constexpr lv_coord_t UNIT_GAP = 3;
+
+        /* The caption sits LABEL_BOTTOM_PAD above the panel's bottom
+         * edge; the value and graphic share what's left above it, less
+         * CONTENT_LABEL_GAP. The caption's position is the one thing that
+         * never depends on mode or value. */
         constexpr lv_coord_t LABEL_BOTTOM_PAD  = 4;
         constexpr lv_coord_t CONTENT_LABEL_GAP = 4;
 
-        /* Strictly centering the content in the zone above the label (see
-         * content_center_offset() below) reads as biased high — the eye
-         * weighs the label's caption text as part of the panel's visual
-         * mass even though it isn't part of the "content" being centered,
-         * so nudge the content down a bit to compensate. */
-        constexpr lv_coord_t CONTENT_VERTICAL_NUDGE = 8;
+        /* Panel content size from which the caption steps up a size. */
+        constexpr lv_coord_t CAPTION_LG_MIN_SIDE = 200;
+        constexpr lv_coord_t CAPTION_XL_MIN_W    = 280;
+        constexpr lv_coord_t CAPTION_XL_MIN_H    = 200;
+
+        /**
+         * The widest number a panel has to hold: a 5-glyph value with a
+         * 3-glyph unit ("-14.5" psi, "-1.00" bar) or a 4-glyph value with
+         * the 5-glyph "lb-ft" (torque has no decimals). A Gauge hides the
+         * unit, so its worst case is just the 5 glyphs.
+         */
+        constexpr lv_coord_t WORST_VALUE_GLYPHS     = 5;
+        constexpr lv_coord_t WORST_UNIT_GLYPHS      = 3;
+        constexpr lv_coord_t WORST_LONG_UNIT_GLYPHS = 5;
+
+        /* A unit font's line is at most this fraction of the value's. */
+        constexpr lv_coord_t UNIT_LINE_DIVISOR = 4;
 
         /* The arc/bar's unfilled track needs its own visible color — left
          * at LVGL's default it rendered as a near-invisible sliver against
@@ -94,71 +139,319 @@ namespace gui
             return static_cast<uint8_t>(range_pct * 100.0f);
         }
 
-        /* Widest Digital readout a panel has to hold, beside its unit
-         * tag and the 3px gap set_view_model() leaves between them: a
-         * 5-glyph value with a 3-glyph unit ("-14.5" psi, "-1.00" bar)
-         * or a 4-glyph value with the 5-glyph "lb-ft" (torque has no
-         * decimals). Both fonts are monospace, so a glyph's advance
-         * times the count is exact. */
-        lv_coord_t worst_readout_width(const lv_font_t *value_font,
-                                       const lv_font_t *unit_font)
+        FLASHMEM lv_coord_t clamp_coord(lv_coord_t v, lv_coord_t lo, lv_coord_t hi)
         {
-            lv_coord_t v = lv_font_get_glyph_width(value_font, '0', 0);
-            lv_coord_t u = lv_font_get_glyph_width(unit_font, '0', 0);
-            lv_coord_t short_unit = 5 * v + 3 + 3 * u;
-            lv_coord_t long_unit  = 4 * v + 3 + 5 * u;
+            return v < lo ? lo : (v > hi ? hi : v);
+        }
+
+        /* Every value/caption font is monospace, so a glyph's advance
+         * times the length is a string's exact width. */
+        FLASHMEM lv_coord_t advance(const lv_font_t *font)
+        {
+            return lv_font_get_glyph_width(font, '0', 0);
+        }
+
+        /**
+         * Where a font's ink sits within its line: `top` from the line's
+         * top to the top of `c`, `height` of `c`. The line is taller than
+         * the digits (room for descenders and accents), so centering the
+         * line would leave the digits sitting high.
+         */
+        struct Ink
+        {
+                lv_coord_t top;
+                lv_coord_t height;
+        };
+
+        FLASHMEM Ink ink_of(const lv_font_t *font, uint32_t c)
+        {
+            lv_font_glyph_dsc_t dsc;
+            if (!lv_font_get_glyph_dsc(font, &dsc, c, 0))
+            {
+                return { 0, lv_font_get_line_height(font) };
+            }
+            lv_coord_t baseline = lv_font_get_line_height(font) - font->base_line;
+            return { static_cast<lv_coord_t>(baseline - dsc.ofs_y - dsc.box_h),
+                     static_cast<lv_coord_t>(dsc.box_h) };
+        }
+
+        FLASHMEM lv_coord_t worst_readout_width(const lv_font_t *value_font,
+                                                const lv_font_t *unit_font)
+        {
+            lv_coord_t v          = advance(value_font);
+            lv_coord_t u          = advance(unit_font);
+            lv_coord_t short_unit = WORST_VALUE_GLYPHS * v + UNIT_GAP
+                                    + WORST_UNIT_GLYPHS * u;
+            lv_coord_t long_unit = (WORST_VALUE_GLYPHS - 1) * v + UNIT_GAP
+                                   + WORST_LONG_UNIT_GLYPHS * u;
             return short_unit > long_unit ? short_unit : long_unit;
         }
 
-        /* Bar/Gauge already give an at-a-glance read via the graphic
-         * itself — the value next to/inside it is there for a closer
-         * look, not to be the dominant element, so a hero slot only
-         * bumps it to data_hero, not the much bigger data_mega. Digital
-         * has no ring to fit inside, so its bare number gets to be as big
-         * as the panel can hold — data_mega in a hero slot, data_md in a
-         * small one, and in a large one the biggest of data_xl/data_lg
-         * that fits (data_md if neither does). Large cells run from
-         * ~150px (portrait 4-panel) to ~300px (portrait 5-panel's merged
-         * bottom row) wide, so that's the one tier sized by `content_w`
-         * rather than by tier alone. */
-        const lv_font_t *value_font(const Typography     &type,
-                                    const PanelViewModel &vm,
-                                    lv_coord_t            content_w)
+        /**
+         * The unit tag's font for a value in `value_font`: the biggest
+         * caption-family font no more than a quarter of the value's line,
+         * so it stays a tag beside a 128 px number instead of an 11 px
+         * speck -- but a smaller one if that's what lets the worst-case
+         * readout fit `width`, since the value matters more.
+         */
+        FLASHMEM const lv_font_t *unit_font(const Typography &type,
+                                            const lv_font_t  *value_font,
+                                            lv_coord_t        width)
         {
-            if (vm.hero)
+            lv_coord_t limit
+                = lv_font_get_line_height(value_font) / UNIT_LINE_DIVISOR;
+            const lv_font_t *const fonts[]
+                = { type.label_xl, type.label_lg, type.label_sm };
+            for (const lv_font_t *font : fonts)
             {
-                return vm.mode == DisplayMode::Digital ? type.data_mega
-                                                       : type.data_hero;
-            }
-            if (vm.mode != DisplayMode::Digital)
-            {
-                return type.data_sm;
-            }
-            if (!vm.large)
-            {
-                return type.data_md;
-            }
-            const lv_font_t *const candidates[] = { type.data_xl,
-                                                    type.data_lg };
-            for (const lv_font_t *font : candidates)
-            {
-                if (worst_readout_width(font, type.unit) <= content_w)
+                if (lv_font_get_line_height(font) <= limit
+                    && worst_readout_width(value_font, font) <= width)
                 {
                     return font;
                 }
             }
-            return type.data_md;
+            return type.unit;
         }
 
-        /* How far to shift the content "anchor" up from dead-center so it
-         * clears the label's reserved slot below — derived from the
-         * caption font actually in use rather than a guessed constant, so
-         * it can't drift out of sync if label sizes ever change. */
-        lv_coord_t content_center_offset(const lv_font_t *caption_font)
+        /**
+         * The panel's room for the value and its graphic: the content box,
+         * less the caption under it.
+         */
+        struct Room
         {
-            lv_coord_t label_zone = lv_font_get_line_height(caption_font)
-                                    + LABEL_BOTTOM_PAD + CONTENT_LABEL_GAP;
-            return -(label_zone / 2) + CONTENT_VERTICAL_NUDGE;
+                lv_coord_t w;
+                lv_coord_t h;
+        };
+
+        FLASHMEM lv_coord_t bar_height(const Room &room)
+        {
+            return clamp_coord(
+                room.h / BAR_HEIGHT_DIVISOR, BAR_HEIGHT_MIN, BAR_HEIGHT_MAX);
+        }
+
+        FLASHMEM lv_coord_t bar_gap(const Ink &ink)
+        {
+            lv_coord_t gap = ink.height / 4;
+            return gap > BAR_DATA_GAP_MIN ? gap : BAR_DATA_GAP_MIN;
+        }
+
+        FLASHMEM lv_coord_t arc_diameter(const Room &room)
+        {
+            lv_coord_t by_h = room.h * 100 / ARC_DRAWN_HEIGHT_PCT;
+            return by_h < room.w ? by_h : room.w;
+        }
+
+        /**
+         * Where every mode centers its value's digits, from the room's
+         * top: the center of the biggest ring this room holds, with the
+         * ring's drawn part centered in the room. That sits a little below
+         * the room's middle -- the ring's empty bottom gap reaches down
+         * toward the caption -- which reads as centered in the panel as a
+         * whole rather than in the space above the caption. Digital and
+         * Bar use it too, so a value doesn't jump when the mode changes.
+         */
+        FLASHMEM lv_coord_t value_center(const Room &room)
+        {
+            lv_coord_t d = arc_diameter(room);
+            return (room.h - d * ARC_DRAWN_HEIGHT_PCT / 100) / 2 + d / 2;
+        }
+
+        /* `top`, moved as little as it takes to keep [top, top + h) inside
+         * the room (the top edge winning if it can't). */
+        FLASHMEM lv_coord_t keep_in_room(lv_coord_t  top,
+                                         lv_coord_t  h,
+                                         const Room &room)
+        {
+            if (top + h > room.h)
+            {
+                top = room.h - h;
+            }
+            return top > 0 ? top : 0;
+        }
+
+        FLASHMEM lv_coord_t arc_width(lv_coord_t diameter)
+        {
+            return clamp_coord(
+                diameter / ARC_WIDTH_DIVISOR, ARC_WIDTH_MIN, ARC_WIDTH_MAX);
+        }
+
+        FLASHMEM lv_coord_t arc_track_width(lv_coord_t diameter)
+        {
+            return arc_width(diameter) + 2 * INDICATOR_INSET;
+        }
+
+        /**
+         * Whether `glyphs` characters of `font` fit inside a ring of
+         * `diameter`, centered: the chord across the ring's inside at the
+         * ink's top and bottom edges has to hold them.
+         */
+        FLASHMEM bool fits_ring(const lv_font_t *font,
+                       lv_coord_t       glyphs,
+                       lv_coord_t       diameter)
+        {
+            float inner = diameter / 2.0f - arc_track_width(diameter)
+                          - GAUGE_TEXT_MARGIN;
+            float half_h = ink_of(font, '0').height / 2.0f;
+            if (inner <= half_h)
+            {
+                return false;
+            }
+            float chord = 2.0f * sqrtf(inner * inner - half_h * half_h);
+            return static_cast<float>(glyphs * advance(font)) <= chord;
+        }
+
+        /**
+         * The ring's drawn diameter for a value in `font` that's `glyphs`
+         * wide: ARC_FILL_PCT of the most the room allows, or less of a cut
+         * if the value wouldn't fit inside that. The font was picked
+         * against the full size, so that always fits.
+         */
+        FLASHMEM lv_coord_t gauge_diameter(const lv_font_t *font,
+                                  lv_coord_t       glyphs,
+                                  lv_coord_t       max_d)
+        {
+            lv_coord_t d   = max_d;
+            lv_coord_t min = max_d * ARC_FILL_PCT / 100;
+            while (d > min && fits_ring(font, glyphs, d - 1))
+            {
+                d--;
+            }
+            return d;
+        }
+
+        /**
+         * Whether a value in `font` fits the room in `mode`: `glyphs`
+         * wide (or the worst-case number with its unit when `glyphs` is
+         * 0), and leaving room under it for a Bar.
+         */
+        FLASHMEM bool fits(const Typography &type,
+                  const lv_font_t  *font,
+                  lv_coord_t        glyphs,
+                  DisplayMode       mode,
+                  const Room       &room)
+        {
+            if (mode == DisplayMode::Gauge)
+            {
+                return fits_ring(font,
+                                 glyphs > 0 ? glyphs : WORST_VALUE_GLYPHS,
+                                 arc_diameter(room));
+            }
+            lv_coord_t w = glyphs > 0
+                               ? glyphs * advance(font) + 2 * TEXT_SIDE_MARGIN
+                               : worst_readout_width(
+                                   font, unit_font(type, font, room.w));
+            lv_coord_t h = lv_font_get_line_height(font);
+            if (mode == DisplayMode::Bar)
+            {
+                Ink ink = ink_of(font, '0');
+                h = ink.top + ink.height + bar_gap(ink) + bar_height(room);
+            }
+            return w <= room.w && h <= room.h;
+        }
+
+        /**
+         * A number's font: the biggest of the value ladder that holds
+         * the worst-case readout here, so every number this panel can
+         * show stays the same size. data_text, smaller than the whole
+         * ladder, is the last resort.
+         */
+        FLASHMEM const lv_font_t *number_font(const Typography &type,
+                                     DisplayMode       mode,
+                                     const Room       &room)
+        {
+            for (uint8_t i = type.data_count; i > 0; i--)
+            {
+                if (fits(type, type.data[i - 1], 0, mode, room))
+                {
+                    return type.data[i - 1];
+                }
+            }
+            return type.data_text;
+        }
+
+        /**
+         * Whether `font` has a glyph for every character of `text`. The
+         * value fonts carry digits and only the characters the active
+         * Enum labels use (tools/gen_value_fonts.py), so a label that
+         * needs another one has to drop to a font that has it.
+         */
+        FLASHMEM bool font_has_glyphs(const lv_font_t *font, const char *text)
+        {
+            for (const char *c = text; *c != '\0'; c++)
+            {
+                lv_font_glyph_dsc_t dsc;
+                if (!lv_font_get_glyph_dsc(
+                        font, &dsc, static_cast<uint8_t>(*c), 0))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /**
+         * Words (an Enum's label) get the size a number would in this
+         * panel, or the biggest smaller one that has all their glyphs and
+         * holds them on one line. The full-ASCII text fonts are the last
+         * resort.
+         */
+        FLASHMEM const lv_font_t *text_font(const Typography     &type,
+                                   const PanelViewModel &vm,
+                                   const Room           &room)
+        {
+            lv_coord_t limit_h
+                = lv_font_get_line_height(number_font(type, vm.mode, room));
+            lv_coord_t n = static_cast<lv_coord_t>(strlen(vm.value_str));
+            if (n == 0)
+            {
+                n = 1;
+            }
+            for (uint8_t i = type.data_count; i > 0; i--)
+            {
+                const lv_font_t *font = type.data[i - 1];
+                if (lv_font_get_line_height(font) <= limit_h
+                    && fits(type, font, n, vm.mode, room)
+                    && font_has_glyphs(font, vm.value_str))
+                {
+                    return font;
+                }
+            }
+            const lv_font_t *const rest[]
+                = { type.data_text, type.label_lg, type.label_sm };
+            for (const lv_font_t *font : rest)
+            {
+                if (fits(type, font, n, vm.mode, room)
+                    && font_has_glyphs(font, vm.value_str))
+                {
+                    return font;
+                }
+            }
+            return type.label_sm;
+        }
+
+        /**
+         * The caption's font: a size up in a big panel, but never so big
+         * the name wraps -- a smaller size on one line reads better than
+         * a bigger one on two. Only label_sm is left to wrap.
+         */
+        FLASHMEM const lv_font_t *caption_font(const Typography &type,
+                                      const char       *name,
+                                      lv_coord_t        content_w,
+                                      lv_coord_t        content_h)
+        {
+            lv_coord_t n = static_cast<lv_coord_t>(strlen(name));
+            if (content_w >= CAPTION_XL_MIN_W && content_h >= CAPTION_XL_MIN_H
+                && n * advance(type.label_xl) <= content_w)
+            {
+                return type.label_xl;
+            }
+            if ((content_w >= CAPTION_LG_MIN_SIDE
+                 || content_h >= CAPTION_LG_MIN_SIDE)
+                && n * advance(type.label_lg) <= content_w)
+            {
+                return type.label_lg;
+            }
+            return type.label_sm;
         }
     } // namespace
 
@@ -194,16 +487,14 @@ namespace gui
         lv_obj_set_style_pad_all(btn_, 4, 0);
 
         /* No flex here on purpose: every child is positioned explicitly in
-         * set_view_model() via lv_obj_align()/lv_obj_align_to(), so the
-         * label's position never depends on the graphic/value's height
-         * the way it would flowing through a flex column. */
+         * set_view_model(), so the label's position never depends on the
+         * graphic/value's height the way it would flowing through a flex
+         * column. */
         arc_ = lv_arc_create(btn_);
         lv_arc_set_bg_angles(arc_, ARC_BG_START_ANGLE, ARC_BG_END_ANGLE);
         lv_arc_set_range(arc_, 0, 100);
         lv_obj_remove_style(arc_, nullptr, LV_PART_KNOB | LV_STATE_ANY);
         lv_obj_set_clickable(arc_, false);
-        lv_obj_set_style_arc_width(arc_, ARC_TRACK_WIDTH, LV_PART_MAIN);
-        lv_obj_set_style_arc_width(arc_, ARC_WIDTH, LV_PART_INDICATOR);
         /* Both parts share an outer radius, so without this the fill would
          * sit flush against the track's outer edge and only be ringed on
          * the inside. */
@@ -219,14 +510,11 @@ namespace gui
          * (e.g. "72" + a smaller "°F") rather than folded into the name
          * caption below — keeping the caption to just the signal's name
          * is what stops it from wrapping in narrow panels. Hidden for
-         * Gauge, whose value already has to fit inside a fixed-size ring. */
+         * Gauge, whose value already has to fit inside the ring. Its font
+         * scales with the value's (see unit_font()). */
         unit_ = lv_label_create(btn_);
         lv_obj_set_style_text_color(unit_, theme.palette.fg, 0);
         lv_obj_set_style_bg_opa(unit_, LV_OPA_TRANSP, 0);
-        /* Typography::unit is the same font at every tier and mode (see
-         * theme.hpp), so it belongs here rather than being re-set on
-         * every set_view_model() call. */
-        lv_obj_set_style_text_font(unit_, theme.typography.unit, 0);
 
         bar_ = lv_bar_create(btn_);
         lv_bar_set_range(bar_, 0, 100);
@@ -237,7 +525,7 @@ namespace gui
             bar_, theme.palette.accent, LV_PART_INDICATOR);
         lv_obj_set_hidden(bar_, true);
 
-        /* Fixed to the bottom of the panel regardless of mode/tier — the
+        /* Fixed to the bottom of the panel regardless of mode or size — the
          * one thing that must never move. Wraps to 2 lines (rather than
          * clipping/running past the edge) for names too long to fit a
          * small panel's width at 1 line. */
@@ -251,20 +539,17 @@ namespace gui
 
     void PanelWidget::set_view_model(const PanelViewModel &vm)
     {
-        const Typography &type = theme_->typography;
-
         /* Everything below is gated on what actually moved since the last
          * call. This runs for every visible panel several times a second,
          * and LVGL's setters do no such check of their own -- each one
          * invalidates the style cache and marks the panel dirty for
          * redraw even when handed the value it already holds. In the
-         * steady state only value_str changes, so the common path is now
-         * one label update plus the geometry that depends on its width,
-         * instead of the whole ~20-call rebuild. */
-        const bool first = !applied_valid_;
+         * steady state only value_str changes, so the common path is one
+         * label update and a horizontal re-centering, instead of the
+         * whole rebuild. */
+        const bool first        = !applied_valid_;
         const bool mode_changed = first || vm.mode != applied_.mode;
-        const bool tier_changed
-            = first || vm.large != applied_.large || vm.hero != applied_.hero;
+        const bool kind_changed = first || vm.is_text != applied_.is_text;
         const bool value_changed
             = first || strcmp(vm.value_str, applied_.value_str) != 0;
         const bool name_changed
@@ -276,140 +561,43 @@ namespace gui
               || vm.warn_hi_active != applied_.warn_hi_active;
         const bool pct_changed = first || vm.range_pct != applied_.range_pct;
 
-        if (mode_changed || tier_changed)
-        {
-            /* The grid sizes btn_ lazily -- resolve it so the width
-             * value_font() sees is this cell's, not a stale one. A move
-             * to a new cell always lands here: set_visible() clears
-             * applied_valid_, making it a `first` call. */
-            lv_obj_update_layout(btn_);
-            lv_obj_set_style_text_font(
-                data_,
-                value_font(type, vm, lv_obj_get_content_width(btn_)),
-                0);
-        }
         if (value_changed)
         {
             lv_label_set_text(data_, vm.value_str);
-        }
-
-        const lv_font_t *caption_font
-            = vm.large ? type.label_lg : type.label_sm;
-        if (tier_changed)
-        {
-            lv_obj_set_style_text_font(label_, caption_font, 0);
-        }
-        if (name_changed)
-        {
-            lv_label_set_text(label_, vm.name);
         }
         if (unit_changed)
         {
             lv_label_set_text(unit_, vm.unit_label);
         }
-
         if (mode_changed || unit_changed)
         {
-            /* Gauge hides the unit outright rather than risk it — the
-             * ring's size already only has room for the bare value (see
-             * ARC_SIZE_* above). Digital/Bar have the horizontal room to
-             * spare. */
+            /* A Gauge's value has to fit inside the ring, which only has
+             * room for the bare number. */
             lv_obj_set_hidden(unit_,
                               vm.mode == DisplayMode::Gauge
                                   || vm.unit_label[0] == '\0');
         }
 
-        /* The graphic's own placement depends only on mode/tier, but
-         * data_ and unit_ are positioned with lv_obj_align_to(), which
-         * resolves to a fixed offset against the base's size at the
-         * moment it's called rather than tracking it — so a value_str
-         * whose rendered width changed has to re-run this too, or the
-         * unit tag drifts away from (or into) the number. */
-        if (mode_changed || tier_changed || value_changed)
+        /**
+         * The sizes depend on the cell, the mode and the caption (whose
+         * height comes out of the room above it) -- and for words, on
+         * their length. A move to a new cell always lands here:
+         * set_visible() clears applied_valid_.
+         */
+        const bool resize = mode_changed || kind_changed || name_changed
+                            || (vm.is_text && value_changed);
+        if (resize)
         {
-            uint8_t    pct    = range_pct_to_100(vm.range_pct);
-            lv_coord_t offset = content_center_offset(caption_font);
-
-            lv_obj_set_hidden(arc_, vm.mode != DisplayMode::Gauge);
-            lv_obj_set_hidden(bar_, vm.mode != DisplayMode::Bar);
-
-            switch (vm.mode)
-            {
-                case DisplayMode::Bar: {
-                    lv_coord_t bar_h = vm.hero ? BAR_HEIGHT_HERO : BAR_HEIGHT;
-                    lv_obj_set_size(bar_, LV_PCT(80), bar_h);
-                    lv_bar_set_value(bar_, pct, LV_ANIM_OFF);
-
-                    /* The value sits above the bar, so centering the bar
-                     * alone at `offset` would leave the (value + bar)
-                     * pair sitting higher than intended — shift the bar
-                     * down by half the pair's combined height so the pair
-                     * as a whole lands at `offset`, matching Digital/
-                     * Gauge's single-element look. */
-                    lv_coord_t data_h
-                        = lv_font_get_line_height(
-                            lv_obj_get_style_text_font(data_, LV_PART_MAIN));
-                    lv_coord_t pair_shift = (data_h + BAR_DATA_GAP) / 2;
-                    lv_obj_align(bar_, LV_ALIGN_CENTER, 0, offset + pair_shift);
-
-                    lv_obj_align_to(
-                        data_, bar_, LV_ALIGN_OUT_TOP_MID, 0, -BAR_DATA_GAP);
-                    lv_obj_align_to(unit_, data_, LV_ALIGN_OUT_RIGHT_TOP, 3, 2);
-                    break;
-                }
-
-                case DisplayMode::Gauge: {
-                    lv_coord_t size = vm.hero    ? ARC_SIZE_HERO
-                                      : vm.large ? ARC_SIZE_LARGE
-                                                 : ARC_SIZE_SMALL;
-                    lv_obj_set_size(arc_, size, size);
-                    lv_obj_align(arc_, LV_ALIGN_CENTER, 0, offset);
-                    lv_arc_set_value(arc_, pct);
-
-                    /* The value sits inside the ring rather than beside
-                     * it — centering it directly on the arc keeps the
-                     * "graphic + number together" rule from adding a
-                     * third vertical element to position. */
-                    lv_obj_align_to(data_, arc_, LV_ALIGN_CENTER, 0, 0);
-                    break;
-                }
-
-                case DisplayMode::Digital:
-                default: {
-                    lv_obj_align(data_, LV_ALIGN_CENTER, 0, offset);
-                    lv_obj_align_to(unit_, data_, LV_ALIGN_OUT_RIGHT_TOP, 3, 2);
-
-                    /* The value stays centered with the unit hanging off
-                     * its right, but at data_md a 5-char value plus a
-                     * long unit ("-12.5" + "lb-ft") can run that tag past
-                     * a small panel's edge — slide the pair left just
-                     * enough to keep it inside, never past the left edge. */
-                    if (!lv_obj_has_flag(unit_, LV_OBJ_FLAG_HIDDEN))
-                    {
-                        /* align_to() only stores the position — resolve it
-                         * before reading coords back. */
-                        lv_obj_update_layout(unit_);
-                        lv_coord_t overflow = lv_obj_get_x(unit_)
-                                              + lv_obj_get_width(unit_)
-                                              - lv_obj_get_content_width(btn_);
-                        lv_coord_t room = lv_obj_get_x(data_);
-                        lv_coord_t shift = overflow < room ? overflow : room;
-                        if (shift > 0)
-                        {
-                            lv_obj_align(
-                                data_, LV_ALIGN_CENTER, -shift, offset);
-                            lv_obj_align_to(
-                                unit_, data_, LV_ALIGN_OUT_RIGHT_TOP, 3, 2);
-                        }
-                    }
-                    break;
-                }
-            }
+            resize_contents(vm, name_changed);
         }
-        else if (pct_changed)
+
+        if (resize || value_changed || unit_changed)
         {
-            /* Same mode and tier, only the fill moved — update the
-             * graphic's value without redoing any of the geometry above. */
+            place_value();
+        }
+
+        if (pct_changed || mode_changed)
+        {
             uint8_t pct = range_pct_to_100(vm.range_pct);
             if (vm.mode == DisplayMode::Bar)
             {
@@ -419,12 +607,9 @@ namespace gui
             {
                 lv_arc_set_value(arc_, pct);
             }
-        }
 
-        /* indicator_color() varies only with whether range_pct has pegged
-         * outside [0,1]. */
-        if (mode_changed || pct_changed)
-        {
+            /* indicator_color() varies only with whether range_pct has
+             * pegged outside [0,1]. */
             lv_color_t indicator = indicator_color(*theme_, vm);
             if (vm.mode == DisplayMode::Bar)
             {
@@ -460,17 +645,145 @@ namespace gui
         applied_valid_ = true;
     }
 
+    FLASHMEM __attribute__((noinline)) void
+    PanelWidget::resize_contents(const PanelViewModel &vm, bool name_changed)
+    {
+        const Typography &type = theme_->typography;
+
+        /* The grid sizes btn_ lazily -- resolve it so the sizes below
+         * are this cell's, not a stale one's. */
+        lv_obj_update_layout(btn_);
+        lv_coord_t content_w = lv_obj_get_content_width(btn_);
+        lv_coord_t content_h = lv_obj_get_content_height(btn_);
+
+        lv_obj_set_style_text_font(
+            label_,
+            caption_font(type, vm.name, content_w, content_h),
+            0);
+        if (name_changed)
+        {
+            lv_label_set_text(label_, vm.name);
+        }
+        lv_obj_update_layout(label_);
+
+        Room room { content_w,
+                    static_cast<lv_coord_t>(
+                        content_h - LABEL_BOTTOM_PAD
+                        - lv_obj_get_height(label_) - CONTENT_LABEL_GAP) };
+
+        const lv_font_t *value_font
+            = vm.is_text ? text_font(type, vm, room)
+                         : number_font(type, vm.mode, room);
+        const lv_font_t *tag_font = unit_font(type, value_font, room.w);
+        lv_obj_set_style_text_font(data_, value_font, 0);
+        lv_obj_set_style_text_font(unit_, tag_font, 0);
+
+        Ink ink  = ink_of(value_font, '0');
+        unit_dy_ = static_cast<lv_coord_t>(ink.top - ink_of(tag_font, 'l').top);
+
+        lv_obj_set_hidden(arc_, vm.mode != DisplayMode::Gauge);
+        lv_obj_set_hidden(bar_, vm.mode != DisplayMode::Bar);
+
+        /* The digits' top if they're centered on the shared line; each
+         * mode keeps them (and its graphic) inside the room. */
+        const lv_coord_t center = value_center(room);
+        const lv_coord_t digits_top
+            = static_cast<lv_coord_t>(center - ink.height / 2);
+
+        switch (vm.mode)
+        {
+            case DisplayMode::Bar: {
+                /* The digits on the line and the bar under them, the two
+                 * moved up together if that leaves the bar less clear of
+                 * the caption than it is of the digits -- a bar resting
+                 * on the caption reads as underlining it. Where even that
+                 * doesn't fit, the two are centered as a group. */
+                lv_coord_t bar_h = bar_height(room);
+                lv_coord_t gap   = bar_gap(ink);
+                lv_coord_t group = static_cast<lv_coord_t>(
+                    ink.height + gap + bar_h);
+                lv_coord_t top
+                    = group + gap > room.h
+                          ? static_cast<lv_coord_t>((room.h - group) / 2)
+                          : keep_in_room(digits_top,
+                                         static_cast<lv_coord_t>(group + gap),
+                                         room);
+                lv_obj_set_size(
+                    bar_, content_w * BAR_WIDTH_PCT / 100, bar_h);
+                lv_obj_align(bar_,
+                             LV_ALIGN_TOP_MID,
+                             0,
+                             top + ink.height + gap);
+                data_y_ = static_cast<lv_coord_t>(top - ink.top);
+                break;
+            }
+
+            case DisplayMode::Gauge: {
+                lv_coord_t glyphs
+                    = vm.is_text
+                          ? static_cast<lv_coord_t>(strlen(vm.value_str))
+                          : WORST_VALUE_GLYPHS;
+                lv_coord_t d = gauge_diameter(
+                    value_font, glyphs, arc_diameter(room));
+                lv_obj_set_size(arc_, d, d);
+                lv_obj_set_style_arc_width(
+                    arc_, arc_track_width(d), LV_PART_MAIN);
+                lv_obj_set_style_arc_width(
+                    arc_, arc_width(d), LV_PART_INDICATOR);
+                /* The ring centered on the line, and the digits in it.
+                 * A ring cut below the biggest is off its drawn-part
+                 * center by at most a pixel or two. */
+                lv_obj_align(arc_, LV_ALIGN_TOP_MID, 0, center - d / 2);
+                data_y_ = static_cast<lv_coord_t>(digits_top - ink.top);
+                break;
+            }
+
+            case DisplayMode::Digital:
+            default:
+                data_y_ = static_cast<lv_coord_t>(
+                    keep_in_room(digits_top, ink.height, room) - ink.top);
+                break;
+        }
+    }
+
+    void PanelWidget::place_value()
+    {
+        /**
+         * The value centered with its unit tag hanging off the right,
+         * slid left just enough to keep the tag inside the panel (never
+         * past the left edge). The worst-case readout always fits, so
+         * this only moves a value when the number is that wide.
+         */
+        lv_obj_update_layout(data_);
+        lv_coord_t content_w = lv_obj_get_content_width(btn_);
+        lv_coord_t data_w    = lv_obj_get_width(data_);
+        lv_coord_t x         = (content_w - data_w) / 2;
+        bool       has_unit  = !lv_obj_has_flag(unit_, LV_OBJ_FLAG_HIDDEN);
+        if (has_unit)
+        {
+            lv_coord_t overflow
+                = x + data_w + UNIT_GAP + lv_obj_get_width(unit_) - content_w;
+            if (overflow > 0)
+            {
+                x -= overflow < x ? overflow : x;
+            }
+        }
+        lv_obj_set_pos(data_, x, data_y_);
+        if (has_unit)
+        {
+            lv_obj_set_pos(unit_, x + data_w + UNIT_GAP, data_y_ + unit_dy_);
+        }
+    }
+
     void PanelWidget::set_visible(bool visible)
     {
         lv_obj_set_hidden(btn_, !visible);
 
         /* This is only ever called from InfoScreen::init()/rebuild(), i.e.
          * exactly when the panel is about to be given a new grid cell (and
-         * therefore a new size). The lv_obj_align_to() placements in
-         * set_view_model() are resolved against the sizes in effect when
-         * they run, so they don't survive a resize — drop the cached
-         * view-model to force the next refresh to re-apply everything
-         * against the new geometry. */
+         * therefore a new size). Every size and position set_view_model()
+         * works out comes from the cell's size, so drop the cached
+         * view-model to force the next refresh to redo them all. */
         applied_valid_ = false;
     }
 

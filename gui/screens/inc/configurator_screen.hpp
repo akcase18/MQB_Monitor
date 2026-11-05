@@ -52,11 +52,16 @@ namespace gui
              * value and to resolve SignalPickerScreen's chosen index back
              * to a signal id.
              * @param signal_ids   Parallel array of catalog signal ids.
-             * @param num_signals  Length of both arrays.
+             * @param signal_is_state Parallel array: true for a signal
+             * shown as a state label (an Enum) -- Digital only, with no
+             * warning thresholds, so Bar/Gauge and the Warning Thresholds
+             * row are disabled while one is selected.
+             * @param num_signals  Length of the arrays.
              */
             void init(const Theme             &theme,
                       const char *const *const signal_names,
                       const uint16_t          *signal_ids,
+                      const bool              *signal_is_state,
                       uint16_t                 num_signals,
                       DoneCallback             done_cb,
                       void                    *done_ctx,
@@ -88,15 +93,23 @@ namespace gui
             static void pick_signal_cb_handler(lv_event_t *e);
 
             void refresh_signal_row_label();
+            /**
+             * Locks the Mode matrix to Digital and disables the Warning
+             * Thresholds row while a state signal is selected.
+             */
+            void apply_state_lock();
+            bool pending_is_state() const;
 
             lv_obj_t *screen_           = nullptr;
             lv_obj_t *signal_value_lbl_ = nullptr;
             lv_obj_t *signal_chevron_   = nullptr;
             lv_obj_t *units_matrix_     = nullptr;
             lv_obj_t *mode_matrix_      = nullptr;
+            lv_obj_t *warn_row_         = nullptr;
 
             const char *const *signal_names_ = nullptr;
             const uint16_t    *signal_ids_   = nullptr;
+            const bool        *signal_is_state_ = nullptr;
             uint16_t           num_signals_  = 0;
 
             uint8_t  current_rank_      = 0;

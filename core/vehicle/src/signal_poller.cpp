@@ -19,11 +19,14 @@ namespace core
     {
     }
 
-    int SignalPoller::find_request(uint8_t byte1, uint8_t byte2) const
+    int SignalPoller::find_request(uint8_t ecu,
+                                   uint8_t byte1,
+                                   uint8_t byte2) const
     {
         for (uint8_t i = 0; i < count_; i++)
         {
-            if (entries_[i].byte1 == byte1 && entries_[i].byte2 == byte2)
+            if (entries_[i].ecu == ecu && entries_[i].byte1 == byte1
+                && entries_[i].byte2 == byte2)
             {
                 return static_cast<int>(i);
             }
@@ -85,7 +88,7 @@ namespace core
 
         for (uint8_t s = 0; s < active_count_; s++)
         {
-            int idx = signal_catalog_find(active_ids_[s]);
+            int idx = signal_table_find(active_ids_[s]);
             if (idx < 0)
             {
                 continue;
@@ -96,14 +99,18 @@ namespace core
             {
                 const UdsRequestSpec &req = spec.requests[r];
 
-                /* Two displayed signals can share a DID -- Int Pres and
+                /**
+                 * Two displayed signals can share a DID -- Int Pres and
                  * Int Pres Act. both read 0x3E70, Amb Pres and Int Pres
                  * Act. both read 0x13CA -- and that is one request on the
                  * wire, at the faster of the two cadences.
                  * SignalStore::on_uds_response() already fans a single
                  * response out to every catalog entry owning the DID, so
-                 * asking twice only ever bought a duplicate frame. */
-                int existing = find_request(req.byte1, req.byte2);
+                 * asking twice only ever bought a duplicate frame. The
+                 * same DID number on two modules is two requests, though:
+                 * it means different things in each.
+                 */
+                int existing = find_request(req.ecu, req.byte1, req.byte2);
                 if (existing >= 0)
                 {
                     if (spec.cycle_time_ms < entries_[existing].period_ms)
@@ -119,6 +126,7 @@ namespace core
                 }
 
                 Entry &entry    = entries_[count_++];
+                entry.ecu       = req.ecu;
                 entry.byte1     = req.byte1;
                 entry.byte2     = req.byte2;
                 entry.period_ms = spec.cycle_time_ms;
@@ -177,10 +185,16 @@ namespace core
 
         if (in_flight_)
         {
-            if (static_cast<int32_t>(now - sent_at_ms_)
-                < static_cast<int32_t>(RESPONSE_TIMEOUT_MS))
+            int32_t waited = static_cast<int32_t>(now - sent_at_ms_);
+            if (waited < static_cast<int32_t>(RESPONSE_TIMEOUT_MS))
             {
                 return; /* still waiting -- this is the flow control */
+            }
+            if (uds_.receiving()
+                && waited < static_cast<int32_t>(RESPONSE_TIMEOUT_MS
+                                                 + MULTI_FRAME_GRACE_MS))
+            {
+                return; /* a long answer is part-way in */
             }
 
             Entry &entry = entries_[in_flight_idx_];
@@ -200,6 +214,7 @@ namespace core
         Entry &entry = entries_[idx];
 
         UdsRequestSpec request {};
+        request.ecu   = entry.ecu;
         request.byte1 = entry.byte1;
         request.byte2 = entry.byte2;
         uds_.send(request);
@@ -216,7 +231,7 @@ namespace core
         sent_at_ms_    = now;
     }
 
-    void SignalPoller::on_response(uint8_t byte1, uint8_t byte2)
+    void SignalPoller::on_response(uint8_t ecu, uint8_t byte1, uint8_t byte2)
     {
         if (!in_flight_)
         {
@@ -224,7 +239,7 @@ namespace core
         }
 
         Entry &entry = entries_[in_flight_idx_];
-        if (entry.byte1 != byte1 || entry.byte2 != byte2)
+        if (entry.ecu != ecu || entry.byte1 != byte1 || entry.byte2 != byte2)
         {
             /* Some other tester's traffic, or a late answer to a request
              * that already timed out. Either way it is not what this slot
@@ -236,9 +251,12 @@ namespace core
         in_flight_   = false;
     }
 
-    void SignalPoller::on_negative_response(uint8_t service, uint8_t nrc)
+    void SignalPoller::on_negative_response(uint8_t ecu,
+                                            uint8_t service,
+                                            uint8_t nrc)
     {
-        if (!in_flight_ || service != SID_READ_DATA_BY_ID)
+        if (!in_flight_ || service != SID_READ_DATA_BY_ID
+            || entries_[in_flight_idx_].ecu != ecu)
         {
             return;
         }

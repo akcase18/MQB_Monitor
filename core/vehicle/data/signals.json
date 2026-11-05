@@ -1,20 +1,28 @@
 {
-  "_comment": "Canonical, single source of truth for the vehicle signal catalog. Both the firmware (via tools/gen_catalog.py -> core/vehicle/src/signal_catalog.generated.inc) and the Mac monitor tool (tools/monitor) read this file. Byte fields are UDS read-data-by-identifier (service 0x22) DID pairs. A signal's displayed value is transform(over each request's (raw + offset) * scale). 'transform' names a C++ function (transform_<name>) defined in signal_catalog.cpp AND a Python function in tools/monitor; 'default' returns request 0's value. Edit here, then run tools/gen_catalog.py. CADENCE FLOOR: no signal polls faster than 50ms. The five signals below that were previously at 20ms -- Int Pres (4), Engine Speed (7), Engine Torque (8), Throttle Pos (12), Int Pres Act. (22) -- were raised to 50ms on 2026-08-25 to match INFO_SCREEN_REFRESH_MS (src/main.cpp), since the display restates values at 20Hz. 'cycle_time_ms' is a FLOOR, not a fixed period: core::SignalPoller polls only the signals currently on a panel, one request outstanding at a time, so a signal is asked for no faster than this and slower whenever the ECU cannot serve full demand. Lowering these back to 20 would not put 20ms of traffic on the bus -- it would only raise their share of whatever throughput the ECU gives. See core/vehicle/README.md.",
+  "_comment": "Canonical, single source of truth for the vehicle signal catalog. Both the firmware (via tools/gen_catalog.py -> core/vehicle/src/signal_catalog.generated.inc) and the Mac monitor tool (tools/monitor) read this file. Byte fields are UDS read-data-by-identifier (service 0x22) DID pairs. A signal's displayed value is transform(over each request's (raw + offset) * scale). 'transform' names a C++ function (transform_<name>) defined in signal_catalog.cpp AND a Python function in tools/monitor; 'default' returns request 0's value. Edit here, then run tools/gen_catalog.py. OPTIONAL per-request keys: 'ecu' {tx, rx} -- the CAN ids the request goes out on and is answered on (which module owns the DID; required for an active signal); 'field' {start, len, signed, bit_shift, bit_len} -- read len big-endian bytes from start, optionally narrowed to a bit sub-field, so several signals can share one multi-value DID (omitted = legacy decode: 1-byte payload unsigned, else first two bytes signed). OPTIONAL per-signal keys: 'description' -- one plain sentence on what the signal is, shown on the phone configurator (gen_catalog.py writes the active signals' into platform/esp32/web/index.html; 'notes' stay the decoding scratchpad); 'enum' [{value, label}] for unit 'Enum'; 'points' [{payload, value|label, note, source, at}] -- raw/true reference pairs kept for fitting and later review. gen_catalog.py refuses active signals using anything the firmware can't decode yet. CADENCE FLOOR: no signal polls faster than 50ms. The five signals below that were previously at 20ms -- Int Pres (4), Engine Speed (7), Engine Torque (8), Throttle Pos (12), Int Pres Act. (22) -- were raised to 50ms on 2026-08-25 to match INFO_SCREEN_REFRESH_MS (src/main.cpp), since the display restates values at 20Hz. 'cycle_time_ms' is a FLOOR, not a fixed period: core::SignalPoller polls only the signals currently on a panel, one request outstanding at a time, so a signal is asked for no faster than this and slower whenever the ECU cannot serve full demand. Lowering these back to 20 would not put 20ms of traffic on the bus -- it would only raise their share of whatever throughput the ECU gives. See core/vehicle/README.md.",
   "unit_types": [
     "None",
-    "Degrees",
+    "Angle",
     "Percent",
     "Pressure",
     "RPM",
     "Speed",
     "Temp",
     "Torque",
-    "Volume"
+    "Volume",
+    "Length",
+    "Voltage",
+    "Current",
+    "Illuminance",
+    "Time",
+    "TempDelta",
+    "Enum"
   ],
   "signals": [
     {
       "id": 0,
       "name": "Cool Temp",
+      "description": "Engine coolant temperature.",
       "unit": "Temp",
       "cycle_time_ms": 2000,
       "transform": "default",
@@ -25,17 +33,22 @@
           "byte1": "0xF4",
           "byte2": "0x05",
           "offset": -40.0,
-          "scale": 1.0
+          "scale": 1.0,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
         }
       ],
       "status": "active",
       "notes": "",
       "samples": [],
-      "updated_at": 0.0
+      "updated_at": 1793400552.742086
     },
     {
       "id": 1,
       "name": "Eng Oil Temp",
+      "description": "Engine oil temperature, measured by the oil temperature sensor in the oil pan.",
       "unit": "Temp",
       "cycle_time_ms": 1000,
       "transform": "default",
@@ -46,17 +59,22 @@
           "byte1": "0x40",
           "byte2": "0xD5",
           "offset": 0.0,
-          "scale": 0.1
+          "scale": 0.1,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
         }
       ],
       "status": "active",
       "notes": "",
       "samples": [],
-      "updated_at": 0.0
+      "updated_at": 1793400575.8750012
     },
     {
       "id": 2,
       "name": "Int Air Temp",
+      "description": "Temperature of the air going into the engine.",
       "unit": "Temp",
       "cycle_time_ms": 100,
       "transform": "default",
@@ -67,17 +85,22 @@
           "byte1": "0xF4",
           "byte2": "0x0F",
           "offset": -40.0,
-          "scale": 1.0
+          "scale": 1.0,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
         }
       ],
       "status": "active",
       "notes": "",
       "samples": [],
-      "updated_at": 0.0
+      "updated_at": 1793400587.254048
     },
     {
       "id": 3,
       "name": "Charge Pres",
+      "description": "Charge-air (boost) pressure ahead of the throttle, as absolute pressure: it reads atmospheric pressure with the engine off.",
       "unit": "Pressure",
       "cycle_time_ms": 100,
       "transform": "default",
@@ -88,17 +111,22 @@
           "byte1": "0x20",
           "byte2": "0x2A",
           "offset": 0.0,
-          "scale": 0.001
+          "scale": 0.001,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
         }
       ],
       "status": "active",
       "notes": "",
       "samples": [],
-      "updated_at": 0.0
+      "updated_at": 1793400593.8410869
     },
     {
       "id": 4,
       "name": "Int Pres",
+      "description": "Intake manifold pressure after the throttle, as absolute pressure: atmospheric with the engine off, below it at idle, above it on boost.",
       "unit": "Pressure",
       "cycle_time_ms": 50,
       "transform": "default",
@@ -109,17 +137,22 @@
           "byte1": "0x3E",
           "byte2": "0x70",
           "offset": 0.0,
-          "scale": 0.001
+          "scale": 0.001,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
         }
       ],
       "status": "active",
       "notes": "",
       "samples": [],
-      "updated_at": 0.0
+      "updated_at": 1793400597.9211788
     },
     {
       "id": 5,
       "name": "Amb Pres",
+      "description": "Outside air (barometric) pressure. Drops as altitude rises.",
       "unit": "Pressure",
       "cycle_time_ms": 1000,
       "transform": "default",
@@ -130,17 +163,22 @@
           "byte1": "0x13",
           "byte2": "0xCA",
           "offset": 0.0,
-          "scale": 0.0001
+          "scale": 0.0001,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
         }
       ],
       "status": "active",
       "notes": "",
       "samples": [],
-      "updated_at": 0.0
+      "updated_at": 1793400602.354615
     },
     {
       "id": 22,
-      "name": "Int Pres Act.",
+      "name": "Boost",
+      "description": "Intake manifold pressure minus outside air pressure. Below zero is vacuum, above zero is boost.",
       "unit": "Pressure",
       "cycle_time_ms": 50,
       "transform": "difference",
@@ -151,23 +189,32 @@
           "byte1": "0x13",
           "byte2": "0xCA",
           "offset": 0.0,
-          "scale": 0.0001
+          "scale": 0.0001,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
         },
         {
           "byte1": "0x3E",
           "byte2": "0x70",
           "offset": 0.0,
-          "scale": 0.001
+          "scale": 0.001,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
         }
       ],
       "status": "active",
       "notes": "",
       "samples": [],
-      "updated_at": 1784908786.328823
+      "updated_at": 1793916462.110937
     },
     {
       "id": 7,
       "name": "Engine Speed",
+      "description": "Engine RPM.",
       "unit": "RPM",
       "cycle_time_ms": 50,
       "transform": "default",
@@ -178,17 +225,22 @@
           "byte1": "0x20",
           "byte2": "0x6E",
           "offset": 0.0,
-          "scale": 1.0
+          "scale": 1.0,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
         }
       ],
       "status": "active",
       "notes": "",
       "samples": [],
-      "updated_at": 0.0
+      "updated_at": 1793400611.9202838
     },
     {
       "id": 8,
       "name": "Engine Torque",
+      "description": "Engine torque as the engine computer calculates it, not measured at the wheels.",
       "unit": "Torque",
       "cycle_time_ms": 50,
       "transform": "default",
@@ -199,17 +251,22 @@
           "byte1": "0x43",
           "byte2": "0x7C",
           "offset": 0.0,
-          "scale": 0.1
+          "scale": 0.1,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
         }
       ],
       "status": "active",
       "notes": "",
       "samples": [],
-      "updated_at": 0.0
+      "updated_at": 1793400616.9588962
     },
     {
       "id": 9,
       "name": "Speed",
+      "description": "Vehicle speed, as the engine computer reports it.",
       "unit": "Speed",
       "cycle_time_ms": 100,
       "transform": "default",
@@ -220,17 +277,22 @@
           "byte1": "0x20",
           "byte2": "0x33",
           "offset": 0.0,
-          "scale": 0.01
+          "scale": 0.01,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
         }
       ],
       "status": "active",
       "notes": "",
       "samples": [],
-      "updated_at": 0.0
+      "updated_at": 1793400620.104702
     },
     {
       "id": 10,
-      "name": "Fuel",
+      "name": "Fuel Vol",
+      "description": "Fuel left in the tank, as a volume.",
       "unit": "Volume",
       "cycle_time_ms": 5000,
       "transform": "default",
@@ -241,17 +303,22 @@
           "byte1": "0x22",
           "byte2": "0x06",
           "offset": 0.0,
-          "scale": 1.0
+          "scale": 1.0,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
         }
       ],
       "status": "active",
       "notes": "",
       "samples": [],
-      "updated_at": 0.0
+      "updated_at": 1793400622.807787
     },
     {
       "id": 11,
-      "name": "Fuel",
+      "name": "Fuel Pct",
+      "description": "Fuel left in the tank, as a percentage of a full tank.",
       "unit": "Percent",
       "cycle_time_ms": 5000,
       "transform": "default",
@@ -262,17 +329,22 @@
           "byte1": "0xF4",
           "byte2": "0x2F",
           "offset": 0.0,
-          "scale": 0.39215686274509803
+          "scale": 0.3922,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
         }
       ],
       "status": "active",
       "notes": "",
       "samples": [],
-      "updated_at": 0.0
+      "updated_at": 1793400625.240844
     },
     {
       "id": 12,
       "name": "Throttle Pos",
+      "description": "Actual position of the throttle body. This is the throttle itself, not the gas pedal.",
       "unit": "Percent",
       "cycle_time_ms": 50,
       "transform": "default",
@@ -283,17 +355,22 @@
           "byte1": "0xF4",
           "byte2": "0x11",
           "offset": 0.0,
-          "scale": 0.39215686274509803
+          "scale": 0.3922,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
         }
       ],
       "status": "active",
       "notes": "",
       "samples": [],
-      "updated_at": 0.0
+      "updated_at": 1793400662.1751199
     },
     {
       "id": 13,
       "name": "Misfire Cnt",
+      "description": "Misfires counted across all cylinders. Will reset periodically.",
       "unit": "None",
       "cycle_time_ms": 500,
       "transform": "default",
@@ -304,17 +381,22 @@
           "byte1": "0x29",
           "byte2": "0x04",
           "offset": 0.0,
-          "scale": 1.0
+          "scale": 1.0,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
         }
       ],
       "status": "active",
       "notes": "",
       "samples": [],
-      "updated_at": 0.0
+      "updated_at": 1793400680.973102
     },
     {
       "id": 14,
       "name": "Misfire Cnt Cyl 1",
+      "description": "Misfires counted on cylinder 1.",
       "unit": "None",
       "cycle_time_ms": 500,
       "transform": "default",
@@ -325,17 +407,22 @@
           "byte1": "0x29",
           "byte2": "0x66",
           "offset": 0.0,
-          "scale": 1.0
+          "scale": 1.0,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
         }
       ],
       "status": "active",
       "notes": "",
       "samples": [],
-      "updated_at": 0.0
+      "updated_at": 1793400682.994019
     },
     {
       "id": 15,
       "name": "Misfire Cnt Cyl 2",
+      "description": "Misfires counted on cylinder 2.",
       "unit": "None",
       "cycle_time_ms": 500,
       "transform": "default",
@@ -346,17 +433,22 @@
           "byte1": "0x29",
           "byte2": "0x67",
           "offset": 0.0,
-          "scale": 1.0
+          "scale": 1.0,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
         }
       ],
       "status": "active",
       "notes": "",
       "samples": [],
-      "updated_at": 0.0
+      "updated_at": 1793400685.195072
     },
     {
       "id": 16,
       "name": "Misfire Cnt Cyl 3",
+      "description": "Misfires counted on cylinder 3.",
       "unit": "None",
       "cycle_time_ms": 500,
       "transform": "default",
@@ -367,17 +459,22 @@
           "byte1": "0x29",
           "byte2": "0x68",
           "offset": 0.0,
-          "scale": 1.0
+          "scale": 1.0,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
         }
       ],
       "status": "active",
       "notes": "",
       "samples": [],
-      "updated_at": 0.0
+      "updated_at": 1793400687.6547909
     },
     {
       "id": 17,
       "name": "Misfire Cnt Cyl 4",
+      "description": "Misfires counted on cylinder 4.",
       "unit": "None",
       "cycle_time_ms": 500,
       "transform": "default",
@@ -388,18 +485,23 @@
           "byte1": "0x29",
           "byte2": "0x69",
           "offset": 0.0,
-          "scale": 1.0
+          "scale": 1.0,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
         }
       ],
       "status": "active",
       "notes": "",
       "samples": [],
-      "updated_at": 0.0
+      "updated_at": 1793400689.7057111
     },
     {
       "id": 18,
       "name": "Time Corr. Cyl 1",
-      "unit": "Degrees",
+      "description": "Knock-control timing correction on cylinder 1. Away from zero means ignition timing is being pulled because of knock.",
+      "unit": "Angle",
       "cycle_time_ms": 100,
       "transform": "default",
       "display_min": -10.0,
@@ -409,18 +511,23 @@
           "byte1": "0x20",
           "byte2": "0x0A",
           "offset": 0.0,
-          "scale": 0.01
+          "scale": 0.01,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
         }
       ],
       "status": "active",
       "notes": "",
       "samples": [],
-      "updated_at": 0.0
+      "updated_at": 1793400694.643162
     },
     {
       "id": 19,
       "name": "Time Corr. Cyl 2",
-      "unit": "Degrees",
+      "description": "Knock-control timing correction on cylinder 2. Away from zero means ignition timing is being pulled because of knock.",
+      "unit": "Angle",
       "cycle_time_ms": 100,
       "transform": "default",
       "display_min": -10.0,
@@ -430,18 +537,23 @@
           "byte1": "0x20",
           "byte2": "0x0B",
           "offset": 0.0,
-          "scale": 0.01
+          "scale": 0.01,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
         }
       ],
       "status": "active",
       "notes": "",
       "samples": [],
-      "updated_at": 0.0
+      "updated_at": 1793400697.3455942
     },
     {
       "id": 20,
       "name": "Time Corr. Cyl 3",
-      "unit": "Degrees",
+      "description": "Knock-control timing correction on cylinder 3. Away from zero means ignition timing is being pulled because of knock.",
+      "unit": "Angle",
       "cycle_time_ms": 100,
       "transform": "default",
       "display_min": -10.0,
@@ -451,7 +563,11 @@
           "byte1": "0x20",
           "byte2": "0x0C",
           "offset": 0.0,
-          "scale": 0.01
+          "scale": 0.01,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
         }
       ],
       "status": "active",
@@ -462,7 +578,8 @@
     {
       "id": 21,
       "name": "Time Corr. Cyl 4",
-      "unit": "Degrees",
+      "description": "Knock-control timing correction on cylinder 4. Away from zero means ignition timing is being pulled because of knock.",
+      "unit": "Angle",
       "cycle_time_ms": 100,
       "transform": "default",
       "display_min": -10.0,
@@ -472,13 +589,2306 @@
           "byte1": "0x20",
           "byte2": "0x0D",
           "offset": 0.0,
-          "scale": 0.01
+          "scale": 0.01,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
         }
       ],
       "status": "active",
       "notes": "",
       "samples": [],
       "updated_at": 0.0
+    },
+    {
+      "id": 23,
+      "name": "Oil Fill Level",
+      "description": "Engine oil level, from the oil level sensor in the oil pan.",
+      "unit": "Length",
+      "cycle_time_ms": 5000,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x20",
+          "byte2": "0x06",
+          "offset": 0.0,
+          "scale": 1.0,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          },
+          "field": {
+            "start": 0,
+            "len": 2,
+            "signed": false
+          }
+        }
+      ],
+      "status": "wip",
+      "notes": "Units are inches\n[2026-10-29] Unit set to Length (stored in mm, shown in inches in imperial); scale x25.4 so the existing inch calibration now yields mm.",
+      "samples": [
+        "0055",
+        "002b"
+      ],
+      "updated_at": 1793400706.3055182,
+      "points": [
+        {
+          "payload": "0199",
+          "value": 409.0,
+          "note": "fake car, raw 409",
+          "source": "emulator",
+          "at": 1793382642.10178
+        },
+        {
+          "payload": "2020",
+          "value": 8224.0,
+          "note": "fake car, raw 8224",
+          "source": "emulator",
+          "at": 1793382652.008821
+        },
+        {
+          "payload": "0100",
+          "value": 256.0,
+          "note": "fake car, raw 256",
+          "source": "emulator",
+          "at": 1793382658.6313689
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "name": "Rad Out Temp",
+      "description": "Coolant temperature at the radiator outlet.",
+      "unit": "Temp",
+      "cycle_time_ms": 2000,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x20",
+          "byte2": "0x2B",
+          "offset": 0.0,
+          "scale": 0.1,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
+        }
+      ],
+      "status": "active",
+      "notes": "Actual Temp",
+      "samples": [
+        "020f",
+        "020e"
+      ],
+      "updated_at": 1793400710.1718988,
+      "points": [
+        {
+          "payload": "004c",
+          "value": 7.6,
+          "note": "fake car, raw 76",
+          "source": "emulator",
+          "at": 1793382795.3730738
+        },
+        {
+          "payload": "014c",
+          "value": 33.2,
+          "note": "fake car, raw 332",
+          "source": "emulator",
+          "at": 1793382801.0324879
+        },
+        {
+          "payload": "f14c",
+          "value": -376.4,
+          "note": "fake car, raw -3764",
+          "source": "emulator",
+          "at": 1793382808.220408
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "name": "Engine Outlet Coolant Temp",
+      "description": "The coolant temperature the engine computer is targeting at the engine outlet.",
+      "unit": "Temp",
+      "cycle_time_ms": 100,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x20",
+          "byte2": "0x2C",
+          "offset": 0.0,
+          "scale": 0.1,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
+        }
+      ],
+      "status": "wip",
+      "notes": "Specified value",
+      "samples": [
+        "0430",
+        "0429"
+      ],
+      "updated_at": 1793400715.044874,
+      "points": [
+        {
+          "payload": "fe88",
+          "value": -37.6,
+          "note": "fake car, raw -376",
+          "source": "emulator",
+          "at": 1793382817.30398
+        },
+        {
+          "payload": "f188",
+          "value": -370.4,
+          "note": "fake car, raw -3704",
+          "source": "emulator",
+          "at": 1793382824.8238971
+        },
+        {
+          "payload": "0188",
+          "value": 39.2,
+          "note": "fake car, raw 392",
+          "source": "emulator",
+          "at": 1793382830.762945
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "name": "Cool Temp Delta",
+      "description": "How much hotter the coolant is leaving the engine than leaving the radiator: the heat the radiator is taking out.",
+      "unit": "TempDelta",
+      "cycle_time_ms": 2000,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x20",
+          "byte2": "0x2E",
+          "offset": 0.0,
+          "scale": 0.1,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
+        }
+      ],
+      "status": "active",
+      "notes": "Coolant temperature difference between engine and radiator\nThese vals are in F not C\n[2026-10-29] Unit set to Temp difference (stored in °C); scale /1.8 so the existing °F-difference calibration now yields °C.",
+      "samples": [
+        "0249",
+        "017f"
+      ],
+      "updated_at": 1793400720.472029,
+      "points": [
+        {
+          "payload": "0249",
+          "value": 58.5,
+          "note": "fake car, raw 585",
+          "source": "emulator",
+          "at": 1793382838.585948
+        },
+        {
+          "payload": "f249",
+          "value": -351.1,
+          "note": "fake car, raw -3511",
+          "source": "emulator",
+          "at": 1793382845.278782
+        },
+        {
+          "payload": "017f",
+          "value": 38.3,
+          "note": "fake car, raw 383",
+          "source": "emulator",
+          "at": 1793382855.273092
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "name": "Modeled Oil Temp",
+      "description": "Engine oil temperature as the engine computer models it, not read from a sensor.",
+      "unit": "Temp",
+      "cycle_time_ms": 100,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x20",
+          "byte2": "0x2F",
+          "offset": 0.0,
+          "scale": 1.0,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
+        }
+      ],
+      "status": "wip",
+      "notes": "Modeled engine oil temperature",
+      "samples": [
+        "0ea7"
+      ],
+      "updated_at": 1793400724.521974
+    },
+    {
+      "id": 28,
+      "name": "Rad Fan 1",
+      "description": "Percent speed that radiator fan 1 is running at.",
+      "unit": "Percent",
+      "cycle_time_ms": 500,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x20",
+          "byte2": "0x55",
+          "offset": 0.0,
+          "scale": 0.01,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          },
+          "field": {
+            "start": 0,
+            "len": 2,
+            "signed": false
+          }
+        }
+      ],
+      "status": "active",
+      "notes": "Coolant fan 1, activation",
+      "samples": [
+        "0bc0",
+        "0be7"
+      ],
+      "updated_at": 1793400732.957953,
+      "points": [
+        {
+          "payload": "0220",
+          "value": 5.44,
+          "note": "fake car, raw 544",
+          "source": "emulator",
+          "at": 1793382702.083458
+        },
+        {
+          "payload": "0227",
+          "value": 5.51,
+          "note": "fake car, raw 551",
+          "source": "emulator",
+          "at": 1793382706.5971441
+        },
+        {
+          "payload": "1011",
+          "value": 41.13,
+          "note": "fake car, raw 4113",
+          "source": "emulator",
+          "at": 1793382712.6356769
+        }
+      ]
+    },
+    {
+      "id": 29,
+      "name": "Rad Fan 2",
+      "description": "Percent speed that radiator fan 2 is running at.",
+      "unit": "Percent",
+      "cycle_time_ms": 500,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x20",
+          "byte2": "0x56",
+          "offset": 0.0,
+          "scale": 0.01,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          },
+          "field": {
+            "start": 0,
+            "len": 2,
+            "signed": false
+          }
+        }
+      ],
+      "status": "active",
+      "notes": "Coolant fan 2, activation",
+      "samples": [
+        "0000"
+      ],
+      "updated_at": 1793400736.62632,
+      "points": [
+        {
+          "payload": "0000",
+          "value": 0.0,
+          "note": "fake car, raw 0",
+          "source": "emulator",
+          "at": 1793382718.630325
+        },
+        {
+          "payload": "0077",
+          "value": 1.19,
+          "note": "fake car, raw 119",
+          "source": "emulator",
+          "at": 1793382723.908138
+        },
+        {
+          "payload": "ff01",
+          "value": 652.81,
+          "note": "fake car, raw -255",
+          "source": "emulator",
+          "at": 1793382735.987466
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "name": "IMRC Cmd",
+      "description": "Intake manifold runner flaps: the position the engine computer commands.",
+      "unit": "Percent",
+      "cycle_time_ms": 100,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x20",
+          "byte2": "0x69",
+          "offset": 0.0,
+          "scale": 0.01,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          },
+          "field": {
+            "start": 0,
+            "len": 2,
+            "signed": false
+          }
+        }
+      ],
+      "status": "active",
+      "notes": "Intake manifold runner control, activation",
+      "samples": [
+        "2710"
+      ],
+      "updated_at": 1793400740.2092311,
+      "points": [
+        {
+          "payload": "2710",
+          "value": 100.0,
+          "note": "fake car, raw 10000",
+          "source": "emulator",
+          "at": 1793382594.023401
+        },
+        {
+          "payload": "2444",
+          "value": 92.84,
+          "note": "fake car, raw 9284",
+          "source": "emulator",
+          "at": 1793382601.860505
+        },
+        {
+          "payload": "0110",
+          "value": 2.72,
+          "note": "fake car, raw 272",
+          "source": "emulator",
+          "at": 1793382606.891129
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "name": "IMRC Ack",
+      "description": "Intake manifold runner flaps: the position the flaps report back.",
+      "unit": "Percent",
+      "cycle_time_ms": 100,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x20",
+          "byte2": "0x6A",
+          "offset": 0.0,
+          "scale": 0.01,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          },
+          "field": {
+            "start": 0,
+            "len": 2,
+            "signed": false
+          }
+        }
+      ],
+      "status": "active",
+      "notes": "Intake manifold runner control, ack",
+      "samples": [
+        "2710",
+        "2710",
+        "2710",
+        "2710",
+        "2710",
+        "2710",
+        "2710",
+        "2710",
+        "2710",
+        "2710",
+        "2710",
+        "2710",
+        "2710",
+        "2710",
+        "2710",
+        "2710",
+        "2710",
+        "2710",
+        "2710",
+        "2710"
+      ],
+      "updated_at": 1793301630.291113,
+      "points": [
+        {
+          "payload": "0000",
+          "value": 0.0,
+          "note": "fake car, raw 0",
+          "source": "emulator",
+          "at": 1793382575.5757551
+        },
+        {
+          "payload": "0011",
+          "value": 0.17,
+          "note": "fake car, raw 17",
+          "source": "emulator",
+          "at": 1793382581.071661
+        },
+        {
+          "payload": "2020",
+          "value": 82.24,
+          "note": "fake car, raw 8224",
+          "source": "emulator",
+          "at": 1793382588.8505442
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "name": "Calc Oil Temp",
+      "description": "Engine oil temperature as the engine computer calculates it.",
+      "unit": "Temp",
+      "cycle_time_ms": 100,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x20",
+          "byte2": "0xA1",
+          "offset": 0.0,
+          "scale": 1.0,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
+        }
+      ],
+      "status": "wip",
+      "notes": "Calculated oil temperature",
+      "samples": [
+        "0406"
+      ],
+      "updated_at": 1793400743.858659
+    },
+    {
+      "id": 33,
+      "name": "Gear",
+      "description": "The gear the transmission is in. Shows None while a shift is in progress. Supports up to 7 gears for 7-speed transmissions.",
+      "unit": "Enum",
+      "cycle_time_ms": 100,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x21",
+          "byte2": "0x0F",
+          "offset": 0.0,
+          "scale": 1.0,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
+        }
+      ],
+      "status": "active",
+      "notes": "This needs to be an enum\n8 = Shifting process active\n0 = First gear\n1  = Second gear",
+      "samples": [
+        "0008"
+      ],
+      "updated_at": 1793635581.8743749,
+      "enum": [
+        {
+          "value": 0,
+          "label": "1"
+        },
+        {
+          "value": 1,
+          "label": "2"
+        },
+        {
+          "value": 8,
+          "label": "N"
+        },
+        {
+          "value": 2,
+          "label": "3"
+        },
+        {
+          "value": 3,
+          "label": "4"
+        },
+        {
+          "value": 4,
+          "label": "5"
+        },
+        {
+          "value": 5,
+          "label": "6"
+        },
+        {
+          "value": 6,
+          "label": "7"
+        }
+      ]
+    },
+    {
+      "id": 34,
+      "name": "EGT",
+      "description": "Exhaust gas temperature ahead of the catalytic converter.",
+      "unit": "Temp",
+      "cycle_time_ms": 500,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x29",
+          "byte2": "0x6F",
+          "offset": 0.0,
+          "scale": 0.1,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
+        }
+      ],
+      "status": "active",
+      "notes": "Exhaust gas temperature before catalytic converter",
+      "samples": [
+        "0e11",
+        "0e12",
+        "0e14",
+        "0e13"
+      ],
+      "updated_at": 1793400765.355697,
+      "points": [
+        {
+          "payload": "1111",
+          "value": 436.9,
+          "note": "fake car, raw 4369",
+          "source": "emulator",
+          "at": 1793382519.04946
+        },
+        {
+          "payload": "1010",
+          "value": 411.2,
+          "note": "fake car, raw 4112",
+          "source": "emulator",
+          "at": 1793382526.529449
+        },
+        {
+          "payload": "ffff",
+          "value": -0.1,
+          "note": "fake car, raw -1",
+          "source": "emulator",
+          "at": 1793382534.057806
+        }
+      ]
+    },
+    {
+      "id": 35,
+      "name": "T Cool Valve",
+      "description": "Valve that lets engine coolant flow to the transmission: open or closed.",
+      "unit": "Enum",
+      "cycle_time_ms": 1000,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x3D",
+          "byte2": "0x74",
+          "offset": 0.0,
+          "scale": 1.0,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
+        }
+      ],
+      "status": "active",
+      "notes": "Transmission coolant valve status",
+      "samples": [
+        "00"
+      ],
+      "updated_at": 1793400767.9931881,
+      "enum": [
+        {
+          "value": 0,
+          "label": "Open"
+        },
+        {
+          "value": 1,
+          "label": "Closed"
+        }
+      ],
+      "points": [
+        {
+          "payload": "01",
+          "label": "Closed",
+          "note": "fake car, raw 1",
+          "source": "emulator",
+          "at": 1793382382.559061
+        },
+        {
+          "payload": "00",
+          "label": "Open",
+          "note": "fake car, raw 0",
+          "source": "emulator",
+          "at": 1793382389.5116842
+        }
+      ]
+    },
+    {
+      "id": 36,
+      "name": "T Oil Cooler Valve",
+      "description": "Transmission oil cooler valve: open or closed. N/A on cars without one.",
+      "unit": "Enum",
+      "cycle_time_ms": 1000,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x3D",
+          "byte2": "0xB1",
+          "offset": 0.0,
+          "scale": 1.0,
+          "ecu": {
+            "tx": "0x7E0",
+            "rx": "0x7E8"
+          }
+        }
+      ],
+      "status": "active",
+      "notes": "Transmission oil cooler valve status",
+      "samples": [
+        "01"
+      ],
+      "updated_at": 1793400776.222305,
+      "enum": [
+        {
+          "value": 0,
+          "label": "N/A"
+        },
+        {
+          "value": 1,
+          "label": "Open"
+        },
+        {
+          "value": 2,
+          "label": "Closed"
+        },
+        {
+          "value": 3,
+          "label": "Error"
+        }
+      ],
+      "points": [
+        {
+          "payload": "00",
+          "label": "Not Installed",
+          "note": "fake car, raw 0",
+          "source": "emulator",
+          "at": 1793382420.233139
+        },
+        {
+          "payload": "01",
+          "label": "Open",
+          "note": "fake car, raw 1",
+          "source": "emulator",
+          "at": 1793382428.812438
+        },
+        {
+          "payload": "02",
+          "label": "Closed",
+          "note": "fake car, raw 2",
+          "source": "emulator",
+          "at": 1793382433.813496
+        },
+        {
+          "payload": "03",
+          "label": "Error",
+          "note": "fake car, raw 3",
+          "source": "emulator",
+          "at": 1793382464.599835
+        }
+      ]
+    },
+    {
+      "id": 37,
+      "name": "Trans Fluid Temp",
+      "description": "Transmission (DSG) fluid temperature. Not supported on MT cars.",
+      "unit": "Temp",
+      "cycle_time_ms": 1000,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x21",
+          "byte2": "0x04",
+          "offset": 0.0,
+          "scale": 1.0,
+          "ecu": {
+            "tx": "0x7E1",
+            "rx": "0x7E9"
+          },
+          "field": {
+            "start": 0,
+            "len": 2,
+            "signed": false,
+            "little_endian": true
+          }
+        }
+      ],
+      "status": "active",
+      "notes": "transmission fluid temperature",
+      "samples": [
+        "4800",
+        "0010",
+        "1100",
+        "1111"
+      ],
+      "updated_at": 1793400785.656033,
+      "points": [
+        {
+          "payload": "0000",
+          "value": 0.0,
+          "source": "manual",
+          "at": 1793381501.286509
+        },
+        {
+          "payload": "1000",
+          "value": 16.0,
+          "source": "manual",
+          "at": 1793381513.199931
+        },
+        {
+          "payload": "0100",
+          "value": 1.0,
+          "source": "manual",
+          "at": 1793381520.699954
+        },
+        {
+          "payload": "0001",
+          "value": 256.0,
+          "source": "manual",
+          "at": 1793381529.3605828
+        },
+        {
+          "payload": "0010",
+          "value": 4096.0,
+          "source": "manual",
+          "at": 1793381539.0356271
+        }
+      ]
+    },
+    {
+      "id": 38,
+      "name": "Clutch 1 Torque",
+      "description": "Specified torque at clutch 1 (odd gears).",
+      "unit": "Torque",
+      "cycle_time_ms": 50,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x38",
+          "byte2": "0x2E",
+          "offset": 0.0,
+          "scale": 0.05,
+          "ecu": {
+            "tx": "0x7E1",
+            "rx": "0x7E9"
+          },
+          "field": {
+            "start": 0,
+            "len": 2,
+            "signed": true,
+            "little_endian": true
+          }
+        }
+      ],
+      "status": "active",
+      "notes": "Specified torque clutch 1",
+      "samples": [
+        "20d1",
+        "1111",
+        "1000",
+        "1020"
+      ],
+      "updated_at": 1793400840.79421,
+      "points": [
+        {
+          "payload": "1111",
+          "value": 218.45,
+          "source": "live",
+          "at": 1793380797.14967
+        },
+        {
+          "payload": "1000",
+          "value": 0.8,
+          "source": "live",
+          "at": 1793380863.8235981
+        },
+        {
+          "payload": "1100",
+          "value": 0.85,
+          "source": "manual",
+          "at": 1793380869.228679
+        },
+        {
+          "payload": "1020",
+          "value": 410.4,
+          "source": "live",
+          "at": 1793381678.36896
+        },
+        {
+          "payload": "4352",
+          "value": 1052.95,
+          "note": "fake car, raw 21059",
+          "source": "emulator",
+          "at": 1793382005.491083
+        },
+        {
+          "payload": "ffff",
+          "value": -0.05,
+          "note": "fake car, raw 65535",
+          "source": "emulator",
+          "at": 1793407617.00284
+        }
+      ]
+    },
+    {
+      "id": 39,
+      "name": "Clutch 2 Torque",
+      "description": "Specified torque at clutch 2 (even gears, reverse).",
+      "unit": "Torque",
+      "cycle_time_ms": 50,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x38",
+          "byte2": "0x38",
+          "offset": 0.0,
+          "scale": 0.05,
+          "ecu": {
+            "tx": "0x7E1",
+            "rx": "0x7E9"
+          },
+          "field": {
+            "start": 0,
+            "len": 2,
+            "signed": true,
+            "little_endian": true
+          }
+        }
+      ],
+      "status": "active",
+      "notes": "Specified torque clutch 2",
+      "samples": [
+        "20d1"
+      ],
+      "updated_at": 1793400862.823304,
+      "points": [
+        {
+          "payload": "0000",
+          "value": 0.0,
+          "note": "fake car, raw 0",
+          "source": "emulator",
+          "at": 1793382030.444459
+        },
+        {
+          "payload": "0001",
+          "value": 12.8,
+          "note": "fake car, raw 1",
+          "source": "emulator",
+          "at": 1793382036.4894562
+        },
+        {
+          "payload": "0010",
+          "value": 204.8,
+          "note": "fake car, raw 16",
+          "source": "emulator",
+          "at": 1793382046.806981
+        },
+        {
+          "payload": "0100",
+          "value": 0.05,
+          "note": "fake car, raw 256",
+          "source": "emulator",
+          "at": 1793382051.896946
+        },
+        {
+          "payload": "1000",
+          "value": 0.8,
+          "note": "fake car, raw 4096",
+          "source": "emulator",
+          "at": 1793382059.3383858
+        },
+        {
+          "payload": "ffff",
+          "value": -0.05,
+          "note": "fake car, raw 65535",
+          "source": "emulator",
+          "at": 1793407637.3288589
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "name": "Clutch Oil Temp",
+      "description": "DSG clutch temperature, measured at the oil thrown off the clutches.",
+      "unit": "Temp",
+      "cycle_time_ms": 1000,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x38",
+          "byte2": "0xB2",
+          "offset": 0.0,
+          "scale": 1.0,
+          "ecu": {
+            "tx": "0x7E1",
+            "rx": "0x7E9"
+          },
+          "field": {
+            "start": 0,
+            "len": 2,
+            "signed": false,
+            "little_endian": true
+          }
+        }
+      ],
+      "status": "active",
+      "notes": "Clutch temperature air / splash oil",
+      "samples": [
+        "4a00"
+      ],
+      "updated_at": 1793400852.5969348,
+      "points": [
+        {
+          "payload": "0001",
+          "value": 256.0,
+          "note": "fake car, raw 1",
+          "source": "emulator",
+          "at": 1793382083.539718
+        },
+        {
+          "payload": "0010",
+          "value": 4096.0,
+          "note": "fake car, raw 16",
+          "source": "emulator",
+          "at": 1793382088.3097029
+        },
+        {
+          "payload": "0100",
+          "value": 1.0,
+          "note": "fake car, raw 256",
+          "source": "emulator",
+          "at": 1793382093.646013
+        },
+        {
+          "payload": "1000",
+          "value": 16.0,
+          "note": "fake car, raw 4096",
+          "source": "emulator",
+          "at": 1793382098.823637
+        }
+      ]
+    },
+    {
+      "id": 41,
+      "name": "Clutch 2 Pres",
+      "description": "Hydraulic pressure on DSG clutch 2 (even gears, reverse).",
+      "unit": "Pressure",
+      "cycle_time_ms": 50,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x38",
+          "byte2": "0xEA",
+          "offset": 0.0,
+          "scale": 0.01,
+          "ecu": {
+            "tx": "0x7E1",
+            "rx": "0x7E9"
+          },
+          "field": {
+            "start": 0,
+            "len": 2,
+            "signed": false,
+            "little_endian": true
+          }
+        }
+      ],
+      "status": "active",
+      "notes": "Pressure of clutch 2 actual value",
+      "samples": [
+        "0000",
+        "0100"
+      ],
+      "updated_at": 1793400868.023196,
+      "points": [
+        {
+          "payload": "0000",
+          "value": 0.0,
+          "note": "fake car, raw 0",
+          "source": "emulator",
+          "at": 1793382163.8969789
+        },
+        {
+          "payload": "0001",
+          "value": 2.56,
+          "note": "fake car, raw 1",
+          "source": "emulator",
+          "at": 1793382168.458195
+        },
+        {
+          "payload": "0010",
+          "value": 40.96,
+          "note": "fake car, raw 16",
+          "source": "emulator",
+          "at": 1793382174.786974
+        },
+        {
+          "payload": "0100",
+          "value": 0.01,
+          "note": "fake car, raw 256",
+          "source": "emulator",
+          "at": 1793382181.323453
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "name": "Clutch 1 Pres",
+      "description": "Hydraulic pressure on DSG clutch 1 (odd gears).",
+      "unit": "Pressure",
+      "cycle_time_ms": 50,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x38",
+          "byte2": "0xEB",
+          "offset": 0.0,
+          "scale": 0.01,
+          "ecu": {
+            "tx": "0x7E1",
+            "rx": "0x7E9"
+          },
+          "field": {
+            "start": 0,
+            "len": 2,
+            "signed": false,
+            "little_endian": true
+          }
+        }
+      ],
+      "status": "active",
+      "notes": "Pressure of clutch 1 actual value",
+      "samples": [
+        "0000"
+      ],
+      "updated_at": 1793400870.7558029,
+      "points": [
+        {
+          "payload": "0000",
+          "value": 0.0,
+          "note": "fake car, raw 0",
+          "source": "emulator",
+          "at": 1793382135.646185
+        },
+        {
+          "payload": "0001",
+          "value": 2.56,
+          "note": "fake car, raw 1",
+          "source": "emulator",
+          "at": 1793382140.80619
+        },
+        {
+          "payload": "0010",
+          "value": 40.96,
+          "note": "fake car, raw 16",
+          "source": "emulator",
+          "at": 1793382146.94481
+        },
+        {
+          "payload": "0100",
+          "value": 0.01,
+          "note": "fake car, raw 256",
+          "source": "emulator",
+          "at": 1793382152.034684
+        },
+        {
+          "payload": "1000",
+          "value": 0.16,
+          "note": "fake car, raw 4096",
+          "source": "emulator",
+          "at": 1793382158.0958369
+        }
+      ]
+    },
+    {
+      "id": 43,
+      "name": "",
+      "description": "Brake pressure, from the brake booster's pressure sensor.",
+      "unit": "Pressure",
+      "cycle_time_ms": 100,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x18",
+          "byte2": "0x10",
+          "offset": 0.0,
+          "scale": 1.0,
+          "ecu": {
+            "tx": "0x713",
+            "rx": "0x77D"
+          }
+        }
+      ],
+      "status": "wip",
+      "notes": "Hydraulic brake booster\nContains information for a bunch of stuff, only brake pressure sensor 1 works\n0 = 0 bar\nc9e=32.3 bar",
+      "samples": [
+        "0000007fff7fffffff",
+        "0000007fff7fffffff",
+        "0000007fff7fffffff",
+        "0000007fff7fffffff",
+        "0000007fff7fffffff",
+        "0000007fff7fffffff",
+        "0000007fff7fffffff",
+        "0000007fff7fffffff",
+        "00000a7fff7fffffff",
+        "0000007fff7fffffff",
+        "0000007fff7fffffff",
+        "0000007fff7fffffff",
+        "0000007fff7fffffff",
+        "00000a7fff7fffffff",
+        "0000007fff7fffffff",
+        "0000007fff7fffffff",
+        "00000a7fff7fffffff",
+        "00000a7fff7fffffff",
+        "0000007fff7fffffff",
+        "00000a7fff7fffffff"
+      ],
+      "updated_at": 1793281175.8774981,
+      "points": [
+        {
+          "payload": "0000",
+          "value": 0.0,
+          "note": "From notes; sensor bytes only, full payload not recorded",
+          "source": "notes",
+          "at": 0.0
+        },
+        {
+          "payload": "0c9e",
+          "value": 32.3,
+          "note": "From notes; sensor bytes only, full payload not recorded",
+          "source": "notes",
+          "at": 0.0
+        }
+      ]
+    },
+    {
+      "id": 44,
+      "name": "",
+      "description": "Instrument cluster needle dimming level.",
+      "unit": "Percent",
+      "cycle_time_ms": 100,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x11",
+          "byte2": "0x00",
+          "offset": 0.0,
+          "scale": 1.0,
+          "ecu": {
+            "tx": "0x714",
+            "rx": "0x77E"
+          },
+          "field": {
+            "start": 2,
+            "len": 1,
+            "signed": false
+          }
+        }
+      ],
+      "status": "wip",
+      "notes": "Dimming channels instrument cluster\nContains:\nDimming characterist curve middle display main field\nDimming characteristic curce indicator lights\nDimming characteristic curve gauge/finger/hand\nDimming characteristic curve clock dial\nDimming characteristic curve bar graph and acc\n\nAll i care about is curve/finger/hand\nDirect hex to decimal conversion of 3rd byte",
+      "samples": [
+        "0308240004",
+        "0308240004",
+        "0308240004",
+        "0309240004",
+        "0309240004",
+        "0308240004",
+        "0308240004",
+        "0308240004",
+        "0308240004",
+        "0308240004",
+        "0308240004",
+        "0308240004",
+        "0308240004",
+        "0309240004",
+        "0308240004",
+        "0308240004",
+        "0308240004",
+        "0308240004",
+        "0308240004",
+        "0308240004"
+      ],
+      "updated_at": 1793296489.7885911
+    },
+    {
+      "id": 45,
+      "name": "Battery Voltage",
+      "description": "12 V battery voltage, from the car's battery monitor.",
+      "unit": "Voltage",
+      "cycle_time_ms": 100,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x2A",
+          "byte2": "0x07",
+          "offset": 4000.0,
+          "scale": 0.001,
+          "ecu": {
+            "tx": "0x710",
+            "rx": "0x77A"
+          },
+          "field": {
+            "start": 0,
+            "len": 2,
+            "signed": false,
+            "bit_shift": 0,
+            "bit_len": 14
+          }
+        }
+      ],
+      "status": "wip",
+      "notes": "",
+      "samples": [
+        "28b5",
+        "28ca",
+        "28a5",
+        "28bf",
+        "28af",
+        "28c5",
+        "28da",
+        "28ba",
+        "2894",
+        "28aa",
+        "289f",
+        "289a",
+        "28cf"
+      ],
+      "updated_at": 1793400874.6948109,
+      "points": [
+        {
+          "payload": "0000",
+          "value": 4.0,
+          "note": "fake car, raw 0",
+          "source": "emulator",
+          "at": 1793384591.649885
+        },
+        {
+          "payload": "00c0",
+          "value": 4.0,
+          "note": "fake car, raw 192",
+          "source": "emulator",
+          "at": 1793384596.48695
+        },
+        {
+          "payload": "00ff",
+          "value": 4.063,
+          "note": "fake car, raw 255",
+          "source": "emulator",
+          "at": 1793384606.8635032
+        },
+        {
+          "payload": "3fff",
+          "value": 20.191,
+          "note": "fake car, raw 16383",
+          "source": "emulator",
+          "at": 1793384617.804134
+        },
+        {
+          "payload": "ffff",
+          "value": 20.191,
+          "note": "fake car, raw 16383",
+          "source": "emulator",
+          "at": 1793384640.0373812
+        }
+      ]
+    },
+    {
+      "id": 46,
+      "name": "Battery Current",
+      "description": "12 V battery charge or discharge current, from the car's battery monitor.",
+      "unit": "Current",
+      "cycle_time_ms": 100,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x2A",
+          "byte2": "0x09",
+          "offset": 0.0,
+          "scale": 0.001,
+          "ecu": {
+            "tx": "0x710",
+            "rx": "0x77A"
+          },
+          "field": {
+            "start": 0,
+            "len": 4,
+            "signed": true
+          }
+        }
+      ],
+      "status": "wip",
+      "notes": "",
+      "samples": [
+        "00000000"
+      ],
+      "updated_at": 1793400877.694304,
+      "points": [
+        {
+          "payload": "00000001",
+          "value": 0.001,
+          "note": "fake car, raw 0",
+          "source": "emulator",
+          "at": 1793383087.883486
+        },
+        {
+          "payload": "00000100",
+          "value": 0.256,
+          "note": "fake car, raw 0",
+          "source": "emulator",
+          "at": 1793383095.267617
+        },
+        {
+          "payload": "00010000",
+          "value": 65.536,
+          "note": "fake car, raw 1",
+          "source": "emulator",
+          "at": 1793383105.122276
+        },
+        {
+          "payload": "f0010000",
+          "value": -268370.0,
+          "note": "fake car, raw -4095",
+          "source": "emulator",
+          "at": 1793383144.776223
+        }
+      ]
+    },
+    {
+      "id": 47,
+      "name": "AWD Ctrl Temp",
+      "description": "Temperature of the Haldex control module.",
+      "unit": "Temp",
+      "cycle_time_ms": 500,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x02",
+          "byte2": "0x8D",
+          "offset": -55.0,
+          "scale": 1.0,
+          "ecu": {
+            "tx": "0x70F",
+            "rx": "0x779"
+          },
+          "field": {
+            "start": 0,
+            "len": 1,
+            "signed": false
+          }
+        }
+      ],
+      "status": "active",
+      "notes": "Haldex control module temperature",
+      "samples": [
+        "6300"
+      ],
+      "updated_at": 1793400886.745711,
+      "points": [
+        {
+          "payload": "6300",
+          "value": 44.0,
+          "note": "fake car, raw 25344",
+          "source": "emulator",
+          "at": 1793383473.0342898
+        },
+        {
+          "payload": "0110",
+          "value": -54.0,
+          "note": "fake car, raw 272",
+          "source": "emulator",
+          "at": 1793383486.54146
+        },
+        {
+          "payload": "f1f1",
+          "value": 186.0,
+          "note": "fake car, raw -3599",
+          "source": "emulator",
+          "at": 1793383495.931266
+        }
+      ]
+    },
+    {
+      "id": 48,
+      "name": "AWD Pump Curr",
+      "description": "Current drawn by the Haldex clutch pump.",
+      "unit": "Current",
+      "cycle_time_ms": 100,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x2B",
+          "byte2": "0xE6",
+          "offset": 0.0,
+          "scale": 0.001,
+          "ecu": {
+            "tx": "0x70F",
+            "rx": "0x779"
+          },
+          "field": {
+            "start": 0,
+            "len": 2,
+            "signed": false
+          }
+        }
+      ],
+      "status": "active",
+      "notes": "Haldex clutch pump current",
+      "samples": [
+        "000d"
+      ],
+      "updated_at": 1793400889.4946501,
+      "points": [
+        {
+          "payload": "002c",
+          "value": 0.044,
+          "note": "fake car, raw 44",
+          "source": "emulator",
+          "at": 1793383512.9116118
+        },
+        {
+          "payload": "f02c",
+          "value": 61.484,
+          "note": "fake car, raw -4052",
+          "source": "emulator",
+          "at": 1793383519.2918909
+        },
+        {
+          "payload": "102c",
+          "value": 4.14,
+          "note": "fake car, raw 4140",
+          "source": "emulator",
+          "at": 1793383526.112607
+        }
+      ]
+    },
+    {
+      "id": 49,
+      "name": "AWD Clutch Temp",
+      "description": "Haldex clutch temperature.",
+      "unit": "Temp",
+      "cycle_time_ms": 500,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x2B",
+          "byte2": "0xF1",
+          "offset": -22767.0,
+          "scale": 0.01,
+          "ecu": {
+            "tx": "0x70F",
+            "rx": "0x779"
+          },
+          "field": {
+            "start": 0,
+            "len": 2,
+            "signed": false,
+            "little_endian": true
+          }
+        }
+      ],
+      "status": "active",
+      "notes": "Haldex clutch temperature",
+      "samples": [
+        "5b6a"
+      ],
+      "updated_at": 1793400892.123301,
+      "points": [
+        {
+          "payload": "0004",
+          "value": -217.43,
+          "note": "fake car, raw 4",
+          "source": "emulator",
+          "at": 1793383601.645401
+        },
+        {
+          "payload": "f010",
+          "value": -184.31,
+          "note": "fake car, raw -4080",
+          "source": "emulator",
+          "at": 1793383610.881449
+        },
+        {
+          "payload": "1111",
+          "value": -183.98,
+          "note": "fake car, raw 4369",
+          "source": "emulator",
+          "at": 1793383622.1953201
+        },
+        {
+          "payload": "ffff",
+          "value": 427.68,
+          "note": "fake car, raw 65535",
+          "source": "emulator",
+          "at": 1793383633.044509
+        }
+      ]
+    },
+    {
+      "id": 50,
+      "name": "AWD Clutch Status",
+      "description": "How far the Haldex clutch is engaged. Higher sends more torque to the rear axle.",
+      "unit": "Percent",
+      "cycle_time_ms": 100,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x2B",
+          "byte2": "0xF3",
+          "offset": 0.0,
+          "scale": 0.3937,
+          "ecu": {
+            "tx": "0x70F",
+            "rx": "0x779"
+          },
+          "field": {
+            "start": 0,
+            "len": 1,
+            "signed": false
+          }
+        }
+      ],
+      "status": "active",
+      "notes": "Haldex clutch status",
+      "samples": [
+        "0000"
+      ],
+      "updated_at": 1793400896.573972,
+      "points": [
+        {
+          "payload": "0000",
+          "value": 0.0,
+          "note": "fake car, raw 0",
+          "source": "emulator",
+          "at": 1793383652.250806
+        },
+        {
+          "payload": "0011",
+          "value": 0.0,
+          "note": "fake car, raw 17",
+          "source": "emulator",
+          "at": 1793383662.5517418
+        },
+        {
+          "payload": "1100",
+          "value": 6.69,
+          "note": "fake car, raw 4352",
+          "source": "emulator",
+          "at": 1793383668.947954
+        },
+        {
+          "payload": "ff00",
+          "value": 100.39,
+          "note": "fake car, raw -256",
+          "source": "emulator",
+          "at": 1793383676.549397
+        },
+        {
+          "payload": "ff11",
+          "value": 100.39,
+          "note": "fake car, raw -239",
+          "source": "emulator",
+          "at": 1793383680.9908621
+        }
+      ]
+    },
+    {
+      "id": 51,
+      "name": "AWD Clutch PWM",
+      "description": "Duty cycle the Haldex module drives the clutch pump at.",
+      "unit": "Percent",
+      "cycle_time_ms": 100,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x2B",
+          "byte2": "0xE7",
+          "offset": 0.0,
+          "scale": 1.0,
+          "ecu": {
+            "tx": "0x70F",
+            "rx": "0x779"
+          }
+        }
+      ],
+      "status": "active",
+      "notes": "Haldex clutch pump PWM signal",
+      "samples": [
+        "0f",
+        "0e"
+      ],
+      "updated_at": 1793400900.5446022,
+      "points": [
+        {
+          "payload": "0e",
+          "value": 14.0,
+          "note": "fake car, raw 14",
+          "source": "emulator",
+          "at": 1793383697.944754
+        },
+        {
+          "payload": "01",
+          "value": 1.0,
+          "note": "fake car, raw 1",
+          "source": "emulator",
+          "at": 1793383701.6457658
+        },
+        {
+          "payload": "ff",
+          "value": 255.0,
+          "note": "fake car, raw 255",
+          "source": "emulator",
+          "at": 1793383705.433037
+        }
+      ]
+    },
+    {
+      "id": 52,
+      "name": "AWD Clutch Volt",
+      "description": "Voltage at the Haldex clutch pump.",
+      "unit": "Voltage",
+      "cycle_time_ms": 100,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x2B",
+          "byte2": "0xE9",
+          "offset": 0.0,
+          "scale": 0.1,
+          "ecu": {
+            "tx": "0x70F",
+            "rx": "0x779"
+          },
+          "field": {
+            "start": 0,
+            "len": 1,
+            "signed": false
+          }
+        }
+      ],
+      "status": "active",
+      "notes": "Haldex clutch pump voltage",
+      "samples": [
+        "1400",
+        "0000"
+      ],
+      "updated_at": 1793400902.9728498,
+      "points": [
+        {
+          "payload": "0000",
+          "value": 0.0,
+          "note": "fake car, raw 0",
+          "source": "emulator",
+          "at": 1793383720.629761
+        },
+        {
+          "payload": "1111",
+          "value": 1.7,
+          "note": "fake car, raw 4369",
+          "source": "emulator",
+          "at": 1793383726.6642601
+        },
+        {
+          "payload": "ffff",
+          "value": 25.5,
+          "note": "fake car, raw -1",
+          "source": "emulator",
+          "at": 1793383731.784302
+        }
+      ]
+    },
+    {
+      "id": 53,
+      "name": "AWD Cool Fin Temp",
+      "description": "Temperature of the Haldex unit's cooling fins.",
+      "unit": "Temp",
+      "cycle_time_ms": 1000,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x2B",
+          "byte2": "0xE4",
+          "offset": -22767.0,
+          "scale": 0.01,
+          "ecu": {
+            "tx": "0x70F",
+            "rx": "0x779"
+          },
+          "field": {
+            "start": 0,
+            "len": 2,
+            "signed": false,
+            "little_endian": true
+          }
+        }
+      ],
+      "status": "active",
+      "notes": "Haldex cooling fin temperature",
+      "samples": [
+        "b169"
+      ],
+      "updated_at": 1793400906.627855,
+      "points": [
+        {
+          "payload": "b169",
+          "value": 42.9,
+          "note": "fake car, raw -20119",
+          "source": "emulator",
+          "at": 1793383544.647638
+        },
+        {
+          "payload": "f169",
+          "value": 43.54,
+          "note": "fake car, raw -3735",
+          "source": "emulator",
+          "at": 1793383552.049181
+        },
+        {
+          "payload": "0111",
+          "value": -184.14,
+          "note": "fake car, raw 273",
+          "source": "emulator",
+          "at": 1793383561.399412
+        }
+      ]
+    },
+    {
+      "id": 54,
+      "name": "AWD OvrTemp Time",
+      "description": "Time the Haldex unit has spent over its temperature limit.",
+      "unit": "Time",
+      "cycle_time_ms": 5000,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x2B",
+          "byte2": "0xE5",
+          "offset": 0.0,
+          "scale": 1.0,
+          "ecu": {
+            "tx": "0x70F",
+            "rx": "0x779"
+          },
+          "field": {
+            "start": 0,
+            "len": 2,
+            "signed": false
+          }
+        }
+      ],
+      "status": "active",
+      "notes": "Haldex duration of overtemperature",
+      "samples": [
+        "0000"
+      ],
+      "updated_at": 1793400909.64341,
+      "points": [
+        {
+          "payload": "ff48",
+          "value": 65352.0,
+          "note": "fake car, raw -184",
+          "source": "emulator",
+          "at": 1793383573.5253289
+        },
+        {
+          "payload": "0110",
+          "value": 272.0,
+          "note": "fake car, raw 272",
+          "source": "emulator",
+          "at": 1793383581.2782059
+        },
+        {
+          "payload": "0001",
+          "value": 1.0,
+          "note": "fake car, raw 1",
+          "source": "emulator",
+          "at": 1793383586.675624
+        }
+      ]
+    },
+    {
+      "id": 55,
+      "name": "AWD Axle Delta",
+      "description": "Speed difference between the front and rear axles. Above zero means wheels are slipping.",
+      "unit": "Speed",
+      "cycle_time_ms": 100,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x2B",
+          "byte2": "0xF0",
+          "offset": 0.0,
+          "scale": 0.1,
+          "ecu": {
+            "tx": "0x70F",
+            "rx": "0x779"
+          },
+          "field": {
+            "start": 0,
+            "len": 2,
+            "signed": false
+          }
+        }
+      ],
+      "status": "active",
+      "notes": "Haldex axle speed deltas",
+      "samples": [
+        "0000"
+      ],
+      "updated_at": 1793400912.9577851,
+      "points": [
+        {
+          "payload": "0000",
+          "value": 0.0,
+          "note": "fake car, raw 0",
+          "source": "emulator",
+          "at": 1793383749.247892
+        },
+        {
+          "payload": "ffff",
+          "value": 6553.5,
+          "note": "fake car, raw -1",
+          "source": "emulator",
+          "at": 1793383757.496011
+        },
+        {
+          "payload": "1101",
+          "value": 435.3,
+          "note": "fake car, raw 4353",
+          "source": "emulator",
+          "at": 1793383763.952259
+        }
+      ]
+    },
+    {
+      "id": 56,
+      "name": "",
+      "description": "Steering wheel angle.",
+      "unit": "Angle",
+      "cycle_time_ms": 100,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x18",
+          "byte2": "0x12",
+          "offset": 0.0,
+          "scale": 0.1,
+          "ecu": {
+            "tx": "0x712",
+            "rx": "0x77C"
+          }
+        }
+      ],
+      "status": "wip",
+      "notes": "Steering angle sensor, angle\nContains steering angle and valid",
+      "samples": [
+        "003901",
+        "003901",
+        "003901",
+        "003901",
+        "003901",
+        "003901",
+        "003901",
+        "003901",
+        "003901",
+        "003901",
+        "003901",
+        "003901",
+        "003901",
+        "003901",
+        "003901",
+        "003901",
+        "003901",
+        "003901",
+        "003901",
+        "003901"
+      ],
+      "updated_at": 1793243592.268831
+    },
+    {
+      "id": 57,
+      "name": "",
+      "description": "Steering torque from the driver, as the power steering measures it.",
+      "unit": "Torque",
+      "cycle_time_ms": 100,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x18",
+          "byte2": "0x06",
+          "offset": 0.3922,
+          "scale": 0.001,
+          "ecu": {
+            "tx": "0x712",
+            "rx": "0x77C"
+          }
+        }
+      ],
+      "status": "wip",
+      "notes": "Steering torque 2\nContains torque and valid",
+      "samples": [
+        "f83000",
+        "f9c200",
+        "fb3300",
+        "fd9500",
+        "fede00",
+        "ff5f00",
+        "ff1f00",
+        "ff1f00",
+        "ff1f00",
+        "ff4700",
+        "ff4700",
+        "ff3f00",
+        "ff3700",
+        "ff2700",
+        "ff2f00",
+        "ff3700",
+        "ff3700",
+        "ff3700",
+        "ff3700",
+        "ff3700"
+      ],
+      "updated_at": 1793276732.705112
+    },
+    {
+      "id": 58,
+      "name": "F Axle Height",
+      "description": "Front suspension travel (ride height). Measured by ride height sensor on front axle.",
+      "unit": "Length",
+      "cycle_time_ms": 100,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x2D",
+          "byte2": "0x06",
+          "offset": 0.0,
+          "scale": 0.1,
+          "ecu": {
+            "tx": "0x754",
+            "rx": "0x7BE"
+          }
+        }
+      ],
+      "status": "active",
+      "notes": "Front jounce travel\nIn mm",
+      "samples": [
+        "fee8",
+        "ffff"
+      ],
+      "updated_at": 1793400939.556759,
+      "points": [
+        {
+          "payload": "019a",
+          "value": 41.0,
+          "note": "fake car, raw 410",
+          "source": "emulator",
+          "at": 1793383925.2839282
+        },
+        {
+          "payload": "0000",
+          "value": 0.0,
+          "note": "fake car, raw 0",
+          "source": "emulator",
+          "at": 1793383929.493443
+        },
+        {
+          "payload": "ffff",
+          "value": -0.1,
+          "note": "fake car, raw -1",
+          "source": "emulator",
+          "at": 1793383934.693048
+        }
+      ]
+    },
+    {
+      "id": 59,
+      "name": "R Axle Height",
+      "description": "Rear suspension travel (ride height). Measured by ride height sensor on rear axle.",
+      "unit": "Length",
+      "cycle_time_ms": 100,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x2D",
+          "byte2": "0x07",
+          "offset": 0.0,
+          "scale": 0.1,
+          "ecu": {
+            "tx": "0x754",
+            "rx": "0x7BE"
+          }
+        }
+      ],
+      "status": "active",
+      "notes": "Rear jounce travel\nin mm",
+      "samples": [
+        "ff7a",
+        "1002"
+      ],
+      "updated_at": 1793400947.8058271,
+      "points": [
+        {
+          "payload": "ffff",
+          "value": -0.1,
+          "note": "fake car, raw -1",
+          "source": "emulator",
+          "at": 1793383899.2021701
+        },
+        {
+          "payload": "0110",
+          "value": 27.2,
+          "note": "fake car, raw 272",
+          "source": "emulator",
+          "at": 1793383908.405911
+        },
+        {
+          "payload": "1002",
+          "value": 409.8,
+          "note": "fake car, raw 4098",
+          "source": "emulator",
+          "at": 1793383918.640563
+        }
+      ]
+    },
+    {
+      "id": 60,
+      "name": "Amb Light",
+      "description": "Outside light level.",
+      "unit": "Illuminance",
+      "cycle_time_ms": 100,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x25",
+          "byte2": "0xB8",
+          "offset": 0.0,
+          "scale": 1.0,
+          "ecu": {
+            "tx": "0x754",
+            "rx": "0x7BE"
+          },
+          "field": {
+            "start": 0,
+            "len": 2,
+            "signed": false
+          }
+        }
+      ],
+      "status": "active",
+      "notes": "Ambient brightness\nMeasured in lx",
+      "samples": [
+        "0042",
+        "003c",
+        "0110"
+      ],
+      "updated_at": 1793400951.1277802,
+      "points": [
+        {
+          "payload": "003c",
+          "value": 60.0,
+          "note": "fake car, raw 60",
+          "source": "emulator",
+          "at": 1793383871.925498
+        },
+        {
+          "payload": "ffff",
+          "value": 65535.0,
+          "note": "fake car, raw -1",
+          "source": "emulator",
+          "at": 1793383879.348547
+        },
+        {
+          "payload": "0110",
+          "value": 272.0,
+          "note": "fake car, raw 272",
+          "source": "emulator",
+          "at": 1793383884.4349089
+        }
+      ]
+    },
+    {
+      "id": 61,
+      "name": "Dim Ctrl",
+      "description": "Instrument cluster dimming level. Follows the dash brightness control.",
+      "unit": "Percent",
+      "cycle_time_ms": 500,
+      "transform": "default",
+      "display_min": 0.0,
+      "display_max": 100.0,
+      "requests": [
+        {
+          "byte1": "0x11",
+          "byte2": "0x00",
+          "offset": 0.0,
+          "scale": 1.0,
+          "ecu": {
+            "tx": "0x714",
+            "rx": "0x77E"
+          },
+          "field": {
+            "start": 2,
+            "len": 1,
+            "signed": false
+          }
+        }
+      ],
+      "status": "internal",
+      "notes": "",
+      "samples": [
+        "0309240004",
+        "0308240004"
+      ],
+      "updated_at": 1793400957.048513,
+      "points": [
+        {
+          "payload": "0308000004",
+          "value": 0.0,
+          "note": "fake car, raw 0",
+          "source": "emulator",
+          "at": 1793389699.5242581
+        },
+        {
+          "payload": "0308ff0004",
+          "value": 255.0,
+          "note": "fake car, raw 255",
+          "source": "emulator",
+          "at": 1793389706.198122
+        },
+        {
+          "payload": "0308560004",
+          "value": 86.0,
+          "note": "fake car, raw 86",
+          "source": "emulator",
+          "at": 1793389718.095398
+        },
+        {
+          "payload": "0308140004",
+          "value": 20.0,
+          "note": "fake car, raw 20",
+          "source": "emulator",
+          "at": 1793389729.855244
+        }
+      ]
     }
   ]
 }

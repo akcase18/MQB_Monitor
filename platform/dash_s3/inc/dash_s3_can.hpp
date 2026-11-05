@@ -12,7 +12,7 @@ class DashS3CanBus : public ICanBus
     public:
         static DashS3CanBus &instance();
 
-        bool begin(uint32_t tx_id, uint32_t rx_id, uint32_t baud) override;
+        bool begin(uint32_t rx_id_lo, uint32_t rx_id_hi, uint32_t baud) override;
         bool send(const CanFrame &frame) override;
         bool receive(CanFrame &out) override;
 

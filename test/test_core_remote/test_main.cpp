@@ -411,6 +411,9 @@ namespace
         settings.flips            = static_cast<uint8_t>(
             (defaults.settings.flipped_horizontal ? 1 : 0)
             | (defaults.settings.flipped_vertical ? 2 : 0));
+        settings.brightness_mode
+            = static_cast<uint8_t>(defaults.settings.brightness_mode);
+        settings.auto_brightness = defaults.settings.auto_brightness_pct;
         p = encode_settings(p, settings);
 
         for (uint8_t i = 0; i < core::MAX_PANELS; i++)
@@ -490,7 +493,7 @@ void test_apply_config_round_trips_flips()
 
     RemoteConfigServer server(config, signals);
 
-    /* The settings record's last byte: only the vertical layout turned. */
+    /* The settings record's flips byte: only the vertical layout turned. */
     uint8_t req[FRAME_MAX_PAYLOAD];
     size_t  req_len = build_apply_payload(config.get(), req);
     req[8]          = 2;
@@ -515,6 +518,59 @@ void test_apply_config_round_trips_flips()
     SettingsWire settings {};
     decode_settings(resp, settings);
     TEST_ASSERT_EQUAL_UINT8(2, settings.flips);
+}
+
+void test_apply_config_round_trips_brightness_settings()
+{
+    FakeConfigStore   backing;
+    core::ConfigStore config(backing);
+    config.load();
+    core::SignalStore signals;
+
+    RemoteConfigServer server(config, signals);
+
+    /* The settings record's mode byte, 2 = Auto, and the Auto slider
+     * after it, past its 100 max. */
+    uint8_t req[FRAME_MAX_PAYLOAD];
+    size_t  req_len = build_apply_payload(config.get(), req);
+    req[9]          = 2;
+    req[10]         = 150;
+
+    uint8_t resp[FRAME_MAX_PAYLOAD];
+    MsgType resp_type;
+    server.handle_request(MsgType::REQ_APPLY_CONFIG,
+                          req,
+                          static_cast<uint16_t>(req_len),
+                          resp,
+                          sizeof(resp),
+                          resp_type);
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ApplyResult::Ok), resp[0]);
+
+    core::ConfigStore reloaded(backing);
+    reloaded.load();
+    TEST_ASSERT_TRUE(core::BrightnessMode::Auto
+                     == reloaded.get().settings.brightness_mode);
+    TEST_ASSERT_EQUAL_UINT8(100, reloaded.get().settings.auto_brightness_pct);
+
+    server.handle_request(
+        MsgType::REQ_GET_STATE, nullptr, 0, resp, sizeof(resp), resp_type);
+    SettingsWire settings {};
+    decode_settings(resp, settings);
+    TEST_ASSERT_EQUAL_UINT8(2, settings.brightness_mode);
+    TEST_ASSERT_EQUAL_UINT8(100, settings.auto_brightness);
+
+    /* A mode this firmware doesn't have is refused, and changes nothing. */
+    req[9] = 3;
+    server.handle_request(MsgType::REQ_APPLY_CONFIG,
+                          req,
+                          static_cast<uint16_t>(req_len),
+                          resp,
+                          sizeof(resp),
+                          resp_type);
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ApplyResult::ErrInvalidEnum),
+                            resp[0]);
+    TEST_ASSERT_TRUE(core::BrightnessMode::Auto
+                     == config.get().settings.brightness_mode);
 }
 
 void test_apply_config_rejects_signal_count_mismatch()
@@ -697,9 +753,9 @@ void test_apply_config_keeps_lone_threshold_on_its_side()
     float   hi = 10.0f;
     uint8_t req[FRAME_MAX_PAYLOAD];
     size_t  req_len = build_apply_payload(config.get(), req, &lo, &hi);
-    /* Signal 0's record starts after settings (9), the panels (24) and
+    /* Signal 0's record starts after settings (11), the panels (24) and
      * the count (2); use_lo is its 9th byte. */
-    req[9 + 24 + 2 + 8] = 0;
+    req[11 + 24 + 2 + 8] = 0;
 
     uint8_t resp[16];
     MsgType resp_type;
@@ -1534,6 +1590,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_get_state_reports_defaults);
     RUN_TEST(test_apply_config_persists_valid_batch);
     RUN_TEST(test_apply_config_round_trips_flips);
+    RUN_TEST(test_apply_config_round_trips_brightness_settings);
     RUN_TEST(test_apply_config_rejects_signal_count_mismatch);
     RUN_TEST(test_apply_config_rejects_invalid_signal_id);
     RUN_TEST(test_apply_config_clamps_brightness_and_panel_count);

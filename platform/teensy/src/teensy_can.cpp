@@ -22,17 +22,18 @@ TeensyCanBus &TeensyCanBus::instance()
     return s_instance;
 }
 
-bool TeensyCanBus::begin(uint32_t tx_id, uint32_t rx_id, uint32_t baud)
+bool TeensyCanBus::begin(uint32_t rx_id_lo, uint32_t rx_id_hi, uint32_t baud)
 {
-    tx_id_ = tx_id;
-    rx_id_ = rx_id;
-    baud_  = baud;
+    rx_id_lo_ = rx_id_lo;
+    rx_id_hi_ = rx_id_hi;
+    baud_     = baud;
 
     s_bus.begin();
     s_bus.setBaudRate(baud);
     s_bus.setMBFilter(REJECT_ALL);
 
-    /* Four mailboxes on the response id, not one. FlexCAN mailboxes do
+    /**
+     * Four mailboxes on the response ids, not one. FlexCAN mailboxes do
      * not chain: a second matching frame arriving before the CPU has read
      * the first overwrites it, so a single open mailbox could only ever
      * hand up one frame per receive() cycle no matter how many arrived.
@@ -42,7 +43,12 @@ bool TeensyCanBus::begin(uint32_t tx_id, uint32_t rx_id, uint32_t baud)
      * case -- and read() walks the mailboxes in order, so the spares cost
      * nothing but stop a burst collapsing into its last frame.
      *
-     * setMBFilterRange(mb, id, id) rather than the obvious
+     * setMBFilterRange() covers every module's response id; the hardware
+     * mask passes everything sharing the range's top bits and core/can
+     * filters exactly. It refuses (returns false, leaving the mailbox
+     * rejecting everything) a range wider than 1000 ids, which
+     * tools/gen_catalog.py won't generate. It was the call here even back
+     * when only one id was received, rather than the obvious
      * setMBFilter(mb, id): the two compute an identical mask and an
      * identical exact-match software filter, but setMBFilter is FLASHMEM
      * in the vendored library, and with four call sites the compiler
@@ -50,11 +56,12 @@ bool TeensyCanBus::begin(uint32_t tx_id, uint32_t rx_id, uint32_t baud)
      * collides with setBaudRate's ("causes a section type conflict ... in
      * section '.flashmem'"). setMBFilterRange carries no such attribute.
      * The REJECT_ALL call above is a different overload and still
-     * inlines. */
-    s_bus.setMBFilterRange(MB1, rx_id, rx_id);
-    s_bus.setMBFilterRange(MB2, rx_id, rx_id);
-    s_bus.setMBFilterRange(MB3, rx_id, rx_id);
-    s_bus.setMBFilterRange(MB4, rx_id, rx_id);
+     * inlines.
+     */
+    s_bus.setMBFilterRange(MB1, rx_id_lo, rx_id_hi);
+    s_bus.setMBFilterRange(MB2, rx_id_lo, rx_id_hi);
+    s_bus.setMBFilterRange(MB3, rx_id_lo, rx_id_hi);
+    s_bus.setMBFilterRange(MB4, rx_id_lo, rx_id_hi);
     return true;
 }
 
@@ -186,7 +193,7 @@ SNIFF_FLASHMEM void TeensyCanBus::sniff_end()
 
     /* begin() soft-resets the controller and drops the FIFO, so this is
      * the exact boot-time REJECT_ALL + response-id mailbox setup again. */
-    begin(tx_id_, rx_id_, baud_);
+    begin(rx_id_lo_, rx_id_hi_, baud_);
 }
 
 bool TeensyCanBus::sniff_read(SniffFrame &out)

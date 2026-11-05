@@ -24,9 +24,9 @@ The C3 decodes nothing. The page speaks `remote/protocol`'s records itself (hex 
 | `POST /api/save` | `REQ_APPLY_CONFIG` (hex body) | `ApplyResult` |
 | `POST /api/revert` | `REQ_REVERT_PREVIEW` (hex body: empty for Discard, `01` when the page is leaving) | `ApplyResult` |
 
-The settings record grew a flips byte (bit 0 the landscape layout, bit 1 portrait). There is no protocol version, so a C3 (which carries the page) and a Teensy built before that change won't understand each other: flash both from the same tree.
+The settings record grew a flips byte (bit 0 the landscape layout, bit 1 portrait), then a brightness-mode byte (0 Day, 1 Night, 2 Auto — the page's Brightness → Mode control) and Auto's slider (0–100, 50 = no shift; the page shows it as the shift, −25% to +25%). There is no protocol version, so a C3 (which carries the page) and a Teensy built before that change won't understand each other: flash both from the same tree.
 
-That keeps every copy of the Teensy's tables out of the C3. The page does mirror a few (unit labels/conversions/decimals, the accent presets, `compute_layout()`, and `PanelWidget`'s geometry for the mock) — the comment at the top of `index.html` lists each one's source. Keep them in step when those change.
+That keeps every copy of the Teensy's tables out of the C3. The page does mirror a few (unit labels/conversions/decimals, the accent presets, `compute_layout()`, and `PanelWidget`'s geometry for the mock) — the comment at the top of `index.html` lists each one's source. Keep them in step when those change. Signal descriptions and Enum states aren't mirrored by hand: [`tools/gen_catalog.py`](../../tools/gen_catalog.py) writes them into the page from `signals.json`, keyed by id (the state frame has no room for them). That's what lets the page preview a state as one of its own labels.
 
 ## Files
 

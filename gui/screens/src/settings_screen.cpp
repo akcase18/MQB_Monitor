@@ -122,6 +122,8 @@ namespace gui
                               const char  *firmware_version,
                               uint8_t      initial_day_brightness_pct,
                               uint8_t      initial_night_brightness_pct,
+                              uint8_t      initial_auto_brightness_pct,
+                              BrightnessMode initial_brightness_mode,
                               uint8_t      initial_num_panels,
                               uint32_t     initial_accent_color,
                               CommitCallback    commit_cb,
@@ -139,6 +141,9 @@ namespace gui
     {
         day_brightness_pct_   = initial_day_brightness_pct;
         night_brightness_pct_ = initial_night_brightness_pct;
+        auto_brightness_pct_  = initial_auto_brightness_pct;
+        mode_                 = initial_brightness_mode;
+        icon_font_            = theme.typography.icon_day_night;
         num_panels_           = initial_num_panels;
         accent_color_         = initial_accent_color;
         commit_cb_            = commit_cb;
@@ -157,6 +162,11 @@ namespace gui
         screen_ = create_screen(theme);
 
         bool portrait = theme.metrics.screen_height > theme.metrics.screen_width;
+
+        /* "AUTO" in the mode button: Portrait's button is a row-height
+         * square, too narrow for label_lg's four characters. */
+        mode_text_font_
+            = portrait ? theme.typography.label_sm : theme.typography.label_lg;
 
         /* Nav bar: title + close, standing in for the bottom-right
          * checkmark other screens use (see the file doc comment). */
@@ -264,14 +274,13 @@ namespace gui
             = (panels_matrix_width - (PANEL_BTN_COUNT - 1) * PANEL_BTN_GAP)
               / PANEL_BTN_COUNT;
 
-        /* Day/Night is a fast manual switch, not automatic (no clock/
-         * light-sensor wiring yet) — flipping it immediately re-applies
-         * the real backlight via preview_cb_ so it's actually useful
-         * mid-drive, not just a setting you'd tune once and forget. A
-         * single button whose glyph swaps between sun/moon
-         * (theme.typography.icon_day_night) on each tap, rather than a
-         * two-button matrix — one button that toggles reads more like a
-         * standard day/night switch than two icon buttons side by side.
+        /* The mode toggle steps Day -> Night -> Auto, each tap
+         * immediately re-applying the real backlight via preview_cb_ so
+         * it's actually useful mid-drive, not just a setting you'd tune
+         * once and forget. A single button whose face swaps between sun,
+         * moon (theme.typography.icon_day_night) and "AUTO" on each tap,
+         * rather than a three-button matrix — one button that toggles
+         * reads more like a standard day/night switch.
          * Landscape: sized to match a single Panels-matrix button exactly,
          * so the two rows' rightmost controls read as the same control
          * size. Portrait: square (matching the row height) instead —
@@ -279,35 +288,33 @@ namespace gui
          * width, so matching them isn't needed to feel consistent the way
          * it is in Landscape, and a square reads more like a toggle than
          * a stretched rectangle would. */
-        lv_coord_t day_night_btn_width
+        lv_coord_t mode_btn_width
             = portrait ? control_height : panel_btn_width;
-        day_night_btn_ = lv_btn_create(brightness_row);
-        lv_obj_set_size(day_night_btn_, day_night_btn_width, control_height);
-        lv_obj_align(day_night_btn_, LV_ALIGN_RIGHT_MID, 0, 0);
-        lv_obj_set_style_bg_color(day_night_btn_, theme.palette.bg, 0);
-        lv_obj_set_style_bg_opa(day_night_btn_, LV_OPA_COVER, 0);
-        lv_obj_set_style_radius(day_night_btn_, 8, 0);
+        mode_btn_ = lv_btn_create(brightness_row);
+        lv_obj_set_size(mode_btn_, mode_btn_width, control_height);
+        lv_obj_align(mode_btn_, LV_ALIGN_RIGHT_MID, 0, 0);
+        lv_obj_set_style_bg_color(mode_btn_, theme.palette.bg, 0);
+        lv_obj_set_style_bg_opa(mode_btn_, LV_OPA_COVER, 0);
+        lv_obj_set_style_radius(mode_btn_, 8, 0);
         lv_obj_set_style_border_width(
-            day_night_btn_, theme.metrics.panel_border_width, 0);
+            mode_btn_, theme.metrics.panel_border_width, 0);
         lv_obj_set_style_border_color(
-            day_night_btn_, theme.palette.panel_border, 0);
-        lv_obj_set_style_shadow_width(day_night_btn_, 0, 0);
+            mode_btn_, theme.palette.panel_border, 0);
+        lv_obj_set_style_shadow_width(mode_btn_, 0, 0);
         lv_obj_set_style_bg_color(
-            day_night_btn_, theme.palette.accent, LV_STATE_PRESSED);
+            mode_btn_, theme.palette.accent, LV_STATE_PRESSED);
         lv_obj_add_event_cb(
-            day_night_btn_, day_night_clicked_cb, LV_EVENT_CLICKED, this);
+            mode_btn_, mode_clicked_cb, LV_EVENT_CLICKED, this);
 
-        day_night_icon_lbl_ = lv_label_create(day_night_btn_);
-        lv_obj_set_style_text_font(
-            day_night_icon_lbl_, theme.typography.icon_day_night, 0);
-        lv_obj_set_style_text_color(day_night_icon_lbl_, theme.palette.fg, 0);
-        lv_obj_center(day_night_icon_lbl_);
+        mode_lbl_ = lv_label_create(mode_btn_);
+        lv_obj_set_style_text_color(mode_lbl_, theme.palette.fg, 0);
+        lv_obj_center(mode_lbl_);
 
         /* Slider fills whatever's left between the label's actual width
          * (Landscape only — Portrait's label isn't in this row) and the
-         * Day/Night button. */
+         * mode button. */
         lv_coord_t slider_width
-            = portrait ? row_width - day_night_btn_width
+            = portrait ? row_width - mode_btn_width
                              - BRIGHTNESS_SLIDER_BTN_GAP
                        : row_width - brightness_label_width
                              - BRIGHTNESS_LABEL_GAP - panel_btn_width
@@ -515,7 +522,7 @@ namespace gui
 
         /* open() syncs too, but it isn't the only way in: after a layout
          * restart, OrientationScreen's X loads this screen directly. Left
-         * unsynced, the Day/Night glyph and swatch showed defaults, and
+         * unsynced, the mode glyph and swatch showed defaults, and
          * the slider's 0 would have been committed as the brightness on
          * the way out. */
         sync_widgets();
@@ -529,11 +536,15 @@ namespace gui
 
     FLASHMEM void SettingsScreen::set_values(uint8_t  day_brightness_pct,
                                     uint8_t  night_brightness_pct,
+                                    uint8_t  auto_brightness_pct,
+                                    BrightnessMode brightness_mode,
                                     uint8_t  num_panels,
                                     uint32_t accent_color)
     {
         day_brightness_pct_   = day_brightness_pct;
         night_brightness_pct_ = night_brightness_pct;
+        auto_brightness_pct_  = auto_brightness_pct;
+        mode_                 = brightness_mode;
         num_panels_           = num_panels;
         accent_color_         = accent_color;
         sync_widgets();
@@ -541,14 +552,9 @@ namespace gui
 
     FLASHMEM void SettingsScreen::sync_widgets()
     {
-        /* Reopens showing whichever of day/night was last selected, not
-         * always Day — flipping to Night to dim the screen and then
-         * backing out of Settings shouldn't silently flip back. */
-        lv_slider_set_value(brightness_slider_,
-                            showing_night_ ? night_brightness_pct_
-                                           : day_brightness_pct_,
-                            LV_ANIM_OFF);
-        refresh_day_night_icon();
+        refresh_mode_widgets();
+        lv_slider_set_value(
+            brightness_slider_, slider_value_for_mode(), LV_ANIM_OFF);
 
         uint8_t selected = (num_panels_ >= 1 && num_panels_ <= 6)
                                ? static_cast<uint8_t>(num_panels_ - 1)
@@ -566,17 +572,33 @@ namespace gui
         lv_obj_set_style_bg_opa(theme_swatch_, LV_OPA_COVER, 0);
     }
 
-    void SettingsScreen::refresh_day_night_icon()
+    FLASHMEM void SettingsScreen::refresh_mode_widgets()
     {
-        lv_label_set_text(day_night_icon_lbl_,
-                          showing_night_ ? ICON_MOON : ICON_SUN);
+        bool is_auto = mode_ == BrightnessMode::Auto;
+        lv_obj_set_style_text_font(
+            mode_lbl_, is_auto ? mode_text_font_ : icon_font_, 0);
+        lv_label_set_text(mode_lbl_,
+                          is_auto                        ? "AUTO"
+                          : mode_ == BrightnessMode::Night ? ICON_MOON
+                                                           : ICON_SUN);
+    }
+
+    uint8_t SettingsScreen::slider_value_for_mode() const
+    {
+        return mode_ == BrightnessMode::Auto    ? auto_brightness_pct_
+               : mode_ == BrightnessMode::Night ? night_brightness_pct_
+                                                : day_brightness_pct_;
     }
 
     void SettingsScreen::capture_slider_value()
     {
         uint8_t value
             = static_cast<uint8_t>(lv_slider_get_value(brightness_slider_));
-        if (showing_night_)
+        if (mode_ == BrightnessMode::Auto)
+        {
+            auto_brightness_pct_ = value;
+        }
+        else if (mode_ == BrightnessMode::Night)
         {
             night_brightness_pct_ = value;
         }
@@ -604,26 +626,29 @@ namespace gui
         if (self->preview_cb_ != nullptr)
         {
             self->preview_cb_(self->preview_ctx_,
+                              self->mode_,
                               static_cast<uint8_t>(lv_slider_get_value(
                                   self->brightness_slider_)));
         }
     }
 
-    void SettingsScreen::day_night_clicked_cb(lv_event_t *e)
+    void SettingsScreen::mode_clicked_cb(lv_event_t *e)
     {
         auto *self = static_cast<SettingsScreen *>(lv_event_get_user_data(e));
 
         self->capture_slider_value();
-        self->showing_night_ = !self->showing_night_;
-        self->refresh_day_night_icon();
+        self->mode_ = self->mode_ == BrightnessMode::Day ? BrightnessMode::Night
+                      : self->mode_ == BrightnessMode::Night
+                          ? BrightnessMode::Auto
+                          : BrightnessMode::Day;
+        self->refresh_mode_widgets();
 
-        uint8_t value = self->showing_night_ ? self->night_brightness_pct_
-                                             : self->day_brightness_pct_;
+        uint8_t value = self->slider_value_for_mode();
         lv_slider_set_value(self->brightness_slider_, value, LV_ANIM_ON);
 
         if (self->preview_cb_ != nullptr)
         {
-            self->preview_cb_(self->preview_ctx_, value);
+            self->preview_cb_(self->preview_ctx_, self->mode_, value);
         }
     }
 
@@ -695,6 +720,8 @@ namespace gui
             commit_cb_(commit_ctx_,
                        day_brightness_pct_,
                        night_brightness_pct_,
+                       auto_brightness_pct_,
+                       mode_,
                        num_panels_);
         }
     }

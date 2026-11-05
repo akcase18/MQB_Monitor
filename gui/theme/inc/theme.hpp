@@ -39,37 +39,32 @@ namespace gui
     };
 
     /**
-     * symbol_lg must point at an LVGL built-in font (e.g.
-     * lv_font_montserrat_32) — LV_SYMBOL_ glyphs live in Unicode's private-use
-     * area and aren't present in the custom JetBrains Mono fonts, which were
-     * only converted over their own printable/numeric ranges.
+     * symbol_lg/symbol_sm must point at fonts with LV_SYMBOL_ glyphs, which
+     * live in Unicode's private-use area and aren't in the custom JetBrains
+     * Mono fonts (converted over their own printable/numeric ranges only).
+     * symbol_lg's font carries just the four glyphs it's used for (see
+     * theme.cpp); a new LV_SYMBOL_ in it needs that font regenerated.
      */
     struct Typography
     {
-            const lv_font_t *data_sm;   /* small-panel data readout */
-            const lv_font_t *data_md;   /* small-panel bare Digital value —
-                                         * no ring to fit inside, so it
-                                         * can outgrow data_sm */
-            const lv_font_t *data_lg;   /* large-panel data readout */
-            const lv_font_t *data_xl;   /* large-panel bare Digital value,
-                                         * when the panel is wide enough
-                                         * (see panel_widget.cpp) */
-            const lv_font_t *data_hero; /* Bar/Gauge value in a true hero
-                                         * slot (count 1, count 3's hero) */
-            const lv_font_t *data_mega; /* bare Digital value in a true
-                                         * hero slot — as big as the
-                                         * narrower of those slots (count
-                                         * 3's hero) can fit */
+            /**
+             * Panel value sizes, smallest first. PanelWidget picks the
+             * biggest one the panel's cell can hold (see
+             * panel_widget.cpp), so a new size here is used wherever it
+             * fits, with no other change.
+             */
+            const lv_font_t *const *data;
+            uint8_t                 data_count;
             const lv_font_t *label_sm;  /* small-panel name label */
             const lv_font_t *label_lg;  /* large-panel name label */
-            const lv_font_t *unit;      /* value's adjacent unit tag — its
-                                         * own (smaller) size regardless of
-                                         * panel tier, since even a small-
-                                         * panel-sized font let a long unit
-                                         * string ("lb-ft") push past the
-                                         * panel's edge */
+            const lv_font_t *label_xl;  /* name label in a panel at least
+                                         * ~300 px wide and ~200 px tall */
+            const lv_font_t *unit;      /* value's adjacent unit tag at the
+                                         * smaller value sizes; bigger ones
+                                         * take a label_* font instead */
             const lv_font_t *ui;        /* general UI text (screens, buttons) */
-            const lv_font_t *symbol_lg; /* done/settings buttons */
+            const lv_font_t *symbol_lg; /* close button, row chevrons,
+                                         * warning +/- buttons */
             const lv_font_t *title;     /* nav bar title — bold, sets it apart
                                          * from the plain-weight row labels
                                          * below it */
@@ -82,6 +77,14 @@ namespace gui
                                               * curated icon subset */
             const lv_font_t *symbol_sm; /* WifiIndicator's glyph --
                                          * built-in, like symbol_lg */
+            const lv_font_t *data_text; /* words the `data` fonts can't
+                                         * draw: those carry digits and
+                                         * only the characters the active
+                                         * Enum labels use, so this is the
+                                         * biggest bold size with every
+                                         * letter. Also the last resort for
+                                         * a number in a panel too small
+                                         * for data[0] */
     };
 
     struct Metrics

@@ -4,16 +4,16 @@ extern "C"
 {
     /* JetBrains Mono (SIL OFL 1.1) — one family for the numeric readouts
      * (Bold weight, digits-only subset), labels/UI text (Regular weight),
-     * and nav bar titles (Bold weight, full charset), sized from actual
-     * panel-cell dimensions so a 4-character value ("2546") fits the
-     * tightest cell (the 6-panel grid, ~150px wide) — and, for Gauge mode,
-     * fits inside the arc alongside it — without overflowing.
+     * and nav bar titles (Bold weight, full charset). The readout sizes
+     * are a ladder PanelWidget picks from per cell (DATA_FONTS below).
      * License lives in gui/assets/font-licenses/. */
     extern const lv_font_t jetbrains_mono_bold_30;
     extern const lv_font_t jetbrains_mono_bold_38;
-    extern const lv_font_t jetbrains_mono_bold_46;
-    extern const lv_font_t jetbrains_mono_bold_56;
-    extern const lv_font_t jetbrains_mono_bold_96;
+    extern const lv_font_t jetbrains_mono_bold_54;
+    extern const lv_font_t jetbrains_mono_bold_64;
+    extern const lv_font_t jetbrains_mono_bold_80;
+    extern const lv_font_t jetbrains_mono_bold_92;
+    extern const lv_font_t jetbrains_mono_bold_128;
     extern const lv_font_t jetbrains_mono_11;
     extern const lv_font_t jetbrains_mono_14;
     extern const lv_font_t jetbrains_mono_16;
@@ -24,10 +24,33 @@ extern "C"
      * gui/assets/font-licenses/) — just the sun/moon glyphs (gui::
      * ICON_SUN/ICON_MOON), for SettingsScreen's Day/Night toggle. */
     extern const lv_font_t icon_day_night_28;
+
+    /* Font Awesome 5 (same license) — just the four LV_SYMBOL_ glyphs
+     * symbol_lg draws: close, right chevron, plus and minus. Cut the way
+     * LVGL cuts its built-in fonts (lib/lvgl/scripts/built_in_font), so
+     * they match the built-in symbols elsewhere; Montserrat 32 carried
+     * them before, at ~10x the flash. */
+    extern const lv_font_t symbols_32;
 }
 
 namespace gui
 {
+
+    namespace
+    {
+        /**
+         * Typography::data. Each step is about what some cell needs:
+         * 30/38 small cells (Gauge/Digital), 54/64 the 2-panel columns,
+         * 80/92 hero-sized cells (Gauge/Digital), 128 the full-screen
+         * landscape panel. tools/gen_value_fonts.py regenerates them.
+         */
+        const lv_font_t *const DATA_FONTS[] = {
+            &jetbrains_mono_bold_30, &jetbrains_mono_bold_38,
+            &jetbrains_mono_bold_54, &jetbrains_mono_bold_64,
+            &jetbrains_mono_bold_80, &jetbrains_mono_bold_92,
+            &jetbrains_mono_bold_128,
+        };
+    } // namespace
 
     /**
      * Palette, fonts, and metrics ported from the old include/styles.hpp /
@@ -57,20 +80,18 @@ namespace gui
         },
         /* typography */
         {
-            &jetbrains_mono_bold_30,
-            &jetbrains_mono_bold_38,
-            &jetbrains_mono_bold_46,
-            &jetbrains_mono_bold_56,
-            &jetbrains_mono_bold_56,
-            &jetbrains_mono_bold_96,
+            DATA_FONTS,
+            sizeof(DATA_FONTS) / sizeof(DATA_FONTS[0]),
             &jetbrains_mono_14,
             &jetbrains_mono_16,
+            &jetbrains_mono_24,
             &jetbrains_mono_11,
             &jetbrains_mono_24,
-            &lv_font_montserrat_32,
+            &symbols_32,
             &jetbrains_mono_bold_24,
             &icon_day_night_28,
             &lv_font_montserrat_18, /* LV_FONT_DEFAULT, so already linked */
+            &jetbrains_mono_bold_24,
         },
         /* metrics */
         {

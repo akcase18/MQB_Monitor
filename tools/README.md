@@ -9,17 +9,33 @@ support firmware development but don't ship on any board.
   catalog from the registry. The single source of truth is
   [`core/vehicle/data/signals.json`](../core/vehicle/data/signals.json) — a
   **two-stage registry**: every signal ever defined lives there, tagged
-  `"status": "active"` or `"status": "wip"` (unconfirmed offset/scale, a
-  placeholder name, etc.). This script filters to `status == "active"` only,
-  emitting `core/vehicle/src/signal_catalog.generated.inc` (the
-  `SIGNAL_CATALOG[]` array `signal_catalog.cpp` includes) **and** keeping
-  `SIGNAL_CATALOG_COUNT` in `signal_catalog.hpp` in sync with the active
-  count. WIP entries never reach the firmware. Run it after editing
+  `"status": "active"`, `"status": "internal"` (compiled in for the
+  firmware's own use, e.g. Dim Ctrl for Auto brightness, but never offered
+  on the dash or the phone page) or `"status": "wip"` (unconfirmed
+  offset/scale, a placeholder name, etc.). This script compiles the active
+  entries, then the internal ones, into
+  `core/vehicle/src/signal_catalog.generated.inc` (the `SIGNAL_CATALOG[]`
+  array `signal_catalog.cpp` includes) **and** keeps `SIGNAL_CATALOG_COUNT`
+  and `INTERNAL_SIGNAL_COUNT` in `signal_catalog.hpp` in sync. WIP entries
+  never reach the firmware. Run it after editing
   `signals.json`; commit the JSON and the generated file together.
 
   ```sh
   python3 tools/gen_catalog.py          # regenerate
   python3 tools/gen_catalog.py --check  # CI guard: fail if the .inc/count are stale
+  ```
+
+- **[`gen_value_fonts.py`](gen_value_fonts.py)** — regenerates the panels'
+  bold value fonts (`gui/assets/fonts/jetbrains_mono_bold_{30..128}.c`) with
+  digits plus only the characters active Enum labels use, so a label like
+  `N` or `Closed` draws as big as a number. `gen_catalog.py` warns when a
+  label needs a character they lack; until this is re-run, that label draws
+  at the 24 px text size. Needs Node.js (`npx lv_font_conv`) and JetBrains
+  Mono Bold **v2.002** (the release the fonts were cut from; later ones
+  differ slightly):
+
+  ```sh
+  python3 tools/gen_value_fonts.py --font path/to/JetBrainsMono-Bold.ttf
   ```
 
 - **[`fw_version.py`](fw_version.py)** — PlatformIO pre-build script for the
@@ -74,13 +90,13 @@ support firmware development but don't ship on any board.
 ## The two-stage registry loop
 
 ```
-                 core/vehicle/data/signals.json   ← every signal, active + WIP
+                 core/vehicle/data/signals.json   ← every signal, any status
                     │                        │
       gen_catalog.py│                        │Catalog.load()
-      (active only) │                        │
+  (active+internal) │                        │
                     ▼                        ▼
    signal_catalog.generated.inc        tools/monitor (Mac app)
-   + SIGNAL_CATALOG_COUNT (hpp)         · decodes live traffic (active only)
+   + the counts (hpp)                   · decodes live traffic (active+internal)
                     │                    · Learn: discover unknown DIDs
    firmware build ◄─┘                    · Registry/WIP: review, promote/
                     ▲                        demote, edit -- writes back to

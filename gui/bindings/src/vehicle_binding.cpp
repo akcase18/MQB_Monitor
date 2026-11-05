@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 
+#include "mem_placement.hpp"
 #include "warning.hpp"
 
 namespace gui
@@ -35,6 +36,34 @@ namespace gui
         }
     }
 
+    FLASHMEM BrightnessMode to_gui_brightness_mode(core::BrightnessMode mode)
+    {
+        switch (mode)
+        {
+            case core::BrightnessMode::Night:
+                return BrightnessMode::Night;
+            case core::BrightnessMode::Auto:
+                return BrightnessMode::Auto;
+            case core::BrightnessMode::Day:
+            default:
+                return BrightnessMode::Day;
+        }
+    }
+
+    FLASHMEM core::BrightnessMode to_core_brightness_mode(BrightnessMode mode)
+    {
+        switch (mode)
+        {
+            case BrightnessMode::Night:
+                return core::BrightnessMode::Night;
+            case BrightnessMode::Auto:
+                return core::BrightnessMode::Auto;
+            case BrightnessMode::Day:
+            default:
+                return core::BrightnessMode::Day;
+        }
+    }
+
     namespace
     {
         /* A bounded, always-terminating string copy. build_view_model()
@@ -61,13 +90,9 @@ namespace gui
     {
     }
 
-    PanelViewModel VehicleBinding::build_view_model(uint8_t rank,
-                                                    bool    large,
-                                                    bool    hero) const
+    PanelViewModel VehicleBinding::build_view_model(uint8_t rank) const
     {
         PanelViewModel vm {};
-        vm.large = large;
-        vm.hero  = hero;
 
         if (rank >= core::MAX_PANELS)
         {
@@ -85,6 +110,7 @@ namespace gui
 
         const core::SignalSpec &spec = core::SIGNAL_CATALOG[catalog_idx];
         bool is_metric               = panel.units == core::UnitSystem::Metric;
+        bool is_state                = core::signal_is_state(spec);
 
         copy_str(vm.name, sizeof(vm.name), spec.name);
         copy_str(vm.unit_label,
@@ -97,7 +123,29 @@ namespace gui
         const core::SignalStore &store
             = override_ != nullptr ? *override_ : signals_;
         const core::SignalValue &value = store.get_at(catalog_idx);
-        if (value.has_data)
+        vm.is_text = is_state;
+        if (value.has_data && is_state)
+        {
+            /**
+             * A state shows its label; a value with no label yet shows
+             * as ?<n> so it can still be read off and added.
+             */
+            const char *label = core::signal_enum_label(spec, value.value);
+            if (label != nullptr)
+            {
+                copy_str(vm.value_str, sizeof(vm.value_str), label);
+            }
+            else
+            {
+                snprintf(vm.value_str,
+                         sizeof(vm.value_str),
+                         "?%ld",
+                         static_cast<long>(value.value < 0.0f
+                                               ? value.value - 0.5f
+                                               : value.value + 0.5f));
+            }
+        }
+        else if (value.has_data)
         {
             float display = store.get_display_value_at(catalog_idx, is_metric);
             snprintf(vm.value_str,
@@ -111,12 +159,20 @@ namespace gui
             copy_str(vm.value_str, sizeof(vm.value_str), "--");
         }
 
-        core::WarningState warn
-            = core::evaluate_warning(value, cfg.signals[catalog_idx].warn);
-        vm.warn_lo_active = warn.lo_active;
-        vm.warn_hi_active = warn.hi_active;
+        /**
+         * A state has no thresholds, and only reads as a label -- whatever
+         * an older config or the phone page says.
+         */
+        if (!is_state)
+        {
+            core::WarningState warn
+                = core::evaluate_warning(value, cfg.signals[catalog_idx].warn);
+            vm.warn_lo_active = warn.lo_active;
+            vm.warn_hi_active = warn.hi_active;
+        }
 
-        vm.mode = to_gui_display_mode(panel.display_mode);
+        vm.mode = is_state ? DisplayMode::Digital
+                           : to_gui_display_mode(panel.display_mode);
         if (vm.mode != DisplayMode::Digital && value.has_data)
         {
             const core::SignalConfig &sig_cfg = cfg.signals[catalog_idx];
@@ -141,6 +197,13 @@ namespace gui
         if (rank >= core::MAX_PANELS)
         {
             return;
+        }
+
+        int catalog_idx = core::signal_catalog_find(new_signal_id);
+        if (catalog_idx >= 0
+            && core::signal_is_state(core::SIGNAL_CATALOG[catalog_idx]))
+        {
+            mode = DisplayMode::Digital;
         }
 
         core::PrioritizedSignal &panel = config_.get().priorities[rank];

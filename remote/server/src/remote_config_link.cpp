@@ -4,7 +4,19 @@ namespace remote::server
 {
     using protocol::MsgType;
 
+#if defined(ARDUINO_ARCH_ESP32)
+    FLASHMEM uint8_t *RemoteConfigLink::resp_payload()
+    {
+        return resp_payload_.get();
+    }
+#else
     DMAMEM uint8_t RemoteConfigLink::resp_payload_[protocol::FRAME_MAX_PAYLOAD];
+
+    FLASHMEM uint8_t *RemoteConfigLink::resp_payload()
+    {
+        return resp_payload_;
+    }
+#endif
 
     FLASHMEM RemoteConfigLink::RemoteConfigLink(ISerialLink        &link,
                                                 RemoteConfigServer &server)
@@ -60,17 +72,21 @@ namespace remote::server
                     case MsgType::REQ_APPLY_CONFIG:
                     case MsgType::REQ_PREVIEW_CONFIG:
                     case MsgType::REQ_REVERT_PREVIEW: {
+                        uint8_t *resp = resp_payload();
+                        if (resp == nullptr)
+                        {
+                            break; /* the relay times the request out */
+                        }
                         MsgType resp_type;
                         size_t  resp_len
                             = server_.handle_request(frame.type,
                                                      frame.payload,
                                                      frame.payload_len,
-                                                     resp_payload_,
-                                                     sizeof(resp_payload_),
+                                                     resp,
+                                                     protocol::FRAME_MAX_PAYLOAD,
                                                      resp_type);
-                        write_frame(resp_type,
-                                    resp_payload_,
-                                    static_cast<uint16_t>(resp_len));
+                        write_frame(
+                            resp_type, resp, static_cast<uint16_t>(resp_len));
                         break;
                     }
 

@@ -1,8 +1,9 @@
 /**
  * @file dash_s3_can.cpp
  * @brief TWAI wiring behind ICanBus. Response filtering by CAN ID is done
- * in core/can as well (UdsClient::poll drops anything but rx_id), but the
- * hardware acceptance filter is set to rx_id too -- see begin() for why.
+ * in core/can as well (UdsClient::poll drops anything but the modules'
+ * response ids), but the hardware acceptance filter narrows to their range
+ * too -- see begin() for why.
  * This layer only moves frames.
  */
 
@@ -96,10 +97,8 @@ DashS3CanBus &DashS3CanBus::instance()
     return s_instance;
 }
 
-bool DashS3CanBus::begin(uint32_t tx_id, uint32_t rx_id, uint32_t baud)
+bool DashS3CanBus::begin(uint32_t rx_id_lo, uint32_t rx_id_hi, uint32_t baud)
 {
-    (void)tx_id;
-
     twai_timing_config_t t_cfg;
     if (!timing_for(baud, t_cfg))
     {
@@ -130,10 +129,20 @@ bool DashS3CanBus::begin(uint32_t tx_id, uint32_t rx_id, uint32_t baud)
      * word, so the ID shifts up by 21 and everything below it (RTR, the
      * first two data bytes) is masked off as don't-care. Extended IDs
      * would shift by 3 instead; this board only ever talks 11-bit OBD
-     * IDs. */
+     * IDs.
+     *
+     * One code/mask pair can't express a range, so every ID bit that
+     * differs anywhere between rx_id_lo and rx_id_hi is don't-care too:
+     * 0x77D..0x7E8 passes all of 0x700..0x7FF, still only diagnostic
+     * traffic. */
+    uint32_t span = 0;
+    for (uint32_t diff = rx_id_lo ^ rx_id_hi; diff != 0; diff >>= 1)
+    {
+        span = (span << 1) | 1u;
+    }
     twai_filter_config_t f_cfg = {};
-    f_cfg.acceptance_code      = rx_id << 21;
-    f_cfg.acceptance_mask      = 0x001FFFFF;
+    f_cfg.acceptance_code      = (rx_id_lo & ~span) << 21;
+    f_cfg.acceptance_mask      = (span << 21) | 0x001FFFFF;
     f_cfg.single_filter        = true;
 
     esp_err_t err = twai_driver_install(&g_cfg, &t_cfg, &f_cfg);
