@@ -9,10 +9,10 @@ namespace esp32
 
     namespace
     {
-        /* Static rather than on the loopTask stack, same reasoning as
-         * RelayLink's req_scratch_buf_. Only one handler runs at a time. */
-        uint8_t s_bytes[protocol::FRAME_MAX_PAYLOAD];
-        char    s_hex[2 * protocol::FRAME_MAX_PAYLOAD + 1];
+        /* Not on the loopTask stack, same reasoning as RelayLink's
+         * frame_scratch_. Only one handler runs at a time. */
+        LazyBuffer<uint8_t, protocol::FRAME_MAX_PAYLOAD> s_bytes;
+        LazyBuffer<char, 2 * protocol::FRAME_MAX_PAYLOAD + 1> s_hex;
 
         void to_hex(const uint8_t *bytes, size_t len, char *out)
         {
@@ -100,27 +100,42 @@ namespace esp32
 
     void ConfigWebHandler::handle_state()
     {
+        uint8_t *bytes = s_bytes.get();
+        char    *hex   = s_hex.get();
+        if (bytes == nullptr || hex == nullptr)
+        {
+            server_->send(503, "text/plain", "out of memory");
+            return;
+        }
+
         uint16_t resp_len = 0;
         if (!relay_.send_request_and_wait(MsgType::REQ_GET_STATE,
                                           nullptr,
                                           0,
                                           MsgType::RESP_STATE,
-                                          s_bytes,
-                                          sizeof(s_bytes),
+                                          bytes,
+                                          s_bytes.size(),
                                           resp_len))
         {
             server_->send(504, "text/plain", "relay timeout");
             return;
         }
 
-        to_hex(s_bytes, resp_len, s_hex);
+        to_hex(bytes, resp_len, hex);
         server_->sendHeader("Cache-Control", "no-store");
-        server_->send(200, "text/plain", s_hex);
+        server_->send(200, "text/plain", hex);
     }
 
     void ConfigWebHandler::handle_change(MsgType type)
     {
-        int len = from_hex(server_->arg("plain"), s_bytes, sizeof(s_bytes));
+        uint8_t *bytes = s_bytes.get();
+        if (bytes == nullptr)
+        {
+            server_->send(503, "text/plain", "out of memory");
+            return;
+        }
+
+        int len = from_hex(server_->arg("plain"), bytes, s_bytes.size());
         if (len < 0)
         {
             server_->send(400, "text/plain", "bad hex body");
@@ -130,7 +145,7 @@ namespace esp32
         uint8_t  resp[8];
         uint16_t resp_len = 0;
         if (!relay_.send_request_and_wait(type,
-                                          s_bytes,
+                                          bytes,
                                           static_cast<uint16_t>(len),
                                           MsgType::RESP_APPLY_RESULT,
                                           resp,

@@ -9,19 +9,28 @@ engine can be exercised headless.
   * DemoSource -- synthesizes plausible OBDEleven-style scan traffic from the
     catalog (including one unknown DID and one multi-frame response) so the UI
     and decode/learn paths can be developed with no hardware attached.
+  * FileSource -- replays a recorded capture (capture.py), in real time or
+    all at once.
+  * SimDongleSource -- no hardware: a simulated diagnostic dongle asking the
+    fake car (emulator.py) for each faked DID, to try the Fake Car tab.
+
+Sources that can put frames on the bus have send(frame).
 """
 from __future__ import annotations
 
 import math
 import threading
 import time
+from pathlib import Path
 from typing import Callable
 
 import serial
 from serial.tools import list_ports
 
 from .can_frame import CanFrame
+from .capture import read_capture
 from .catalog import Catalog
+from .emulator import SimDongle
 
 OnFrame = Callable[[CanFrame], None]
 
@@ -122,6 +131,26 @@ class SlcanSerialSource:
         self._ser: serial.Serial | None = None
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
+        self._write_lock = threading.Lock()
+
+    @property
+    def can_send(self) -> bool:
+        return self.state == self.STREAMING and not self.listen_only
+
+    def send(self, frame: CanFrame) -> bool:
+        """Puts `frame` on the bus (SLCAN t/T). False unless streaming in
+        normal mode -- listen-only never transmits."""
+        if not self.can_send or self._ser is None:
+            return False
+        kind, ident = ("T", f"{frame.can_id:08X}") if frame.extended else (
+            "t", f"{frame.can_id:03X}")
+        line = f"{kind}{ident}{len(frame.data)}{frame.data.hex().upper()}\r"
+        try:
+            with self._write_lock:
+                self._ser.write(line.encode())
+        except OSError:
+            return False
+        return True
 
     def start(self) -> None:
         self._ser = serial.Serial(self.port, self.serial_baud, timeout=0.1)
@@ -203,7 +232,11 @@ class SlcanSerialSource:
         buf = bytearray()
         while not self._stop.is_set():
             try:
-                chunk = self._ser.read(256)
+                # Whatever has arrived, or wait for the first byte. read(256)
+                # would sit on a quiet bus's frames until 256 bytes or the
+                # 0.1 s timeout -- too slow for the fake car, whose dongle
+                # gives up on an answer after 50 ms.
+                chunk = self._ser.read(self._ser.in_waiting or 1)
             except OSError:
                 self.state = self.LOST
                 break
@@ -361,3 +394,116 @@ class DemoSource:
             cf = cf.ljust(8, b"\x00")
             self.on_frame(CanFrame(time.monotonic(), OBD_RX_ID, cf, direction="rx"))
             seq += 1
+
+
+class FileSource:
+    """Replays a capture file (capture.py) into `on_frame`.
+
+    Frames keep their recorded spacing: replayed timestamps are the
+    capture's time_s offset by `base`, so latencies and ages read as they
+    did live. In real time, frames go out at that pace starting now; with
+    `realtime=False` they all go out at once, timed as if the capture had
+    just finished. Raises ValueError (from read_capture) on a bad file."""
+
+    def __init__(self, path, on_frame: OnFrame, realtime: bool = True) -> None:
+        self.path = Path(path)
+        self.on_frame = on_frame
+        self.realtime = realtime
+        self.info, self._frames = read_capture(self.path)
+        self.total = len(self._frames)
+        self.sent = 0
+        self.done = False
+        # Monotonic time of the capture's time_s = 0 -- fixed here rather
+        # than in start() so a caller can reset its engine to it first;
+        # start() right after constructing.
+        now = time.monotonic()
+        self.base = now if realtime else now - self.duration
+        self._thread: threading.Thread | None = None
+        self._stop = threading.Event()
+
+    @property
+    def duration(self) -> float:
+        return self._frames[-1][0] if self._frames else 0.0
+
+    def start(self) -> None:
+        self._stop.clear()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread:
+            self._thread.join(timeout=1.0)
+
+    def _run(self) -> None:
+        for t, f in self._frames:
+            if self.realtime:
+                wait = self.base + t - time.monotonic()
+                if wait > 0 and self._stop.wait(wait):
+                    return
+            elif self._stop.is_set():
+                return
+            self.on_frame(CanFrame(self.base + t, f.can_id, f.data,
+                                   f.extended, f.direction))
+            self.sent += 1
+        self.done = True
+
+
+class SimDongleSource:
+    """Stands in for the dongle and the bus, with no hardware: every
+    `period_s` it asks for the next of `targets()` -- (request id, request
+    bytes) pairs, normally the fake car's faked DIDs -- and sends flow
+    control for long answers. Its frames reach `on_frame` like bus traffic;
+    send() is how the fake car's answers reach it (queued, and handled on
+    this source's own thread)."""
+
+    def __init__(self, on_frame: OnFrame, targets: Callable[[], list[tuple[int, bytes]]],
+                 period_s: float = 0.1) -> None:
+        self.on_frame = on_frame
+        self.targets = targets
+        self.period_s = period_s
+        self.dongle = SimDongle(on_frame)
+        self._inbox: list[CanFrame] = []
+        self._inbox_lock = threading.Lock()
+        self._thread: threading.Thread | None = None
+        self._stop = threading.Event()
+        self._i = 0
+
+    can_send = True
+
+    def send(self, frame: CanFrame) -> bool:
+        with self._inbox_lock:
+            self._inbox.append(frame)
+        return True
+
+    def start(self) -> None:
+        self._stop.clear()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread:
+            self._thread.join(timeout=1.0)
+
+    def _drain(self) -> None:
+        while True:
+            with self._inbox_lock:
+                if not self._inbox:
+                    return
+                frame = self._inbox.pop(0)
+            self.dongle.on_frame(frame)
+
+    def _run(self) -> None:
+        next_ask = time.monotonic()
+        while not self._stop.is_set():
+            self._drain()
+            now = time.monotonic()
+            if now >= next_ask:
+                next_ask = now + self.period_s
+                targets = self.targets()
+                if targets:
+                    tx, req = targets[self._i % len(targets)]
+                    self._i += 1
+                    self.dongle.request(tx, req)
+            self._stop.wait(0.005)

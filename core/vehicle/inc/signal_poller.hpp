@@ -30,13 +30,16 @@ namespace core
     class SignalPoller
     {
         public:
-            /* Sized for a full screen of panels (core::MAX_PANELS) each
-             * owning the catalog maximum of DIDs, assuming no dedup.
-             * Spelled out here rather than derived from MAX_PANELS so
-             * core/vehicle keeps its independence from core/config --
-             * main.cpp, which already depends on both, is what translates
-             * the displayed panel set into the id list set_active() takes. */
-            static constexpr uint8_t MAX_ACTIVE_SIGNALS = 6;
+            /* Sized for a full screen of panels (core::MAX_PANELS) plus
+             * every internal signal the dash reads for itself (Dim Ctrl,
+             * for auto brightness), each owning the catalog maximum of
+             * DIDs, assuming no dedup. The panel count is spelled out here
+             * rather than derived from MAX_PANELS so core/vehicle keeps its
+             * independence from core/config -- main.cpp, which already
+             * depends on both, is what translates the displayed panel set
+             * into the id list set_active() takes. */
+            static constexpr uint8_t MAX_ACTIVE_SIGNALS
+                = 6 + INTERNAL_SIGNAL_COUNT;
             static constexpr uint8_t MAX_ACTIVE_REQUESTS
                 = MAX_ACTIVE_SIGNALS * MAX_REQUESTS_PER_SIGNAL;
 
@@ -46,6 +49,16 @@ namespace core
              * beat. An ECU that needs longer is required to say so with
              * an 0x78 NRC, which restarts this rather than expiring it. */
             static constexpr uint32_t RESPONSE_TIMEOUT_MS = 60;
+
+            /**
+             * How long past RESPONSE_TIMEOUT_MS a multi-frame answer that
+             * has started arriving (UdsClient::receiving()) is waited for.
+             * Each block of consecutive frames needs a main-loop pass to
+             * drain and answer with flow control, so a long answer can
+             * outlast the single-frame deadline without anything being
+             * wrong; this caps it if the module stops part-way.
+             */
+            static constexpr uint32_t MULTI_FRAME_GRACE_MS = 200;
 
             /* A DID this ECU will never answer -- unsupported on the car,
              * or gated behind a diagnostic session this client does not
@@ -61,8 +74,9 @@ namespace core
 
             /**
              * Points the poller at the signals currently worth asking for
-             * — the displayed panel set. Ids not in the catalog are
-             * skipped; anything past MAX_ACTIVE_SIGNALS is ignored.
+             * — the displayed panel set, plus any internal signal in use.
+             * Ids in neither part of the catalog are skipped; anything past
+             * MAX_ACTIVE_SIGNALS is ignored.
              *
              * Rebuilding the request table costs a full cadence reset, so
              * an unchanged list is a no-op and this is safe to call on a
@@ -80,15 +94,21 @@ namespace core
              */
             void tick();
 
-            /** Feed every decoded UDS response here. */
-            void on_response(uint8_t byte1, uint8_t byte2);
+            /**
+             * Feed every UDS response here, with the module (ECU table
+             * index) that sent it.
+             */
+            void on_response(uint8_t ecu, uint8_t byte1, uint8_t byte2);
 
-            /** Feed every UDS negative response here. */
-            void on_negative_response(uint8_t service, uint8_t nrc);
+            /**
+             * Feed every UDS negative response here.
+             */
+            void on_negative_response(uint8_t ecu, uint8_t service, uint8_t nrc);
 
         private:
             struct Entry
             {
+                    uint8_t  ecu         = 0;
                     uint8_t  byte1       = 0;
                     uint8_t  byte2       = 0;
                     uint32_t period_ms   = 0;
@@ -96,7 +116,7 @@ namespace core
                     uint8_t  misses      = 0;
             };
 
-            int      find_request(uint8_t byte1, uint8_t byte2) const;
+            int find_request(uint8_t ecu, uint8_t byte1, uint8_t byte2) const;
             int      pick_due(uint32_t now_ms) const;
             uint32_t effective_period(const Entry &entry) const;
 

@@ -426,10 +426,8 @@ namespace gui
 
         if (self->return_screen_ != nullptr)
         {
-            /* Mirrors open()'s OVER_TOP with its opposite, so closing
-             * visually undoes the swipe that opened this. */
-            slide_screen_in(
-                self->return_screen_, LV_SCR_LOAD_ANIM_OVER_BOTTOM, 220);
+            /* No slide out, matching Settings: the screen just goes. */
+            lv_screen_load(self->return_screen_);
         }
     }
 

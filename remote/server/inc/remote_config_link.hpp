@@ -47,19 +47,29 @@ namespace remote::server
                              const uint8_t    *payload,
                              uint16_t          len);
 
+            /**
+             * resp_payload_'s storage; null only if the ESP32 build's
+             * allocation failed.
+             */
+            uint8_t *resp_payload();
+
             ISerialLink          &link_;
             RemoteConfigServer   &server_;
             protocol::FrameReader reader_;
             /** Scratch space for a response payload built by
              * RemoteConfigServer before write_frame() streams it out —
-             * sized for the largest response (RESP_STATE). static for the
-             * same reason as FrameReader::buf_ (DMAMEM needs static
-             * storage duration; only one RemoteConfigLink is ever alive
-             * in the real app). Always fully overwritten up to the
-             * returned length before being read, so it doesn't need
-             * DMAMEM's .bss.dma section to guarantee zero-initialization
-             * at startup. */
+             * sized for the largest response (RESP_STATE). static on the
+             * Teensy for the same reason as FrameReader::buf_ (DMAMEM
+             * needs static storage duration; only one RemoteConfigLink is
+             * ever alive in the real app); a LazyBuffer on the ESP32, so
+             * it sits in PSRAM on the S3. Always fully overwritten up to the returned length before
+             * being read, so it doesn't need DMAMEM's .bss.dma section to
+             * guarantee zero-initialization at startup. */
+#if defined(ARDUINO_ARCH_ESP32)
+            LazyBuffer<uint8_t, protocol::FRAME_MAX_PAYLOAD> resp_payload_;
+#else
             static uint8_t resp_payload_[protocol::FRAME_MAX_PAYLOAD];
+#endif
     };
 
 } // namespace remote::server

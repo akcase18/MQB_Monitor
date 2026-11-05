@@ -23,9 +23,7 @@ namespace gui
             /** `rank` is priority rank (0 = most important, see
              * core::Config::priorities[]) — not a screen slot index. */
             using ViewModelBuilder   = PanelViewModel (*)(void   *ctx,
-                                                        uint8_t rank,
-                                                        bool    large,
-                                                        bool    hero);
+                                                        uint8_t rank);
             using PanelPressCallback = void (*)(void *ctx, uint8_t rank);
 
             void init(const Theme       &theme,
@@ -82,11 +80,6 @@ namespace gui
             const Theme *theme_         = nullptr;
 
             PanelWidget panels_[MAX_PANELS];
-            bool        panel_large_[MAX_PANELS] = {};
-            /** True for the truly roomy full-height slots — count 1's
-             * panel and count 3's hero, not count 2's narrower columns —
-             * derived from PanelSlot::rowspan/colspan in rebuild(). */
-            bool     panel_hero_[MAX_PANELS] = {};
             ClickCtx click_ctx_[MAX_PANELS]  = {};
             uint8_t  num_panels_             = 0;
 

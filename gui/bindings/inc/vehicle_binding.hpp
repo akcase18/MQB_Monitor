@@ -12,6 +12,7 @@
 
 #include "config_store.hpp"
 #include "panel_widget.hpp"
+#include "settings_screen.hpp"
 #include "signal_store.hpp"
 #include "warning_config_screen.hpp"
 
@@ -26,6 +27,11 @@ namespace gui
     DisplayMode       to_gui_display_mode(core::DisplayMode mode);
     core::DisplayMode to_core_display_mode(DisplayMode mode);
 
+    /* Likewise core::BrightnessMode <-> gui::BrightnessMode, for
+     * SettingsScreen's mode toggle. */
+    BrightnessMode       to_gui_brightness_mode(core::BrightnessMode mode);
+    core::BrightnessMode to_core_brightness_mode(BrightnessMode mode);
+
     class VehicleBinding
     {
         public:
@@ -34,13 +40,9 @@ namespace gui
 
             /**
              * Builds rank's view-model from whatever signal it's currently
-             * assigned to. `large`/`hero` are layout decisions (see
-             * gui/screens/layout.hpp), passed through rather than derived
-             * from vehicle data.
+             * assigned to.
              */
-            PanelViewModel build_view_model(uint8_t rank,
-                                            bool    large,
-                                            bool    hero) const;
+            PanelViewModel build_view_model(uint8_t rank) const;
 
             /** Reassigns rank to a different signal/unit system/display
              * mode, persisted immediately. */

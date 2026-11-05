@@ -60,13 +60,17 @@ class ICanBus
         /**
          * One-time peripheral initialization.
          *
-         * @param tx_id CAN ID this bus sends requests on.
-         * @param rx_id CAN ID this bus filters responses to.
-         * @param baud  Bus baud rate, in bits/sec.
+         * @param rx_id_lo Lowest CAN ID to receive -- the modules' response
+         *                 ids span rx_id_lo..rx_id_hi.
+         * @param rx_id_hi Highest CAN ID to receive. A hardware filter may
+         *                 let more through than the range; core/can
+         *                 filters exactly.
+         * @param baud     Bus baud rate, in bits/sec.
          *
          * @returns True on success, otherwise false.
          */
-        virtual bool begin(uint32_t tx_id, uint32_t rx_id, uint32_t baud) = 0;
+        virtual bool begin(uint32_t rx_id_lo, uint32_t rx_id_hi, uint32_t baud)
+            = 0;
 
         /**
          * Non-blocking send function.

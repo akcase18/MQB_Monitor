@@ -30,7 +30,7 @@
 namespace
 {
     /* One max-size frame each way, doubled: RESP_STATE (dash -> relay)
-     * is the largest thing on the link at ~1.2KB, and only one request
+     * is the largest thing on the link (~2.8KB at 51 signals), and only one request
      * is ever outstanding, so nothing ever queues behind a full frame. */
     constexpr size_t PIPE_BYTES
         = 2 * (remote::protocol::FRAME_MAX_PAYLOAD + 8);

@@ -50,8 +50,12 @@ namespace
      * depends on how long a loop() pass happens to take. */
     constexpr size_t LINK_BUF_SIZE = remote::protocol::FRAME_MAX_PAYLOAD + 64;
 
-    uint8_t s_rx_buf[LINK_BUF_SIZE];
-    uint8_t s_tx_buf[LINK_BUF_SIZE];
+    /**
+     * In RAM2: HardwareSerial copies through these from its ISR with the
+     * CPU, no DMA, so they don't need RAM1.
+     */
+    DMAMEM uint8_t s_rx_buf[LINK_BUF_SIZE];
+    DMAMEM uint8_t s_tx_buf[LINK_BUF_SIZE];
 } // namespace
 
 TeensySerialLink &TeensySerialLink::instance()

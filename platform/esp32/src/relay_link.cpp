@@ -7,9 +7,6 @@ namespace esp32
 {
     using remote::protocol::MsgType;
 
-    uint8_t
-        RelayLink::req_scratch_buf_[remote::protocol::FRAME_MAX_PAYLOAD + 8];
-
     RelayLink::RelayLink(Stream &stream)
         : stream_(stream)
     {
@@ -38,9 +35,13 @@ namespace esp32
                                const uint8_t *payload,
                                uint16_t       len)
     {
-        uint8_t buf[remote::protocol::FRAME_MAX_PAYLOAD + 8];
-        size_t  written = remote::protocol::encode_frame(
-            type, payload, len, buf, sizeof(buf));
+        uint8_t *buf = frame_scratch_.get();
+        if (buf == nullptr)
+        {
+            return;
+        }
+        size_t written = remote::protocol::encode_frame(
+            type, payload, len, buf, frame_scratch_.size());
         if (written > 0)
         {
             stream_.write(buf, written);
@@ -56,17 +57,18 @@ namespace esp32
                                           uint16_t      &resp_len,
                                           uint32_t       timeout_ms)
     {
-        size_t written
-            = remote::protocol::encode_frame(req_type,
-                                             req_payload,
-                                             req_len,
-                                             req_scratch_buf_,
-                                             sizeof(req_scratch_buf_));
+        uint8_t *buf = frame_scratch_.get();
+        if (buf == nullptr)
+        {
+            return false;
+        }
+        size_t written = remote::protocol::encode_frame(
+            req_type, req_payload, req_len, buf, frame_scratch_.size());
         if (written == 0)
         {
             return false;
         }
-        stream_.write(req_scratch_buf_, written);
+        stream_.write(buf, written);
 
         uint32_t start_ms = millis();
         while (millis() - start_ms < timeout_ms)

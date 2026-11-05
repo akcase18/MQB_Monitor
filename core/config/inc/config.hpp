@@ -1,9 +1,10 @@
 /**
  * @file config.hpp
  * @brief Persisted configuration schema, stored over IConfigStore. Warning
- * thresholds are keyed by signal (Config.signals[], indexed by catalog
- * position) rather than by panel slot, so moving a signal to a different
- * panel carries its thresholds with it automatically. Config.priorities[]
+ * thresholds are keyed by signal (Config.signals[], each record tagged with
+ * its signal id, and indexed by catalog position once loaded) rather than
+ * by panel slot, so moving a signal to a different panel carries its
+ * thresholds with it automatically. Config.priorities[]
  * follows the same principle one level further: it's indexed by priority
  * rank (0 = most important), not screen slot, so the most important signal
  * stays the most prominent one on screen regardless of how many panels are
@@ -45,6 +46,23 @@ namespace core
         Gauge
     };
 
+    /**
+     * Which level the backlight shows. Persisted, and its ordinal goes
+     * over the wire to the phone configurator: append only.
+     */
+    enum class BrightnessMode : uint8_t
+    {
+        Day,   /* Settings::day_brightness */
+        Night, /* Settings::night_brightness */
+        Auto   /* follows the car's dimmer -- core::AutoBrightness */
+    };
+
+    /**
+     * Settings::auto_brightness_pct's default and midpoint: the car's
+     * dimmer level shown as it is.
+     */
+    constexpr uint8_t AUTO_BRIGHTNESS_NEUTRAL = 50;
+
     struct ConfigHeader
     {
             uint16_t magic;
@@ -56,6 +74,11 @@ namespace core
             uint8_t day_brightness;
             uint8_t night_brightness;
             uint8_t num_panels; /* 1-6, active count within MAX_PANELS */
+            /* v8. Sits in what was padding before orientation, so the
+             * layout didn't move -- but that padding was never guaranteed
+             * zero, so v8 still needed a version bump and a migrate()
+             * step that sets it. */
+            BrightnessMode brightness_mode;
             LayoutOrientation orientation;
             /* Whether core::Logger records anything. Opt-in: logging is
              * a deliberate "capture this drive" action, not something
@@ -83,6 +106,11 @@ namespace core
              * an lv_color_t so core:: stays LVGL-free; gui/bindings
              * converts it at the boundary. */
             uint32_t accent_color;
+            /* v9. Auto's brightness slider, 0-100: 50 shows the car's
+             * dimmer level as it is, either end shifts it by up to
+             * AutoBrightness::MAX_SHIFT_PCT. After accent_color, so the
+             * v6-v8 Settings is a prefix of this one. */
+            uint8_t auto_brightness_pct;
     };
 
     /** A single priority-ranked signal assignment — see the file doc
@@ -94,6 +122,28 @@ namespace core
             DisplayMode display_mode = DisplayMode::Digital;
     };
 
+    /**
+     * SignalConfig::signal_id of a slot that holds no signal's settings.
+     * Also what erased flash reads as.
+     */
+    constexpr uint16_t NO_SIGNAL_ID = 0xFFFF;
+
+    /**
+     * How many SignalConfig records the stored config has room for. Fixed,
+     * so promoting a signal or reordering the registry never changes the
+     * stored layout: ConfigStore::load() matches records to signals by id.
+     * Room beyond the active catalog keeps the settings of signals this
+     * build no longer has, so demoting a signal and promoting it again
+     * gets its thresholds back. 64 x 28 bytes keeps Config under 2 KB of
+     * RAM and well inside the smallest IConfigStore (4 KB). Raising it
+     * changes the layout, so it needs a CURRENT_VERSION bump.
+     */
+    constexpr uint8_t SIGNAL_CONFIG_SLOTS = 64;
+
+    static_assert(SIGNAL_CATALOG_COUNT <= SIGNAL_CONFIG_SLOTS,
+                  "more active signals than Config::signals[] has room for "
+                  "-- raise SIGNAL_CONFIG_SLOTS and migrate the old layout");
+
     struct SignalConfig
     {
             WarningThresholds warn;
@@ -103,6 +153,12 @@ namespace core
             bool  use_custom_range = false;
             float custom_min       = 0.0f;
             float custom_max       = 0.0f;
+            /**
+             * Which signal these settings belong to, stored with them so a
+             * load can find them wherever they sit. Last, so the v6
+             * record (everything above) is a prefix of this one.
+             */
+            uint16_t signal_id = NO_SIGNAL_ID;
     };
 
     struct Config
@@ -110,7 +166,13 @@ namespace core
             ConfigHeader      header;
             Settings          settings;
             PrioritizedSignal priorities[MAX_PANELS];
-            SignalConfig      signals[SIGNAL_CATALOG_COUNT];
+            /**
+             * After ConfigStore::load(), signals[i] belongs to
+             * SIGNAL_CATALOG[i] for every i below SIGNAL_CATALOG_COUNT, so
+             * callers index it by catalog position as before. The slots
+             * past that hold signals this build doesn't have, or nothing.
+             */
+            SignalConfig signals[SIGNAL_CONFIG_SLOTS];
     };
 
 } // namespace core

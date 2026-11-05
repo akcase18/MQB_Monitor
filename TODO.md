@@ -5,7 +5,6 @@ Reworked from the old README's list against what's actually implemented as of th
 ## Hardware
 
 - [X] Enclosure redesign - New heat-resistant enclosure and mounting for new PCB.
-  - In Progress
 - [X] PCB redesign - smaller board that utilizes the non-breakout LCD panel.
 - [X] Populate BOOT and RESET buttons on the PCB (provisions exist on the board, buttons just need to be ordered/installed).
 - [X] Touch screen support — SPI SDI/SCL lines were swapped on PCB v2; fixed on the schematic/PCB and confirmed working in the car.
@@ -13,18 +12,24 @@ Reworked from the old README's list against what's actually implemented as of th
 
 ## Software
 
-- [ ] **Automatic** day/night brightness switching (by clock or a light sensor) — currently only a manual toggle; explicitly deferred pending sensor hardware or a scheduling design.
-- [ ] Additional signal sources: transmission data (temp, clamping pressure, etc.), Haldex data, and similar beyond the current 22-signal engine/OBD2 catalog.
+- [ ] **Automatic** day/night brightness switching from the ambient light sensor (#60 Amb Light, `25 B8` on 754/7BE). Auto mode follows the dimmer knob through Dim Ctrl, but doesn't switch day/night on its own yet — needs the car capture (knob sweep in daylight, sensor covered, knob sweep again).
 - [ ] Rework of logging system. Keep current system as default (display logs what is on the screen), with an option to separate the data that is logged and the data that is displayed. This log setup could be done through the phone configurator, and could give the option to log either option when starting logging.
 - [ ] Wireless (phone) and Micro-SD export of the signal log — sequenced follow-ons to the USB-only retrieval above, both reusing the same on-disk `LogRecord`/`ChunkHeader` format over a different transport. Wireless needs new `remote::protocol` message types plus a chunking scheme (today's link is single-frame request/response only); Micro-SD needs a physical slot the current PCB doesn't have (the `TeensySdCard`/`IStorage` code path is already in place, see `platform/teensy/README.md`).
-- [ ] ISO-TP support for CAN (multi-frame UDS responses) — current `core::can::UdsClient` only decodes single-frame responses.
 - [ ] Expand to other vehicle platforms — the `platform/` HAL split and `core/vehicle` signal catalog make this architecturally possible, but the current catalog is still MQB-specific and no second platform is implemented.
+- [X] Additional signal sources: transmission data (temp, clamping pressure, etc.), Haldex data, and similar beyond the current 22-signal engine/OBD2 catalog.
+  - First round complete, but will be a general work in progress.
+- [X] Enum values (Gear's `N`, the valves' `Open`/`Closed`) draw as big as a number would. The bold value fonts carry digits plus only the characters active Enum labels use; [tools/gen_value_fonts.py](tools/gen_value_fonts.py) regenerates them, and `gen_catalog.py` warns when a label needs a character they lack (that label draws at 24 px until the fonts are regenerated).
+- [ ] S3 internal RAM: try moving LVGL's small allocations to PSRAM. `dash_s3_platform.cpp` sends only mallocs over 2 KB to PSRAM (`DASH_S3_INTERNAL_MALLOC_LIMIT`), so every LVGL object and style stays in the internal RAM the Wi-Fi stack needs. Lowering the limit could free tens of KB, but LVGL reads styles on every draw and the PCB's PSRAM is quad, so it may slow redraws. Measure internal free heap (AP up, config page loaded) and redraw time (`dash_s3_stress`'s LCD stats) before and after. Shrinking the LVGL draw buffers (`DRAW_BUF_DIVISOR`) is the other lever: last resort only, or after a hardware revision.
+- [X] ISO-TP support for CAN (multi-frame UDS responses) — `core::UdsClient` reassembles answers up to 32 data bytes, flow-controlling in blocks of 3, and polls any module in the generated ECU table — [core/can](core/can/README.md).
 - [X] EEPROM-backed configuration storage (panel assignments, warning thresholds, brightness, theme) — [core/config](core/config/README.md).
 - [X] Warning light configuration with independent per-signal low/high thresholds — [core/vehicle/inc/warning.hpp](core/vehicle/inc/warning.hpp), [gui/screens/inc/warning_config_screen.hpp](gui/screens/inc/warning_config_screen.hpp).
 - [X] Digital/Bar/Gauge display options, chosen per panel — [gui/widgets](gui/widgets/README.md).
 - [X] 1–6 panel layouts, each with its own shape (horizontal orientation) — [gui/screens/inc/layout.hpp](gui/screens/inc/layout.hpp).
 - [X] Overall appearance customization — accent color picker + swappable `Theme` — [gui/theme](gui/theme/README.md).
 - [X] Manual day/night brightness toggle (two independently-set levels, switches instantly).
+- [X] Auto brightness from the car's dimmer: Settings' mode button steps Day → Night → Auto, Auto follows Dim Ctrl (the cluster's needle dimming level, an internal signal), ramped, falling back to the Day level when the cluster isn't answering — [core/vehicle](core/vehicle/README.md). In Auto the slider shifts the level ±25% (midpoint = 1:1). The mode and shift are saved (config v9) and the dash boots at the saved level instead of 100%.
+- [ ] Non-linear Auto mapping, if a straight shift isn't enough at the ends of the dimmer's range — `AutoBrightness::level_for()`.
+- [X] Internal signal status: `"internal"` signals in `signals.json` are compiled and polled for the firmware's own use but never offered on the dash or phone page; the monitor app treats them like active ones — [tools](tools/README.md).
 - [X] Vertical (portrait) layout orientation — selectable from Settings → Orientation (pick the layout, confirm the popup). Physically rotates the display/touch panel and every screen's layout, not just a transposed `InfoScreen` panel grid inside a canvas that stayed landscape. Boot-time-only, so Confirm persists it and restarts the board in software (`platform_restart()`), coming back up on the Orientation screen — see `platform.hpp`'s `DisplayOrientation`/`IDisplay::set_orientation()`. A phone-side layout change still waits for the next restart.
 - [X] Rotate 180° — Settings → Orientation's Rotate button turns the active layout upside down for a panel mounted the other way up — remembered per layout (`Settings::flipped_horizontal`/`flipped_vertical`), so flipping one never flips the other. Applied live behind a blanked backlight, no restart. Carried over the remote protocol, so the phone configurator's settings-file backup keeps it and a phone-side change applies it live, but the page has no control for it. The flipped MADCTL values and touch mappings are derived (MX/MY toggled; touch rotated in screen space), not yet verified on hardware.
 - [X] Storage abstraction (platform-layer HAL only — mount + file I/O, not the logging format/rotation) — `platform::IStorage`. Internal MCU program flash (`LittleFS_Program`) is the active backend; Micro-SD is kept as a switchable alternate implementation for whenever a card slot is back in the design — [platform/teensy](platform/teensy/README.md).
@@ -35,6 +40,11 @@ Reworked from the old README's list against what's actually implemented as of th
 
 ## Manual validation still needed
 
+- [ ] **A non-engine, multi-frame signal on the dash, in the car.** Once its ECU is known, promote one (#43 brake booster, 0x1810, 9 bytes, is both), flash the dash, check the panel fills in. If it stays "--", the sniffer beside it shows whether the module answered and whether the dash sent flow control (`30 03 00`).
+- [ ] **Battery voltage (#45, 2A 07) in the car.** With the monitor listening, Add from Live one point while OBDEleven shows battery voltage. For payload `28 BF`: phone 14.431 = the current mapping (14-bit × 0.001 + 4 V) is right; 14.303 = the phone masks each byte with 0x3F, as it did on the bench, and the fitter needs mask support. The car's answers always have the low byte ≥ 0x80, so one point decides it.
+- [ ] **Auto brightness in the car.** Dim Ctrl is taken as 0–100% (anything above clamps to 100) from one real sample (`0x24` = 36). Sweep the dimmer knob min to max with the monitor listening to confirm, and try the slider's ±25% shift at both ends of the knob. Also check the ramp speed feels right and the fallback (Day level) takes over within ~5 s of the cluster going quiet.
+- [ ] **v7 settings surviving the v9 upgrade, on a real dash.** Flash the v9 build over a v7 dash: brightness levels, panels and thresholds stay, the mode comes up as Day and Auto's slider at the midpoint. A panel that held Dim Ctrl goes back to its rank's default.
+- [ ] **v6 settings surviving the v7 upgrade, on a real dash.** Set a distinctive warning threshold and custom range, flash the v7 build, check both (plus brightness and panel layout) are still there.
 - [ ] Phone join/leave on real phones: the Wi-Fi glyph going grey/accent, and the panel going back to the QR code when the phone leaves (turning its Wi-Fi off, and walking out of range, which takes up to the AP's 30 s inactive time). Check a locked phone isn't dropped by that 30 s while it's still in range. Tested only in the simulator (P key).
 - [ ] The configurator's settings-file Download/Load on real phones (iOS Safari, Android Chrome) over the dash's AP. Tested only in desktop headless Chrome against the simulator.
 - [X] On-hardware check of `gui/screens/inc/layout.hpp`'s `HERO_COLSPAN`/`STACK_COLSPAN` split (the 3-panel layout's hero-vs-stack width ratio) — currently a starting guess, not yet confirmed to read well at arm's length in the car.

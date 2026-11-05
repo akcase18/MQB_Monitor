@@ -23,10 +23,14 @@ namespace core
              * use_custom_range/custom_min/custom_max. v5: Config.panels[]
              * (screen-slot-indexed) renamed to Config.priorities[]
              * (priority-rank-indexed) — see config.hpp's file doc comment.
-             * No device has shipped with saved config yet, so migrate()
-             * still just falls through to defaults rather than preserving
-             * old fields. */
-            static constexpr uint8_t CURRENT_VERSION = 6;
+             * v6: added Settings::logging_enabled; the first version
+             * dashes in the field hold. v7: Config.signals[] became a
+             * fixed table of id-tagged records instead of one positional
+             * record per catalog entry. v8: added Settings::
+             * brightness_mode. v9: added Settings::auto_brightness_pct,
+             * growing Settings by 4 bytes. migrate() carries v6-v8
+             * across; anything older resets to defaults. */
+            static constexpr uint8_t CURRENT_VERSION = 9;
 
             explicit ConfigStore(IConfigStore &backing);
 
@@ -35,7 +39,10 @@ namespace core
             /**
              * Loads from backing storage. Unrecognized magic -> defaults
              * (and persists them). Older version -> migrate() (and persists
-             * the result). Current version -> full load. Newer version --
+             * the result). Current version -> full load, then the signal
+             * records are put back in catalog order, and saved if that
+             * moved anything (a signal promoted, retired or reordered
+             * since the last boot). Newer version --
              * written by firmware this board has since rolled back from
              * (an OTA update, see platform/dash_s3/OTA_PLAN.md) -> defaults,
              * NOT persisted: a layout this build doesn't know can't be
@@ -67,6 +74,15 @@ namespace core
         private:
             void set_defaults();
             void migrate(uint8_t old_version);
+            bool sort_signals();
+            /**
+             * Puts a rank whose signal this build doesn't offer (demoted to
+             * WIP or internal, or removed) back to that rank's default.
+             * Left alone, the panel shows nothing, the phone page can't
+             * select it, and the dash rejects the phone's Save. True if
+             * anything changed.
+             */
+            bool fix_priorities();
 
             IConfigStore &backing_;
             Config        config_ {};

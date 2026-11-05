@@ -62,6 +62,10 @@ QFrame#TopBar {{
     background: {PANEL};
     border-bottom: 1px solid {BORDER};
 }}
+QFrame#StatusBar {{
+    background: {PANEL};
+    border-top: 1px solid {BORDER};
+}}
 QLabel#AppTitle {{ color: {TEXT}; font-size: 14px; font-weight: 600; }}
 QLabel#AppSubtitle {{ color: {TEXT_DIM}; font-size: 10px; }}
 QLabel#FieldLabel {{ color: {TEXT_DIM}; font-size: 11px; }}
@@ -146,6 +150,8 @@ QCheckBox::indicator {{
 }}
 QCheckBox::indicator:checked {{ background: {ACCENT}; border-color: {ACCENT}; }}
 QCheckBox::indicator:disabled {{ background: {PANEL}; border-color: {BORDER}; }}
+/* Still visibly ticked while greyed out (e.g. Listen-only once connected). */
+QCheckBox::indicator:checked:disabled {{ background: {ACCENT_DIM}; border-color: {ACCENT}; }}
 
 QTableWidget {{
     background: {PANEL};

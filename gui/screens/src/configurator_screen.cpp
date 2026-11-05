@@ -56,6 +56,7 @@ namespace gui
     FLASHMEM void ConfiguratorScreen::init(const Theme             &theme,
                                   const char *const *const signal_names,
                                   const uint16_t          *signal_ids,
+                                  const bool              *signal_is_state,
                                   uint16_t                 num_signals,
                                   DoneCallback             done_cb,
                                   void                    *done_ctx,
@@ -66,6 +67,7 @@ namespace gui
     {
         signal_names_    = signal_names;
         signal_ids_      = signal_ids;
+        signal_is_state_ = signal_is_state;
         num_signals_     = num_signals;
         done_cb_         = done_cb;
         done_ctx_        = done_ctx;
@@ -225,6 +227,7 @@ namespace gui
                      portrait ? PORTRAIT_WARN_ROW_Y : WARN_ROW_Y);
         lv_obj_add_event_cb(
             warn_row.btn, settings_cb_handler, LV_EVENT_CLICKED, this);
+        warn_row_ = warn_row.btn;
     }
 
     void ConfiguratorScreen::open(uint8_t     rank,
@@ -245,6 +248,7 @@ namespace gui
         lv_buttonmatrix_set_button_ctrl(mode_matrix_,
                                         static_cast<uint16_t>(mode),
                                         LV_BUTTONMATRIX_CTRL_CHECKED);
+        apply_state_lock();
 
         lv_screen_load(screen_);
     }
@@ -253,6 +257,62 @@ namespace gui
     {
         pending_signal_id_ = signal_id;
         refresh_signal_row_label();
+        apply_state_lock();
+    }
+
+    bool ConfiguratorScreen::pending_is_state() const
+    {
+        if (signal_is_state_ == nullptr)
+        {
+            return false;
+        }
+        for (uint16_t i = 0; i < num_signals_; i++)
+        {
+            if (signal_ids_[i] == pending_signal_id_)
+            {
+                return signal_is_state_[i];
+            }
+        }
+        return false;
+    }
+
+    void ConfiguratorScreen::apply_state_lock()
+    {
+        bool state = pending_is_state();
+
+        /**
+         * mode_map is { "Digital", "Bar", "Gauge" }.
+         */
+        for (uint16_t i = 1; i < 3; i++)
+        {
+            if (state)
+            {
+                lv_buttonmatrix_clear_button_ctrl(
+                    mode_matrix_, i, LV_BUTTONMATRIX_CTRL_CHECKED);
+                lv_buttonmatrix_set_button_ctrl(
+                    mode_matrix_, i, LV_BUTTONMATRIX_CTRL_DISABLED);
+            }
+            else
+            {
+                lv_buttonmatrix_clear_button_ctrl(
+                    mode_matrix_, i, LV_BUTTONMATRIX_CTRL_DISABLED);
+            }
+        }
+        if (state)
+        {
+            lv_buttonmatrix_set_button_ctrl(
+                mode_matrix_, 0, LV_BUTTONMATRIX_CTRL_CHECKED);
+        }
+
+        if (state)
+        {
+            lv_obj_add_state(warn_row_, LV_STATE_DISABLED);
+        }
+        else
+        {
+            lv_obj_remove_state(warn_row_, LV_STATE_DISABLED);
+        }
+        lv_obj_set_style_opa(warn_row_, state ? LV_OPA_40 : LV_OPA_COVER, 0);
     }
 
     void ConfiguratorScreen::refresh_signal_row_label()
@@ -313,7 +373,7 @@ namespace gui
     {
         auto *self
             = static_cast<ConfiguratorScreen *>(lv_event_get_user_data(e));
-        if (self->settings_cb_ != nullptr)
+        if (self->settings_cb_ != nullptr && !self->pending_is_state())
         {
             self->settings_cb_(self->settings_ctx_,
                                self->current_rank_,

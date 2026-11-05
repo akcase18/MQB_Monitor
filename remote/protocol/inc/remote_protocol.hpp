@@ -43,12 +43,18 @@ namespace remote::protocol
      =========================================================================*/
 
     constexpr uint8_t FRAME_SYNC = 0xA5;
-    /* Comfortably above RESP_STATE's worst-case ~1224-byte payload (22
-     * signals' worth of catalog + config, then the preview flag), with
-     * headroom for catalog growth. */
-    constexpr uint16_t FRAME_MAX_PAYLOAD = 1536;
-    /* ~3x the worst-case transfer time at a conservative 115200 baud. */
-    constexpr uint32_t FRAME_TIMEOUT_MS = 300;
+    /**
+     * RESP_STATE is the largest payload: 54 bytes of catalog entry and
+     * config per active signal on top of a 39-byte head, so 3495 bytes for
+     * the 64 signals core::SIGNAL_CONFIG_SLOTS allows.
+     * remote_config_server.cpp static_asserts that it fits.
+     */
+    constexpr uint16_t FRAME_MAX_PAYLOAD = 4096;
+    /**
+     * A whole frame must arrive within this. ~3x a full 64-signal
+     * RESP_STATE (~304 ms) at the C3 link's 115200 baud.
+     */
+    constexpr uint32_t FRAME_TIMEOUT_MS = 1000;
 
     constexpr uint8_t WIRE_NAME_LEN = 24; /* matches gui::PANEL_NAME_LEN */
     /* A firmware version string plus NUL -- matches the dash's update
@@ -213,19 +219,33 @@ namespace remote::protocol
 
             void reset();
 
+            /**
+             * Where payload bytes go; null only if the ESP32 build's
+             * allocation failed.
+             */
+            uint8_t *payload_buf();
+
             State    state_          = State::WaitSync;
             uint8_t  msg_type_       = 0;
             uint16_t len_            = 0;
             uint16_t received_       = 0;
             uint16_t crc_received_   = 0;
             uint32_t frame_start_ms_ = 0;
+#if defined(ARDUINO_ARCH_ESP32)
+            /**
+             * One per reader, in PSRAM on the S3 (see LazyBuffer). The S3
+             * has two readers alive at once, the dash's and the in-process
+             * relay's, on different cores, so they can't share one.
+             */
+            LazyBuffer<uint8_t, FRAME_MAX_PAYLOAD> buf_;
+#else
             /* static, not a plain member: GCC rejects a `section`
              * attribute on a non-static data member (there's no
              * independent storage to place — it's part of whatever object
              * contains it), so DMAMEM placement needs static storage
              * duration; see the out-of-class definition in
              * remote_protocol.cpp. Safe because there's only ever one
-             * FrameReader alive in the real app (inside RemoteConfigLink,
+             * FrameReader alive on the Teensy (inside RemoteConfigLink,
              * inside the Composition singleton); tests construct more
              * than one, but Unity runs test cases sequentially, never two
              * FrameReaders mid-frame at once. Never read before being
@@ -233,6 +253,7 @@ namespace remote::protocol
              * DMAMEM's .bss.dma section doesn't guarantee — zero-
              * initialization at startup. */
             static uint8_t buf_[FRAME_MAX_PAYLOAD];
+#endif
             DecodedFrame   frame_ {};
     };
 
@@ -255,6 +276,10 @@ namespace remote::protocol
             /* Bit 0: the horizontal layout turned 180 degrees, bit 1: the
              * vertical one (Settings::flipped_horizontal/_vertical). */
             uint8_t  flips            = 0;
+            /* core::BrightnessMode: 0=Day, 1=Night, 2=Auto. */
+            uint8_t  brightness_mode  = 0;
+            /* Settings::auto_brightness_pct, 0-100 (50 = no shift). */
+            uint8_t  auto_brightness  = 0;
     };
     uint8_t       *encode_settings(uint8_t *p, const SettingsWire &v);
     const uint8_t *decode_settings(const uint8_t *p, SettingsWire &out);

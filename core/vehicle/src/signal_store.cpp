@@ -24,22 +24,22 @@ namespace core
 
     void SignalStore::set(uint16_t id, float value, uint32_t now_ms)
     {
-        set_at(signal_catalog_find(id), value, now_ms);
+        set_at(signal_table_find(id), value, now_ms);
     }
 
     const SignalValue &SignalStore::get(uint16_t id) const
     {
-        return get_at(signal_catalog_find(id));
+        return get_at(signal_table_find(id));
     }
 
     float SignalStore::get_display_value(uint16_t id, bool is_metric) const
     {
-        return get_display_value_at(signal_catalog_find(id), is_metric);
+        return get_display_value_at(signal_table_find(id), is_metric);
     }
 
     void SignalStore::set_at(int idx, float value, uint32_t now_ms)
     {
-        if (idx < 0 || idx >= static_cast<int>(SIGNAL_CATALOG_COUNT))
+        if (idx < 0 || idx >= static_cast<int>(SIGNAL_TABLE_COUNT))
         {
             return;
         }
@@ -52,7 +52,7 @@ namespace core
 
     const SignalValue &SignalStore::get_at(int idx) const
     {
-        if (idx < 0 || idx >= static_cast<int>(SIGNAL_CATALOG_COUNT))
+        if (idx < 0 || idx >= static_cast<int>(SIGNAL_TABLE_COUNT))
         {
             return s_invalid;
         }
@@ -61,7 +61,7 @@ namespace core
 
     float SignalStore::get_display_value_at(int idx, bool is_metric) const
     {
-        if (idx < 0 || idx >= static_cast<int>(SIGNAL_CATALOG_COUNT))
+        if (idx < 0 || idx >= static_cast<int>(SIGNAL_TABLE_COUNT))
         {
             return 0.0f;
         }
@@ -74,16 +74,24 @@ namespace core
             value = unit_convert_to_imperial(spec.unit_type, value);
         }
 
-        /* Old round_data(): Volume/Pressure round to N decimals, everything
-         * else truncates toward zero (no rounding). Preserved as-is. */
+        /**
+         * Old round_data(): units shown with decimals round to them
+         * (Volume/Pressure, and the newer Length/Voltage/Current);
+         * everything else truncates toward zero -- the old behavior,
+         * preserved. An Enum keeps its exact value for the label lookup.
+         */
         switch (spec.unit_type)
         {
             case UnitType::Volume:
-                value = round_half_up(value, 1);
+            case UnitType::Pressure:
+            case UnitType::Length:
+            case UnitType::Voltage:
+            case UnitType::Current:
+                value = round_half_up(value,
+                                      unit_decimals(spec.unit_type, is_metric));
                 break;
 
-            case UnitType::Pressure:
-                value = round_half_up(value, is_metric ? 2 : 1);
+            case UnitType::Enum:
                 break;
 
             default:
@@ -94,12 +102,14 @@ namespace core
         return value;
     }
 
-    void SignalStore::on_uds_response(uint8_t  byte1,
-                                      uint8_t  byte2,
-                                      float    raw,
-                                      uint32_t now_ms)
+    void SignalStore::on_uds_response(uint8_t        ecu,
+                                      uint8_t        byte1,
+                                      uint8_t        byte2,
+                                      const uint8_t *payload,
+                                      uint8_t        len,
+                                      uint32_t       now_ms)
     {
-        for (size_t i = 0; i < SIGNAL_CATALOG_COUNT; i++)
+        for (size_t i = 0; i < SIGNAL_TABLE_COUNT; i++)
         {
             const SignalSpec &spec = SIGNAL_CATALOG[i];
 
@@ -112,7 +122,13 @@ namespace core
             for (uint8_t r = 0; r < spec.num_requests; r++)
             {
                 const UdsRequestSpec &req = spec.requests[r];
-                if (req.byte1 != byte1 || req.byte2 != byte2)
+                if (req.ecu != ecu || req.byte1 != byte1 || req.byte2 != byte2)
+                {
+                    continue;
+                }
+
+                float raw;
+                if (!uds_decode_field(payload, len, req.field, raw))
                 {
                     continue;
                 }

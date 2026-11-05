@@ -24,7 +24,7 @@
  *
  * ## Sizing
  *
- * core::Config is well under 1KB, so 4KB is the region with generous
+ * core::Config is under 2KB, so 4KB is the region with generous
  * headroom -- the same size the sibling gauge board reserves, so a config
  * blob is portable between the two.
  */

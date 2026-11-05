@@ -149,8 +149,13 @@ namespace remote::server
              * and refreshed by each Save within it. static for
              * the same reason as FrameReader::buf_ (DMAMEM placement needs
              * static storage; RAM1 is tight on Teensy) -- there is only
-             * ever one RemoteConfigServer in the real app. */
+             * ever one RemoteConfigServer in the real app. On the ESP32 it
+             * lives in PSRAM instead (see psram_new()). */
+#if defined(ARDUINO_ARCH_ESP32)
+            static core::Config &saved_before_preview_;
+#else
             static core::Config saved_before_preview_;
+#endif
     };
 
 } // namespace remote::server

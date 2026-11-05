@@ -39,6 +39,13 @@ namespace gui
             close.btn, theme.palette.accent, LV_STATE_PRESSED);
         lv_obj_set_style_bg_opa(close.btn, LV_OPA_COVER, LV_STATE_PRESSED);
         lv_obj_align(close.btn, LV_ALIGN_TOP_RIGHT, -16, 6);
+        /**
+         * Touchable 10px past the drawn 40x40 on every side, so it's
+         * easier to hit and looks the same. That reaches down to y=55,
+         * short of the first tappable thing on any screen (y=60,
+         * Logging's toggle row).
+         */
+        lv_obj_set_ext_click_area(close.btn, 10);
 
         close.label = lv_label_create(close.btn);
         lv_obj_set_style_text_font(close.label, theme.typography.symbol_lg, 0);

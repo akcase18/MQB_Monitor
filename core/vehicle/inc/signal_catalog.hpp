@@ -14,18 +14,45 @@
 namespace core
 {
 
+    /**
+     * Ordinals go over the wire to the phone configurator (its UNITS
+     * table, platform/esp32/web/index.html) -- append only, never reorder.
+     * Same order as the monitor tool's UNITS (tools/monitor).
+     */
     enum class UnitType
     {
         None,
-        Degrees,
+        Angle,
         Percent,
         Pressure,
         RPM,
         Speed,
         Temp,
         Torque,
-        Volume
+        Volume,
+        Length,      /* mm / in */
+        Voltage,     /* V */
+        Current,     /* A */
+        Illuminance, /* lx */
+        Time,        /* min */
+        TempDelta,   /* a temperature difference: °C / °F with no +32 */
+        Enum         /* a state: shown as its EnumEntry label, no unit */
     };
+
+    /**
+     * One value -> label pair of an Enum signal (gear, valve state).
+     */
+    struct EnumEntry
+    {
+            int32_t     value;
+            const char *label;
+    };
+
+    /**
+     * Longest Enum label a panel can show -- gui::PANEL_VALUE_LEN - 1.
+     * tools/gen_catalog.py refuses longer ones.
+     */
+    constexpr uint8_t ENUM_LABEL_MAX = 15;
 
     constexpr uint8_t MAX_REQUESTS_PER_SIGNAL = 2;
 
@@ -58,10 +85,60 @@ namespace core
              */
             float display_min;
             float display_max;
+
+            /**
+             * UnitType::Enum only: the value -> label table, else
+             * nullptr/0.
+             */
+            const EnumEntry *enum_entries;
+            uint8_t          num_enum_entries;
     };
 
+    /**
+     * True for a signal shown as a state label rather than a number:
+     * Digital panels only, no warning thresholds.
+     */
+    inline bool signal_is_state(const SignalSpec &spec)
+    {
+        return spec.unit_type == UnitType::Enum;
+    }
+
+    /**
+     * @returns The label `spec` shows for `value` (rounded to the nearest
+     * whole number), or nullptr when the value has no entry -- callers show
+     * "?<n>" for that.
+     */
+    const char *signal_enum_label(const SignalSpec &spec, float value);
+
+    /**
+     * Every compiled signal: the SIGNAL_CATALOG_COUNT the user can pick
+     * (panels, the signal picker, the phone page, the saved per-signal
+     * config), then INTERNAL_SIGNAL_COUNT the firmware reads for itself
+     * and never offers -- signals.json's "internal" status. Anything that
+     * walks the user-facing catalog stops at SIGNAL_CATALOG_COUNT and
+     * looks ids up with signal_catalog_find(); only the value store and
+     * the poller, which serve both, go up to SIGNAL_TABLE_COUNT.
+     */
     extern const SignalSpec SIGNAL_CATALOG[];
-    inline constexpr size_t SIGNAL_CATALOG_COUNT = 22;
+
+    /**
+     * Every module the catalog's requests go to (UdsRequestSpec::ecu
+     * indexes it), generated alongside SIGNAL_CATALOG.
+     */
+    extern const UdsEcu  UDS_ECUS[];
+    extern const uint8_t UDS_ECU_COUNT;
+
+    /**
+     * The lowest and highest response id in UDS_ECUS -- what the CAN bus is
+     * opened to receive (ICanBus::begin()).
+     */
+    void uds_ecu_rx_range(uint32_t &lo, uint32_t &hi);
+
+    /* Both synced by tools/gen_catalog.py. */
+    inline constexpr size_t SIGNAL_CATALOG_COUNT = 50;
+    inline constexpr size_t INTERNAL_SIGNAL_COUNT = 1;
+    inline constexpr size_t SIGNAL_TABLE_COUNT
+        = SIGNAL_CATALOG_COUNT + INTERNAL_SIGNAL_COUNT;
 
     /** A signal's effective display range — either SignalSpec's compiled-in
      * default or a user-calibrated override. */
@@ -86,30 +163,22 @@ namespace core
                                        float             custom_max);
 
     /**
-     * @returns The catalog index for `id`, or -1 if not found.
+     * @returns The catalog index for `id`, or -1 if not found. User-facing
+     * signals only: an internal signal's id is not found.
      */
     int signal_catalog_find(uint16_t id);
 
     /**
-     * Writes SIGNAL_CATALOG[index]'s name as a signal list shows it into
-     * `buf`: the name, plus " (<unit_tag>)" when another signal shares it
-     * (Fuel by volume and in %). Truncates to fit `len`.
+     * @returns The SIGNAL_CATALOG index for `id`, internal signals
+     * included, or -1 if not found. For the value store and the poller.
      */
-    void signal_catalog_label(size_t index, char *buf, size_t len);
+    int signal_table_find(uint16_t id);
 
     /**
      * @returns The unit label to display alongside a signal's value, e.g.
      * "[bar]"/"[psi]" for Pressure depending on `is_metric`.
      */
     const char *unit_label(UnitType type, bool is_metric);
-
-    /**
-     * @returns A short name for the unit type that reads the same in either
-     * unit system ("vol", "temp", "%"), for telling apart signals that share
-     * a name — see signal_catalog_label(). Mirrored by the phone
-     * configurator's UNITS table (platform/esp32/web/index.html).
-     */
-    const char *unit_tag(UnitType type);
 
     /**
      * @returns How many decimal places to display a value with, for the given
@@ -126,7 +195,7 @@ namespace core
 
     /**
      * Converts a metric value to imperial for the given unit type. No-op for
-     * unit types with no imperial conversion (None, Degrees, Percent, RPM).
+     * unit types with no imperial conversion (None, Angle, Percent, RPM).
      */
     float unit_convert_to_imperial(UnitType type, float metric_value);
 

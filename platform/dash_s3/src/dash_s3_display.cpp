@@ -739,7 +739,7 @@ void DashS3Display::set_backlight(uint8_t pct)
      * shortest pulses deliver less current than their duty suggests.
      * Raise it if the low end drops to black early, lower it if the
      * dimmest setting is still too bright at night. */
-    constexpr uint32_t MIN_BACKLIGHT_PCT = 5;
+    constexpr uint32_t MIN_BACKLIGHT_PCT = 2;
     uint32_t           effective_pct
         = MIN_BACKLIGHT_PCT
           + (static_cast<uint32_t>(pct) * (100 - MIN_BACKLIGHT_PCT)) / 100;

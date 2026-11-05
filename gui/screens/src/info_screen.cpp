@@ -21,8 +21,8 @@ namespace gui
          * read as a deliberate recording light rather than an alarm. */
         constexpr uint32_t LOGGING_LED_BLINK_MS = 700;
         /* The strip the preview banner takes off the top of the grid --
-         * room for one line of label_lg. 30 still fits every layout's
-         * readouts and gauges at either orientation. */
+         * room for one line of label_lg. The panels size their contents
+         * to what's left (see PanelWidget). */
         constexpr lv_coord_t PREVIEW_BANNER_HEIGHT = 26;
     } // namespace
 
@@ -184,9 +184,6 @@ namespace gui
                                  LV_GRID_ALIGN_STRETCH,
                                  slot.row,
                                  slot.rowspan);
-            panel_large_[i] = slot.large;
-            panel_hero_[i]  = is_hero_slot(slot);
-
             rank_of_slot_[i]    = rank_of_slot[i];
             click_ctx_[i].index = rank_of_slot[i];
         }
@@ -204,10 +201,7 @@ namespace gui
 
         for (uint8_t i = 0; i < num_panels_; i++)
         {
-            PanelViewModel vm = builder_(builder_ctx_,
-                                         rank_of_slot_[i],
-                                         panel_large_[i],
-                                         panel_hero_[i]);
+            PanelViewModel vm = builder_(builder_ctx_, rank_of_slot_[i]);
             panels_[i].set_view_model(vm);
         }
     }

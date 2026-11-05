@@ -674,15 +674,12 @@
 #define LV_ATTRIBUTE_LARGE_RAM_ARRAY
 
 /** Place performance critical functions into a faster memory (e.g RAM) */
-/* On the S3, LVGL's hot blend/fill loops run from IRAM rather than
- * through the flash cache: ~10% off a full redraw for ~16KB of IRAM,
- * which comes out of the same internal SRAM as the heap (~28KB left with
- * the SoftAP up). The Teensy's ITCM is too tight to do the same. */
-#if defined(PLATFORM_DASH_S3)
-    #define LV_ATTRIBUTE_FAST_MEM __attribute__((section(".iram1.lvgl_fast")))
-#else
-    #define LV_ATTRIBUTE_FAST_MEM
-#endif
+/* Left empty on every target, so LVGL's hot blend/fill loops run from
+ * flash through the cache. On the S3, IRAM placement was ~10% faster on
+ * a full redraw but cost ~16KB of the same internal SRAM the heap and
+ * the Wi-Fi stack draw on (~28KB left with the SoftAP up). The Teensy's
+ * ITCM is too tight to do it either. */
+#define LV_ATTRIBUTE_FAST_MEM
 
 /** Export integer constant to binding. This macro is used with constants in the form of LV_<CONST> that
  *  should also appear on LVGL binding API such as MicroPython. */
@@ -721,7 +718,7 @@
 #define LV_FONT_MONTSERRAT_26 0
 #define LV_FONT_MONTSERRAT_28 0
 #define LV_FONT_MONTSERRAT_30 0
-#define LV_FONT_MONTSERRAT_32 1
+#define LV_FONT_MONTSERRAT_32 0
 #define LV_FONT_MONTSERRAT_34 0
 #define LV_FONT_MONTSERRAT_36 0
 #define LV_FONT_MONTSERRAT_38 0

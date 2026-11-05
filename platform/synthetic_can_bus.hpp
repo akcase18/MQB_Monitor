@@ -38,12 +38,23 @@ class SyntheticCanBus : public ICanBus
         {
         }
 
-        bool begin(uint32_t tx_id, uint32_t rx_id, uint32_t baud) override
+        bool begin(uint32_t rx_id_lo, uint32_t rx_id_hi, uint32_t baud) override
         {
-            (void)tx_id;
+            (void)rx_id_lo;
+            (void)rx_id_hi;
             (void)baud;
-            rx_id_ = rx_id;
             return true;
+        }
+
+        /**
+         * The id a module answers on, by the usual VW addressing: OBD's
+         * 0x7E0-0x7E7 answer 8 up, the UDS modules 0x6A up (713 -> 77D).
+         */
+        static uint32_t response_id_for(uint32_t request_id)
+        {
+            return request_id >= 0x7E0 && request_id <= 0x7E7
+                       ? request_id + 0x08
+                       : request_id + 0x6A;
         }
 
         bool send(const CanFrame &frame) override
@@ -85,7 +96,7 @@ class SyntheticCanBus : public ICanBus
             last_fake_raw_    = fake_raw;
 
             CanFrame &response = queue_[head_];
-            response.id        = rx_id_;
+            response.id        = response_id_for(frame.id);
             response.len       = 8;
             response.data[0]   = TWO_BYTE_PAYLOAD;
             response.data[1]   = UDS_RESPONSE_SID;
@@ -140,7 +151,6 @@ class SyntheticCanBus : public ICanBus
          * constant. */
         uint32_t tick_          = 0;
         uint16_t last_fake_raw_ = 0;
-        uint32_t rx_id_         = 0;
         uint32_t sends_per_step_;
         int32_t  amplitude_;
 };

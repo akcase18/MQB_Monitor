@@ -14,13 +14,15 @@
   The C3 only relays bytes, so this page speaks remote::protocol's records
   itself (see remote/protocol/inc/remote_protocol.hpp) and mirrors a few small
   tables from the Teensy firmware. Keep these in step with their sources:
-    UNITS             core/vehicle/src/signal_catalog.cpp (unit_tag,
-                      unit_label, unit_decimals,
-                      unit_convert_to_imperial/_to_metric)
+    UNITS             core/vehicle/src/signal_catalog.cpp (unit_label,
+                      unit_decimals, unit_convert_to_imperial/_to_metric)
     ACCENTS           gui/theme/src/theme.cpp (ACCENT_PRESETS)
     computeLayout()   gui/screens/src/layout.cpp, plus InfoScreen::rebuild()'s
                       grid tracks
     the dash mock     gui/widgets/src/panel_widget.cpp and THEME_DEFAULT
+  SIGNAL_DESCRIPTIONS and SIGNAL_ENUMS are generated, not mirrored by hand:
+  edit the signal in core/vehicle/data/signals.json and run
+  tools/gen_catalog.py.
 -->
 <style>
 :root {
@@ -135,17 +137,11 @@ button, input, select { font: inherit; color: inherit; }
 }
 .p .cap {
   position: absolute; left: 4px; right: 4px; bottom: 4px;
-  text-align: center; font-weight: 400; line-height: 1.3;
+  text-align: center; font-weight: 400;
   overflow-wrap: anywhere;
 }
-.p .val {
-  position: absolute; transform: translate(-50%, -50%);
-  font-weight: 700; line-height: 1.3; white-space: nowrap;
-}
-.p .unit {
-  position: absolute; left: calc(100% + 3px); top: 2px;
-  font-size: 11px; font-weight: 400; line-height: 1.3;
-}
+.p .val, .p .unit { position: absolute; white-space: nowrap; }
+.p .unit { font-weight: 400; }
 .p svg, .p .bar { position: absolute; }
 .p .bar { border-radius: 999px; background: #404040; padding: 2px; }
 .p .bar > div { height: 100%; border-radius: 999px; background: var(--accent); }
@@ -162,6 +158,7 @@ section > h2.editing-name {
   font-size: 1.15rem; font-weight: 650; margin: 0 0 6px;
   letter-spacing: 0; text-transform: none; color: var(--text);
 }
+.desc { margin: -2px 0 4px; font-size: .85rem; color: var(--muted); }
 
 .row {
   display: flex; align-items: center; justify-content: space-between;
@@ -309,6 +306,14 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 
   <section aria-labelledby="h-bright">
     <h2 id="h-bright">Brightness</h2>
+    <div class="row">
+      <span class="lbl">Mode</span>
+      <div class="seg" id="bmode" role="group" aria-label="Brightness mode">
+        <button type="button" data-v="0">Day</button>
+        <button type="button" data-v="1">Night</button>
+        <button type="button" data-v="2">Auto</button>
+      </div>
+    </div>
     <div class="row stack">
       <div class="range-head"><label for="day">Day</label><output id="day-out"></output></div>
       <input type="range" id="day" min="0" max="100" step="1">
@@ -316,6 +321,10 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
     <div class="row stack">
       <div class="range-head"><label for="night">Night</label><output id="night-out"></output></div>
       <input type="range" id="night" min="0" max="100" step="1">
+    </div>
+    <div class="row stack">
+      <div class="range-head"><label for="auto">Auto</label><output id="auto-out"></output></div>
+      <input type="range" id="auto" min="0" max="100" step="1">
     </div>
   </section>
 
@@ -335,6 +344,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
   <div id="pane-panel" role="tabpanel" aria-labelledby="tab-panel" hidden>
   <section aria-labelledby="h-panel">
     <h2 id="h-panel" class="editing-name"></h2>
+    <p class="desc" id="signal-desc" hidden></p>
 
     <div class="row">
       <label for="signal">Signal</label>
@@ -344,13 +354,17 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
       <span class="lbl">Units</span>
       <div class="seg" id="units" role="group" aria-label="Units"></div>
     </div>
-    <div class="row">
+    <div class="row" id="mode-row">
       <span class="lbl">Display</span>
       <div class="seg" id="mode" role="group" aria-label="Display">
         <button type="button" data-v="0">Digital</button>
         <button type="button" data-v="1">Bar</button>
         <button type="button" data-v="2">Gauge</button>
       </div>
+    </div>
+    <div class="row" id="state-row">
+      <label for="try-state">Try a state</label>
+      <select id="try-state"></select>
     </div>
     <div class="row" id="scale-row">
       <label class="sw"><input type="checkbox" id="use-custom"><span class="track"></span>
@@ -363,7 +377,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
     </div>
   </section>
 
-  <section aria-labelledby="h-warn">
+  <section aria-labelledby="h-warn" id="warn-section">
     <h2 id="h-warn">Warnings</h2>
     <div class="row">
       <label class="sw"><input type="checkbox" id="use-hi"><span class="track"></span><span>High</span></label>
@@ -403,22 +417,103 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 
 /* core::UnitType, by wire ordinal. */
 const UNITS = [
-  /* None     */ { tag: "",       m: "",    i: "",      dm: 0, di: 0, toI: v => v,                 toM: v => v },
-  /* Degrees  */ { tag: "°",      m: "°",   i: "°",     dm: 0, di: 0, toI: v => v,                 toM: v => v },
-  /* Percent  */ { tag: "%",      m: "%",   i: "%",     dm: 0, di: 0, toI: v => v,                 toM: v => v },
-  /* Pressure */ { tag: "press",  m: "bar", i: "psi",   dm: 2, di: 1, toI: v => v * 14.5038,       toM: v => v / 14.5038 },
-  /* RPM      */ { tag: "rpm",    m: "rpm", i: "rpm",   dm: 0, di: 0, toI: v => v,                 toM: v => v },
-  /* Speed    */ { tag: "speed",  m: "kph", i: "mph",   dm: 0, di: 0, toI: v => v / 1.609,         toM: v => v * 1.609 },
-  /* Temp     */ { tag: "temp",   m: "°C",  i: "°F",    dm: 0, di: 0, toI: v => v * 1.8 + 32,      toM: v => (v - 32) / 1.8 },
-  /* Torque   */ { tag: "torque", m: "Nm",  i: "lb-ft", dm: 0, di: 0, toI: v => v * 0.7375621493,  toM: v => v / 0.7375621493 },
-  /* Volume   */ { tag: "vol",    m: "L",   i: "gal",   dm: 1, di: 1, toI: v => v / 3.785,         toM: v => v * 3.785 },
+  /* None     */ { m: "",    i: "",      dm: 0, di: 0, toI: v => v,                 toM: v => v },
+  /* Angle    */ { m: "°",   i: "°",     dm: 0, di: 0, toI: v => v,                 toM: v => v },
+  /* Percent  */ { m: "%",   i: "%",     dm: 0, di: 0, toI: v => v,                 toM: v => v },
+  /* Pressure */ { m: "bar", i: "psi",   dm: 2, di: 1, toI: v => v * 14.5038,       toM: v => v / 14.5038 },
+  /* RPM      */ { m: "rpm", i: "rpm",   dm: 0, di: 0, toI: v => v,                 toM: v => v },
+  /* Speed    */ { m: "kph", i: "mph",   dm: 0, di: 0, toI: v => v / 1.609,         toM: v => v * 1.609 },
+  /* Temp     */ { m: "°C",  i: "°F",    dm: 0, di: 0, toI: v => v * 1.8 + 32,      toM: v => (v - 32) / 1.8 },
+  /* Torque   */ { m: "Nm",  i: "lb-ft", dm: 0, di: 0, toI: v => v * 0.7375621493,  toM: v => v / 0.7375621493 },
+  /* Volume   */ { m: "L",   i: "gal",   dm: 1, di: 1, toI: v => v / 3.785,         toM: v => v * 3.785 },
+  /* Length   */ { m: "mm",  i: "in",    dm: 0, di: 2, toI: v => v / 25.4,          toM: v => v * 25.4 },
+  /* Voltage  */ { m: "V",   i: "V",     dm: 2, di: 2, toI: v => v,                 toM: v => v },
+  /* Current  */ { m: "A",   i: "A",     dm: 1, di: 1, toI: v => v,                 toM: v => v },
+  /* Illum.   */ { m: "lx",  i: "lx",    dm: 0, di: 0, toI: v => v,                 toM: v => v },
+  /* Time     */ { m: "min", i: "min",   dm: 0, di: 0, toI: v => v,                 toM: v => v },
+  /* TempDelta*/ { m: "°C",  i: "°F",    dm: 0, di: 0, toI: v => v * 1.8,           toM: v => v / 1.8 },
+  /* Enum     */ { m: "",    i: "",      dm: 0, di: 0, toI: v => v,                 toM: v => v },
 ];
 const unitOf = t => UNITS[t] || UNITS[0];
+/* Unit types that round to their decimals rather than truncate --
+ * SignalStore::get_display_value_at(): Pressure, Volume, Length, Voltage,
+ * Current. */
+const ROUNDED_UNITS = [3, 8, 9, 10, 11];
+/* core::UnitType::Enum: a state, shown as one of its SIGNAL_ENUMS labels --
+ * Digital only, no unit, scale or warnings. */
+const UNIT_ENUM = 15;
+const isState = i => state.catalog[i].unit === UNIT_ENUM;
+/* A state's [value, label] pairs, or [] when this page doesn't know them. */
+const statesOf = i => SIGNAL_ENUMS[state.catalog[i].id] || [];
 
 /* gui::ACCENT_PRESETS. The Teensy resets anything else to the first one at
  * boot, so the page offers exactly these. */
 const ACCENTS = [0x4CAF50, 0x00BCD4, 0x2196F3, 0x9C27B0, 0xE91E63,
                  0xF44336, 0xFF9800, 0xFFC107, 0x9E9E9E];
+
+/* What each signal is, and each state's [value, label] pairs, by catalog
+ * id. Keyed by id rather than position, so a page and a dash catalog of
+ * different ages still line up; an id the page doesn't know just goes
+ * without. */
+/* BEGIN GENERATED -- tools/gen_catalog.py */
+const SIGNAL_DESCRIPTIONS = {
+  0: "Engine coolant temperature.",
+  1: "Engine oil temperature, measured by the oil temperature sensor in the oil pan.",
+  2: "Temperature of the air going into the engine.",
+  3: "Charge-air (boost) pressure ahead of the throttle, as absolute pressure: it reads atmospheric pressure with the engine off.",
+  4: "Intake manifold pressure after the throttle, as absolute pressure: atmospheric with the engine off, below it at idle, above it on boost.",
+  5: "Outside air (barometric) pressure. Drops as altitude rises.",
+  22: "Intake manifold pressure minus outside air pressure. Below zero is vacuum, above zero is boost.",
+  7: "Engine RPM.",
+  8: "Engine torque as the engine computer calculates it, not measured at the wheels.",
+  9: "Vehicle speed, as the engine computer reports it.",
+  10: "Fuel left in the tank, as a volume.",
+  11: "Fuel left in the tank, as a percentage of a full tank.",
+  12: "Actual position of the throttle body. This is the throttle itself, not the gas pedal.",
+  13: "Misfires counted across all cylinders. Will reset periodically.",
+  14: "Misfires counted on cylinder 1.",
+  15: "Misfires counted on cylinder 2.",
+  16: "Misfires counted on cylinder 3.",
+  17: "Misfires counted on cylinder 4.",
+  18: "Knock-control timing correction on cylinder 1. Away from zero means ignition timing is being pulled because of knock.",
+  19: "Knock-control timing correction on cylinder 2. Away from zero means ignition timing is being pulled because of knock.",
+  20: "Knock-control timing correction on cylinder 3. Away from zero means ignition timing is being pulled because of knock.",
+  21: "Knock-control timing correction on cylinder 4. Away from zero means ignition timing is being pulled because of knock.",
+  24: "Coolant temperature at the radiator outlet.",
+  26: "How much hotter the coolant is leaving the engine than leaving the radiator: the heat the radiator is taking out.",
+  28: "Percent speed that radiator fan 1 is running at.",
+  29: "Percent speed that radiator fan 2 is running at.",
+  30: "Intake manifold runner flaps: the position the engine computer commands.",
+  31: "Intake manifold runner flaps: the position the flaps report back.",
+  33: "The gear the transmission is in. Shows None while a shift is in progress. Supports up to 7 gears for 7-speed transmissions.",
+  34: "Exhaust gas temperature ahead of the catalytic converter.",
+  35: "Valve that lets engine coolant flow to the transmission: open or closed.",
+  36: "Transmission oil cooler valve: open or closed. N/A on cars without one.",
+  37: "Transmission (DSG) fluid temperature. Not supported on MT cars.",
+  38: "Specified torque at clutch 1 (odd gears).",
+  39: "Specified torque at clutch 2 (even gears, reverse).",
+  40: "DSG clutch temperature, measured at the oil thrown off the clutches.",
+  41: "Hydraulic pressure on DSG clutch 2 (even gears, reverse).",
+  42: "Hydraulic pressure on DSG clutch 1 (odd gears).",
+  47: "Temperature of the Haldex control module.",
+  48: "Current drawn by the Haldex clutch pump.",
+  49: "Haldex clutch temperature.",
+  50: "How far the Haldex clutch is engaged. Higher sends more torque to the rear axle.",
+  51: "Duty cycle the Haldex module drives the clutch pump at.",
+  52: "Voltage at the Haldex clutch pump.",
+  53: "Temperature of the Haldex unit's cooling fins.",
+  54: "Time the Haldex unit has spent over its temperature limit.",
+  55: "Speed difference between the front and rear axles. Above zero means wheels are slipping.",
+  58: "Front suspension travel (ride height). Measured by ride height sensor on front axle.",
+  59: "Rear suspension travel (ride height). Measured by ride height sensor on rear axle.",
+  60: "Outside light level.",
+};
+const SIGNAL_ENUMS = {
+  33: [[0, "1"], [1, "2"], [2, "3"], [3, "4"], [4, "5"], [5, "6"], [6, "7"], [8, "N"]],
+  35: [[0, "Open"], [1, "Closed"]],
+  36: [[0, "N/A"], [1, "Open"], [2, "Closed"], [3, "Error"]],
+};
+/* END GENERATED */
 
 const MAX_PANELS = 6;
 const RESULT_TEXT = ["", "Signal list mismatch", "Unknown signal", "Invalid setting", "Incomplete request"];
@@ -466,7 +561,7 @@ function decodeState(bytes) {
   const r = new Reader(bytes);
   const s = {
     settings: { day: r.u8(), night: r.u8(), count: r.u8(), orient: r.u8(), accent: r.u32(),
-                flips: r.u8() },
+                flips: r.u8(), bmode: r.u8(), auto: r.u8() },
     panels: [], catalog: [], signals: [], previewActive: false, unsaved: false,
   };
   const nPanels = r.u8();
@@ -494,6 +589,7 @@ function encodeConfig(s, values) {
   const w = new Writer(2048);
   w.u8(s.settings.day); w.u8(s.settings.night); w.u8(s.settings.count);
   w.u8(s.settings.orient); w.u32(s.settings.accent); w.u8(s.settings.flips);
+  w.u8(s.settings.bmode); w.u8(s.settings.auto);
   for (const p of s.panels) { w.u16(p.id); w.u8(p.imperial ? 1 : 0); w.u8(p.mode); }
   w.u16(s.signals.length);
   for (const c of s.signals) {
@@ -574,24 +670,83 @@ function gridTracks(count, vertical) {
  * Dash mock -- PanelWidget, in logical pixels.
  * ====================================================================== */
 
-const FONT = { dataSm: 30, dataMd: 38, dataLg: 46, dataXl: 56, dataHero: 56, dataMega: 96,
-               labelSm: 14, labelLg: 16, unit: 11 };
-const LINE = 1.3;                         /* ≈ the JetBrains Mono fonts' line height */
-const GLYPH_W = 0.6;                      /* monospace advance, em */
-const ARC = { small: 104, large: 128, hero: 180, width: 7, inset: 2 };
-const BAR_H = 18, BAR_H_HERO = 28, BAR_GAP = 6, NUDGE = 8;
+/* PanelWidget's fonts, measured from the LVGL ones: [px, line height,
+ * glyph advance, digit height, gap from the line's top to the digits].
+ * Value fonts smallest first (Typography::data). */
+const DATA_FONTS = [[30, 31, 18, 22, 4], [38, 39, 23, 27, 5], [54, 55, 32, 41, 5],
+                    [64, 66, 38, 49, 6], [80, 81, 48, 60, 8], [92, 95, 55, 70, 9],
+                    [128, 130, 77, 96, 12]];
+const DATA_TEXT = [24, 26, 14, 18, 4];      /* bold, every letter */
+const LABEL = { sm: [14, 16, 8, 10, 3], lg: [16, 18, 10, 12, 3], xl: [24, 27, 14, 18, 5] };
+const UNIT_FONT = [11, 12, 7, 8, 2];
+const INSET = 2, RING_MARGIN = 4, TEXT_MARGIN = 6, UNIT_GAP = 3;
 
-function worstReadoutWidth(size) {
-  const v = size * GLYPH_W, u = FONT.unit * GLYPH_W;
-  return Math.max(5 * v + 3 + 3 * u, 4 * v + 3 + 5 * u);
+const arcWidth = d => Math.max(7, Math.min(16, Math.floor(d / 14)));
+const barHeight = roomH => Math.max(18, Math.min(32, Math.floor(roomH / 10)));
+const barGap = f => Math.max(8, Math.floor(f[3] / 4));
+/* The ring's diameter if it filled the room: its drawn part is 88% of it. */
+const ringMax = room => Math.min(Math.floor(room.h * 100 / 88), room.w);
+/* Where every mode centers its digits: the center of the biggest ring the
+ * room holds, its drawn part centered -- a little below the room's middle. */
+function valueCenter(room) {
+  const d = ringMax(room);
+  return Math.trunc((room.h - Math.trunc(d * 88 / 100)) / 2) + Math.trunc(d / 2);
+}
+/* top, moved as little as it takes to keep [top, top + h) inside the room. */
+const keepInRoom = (top, h, room) => Math.max(0, Math.min(top, room.h - h));
+
+/* "-14.5 psi" or "312 lb-ft", whichever is wider. */
+function worstReadoutWidth(f, u) {
+  return Math.max(5 * f[2] + UNIT_GAP + 3 * u[2], 4 * f[2] + UNIT_GAP + 5 * u[2]);
 }
 
-function valueFont(mode, large, hero, contentW) {
-  if (hero) return mode === 0 ? FONT.dataMega : FONT.dataHero;
-  if (mode !== 0) return FONT.dataSm;
-  if (!large) return FONT.dataMd;
-  for (const f of [FONT.dataXl, FONT.dataLg]) if (worstReadoutWidth(f) <= contentW) return f;
-  return FONT.dataMd;
+/* Up to a quarter of the value's line, but smaller if that lets the
+ * worst-case readout fit `width`. */
+function unitFont(f, width) {
+  const limit = Math.floor(f[1] / 4);
+  return [LABEL.xl, LABEL.lg, LABEL.sm]
+    .find(u => u[1] <= limit && worstReadoutWidth(f, u) <= width) || UNIT_FONT;
+}
+
+function fitsRing(f, glyphs, d) {
+  const inner = d / 2 - (arcWidth(d) + 2 * INSET) - RING_MARGIN, half = f[3] / 2;
+  return inner > half && glyphs * f[2] <= 2 * Math.sqrt(inner * inner - half * half);
+}
+
+/* glyphs = 0: the worst-case number. */
+function fits(f, glyphs, mode, room) {
+  if (mode === 2) return fitsRing(f, glyphs || 5, ringMax(room));
+  const w = glyphs ? glyphs * f[2] + 2 * TEXT_MARGIN : worstReadoutWidth(f, unitFont(f, room.w));
+  const h = mode === 1 ? f[4] + f[3] + barGap(f) + barHeight(room.h) : f[1];
+  return w <= room.w && h <= room.h;
+}
+
+function numberFont(mode, room) {
+  for (let i = DATA_FONTS.length - 1; i >= 0; i--) {
+    if (fits(DATA_FONTS[i], 0, mode, room)) return DATA_FONTS[i];
+  }
+  return DATA_TEXT;
+}
+
+/* Words: [font, weight]. Never bigger than a number would be here. */
+function textFont(text, mode, room) {
+  const limit = numberFont(mode, room)[1], n = Math.max(1, text.length);
+  for (let i = DATA_FONTS.length - 1; i >= 0; i--) {
+    const f = DATA_FONTS[i];
+    if (f[1] <= limit && fits(f, n, mode, room)) return [f, 700];
+  }
+  for (const [f, w] of [[DATA_TEXT, 700], [LABEL.lg, 400], [LABEL.sm, 400]]) {
+    if (fits(f, n, mode, room)) return [f, w];
+  }
+  return [LABEL.sm, 400];
+}
+
+/* A size up in a big panel, but stepping down rather than wrapping. */
+function captionFont(name, cw, ch) {
+  const n = name.length;
+  if (cw >= 280 && ch >= 200 && n * LABEL.xl[2] <= cw) return LABEL.xl;
+  if ((cw >= 200 || ch >= 200) && n * LABEL.lg[2] <= cw) return LABEL.lg;
+  return LABEL.sm;
 }
 
 function arcPath(cx, cy, r, a0, a1) {
@@ -616,46 +771,51 @@ function drawPanel(box, vm, w, h) {
   box.classList.toggle("warn-lo", !vm.warnHi && vm.warnLo);
 
   const cw = w - 12, ch = h - 12;          /* minus border 2 + pad 4, each side */
-  const cx = 4 + cw / 2, cy = 4 + ch / 2;  /* relative to the padding box */
-  const capSize = vm.large ? FONT.labelLg : FONT.labelSm;
-  const offset = -Math.round((capSize * LINE + 8) / 2) + NUDGE;
+  const cap = captionFont(vm.name, cw, ch);
+  const capLines = vm.name.length * cap[2] > cw ? 2 : 1;
+  box.append(Object.assign(el("div", "cap", vm.name),
+                          { style: `font-size:${cap[0]}px;line-height:${cap[1]}px` }));
+  /* What's left above the caption, for the value and its graphic. */
+  const room = { w: cw, h: ch - 4 - capLines * cap[1] - 4 };
 
-  box.append(Object.assign(el("div", "cap", vm.name), { style: `font-size:${capSize}px` }));
-
-  const size = valueFont(vm.mode, vm.large, vm.hero, cw);
-  const val = el("div", "val", vm.value);
-  val.style.fontSize = size + "px";
-  const unit = vm.unit && vm.mode !== 2 ? el("span", "unit", vm.unit) : null;
-  if (unit) val.append(unit);
+  const [f, weight] = vm.isText ? textFont(vm.value, vm.mode, room) : [numberFont(vm.mode, room), 700];
 
   /* VehicleBinding clamps before PanelWidget sees it, so the dash never
    * shows PanelWidget's out-of-range tint either. */
   const pct = Math.max(0, Math.min(1, vm.pct));
   const fill = "var(--accent)";
+  const center = valueCenter(room);
+  let digitsTop = center - Math.trunc(f[3] / 2);  /* in the content box */
 
   if (vm.mode === 1) {                       /* Bar */
-    const bh = vm.hero ? BAR_H_HERO : BAR_H;
-    const bw = cw * 0.8;
-    const dataH = size * LINE;
-    const barCy = cy + offset + (dataH + BAR_GAP) / 2;
+    const bh = barHeight(room.h), gap = barGap(f);
+    /* Digits on the line, bar under them; both move up to keep the bar as
+     * clear of the caption as of the digits, or center as a group if even
+     * that won't fit. */
+    const group = f[3] + gap + bh;
+    const top = group + gap > room.h ? Math.trunc((room.h - group) / 2)
+                                     : keepInRoom(digitsTop, group + gap, room);
+    const bw = Math.floor(cw * 0.85);
     const bar = el("div", "bar");
     Object.assign(bar.style, { width: bw + "px", height: bh + "px",
-                               left: cx - bw / 2 + "px", top: barCy - bh / 2 + "px" });
+                               left: 4 + (cw - bw) / 2 + "px", top: 4 + top + f[3] + gap + "px" });
     const ind = el("div");
     ind.style.width = pct * 100 + "%";
     ind.style.background = fill;
     bar.append(ind);
     box.append(bar);
-    val.style.left = cx + "px";
-    val.style.top = barCy - bh / 2 - BAR_GAP - dataH / 2 + "px";
+    digitsTop = top;
   } else if (vm.mode === 2) {                /* Gauge */
-    const d = vm.hero ? ARC.hero : vm.large ? ARC.large : ARC.small;
-    const trackW = ARC.width + 2 * ARC.inset;
-    const r = d / 2;
+    const glyphs = vm.isText ? vm.value.length : 5;
+    let d = ringMax(room);
+    const min = Math.floor(d * 0.92);
+    while (d > min && fitsRing(f, glyphs, d - 1)) d--;
+    const aw = arcWidth(d), trackW = aw + 2 * INSET, r = d / 2;
+    const top = center - Math.trunc(d / 2);  /* the ring centered on the line */
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("width", d); svg.setAttribute("height", d);
     svg.setAttribute("viewBox", `0 0 ${d} ${d}`);
-    Object.assign(svg.style, { left: cx - r + "px", top: cy + offset - r + "px" });
+    Object.assign(svg.style, { left: 4 + (cw - d) / 2 + "px", top: 4 + top + "px" });
     const path = (rad, a1, color, width) => {
       const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
       p.setAttribute("d", arcPath(r, r, rad, 135, a1));
@@ -664,15 +824,28 @@ function drawPanel(box, vm, w, h) {
       return p;
     };
     svg.append(path(r - trackW / 2, 45, "#404040", trackW));
-    if (pct > 0.004) svg.append(path(r - ARC.inset - ARC.width / 2, 135 + 270 * pct, fill, ARC.width));
+    if (pct > 0.004) svg.append(path(r - INSET - aw / 2, 135 + 270 * pct, fill, aw));
     box.append(svg);
-    val.style.left = cx + "px";
-    val.style.top = cy + offset + "px";
   } else {                                   /* Digital */
-    val.style.left = cx + "px";
-    val.style.top = cy + offset + "px";
+    digitsTop = keepInRoom(digitsTop, f[3], room);
   }
+
+  /* Centered, the unit tag hanging off the right, slid left just enough
+   * to keep the tag inside. */
+  const u = vm.unit && vm.mode !== 2 ? unitFont(f, cw) : null;
+  const valueW = vm.value.length * f[2];
+  let x = Math.floor((cw - valueW) / 2);
+  if (u) x -= Math.min(x, Math.max(0, x + valueW + UNIT_GAP + vm.unit.length * u[2] - cw));
+  const val = el("div", "val", vm.value);
+  Object.assign(val.style, { fontSize: f[0] + "px", lineHeight: f[1] + "px", fontWeight: weight,
+                             left: 4 + x + "px", top: 4 + digitsTop - f[4] + "px" });
   box.append(val);
+  if (u) {
+    const unit = el("div", "unit", vm.unit);
+    Object.assign(unit.style, { fontSize: u[0] + "px", lineHeight: u[1] + "px",
+                                left: 4 + x + valueW + UNIT_GAP + "px", top: 4 + digitsTop - u[4] + "px" });
+    box.append(unit);
+  }
 }
 
 /* ========================================================================
@@ -697,8 +870,15 @@ function effectiveRange(i) {
 /* fround: the dash gets these as f32, and has to land on the same digits. */
 function sampleFor(i) {
   if (!samples.has(i)) {
-    const [a, b] = [state.catalog[i].min, state.catalog[i].max];
-    samples.set(i, Math.fround(a + (b - a) * 0.62));
+    if (isState(i)) {
+      /* One of its own states: anything else is "?<n>" on the dash. Without
+       * them, NaN -- no value, which the dash shows as "--". */
+      const s = statesOf(i);
+      samples.set(i, s.length ? s[0][0] : NaN);
+    } else {
+      const [a, b] = [state.catalog[i].min, state.catalog[i].max];
+      samples.set(i, Math.fround(a + (b - a) * 0.62));
+    }
   }
   return samples.get(i);
 }
@@ -715,13 +895,19 @@ function fmt(v, decimals) {
 }
 
 /* A panel's readout, as SignalStore::get_display_value_at() and
- * VehicleBinding format it: Pressure/Volume round, everything else
- * truncates toward zero. */
+ * VehicleBinding format it: units with decimals round, everything else
+ * truncates toward zero; a state shows its label, or ?<n> without one. */
 function readout(i, metric, imperial) {
+  if (isState(i)) {
+    if (Number.isNaN(metric)) return "--";
+    const n = Math.round(metric);
+    const hit = statesOf(i).find(([v]) => v === n);
+    return hit ? hit[1] : "?" + n;
+  }
   const type = state.catalog[i].unit;
   const v = shown(i, metric, imperial);
   const d = decimals(i, imperial);
-  if (type === 3 || type === 8) {
+  if (ROUNDED_UNITS.includes(type)) {
     const k = Math.pow(10, d);
     return fmt(Math.floor(v * k + 0.5) / k, d);
   }
@@ -742,24 +928,24 @@ function unitLabel(i, imperial) {
   return imperial ? u.i : u.m;
 }
 
-function panelVm(rank, slot) {
+function panelVm(rank) {
   const p = state.panels[rank];
   const i = sigIndex(p.id);
-  if (i < 0) return { name: "?", unit: "", value: "--", mode: p.mode, large: slot.large,
-                      hero: isHero(slot), pct: 0, warnLo: false, warnHi: false };
+  if (i < 0) return { name: "?", unit: "", value: "--", mode: p.mode,
+                      pct: 0, warnLo: false, warnHi: false };
   const c = state.signals[i];
   const v = sampleFor(i);
   const [lo, hi] = effectiveRange(i);
+  const st = isState(i);
   return {
     name: state.catalog[i].name,
     unit: unitLabel(i, p.imperial),
     value: readout(i, v, p.imperial),
-    mode: p.mode,
-    large: slot.large,
-    hero: isHero(slot),
+    mode: st ? 0 : p.mode,
+    isText: st,
     pct: hi > lo ? (v - lo) / (hi - lo) : 0,
-    warnLo: c.useLo && v <= c.lo,
-    warnHi: c.useHi && v >= c.hi,
+    warnLo: !st && c.useLo && v <= c.lo,
+    warnHi: !st && c.useHi && v >= c.hi,
   };
 }
 
@@ -804,7 +990,7 @@ function renderDash() {
     dash.append(b);
     return b;
   });
-  boxes.forEach((b, i) => drawPanel(b, panelVm(ranks[i], slots[i]), b.offsetWidth, b.offsetHeight));
+  boxes.forEach((b, i) => drawPanel(b, panelVm(ranks[i]), b.offsetWidth, b.offsetHeight));
 
 }
 
@@ -822,8 +1008,14 @@ function renderEditor() {
   const u = unitOf(spec.unit);
 
   $("h-panel").textContent = spec.name;
+  const desc = SIGNAL_DESCRIPTIONS[spec.id] || "";
+  $("signal-desc").textContent = desc;
+  $("signal-desc").hidden = !desc;
   $("signal").value = String(p.id);
 
+  const st = isState(i);
+  $("mode-row").hidden = st;
+  $("warn-section").hidden = st;
   const hasImperial = u.m !== u.i;
   $("units-row").hidden = !hasImperial;
   if (hasImperial) {
@@ -836,12 +1028,20 @@ function renderEditor() {
   }
   setSeg($("mode"), p.mode);
 
+  const states = st ? statesOf(i) : [];
+  $("state-row").hidden = !states.length;
+  if (states.length) {
+    $("try-state").replaceChildren(...states.map(([v, text]) =>
+      Object.assign(el("option", null, text), { value: String(v) })));
+    $("try-state").value = String(sampleFor(i));
+  }
+
   const dec = decimals(i, p.imperial);
   const label = unitLabel(i, p.imperial);
   const show = v => fmt(shown(i, v, p.imperial), dec);
   const unitSuffix = label ? " " + label : "";
 
-  $("scale-row").hidden = p.mode === 0;
+  $("scale-row").hidden = st || p.mode === 0;
   $("use-custom").checked = c.useCustom;
   $("scale-default").textContent = `Default ${show(spec.min)} – ${show(spec.max)}${unitSuffix}`;
   $("scale-inputs").hidden = !c.useCustom;
@@ -872,9 +1072,11 @@ function renderSettings() {
   const s = state.settings;
   setSeg($("count"), s.count);
   setSeg($("orient"), s.orient);
+  setSeg($("bmode"), s.bmode);
   for (const b of $("accent").children) b.setAttribute("aria-pressed", String(Number(b.dataset.v) === s.accent));
   $("day").value = s.day; $("day-out").textContent = s.day + "%";
   $("night").value = s.night; $("night-out").textContent = s.night + "%";
+  $("auto").value = s.auto; $("auto-out").textContent = autoShiftText(s.auto);
   document.documentElement.style.setProperty("--accent", hex6(s.accent));
   document.documentElement.style.setProperty("--on-accent", s.accent === 0xFFC107 ? "#1a1a1a" : "#ffffff");
 }
@@ -1055,6 +1257,15 @@ function endSession() {
 
 const FILE_FORMAT = "mqb-monitor-config";
 const FILE_VERSION = 1;
+/* core::BrightnessMode, in order. */
+const BRIGHTNESS_MODES = ["day", "night", "auto"];
+
+/* Auto's slider as the shift it puts on the car's dimmer level --
+ * core::AutoBrightness::shift_for(): 50 is none, either end 25%. */
+function autoShiftText(v) {
+  const half = (v - 50) / 2, shift = Math.sign(half) * Math.round(Math.abs(half));
+  return shift > 0 ? "+" + shift + "%" : shift < 0 ? "\u2212" + -shift + "%" : "0%";
+}
 const MODE_NAMES = ["digital", "bar", "gauge"];
 
 /* The shortest decimal that reads back as the same float32 -- 0.3, not
@@ -1080,8 +1291,10 @@ function exportConfig() {
       flipLandscape: (s.flips & 1) !== 0,
       flipPortrait: (s.flips & 2) !== 0,
       accent: hex6(s.accent),
+      brightnessMode: BRIGHTNESS_MODES[s.bmode],
       dayBrightness: s.day,
       nightBrightness: s.night,
+      autoBrightness: s.auto,
     },
     panels: state.panels.map(p => ({
       signal: p.id, name: state.catalog[sigIndex(p.id)].name,
@@ -1118,6 +1331,8 @@ function importConfig(text) {
   const s = state.settings, fs = f.settings || {};
   s.day = int(fs.dayBrightness, 0, 100, s.day);
   s.night = int(fs.nightBrightness, 0, 100, s.night);
+  s.auto = int(fs.autoBrightness, 0, 100, s.auto);
+  if (BRIGHTNESS_MODES.includes(fs.brightnessMode)) s.bmode = BRIGHTNESS_MODES.indexOf(fs.brightnessMode);
   s.count = int(fs.panels, 1, state.panels.length, s.count);
   if (fs.orientation === "landscape" || fs.orientation === "portrait") {
     s.orient = fs.orientation === "portrait" ? 1 : 0;
@@ -1155,14 +1370,8 @@ function importConfig(text) {
  * ====================================================================== */
 
 function buildStatic() {
-  const names = state.catalog.map(c => c.name);
-  $("signal").replaceChildren(...state.catalog.map(c => {
-    /* Labelled as the dash's picker labels them -- see
-     * core::signal_catalog_label(). */
-    const dup = names.filter(n => n === c.name).length > 1;
-    const t = unitOf(c.unit).tag;
-    return Object.assign(el("option", null, dup && t ? `${c.name} (${t})` : c.name), { value: String(c.id) });
-  }));
+  $("signal").replaceChildren(...state.catalog.map(c =>
+    Object.assign(el("option", null, c.name), { value: String(c.id) })));
 
   $("count").replaceChildren(...Array.from({ length: state.panels.length }, (_, k) => {
     const b = el("button", null, String(k + 1));
@@ -1215,6 +1424,8 @@ function wire() {
       toast("Swapped with the other panel");
     }
     p.id = id;
+    /* A state is Digital only (the dash enforces it too). */
+    if (isState(sigIndex(id))) p.mode = 0;
     changed();
   });
 
@@ -1275,6 +1486,12 @@ function wire() {
     renderEditor();
     schedulePreview();
   });
+  $("try-state").addEventListener("change", e => {
+    setSample(current().i, Number(e.target.value));
+    renderDash();
+    renderEditor();
+    schedulePreview();
+  });
 
   $("count").addEventListener("click", e => {
     const b = e.target.closest("button"); if (!b) return;
@@ -1287,12 +1504,17 @@ function wire() {
     state.settings.orient = Number(b.dataset.v);
     changed();
   });
+  $("bmode").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    state.settings.bmode = Number(b.dataset.v);
+    changed();
+  });
   $("accent").addEventListener("click", e => {
     const b = e.target.closest("button"); if (!b) return;
     state.settings.accent = Number(b.dataset.v);
     changed();
   });
-  for (const k of ["day", "night"]) {
+  for (const k of ["day", "night", "auto"]) {
     $(k).addEventListener("input", e => {
       state.settings[k] = Number(e.target.value);
       changed();

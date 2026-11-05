@@ -121,7 +121,19 @@ namespace remote::protocol
      * FRAMING
      =========================================================================*/
 
+#if defined(ARDUINO_ARCH_ESP32)
+    FLASHMEM uint8_t *FrameReader::payload_buf()
+    {
+        return buf_.get();
+    }
+#else
     DMAMEM uint8_t FrameReader::buf_[FRAME_MAX_PAYLOAD];
+
+    FLASHMEM uint8_t *FrameReader::payload_buf()
+    {
+        return buf_;
+    }
+#endif
 
     FLASHMEM size_t encode_frame(MsgType        type,
                                  const uint8_t *payload,
@@ -191,7 +203,7 @@ namespace remote::protocol
 
             case State::LenHi:
                 len_ = static_cast<uint16_t>(len_ | (b << 8));
-                if (len_ > FRAME_MAX_PAYLOAD)
+                if (len_ > FRAME_MAX_PAYLOAD || payload_buf() == nullptr)
                 {
                     reset();
                     return false;
@@ -201,7 +213,7 @@ namespace remote::protocol
                 return false;
 
             case State::Payload:
-                buf_[received_++] = b;
+                payload_buf()[received_++] = b;
                 if (received_ == len_)
                 {
                     state_ = State::CrcLo;
@@ -225,7 +237,7 @@ namespace remote::protocol
                         static_cast<uint8_t>((len_ >> 8) & 0xFF) };
                 uint16_t crc
                     = crc16_ccitt_continue(0xFFFF, header, sizeof(header));
-                crc = crc16_ccitt_continue(crc, buf_, len_);
+                crc = crc16_ccitt_continue(crc, payload_buf(), len_);
 
                 bool     ok          = (crc == crc_received_);
                 uint8_t  type        = msg_type_;
@@ -240,7 +252,7 @@ namespace remote::protocol
                 }
 
                 frame_.type        = static_cast<MsgType>(type);
-                frame_.payload     = buf_;
+                frame_.payload     = payload_buf();
                 frame_.payload_len = payload_len;
                 return true;
             }
@@ -261,6 +273,8 @@ namespace remote::protocol
         p = put_u8(p, v.orientation);
         p = put_u32(p, v.accent_color);
         p = put_u8(p, v.flips);
+        p = put_u8(p, v.brightness_mode);
+        p = put_u8(p, v.auto_brightness);
         return p;
     }
 
@@ -272,6 +286,8 @@ namespace remote::protocol
         p = get_u8(p, out.orientation);
         p = get_u32(p, out.accent_color);
         p = get_u8(p, out.flips);
+        p = get_u8(p, out.brightness_mode);
+        p = get_u8(p, out.auto_brightness);
         return p;
     }
 

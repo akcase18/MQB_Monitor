@@ -42,7 +42,7 @@ namespace core
             /* Catalog-index overloads of the three accessors above, for
              * callers that already hold an index (gui::VehicleBinding,
              * core::Logger, on_uds_response() below). The id-keyed forms
-             * are just signal_catalog_find() -- a linear scan of the whole
+             * are just signal_table_find() -- a linear scan of the whole
              * catalog -- in front of these, and the hot paths were paying
              * for it two or three times per panel per refresh to look up
              * an index they had already computed. Out-of-range indices
@@ -54,25 +54,32 @@ namespace core
             float get_display_value_at(int idx, bool is_metric) const;
 
             /**
-             * Feeds one decoded UDS response into the store: finds every
-             * catalog request matching (byte1, byte2), decodes `raw` with that
-             * request's offset/scale, and once all of a signal's requests have
-             * reported, recomputes it via SignalSpec::transform.
+             * Feeds one UDS response into the store: every catalog request
+             * to module `ecu` matching (byte1, byte2) reads its own field out of `payload`
+             * (uds_decode_field()) and applies its offset/scale -- so one
+             * response can update several signals -- and once all of a
+             * signal's requests have reported, recomputes it via
+             * SignalSpec::transform. A request whose field the payload is
+             * too short for is left as it was.
              */
-            void on_uds_response(uint8_t  byte1,
-                                 uint8_t  byte2,
-                                 float    raw,
-                                 uint32_t now_ms);
+            void on_uds_response(uint8_t        ecu,
+                                 uint8_t        byte1,
+                                 uint8_t        byte2,
+                                 const uint8_t *payload,
+                                 uint8_t        len,
+                                 uint32_t       now_ms);
 
         private:
             /* const, so it lands in flash rather than costing a
              * SignalValue's worth of RAM for a value that never changes. */
             static const SignalValue s_invalid;
 
-            SignalValue values_[SIGNAL_CATALOG_COUNT];
-            float request_raw_[SIGNAL_CATALOG_COUNT][MAX_REQUESTS_PER_SIGNAL]
+            /* The whole table, internal signals included: they're fed
+             * and read exactly like the user-facing ones. */
+            SignalValue values_[SIGNAL_TABLE_COUNT];
+            float request_raw_[SIGNAL_TABLE_COUNT][MAX_REQUESTS_PER_SIGNAL]
                 = {};
-            bool request_recv_[SIGNAL_CATALOG_COUNT][MAX_REQUESTS_PER_SIGNAL]
+            bool request_recv_[SIGNAL_TABLE_COUNT][MAX_REQUESTS_PER_SIGNAL]
                 = {};
     };
 

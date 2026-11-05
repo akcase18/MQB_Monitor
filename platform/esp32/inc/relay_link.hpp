@@ -67,15 +67,15 @@ namespace esp32
             Stream                       &stream_;
             remote::protocol::FrameReader reader_;
 
-            /* Scratch space for the outbound request frame built by
-             * send_request_and_wait() — static rather than a stack array
-             * for the same reason send_event() itself doesn't stack-
-             * allocate more than once: a handler building a multi-KB HTML
-             * response on the same loopTask stack while also holding a
-             * FRAME_MAX_PAYLOAD+8 (1544-byte) request buffer AND resp_buf
-             * is a real overflow risk on a C3. */
-            static uint8_t
-                req_scratch_buf_[remote::protocol::FRAME_MAX_PAYLOAD + 8];
+            /* Scratch space for an outbound frame, shared by
+             * send_event() and send_request_and_wait(): each encodes and
+             * writes its frame before returning. Not a stack array: a
+             * handler building a multi-KB HTML response on the same
+             * loopTask stack while also holding a FRAME_MAX_PAYLOAD+8
+             * (4104-byte) request buffer AND resp_buf is a real overflow
+             * risk on a C3. In PSRAM on the S3 (see LazyBuffer). */
+            LazyBuffer<uint8_t, remote::protocol::FRAME_MAX_PAYLOAD + 8>
+                frame_scratch_;
     };
 
 } // namespace esp32

@@ -19,13 +19,35 @@ namespace remote::server
         /* Wire sizes of each record -- see the encode_*() functions in
          * remote_protocol.cpp. A config batch is settings, MAX_PANELS
          * panels, the signal count and one SignalConfigWire per signal. */
-        constexpr size_t SETTINGS_BYTES = 9;
+        constexpr size_t SETTINGS_BYTES = 11;
         constexpr size_t PANEL_BYTES    = 4;
         constexpr size_t SIGNAL_BYTES   = 19;
         constexpr size_t HEAD_LEN
             = SETTINGS_BYTES + core::MAX_PANELS * PANEL_BYTES + 2;
         constexpr size_t BATCH_LEN
             = HEAD_LEN + core::SIGNAL_CATALOG_COUNT * SIGNAL_BYTES;
+
+        /**
+         * RESP_STATE: settings, the panel count and panels, the signal
+         * count, a catalog entry and a config per signal, then the flags
+         * byte. See handle_get_state().
+         */
+        constexpr size_t CATALOG_ENTRY_BYTES
+            = 2 + protocol::WIRE_NAME_LEN + 1 + 4 + 4;
+        constexpr size_t state_len(size_t signals)
+        {
+            return SETTINGS_BYTES + 1 + core::MAX_PANELS * PANEL_BYTES + 2
+                   + signals * (CATALOG_ENTRY_BYTES + SIGNAL_BYTES) + 1;
+        }
+
+        /**
+         * Sized against the most signals the config can ever hold, not
+         * today's catalog, so promoting signals can't outgrow the frame.
+         */
+        static_assert(state_len(core::SIGNAL_CONFIG_SLOTS)
+                          <= protocol::FRAME_MAX_PAYLOAD,
+                      "RESP_STATE for a full catalog no longer fits a frame "
+                      "-- raise FRAME_MAX_PAYLOAD");
 
         /* Clamps both thresholds into the signal's range, and puts a
          * reversed pair back in order -- but only when both are in use. A
@@ -66,7 +88,9 @@ namespace remote::server
                 || sa.orientation != sb.orientation
                 || sa.accent_color != sb.accent_color
                 || sa.flipped_horizontal != sb.flipped_horizontal
-                || sa.flipped_vertical != sb.flipped_vertical)
+                || sa.flipped_vertical != sb.flipped_vertical
+                || sa.brightness_mode != sb.brightness_mode
+                || sa.auto_brightness_pct != sb.auto_brightness_pct)
             {
                 return false;
             }
@@ -116,7 +140,12 @@ namespace remote::server
         }
     } // namespace
 
+#if defined(ARDUINO_ARCH_ESP32)
+    core::Config &RemoteConfigServer::saved_before_preview_
+        = psram_new<core::Config>();
+#else
     DMAMEM core::Config RemoteConfigServer::saved_before_preview_;
+#endif
 
     FLASHMEM RemoteConfigServer::RemoteConfigServer(core::ConfigStore &config,
                                                     core::SignalStore &signals)
@@ -270,6 +299,15 @@ namespace remote::server
         uint8_t            *p   = out;
         uint8_t            *end = out + cap;
 
+        /**
+         * Every field below has a fixed size, so this one check covers the
+         * whole encode. Refusing beats writing past a short buffer.
+         */
+        if (cap < state_len(core::SIGNAL_CATALOG_COUNT))
+        {
+            return 0;
+        }
+
         SettingsWire settings {};
         settings.day_brightness   = cfg.settings.day_brightness;
         settings.night_brightness = cfg.settings.night_brightness;
@@ -281,6 +319,9 @@ namespace remote::server
         settings.flips        = static_cast<uint8_t>(
             (cfg.settings.flipped_horizontal ? 1 : 0)
             | (cfg.settings.flipped_vertical ? 2 : 0));
+        settings.brightness_mode
+            = static_cast<uint8_t>(cfg.settings.brightness_mode);
+        settings.auto_brightness = cfg.settings.auto_brightness_pct;
         p = protocol::encode_settings(p, settings);
 
         p = protocol::put_u8(p, core::MAX_PANELS);
@@ -330,9 +371,7 @@ namespace remote::server
             p,
             static_cast<uint8_t>((preview_active_ ? 1 : 0) | (unsaved_ ? 2 : 0)));
 
-        (void)end; /* individual field sizes are fixed/known; a real
-                    * overflow here would mean FRAME_MAX_PAYLOAD itself is
-                    * too small, not a runtime data-dependent overrun */
+        (void)end; /* checked up front against state_len() */
         return static_cast<size_t>(p - out);
     }
 
@@ -373,6 +412,11 @@ namespace remote::server
 
         /* Validate the whole batch before mutating anything — a rejected
          * Save should never leave the config half-applied. */
+        if (settings.brightness_mode
+            > static_cast<uint8_t>(core::BrightnessMode::Auto))
+        {
+            return ApplyResult::ErrInvalidEnum;
+        }
         for (uint8_t i = 0; i < core::MAX_PANELS; i++)
         {
             if (core::signal_catalog_find(priorities[i].signal_id) < 0)
@@ -414,6 +458,10 @@ namespace remote::server
         cfg.settings.accent_color = settings.accent_color;
         cfg.settings.flipped_horizontal = (settings.flips & 1) != 0;
         cfg.settings.flipped_vertical   = (settings.flips & 2) != 0;
+        cfg.settings.brightness_mode
+            = static_cast<core::BrightnessMode>(settings.brightness_mode);
+        cfg.settings.auto_brightness_pct
+            = clamp_u8(settings.auto_brightness, 0, 100);
 
         for (uint8_t i = 0; i < core::MAX_PANELS; i++)
         {

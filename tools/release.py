@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Builds a firmware release into releases/<version>/ for the release
 hardware -- the ESP32-S3 dash PCB (env:dash_s3), and the Teensy dash: the
-Teensy MicroMod (env:teensymm) and its ESP32-C3 Wi-Fi relay
-(env:esp32c3). Out come the S3 dash's OTA file and everything needed to
+Teensy MicroMod (env:dash_teensy) and its ESP32-C3 Wi-Fi relay
+(env:wifi_c3). Out come the S3 dash's OTA file and everything needed to
 install it over USB instead, the Teensy's .hex, the C3's USB install, and
 a manifest saying what it is and whether the S3 dash can take it over the
 air at all. Every other env (the S3 dev kit, stress builds, the
@@ -21,13 +21,13 @@ the dashes show (tools/fw_version.py stamps `git describe`) is that tag.
 
 What comes out:
 
-    dash_s3/mqb-dash-s3-<version>.bin     send this from the phone
+    dash_s3/mqb-dash-s3-<version>.bin           send this from the phone
     dash_s3/bootloader.bin, partitions.bin, boot_app0.bin
-    dash_s3/flash-usb.sh                  USB install, same files
-    teensymm/mqb-teensymm-<version>.hex   open in Teensy Loader
-    esp32c3/mqb-esp32c3-<version>.bin     the Teensy dash's C3 relay
-    esp32c3/bootloader.bin, partitions.bin, boot_app0.bin
-    esp32c3/flash-usb.sh                  USB install, the only way in
+    dash_s3/flash-usb.sh                        USB install, same files
+    dash_teensy/mqb-dash-teensy-<version>.hex   open in Teensy Loader
+    wifi_c3/mqb-wifi-c3-<version>.bin           the Teensy dash's C3 relay
+    wifi_c3/bootloader.bin, partitions.bin,     boot_app0.bin
+    wifi_c3/flash-usb.sh                        USB install, the only way in
 
 plus manifest.json (sizes, SHA-256s, partition layout, config version) and
 RELEASE.md, a summary to paste into the GitHub release.
@@ -66,11 +66,11 @@ CONFIG_STORE = "core/config/inc/config_store.hpp"
 
 # The only release hardware. The dev kit and the stress builds are never
 # distributed (the dash refuses a stress build anyway --
-# DASH_S3_BUILD_VARIANT).
+# DASH_S3_BUILD_VARIANT).t
 DASH_ENV = "dash_s3"
 DASH_HW_VARIANT = "pcb"  # dash_s3_firmware.hpp's DASH_S3_HW_VARIANT default
-TEENSY_ENV = "teensymm"
-C3_ENV = "esp32c3"
+TEENSY_ENV = "dash_teensy"
+C3_ENV = "wifi_c3"
 
 # What `pio run -e dash_s3 -t upload` passes esptool (Arduino turns the
 # board's qio into dio for the bootloader header).
@@ -78,7 +78,7 @@ ESPTOOL_FLASH_ARGS = "--flash_mode dio --flash_freq 80m --flash_size 16MB"
 BOOTLOADER_OFFSET = 0x0
 PARTITION_TABLE_OFFSET = 0x8000
 
-# The same for `pio run -e esp32c3 -t upload`: the XIAO's 4MB flash and the
+# The same for `pio run -e wifi_c3 -t upload`: the XIAO's 4MB flash and the
 # Arduino default partition table, so the offsets are fixed.
 C3_ESPTOOL_FLASH_ARGS = "--flash_mode dio --flash_freq 80m --flash_size 4MB"
 C3_OTADATA_OFFSET = 0xE000
@@ -334,7 +334,7 @@ def main():
     # The Teensy: one .hex, installed over USB with PJRC's Teensy Loader.
     dest = os.path.join(out, TEENSY_ENV)
     os.makedirs(dest)
-    hex_name = "mqb-teensymm-%s.hex" % version
+    hex_name = "mqb-dash-teensy-%s.hex" % version
     shutil.copyfile(os.path.join(teensy_build, "firmware.hex"), os.path.join(dest, hex_name))
     manifest["builds"][TEENSY_ENV] = {
         "env": TEENSY_ENV,
@@ -347,7 +347,7 @@ def main():
     # The Teensy's C3 relay: USB only, laid out like the dash's USB install.
     dest = os.path.join(out, C3_ENV)
     os.makedirs(dest)
-    c3_app = "mqb-esp32c3-%s.bin" % version
+    c3_app = "mqb-wifi-c3-%s.bin" % version
     files = {
         c3_app: os.path.join(c3_build, "firmware.bin"),
         "bootloader.bin": os.path.join(c3_build, "bootloader.bin"),
@@ -358,7 +358,7 @@ def main():
         shutil.copyfile(src, os.path.join(dest, name))
     script = os.path.join(dest, "flash-usb.sh")
     with open(script, "w") as f:
-        f.write(flash_script("esp32c3", C3_ESPTOOL_FLASH_ARGS, C3_FLASH_INTRO, c3_app, C3_OTADATA_OFFSET, C3_APP_OFFSET))
+        f.write(flash_script("wifi_c3", C3_ESPTOOL_FLASH_ARGS, C3_FLASH_INTRO, c3_app, C3_OTADATA_OFFSET, C3_APP_OFFSET))
     os.chmod(script, 0o755)
     manifest["builds"][C3_ENV] = {
         "env": C3_ENV,

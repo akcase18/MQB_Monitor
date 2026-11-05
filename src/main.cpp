@@ -12,6 +12,7 @@
 #include "platform.hpp"
 #include "theme.hpp"
 
+#include "auto_brightness.hpp"
 #include "config_store.hpp"
 #include "logger.hpp"
 #include "scheduler.hpp"
@@ -59,8 +60,6 @@ namespace
     /* Standard OBD2 enhanced-diagnostic-session request/response arbitration
      * IDs, ported from the old can_handler.cpp. Real-vehicle validation is a
      * Phase 7 hardware-flash-test concern. */
-    constexpr uint32_t CAN_TX_ID = 0x7E0;
-    constexpr uint32_t CAN_RX_ID = 0x7E8;
     constexpr uint32_t CAN_BAUD  = 500000;
 
     /* Teensy<->ESP32-C3 wireless-configuration link. See remote/protocol
@@ -83,6 +82,13 @@ namespace
      * the user just made by hand, and an unchanged list costs a six-entry
      * comparison. */
     constexpr uint32_t ACTIVE_SIGNAL_SYNC_MS = 500;
+
+    /**
+     * How often Auto brightness steps its ramp toward the car's dimmer
+     * level -- fine enough that core::AutoBrightness::RAMP_PCT_PER_S moves
+     * in 4% steps, which don't read as steps.
+     */
+    constexpr uint32_t AUTO_BRIGHTNESS_PERIOD_MS = 40;
 
     /* How often LVGL polls the touch driver. lv_indev_create() defaults
      * this to LV_DEF_REFR_PERIOD (20ms, lib/lv_conf.h), which is the
@@ -166,7 +172,8 @@ namespace
      * platform's HAL classes already use) so it can safely depend on
      * platform_get() without any static-initialization-order concerns, and
      * so setup()/loop()/the LVGL callbacks below can all reach the same
-     * instance without heap allocation.
+     * instance. Static storage everywhere but the ESP32, where it's one
+     * allocation at first access (see composition()).
      */
     struct Composition
     {
@@ -200,17 +207,15 @@ namespace
              * each sniffer session (see enter_sniff()). */
             gui::SnifferScreen sniffer_screen;
 
-            /* Catalog names as the picker lists them -- see
-             * core::signal_catalog_label(). */
-            char signal_labels[core::SIGNAL_CATALOG_COUNT][32];
             const char *signal_names[core::SIGNAL_CATALOG_COUNT];
             uint16_t    signal_ids[core::SIGNAL_CATALOG_COUNT];
+            bool        signal_is_state[core::SIGNAL_CATALOG_COUNT];
 
             /* FLASHMEM: runs once, and its member initializers are a
              * kilobyte of code RAM1 can't spare. */
             FLASHMEM explicit Composition(Platform &platform)
                 : config_store(platform.config_store)
-                , uds_client(platform.can, CAN_TX_ID, CAN_RX_ID)
+                , uds_client(platform.can, core::UDS_ECUS, core::UDS_ECU_COUNT)
                 , uds_poller(uds_client, platform.clock)
                 , scheduler(platform.clock)
                 , logger(
@@ -224,17 +229,25 @@ namespace
             {
                 for (uint16_t i = 0; i < core::SIGNAL_CATALOG_COUNT; i++)
                 {
-                    core::signal_catalog_label(
-                        i, signal_labels[i], sizeof(signal_labels[i]));
-                    signal_names[i] = signal_labels[i];
+                    signal_names[i] = core::SIGNAL_CATALOG[i].name;
                     signal_ids[i]   = core::SIGNAL_CATALOG[i].id;
+                    signal_is_state[i]
+                        = core::signal_is_state(core::SIGNAL_CATALOG[i]);
                 }
             }
     };
 
     Composition &composition()
     {
+#if defined(ARDUINO_ARCH_ESP32)
+        /**
+         * In PSRAM on the S3: ~15KB the Wi-Fi stack needs more in internal
+         * RAM. See psram_new().
+         */
+        static Composition &instance = psram_new<Composition>(platform_get());
+#else
         static Composition instance(platform_get());
+#endif
         return instance;
     }
 
@@ -427,11 +440,62 @@ namespace
         return ms;
     }
 
-    /** The brightness the panel returns to once it's lit again. */
+    /**
+     * The brightness the panel returns to once it's lit again. setup()
+     * seeds it from the saved mode before the first frame lights the
+     * panel: left at this initializer, every boot came up at 100%
+     * whatever was saved, until something touched brightness.
+     */
     uint8_t &backlight_pct()
     {
         static uint8_t pct = 100;
         return pct;
+    }
+
+    /**
+     * What the backlight follows right now: the saved
+     * Settings::brightness_mode, except while SettingsScreen or the phone
+     * is previewing another. Change it through set_live_brightness_mode().
+     */
+    core::BrightnessMode &live_brightness_mode()
+    {
+        static core::BrightnessMode mode = core::BrightnessMode::Day;
+        return mode;
+    }
+
+    /**
+     * Auto's slider position right now (Settings::auto_brightness_pct, or
+     * SettingsScreen's/the phone's unsaved one while it's being dragged).
+     */
+    uint8_t &live_auto_pct()
+    {
+        static uint8_t pct = core::AUTO_BRIGHTNESS_NEUTRAL;
+        return pct;
+    }
+
+    core::AutoBrightness &auto_brightness()
+    {
+        static core::AutoBrightness auto_level;
+        return auto_level;
+    }
+
+    /**
+     * The slider value `mode` uses: its level for Day/Night, the shift's
+     * position for Auto.
+     */
+    FLASHMEM uint8_t mode_slider_pct(const core::Settings &settings,
+                                     core::BrightnessMode  mode)
+    {
+        switch (mode)
+        {
+            case core::BrightnessMode::Night:
+                return settings.night_brightness;
+            case core::BrightnessMode::Auto:
+                return settings.auto_brightness_pct;
+            case core::BrightnessMode::Day:
+            default:
+                return settings.day_brightness;
+        }
     }
 
     /** Sets the brightness, now if the panel is lit and on the way back
@@ -577,18 +641,20 @@ namespace
     }
 
     /* core::SignalPoller holds a full screen of panels' worth of signals,
-     * which is exactly what core::Config::priorities[] can describe. If
-     * one grows past the other, sync_active_signals() below would silently
-     * stop asking for the panels past the cut. */
-    static_assert(core::SignalPoller::MAX_ACTIVE_SIGNALS >= core::MAX_PANELS,
+     * which is exactly what core::Config::priorities[] can describe, plus
+     * Dim Ctrl for Auto brightness. If one grows past the other,
+     * sync_active_signals() below would silently stop asking for the
+     * signals past the cut. */
+    static_assert(core::SignalPoller::MAX_ACTIVE_SIGNALS >= core::MAX_PANELS + 1,
                   "SignalPoller cannot hold every displayable panel");
 
     /** Points the poller at the signals the dashboard is currently showing
-     * -- `priorities[0..num_panels-1]`, which is the complete set of live
-     * values anything reads (gui::VehicleBinding::build_view_model() for
-     * the panels, core::Logger::sample() for the log, and nothing else).
-     * Every other catalog entry is dead weight on the bus until the user
-     * puts it on a panel.
+     * -- `priorities[0..num_panels-1]` -- plus, in Auto brightness, the
+     * cluster's dimming level (core::AutoBrightness). That is the complete
+     * set of live values anything reads (gui::VehicleBinding::
+     * build_view_model() for the panels, core::Logger::sample() for the
+     * log, auto_brightness_task, and nothing else). Every other catalog
+     * entry is dead weight on the bus until the user puts it on a panel.
      *
      * Cheap and idempotent: core::SignalPoller::set_active() returns
      * immediately when the list has not changed, so this is called both
@@ -606,13 +672,76 @@ namespace
             count = core::MAX_PANELS;
         }
 
-        uint16_t ids[core::MAX_PANELS];
+        uint16_t ids[core::MAX_PANELS + 1];
         for (uint8_t i = 0; i < count; i++)
         {
             ids[i] = cfg.priorities[i].signal_id;
         }
+        if (live_brightness_mode() == core::BrightnessMode::Auto)
+        {
+            ids[count++] = core::AutoBrightness::DIM_SIGNAL_ID;
+        }
 
         app.uds_poller.set_active(ids, count);
+    }
+
+    /**
+     * Switches what the backlight follows. `slider_pct` is the slider for
+     * that mode (mode_slider_pct()), passed in rather than read from the
+     * settings since it may not be saved yet (a slider mid-drag): Day's
+     * or Night's level, applied now, or Auto's shift, which
+     * auto_brightness_task ramps to from wherever the panel is.
+     */
+    FLASHMEM void set_live_brightness_mode(core::BrightnessMode mode,
+                                           uint8_t              slider_pct)
+    {
+        bool entering_auto = mode == core::BrightnessMode::Auto
+                             && live_brightness_mode() != mode;
+        live_brightness_mode() = mode;
+        if (mode != core::BrightnessMode::Auto)
+        {
+            apply_backlight(slider_pct);
+        }
+        else
+        {
+            live_auto_pct() = slider_pct;
+            if (entering_auto)
+            {
+                auto_brightness().start(backlight_pct(),
+                                        platform_get().clock.millis());
+            }
+        }
+        sync_active_signals();
+    }
+
+    /**
+     * Auto brightness: steps the backlight toward the cluster's dimming
+     * level, or toward the Day level while the cluster isn't answering.
+     * While the panel is dark (booting, or a screen rebuild) it jumps
+     * straight there instead, so a night-time boot doesn't light at the
+     * Day level and fade down.
+     */
+    FLASHMEM void auto_brightness_task(void *ctx)
+    {
+        (void)ctx;
+        if (live_brightness_mode() != core::BrightnessMode::Auto)
+        {
+            return;
+        }
+
+        Composition &app = composition();
+        static const int dim_idx
+            = core::signal_table_find(core::AutoBrightness::DIM_SIGNAL_ID);
+        uint8_t pct = auto_brightness().update(
+            app.signal_store.get_at(dim_idx), /* no data if not compiled */
+            core::AutoBrightness::shift_for(live_auto_pct()),
+            app.config_store.get().settings.day_brightness,
+            platform_get().clock.millis(),
+            backlight_state() != BacklightState::Live);
+        if (pct != backlight_pct())
+        {
+            apply_backlight(pct);
+        }
     }
 
     void sync_active_signals_task(void *ctx)
@@ -651,24 +780,32 @@ namespace
                           platform_get().clock.millis());
     }
 
-    void on_uds_response(void *ctx, uint8_t byte1, uint8_t byte2, float raw)
+    void on_uds_response(void          *ctx,
+                         uint8_t        ecu,
+                         uint8_t        byte1,
+                         uint8_t        byte2,
+                         const uint8_t *payload,
+                         uint8_t        len)
     {
         (void)ctx;
         composition().signal_store.on_uds_response(
-            byte1, byte2, raw, platform_get().clock.millis());
+            ecu, byte1, byte2, payload, len, platform_get().clock.millis());
 
         /* Closes the flow-control loop: this is what frees the poller's
          * single in-flight slot so the next request can go out. */
-        composition().uds_poller.on_response(byte1, byte2);
+        composition().uds_poller.on_response(ecu, byte1, byte2);
     }
 
     /* A rejection still ends the request it rejects, so handing these to
      * the poller is what stops a DID the ECU refuses from costing a full
      * response timeout every time it comes due. */
-    void on_uds_negative_response(void *ctx, uint8_t service, uint8_t nrc)
+    void on_uds_negative_response(void   *ctx,
+                                  uint8_t ecu,
+                                  uint8_t service,
+                                  uint8_t nrc)
     {
         (void)ctx;
-        composition().uds_poller.on_negative_response(service, nrc);
+        composition().uds_poller.on_negative_response(ecu, service, nrc);
     }
 
     /** Whether a revert in progress came from the panel (the AP going
@@ -724,12 +861,12 @@ namespace
         return settings;
     }
 
-    /** Which brightness a phone-side change shows: the one it last edited.
-     * See remote_config_event_cb. */
-    bool &remote_showing_night()
+    /** Which brightness a phone-side change shows: the level it last
+     * edited, else the mode it picked. See remote_config_event_cb. */
+    core::BrightnessMode &remote_shown_mode()
     {
-        static bool night = false;
-        return night;
+        static core::BrightnessMode mode = core::BrightnessMode::Day;
+        return mode;
     }
 
     /* The Wi-Fi glyph follows the AP: shown only while it's Active.
@@ -828,13 +965,10 @@ namespace
         }
     }
 
-    gui::PanelViewModel view_model_builder(void   *ctx,
-                                           uint8_t rank,
-                                           bool    large,
-                                           bool    hero)
+    gui::PanelViewModel view_model_builder(void *ctx, uint8_t rank)
     {
         auto *binding = static_cast<gui::VehicleBinding *>(ctx);
-        return binding->build_view_model(rank, large, hero);
+        return binding->build_view_model(rank);
     }
 
     /** While the phone holds an unsaved preview, the dashboard is showing
@@ -923,14 +1057,17 @@ namespace
         composition().vehicle_binding.apply_warning_change(signal_id, result);
     }
 
-    /* Fired immediately on every brightness slider move / Day-Night toggle
+    /* Fired immediately on every brightness slider move / mode toggle
      * — pushes straight to the real backlight so switching (or tuning
      * either value) is actually useful mid-drive, not just a setting
      * that takes effect after leaving Settings. */
-    void settings_preview_brightness_cb(void *ctx, uint8_t brightness_pct)
+    void settings_preview_brightness_cb(void                *ctx,
+                                        gui::BrightnessMode  mode,
+                                        uint8_t              brightness_pct)
     {
         (void)ctx;
-        apply_backlight(brightness_pct);
+        set_live_brightness_mode(gui::to_core_brightness_mode(mode),
+                                 brightness_pct);
     }
 
     /* Runs on every exit from SettingsScreen — the X button and the
@@ -939,16 +1076,18 @@ namespace
      * reads the store back. Persist only; settings_done_cb owns the
      * navigation, since a hand-off to Theme/WiFi must not bounce to the
      * dashboard. */
-    void settings_commit_cb(void   *ctx,
-                            uint8_t day_brightness_pct,
-                            uint8_t night_brightness_pct,
-                            uint8_t num_panels)
+    void settings_commit_cb(void               *ctx,
+                            uint8_t             day_brightness_pct,
+                            uint8_t             night_brightness_pct,
+                            uint8_t             auto_brightness_pct,
+                            gui::BrightnessMode brightness_mode,
+                            uint8_t             num_panels)
     {
         (void)ctx;
         /* No set_backlight() here — settings_preview_brightness_cb already
-         * pushed the real backlight live on every slider move and Day/
-         * Night toggle, so it's already showing whichever of day/night was
-         * actually active when the screen was left. Re-applying
+         * pushed the real backlight live on every slider move and mode
+         * toggle, so it's already showing whichever mode was actually
+         * active when the screen was left. Re-applying
          * day_brightness_pct unconditionally here was wrong: it stomped
          * over a Night-mode edit with the (usually untouched, 100%) Day
          * value on every exit. */
@@ -959,7 +1098,10 @@ namespace
          * its own changes (see the orientation_* callbacks below). */
         settings.day_brightness   = day_brightness_pct;
         settings.night_brightness = night_brightness_pct;
-        settings.num_panels       = num_panels;
+        settings.auto_brightness_pct = auto_brightness_pct;
+        settings.brightness_mode
+            = gui::to_core_brightness_mode(brightness_mode);
+        settings.num_panels = num_panels;
         composition().config_store.save();
         sync_active_signals();
     }
@@ -1770,7 +1912,7 @@ namespace
         Composition &app = composition();
         app.remote_binding.activate();
         remote_last_settings() = app.config_store.get().settings;
-        remote_showing_night() = false;
+        remote_shown_mode()    = remote_last_settings().brightness_mode;
         app.wireless_setup_screen.open(app.remote_binding.build_view_model(),
                                        app.settings_screen.screen());
     }
@@ -1782,10 +1924,10 @@ namespace
      * brings the panel in line with them, so what the phone is editing is
      * on the dashboard as it's edited.
      *
-     * Brightness follows whichever of day/night the phone last changed,
-     * so dragging the night slider is visible on the panel. A Save or a
-     * discard goes back to Day, which is what the panel shows outside
-     * Settings (SettingsScreen::showing_night_ is local to that screen).
+     * Brightness follows whichever of day/night/auto the phone last
+     * dragged, so dragging the night slider is visible on the panel, and
+     * otherwise the mode the phone picked. A Save or a discard goes back to the
+     * saved mode.
      *
      * Orientation is NOT applied and cannot be -- it is boot-time-only
      * (see platform.hpp's DisplayOrientation). The phone's own mock shows
@@ -1806,25 +1948,33 @@ namespace
         app.remote_ap.note_activity(now);
         remote_last_request_ms() = now;
 
+        core::BrightnessMode &shown = remote_shown_mode();
         if (event == Event::Previewed)
         {
             const core::Settings &last = remote_last_settings();
             if (settings.night_brightness != last.night_brightness)
             {
-                remote_showing_night() = true;
+                shown = core::BrightnessMode::Night;
             }
             else if (settings.day_brightness != last.day_brightness)
             {
-                remote_showing_night() = false;
+                shown = core::BrightnessMode::Day;
+            }
+            else if (settings.auto_brightness_pct != last.auto_brightness_pct)
+            {
+                shown = core::BrightnessMode::Auto;
+            }
+            else if (settings.brightness_mode != last.brightness_mode)
+            {
+                shown = settings.brightness_mode;
             }
         }
         else
         {
-            remote_showing_night() = false;
+            shown = settings.brightness_mode;
         }
         remote_last_settings() = settings;
-        apply_backlight(remote_showing_night() ? settings.night_brightness
-                                               : settings.day_brightness);
+        set_live_brightness_mode(shown, mode_slider_pct(settings, shown));
 
         bool flipped = flipped_for(app.config_store.get().settings,
                                    active_orientation());
@@ -1845,9 +1995,12 @@ namespace
         /* Kept in step even mid-preview: SettingsScreen commits its own
          * copy of these on every exit, which would otherwise write stale
          * values back over whatever the phone just did. */
-        app.settings_screen.set_values(settings.day_brightness,
-                                       settings.night_brightness,
-                                       settings.num_panels,
+        app.settings_screen.set_values(
+            settings.day_brightness,
+            settings.night_brightness,
+            settings.auto_brightness_pct,
+            gui::to_gui_brightness_mode(settings.brightness_mode),
+            settings.num_panels,
                                        settings.accent_color);
 
         /* The phone's own edits (and its Discard) land on the dashboard,
@@ -2188,6 +2341,7 @@ namespace
         app.configurator_screen.init(theme,
                                      app.signal_names,
                                      app.signal_ids,
+                                     app.signal_is_state,
                                      core::SIGNAL_CATALOG_COUNT,
                                      configurator_done_cb,
                                      nullptr,
@@ -2206,6 +2360,9 @@ namespace
                                  platform_firmware_version(),
                                  settings.day_brightness,
                                  settings.night_brightness,
+                                 settings.auto_brightness_pct,
+                                 gui::to_gui_brightness_mode(
+                                     settings.brightness_mode),
                                  settings.num_panels,
                                  settings.accent_color,
                                  settings_commit_cb,
@@ -2365,6 +2522,16 @@ FLASHMEM void setup()
 
     active_orientation() = settings.orientation;
 
+    /* The saved level from the first lit frame -- see backlight_pct(). */
+    /* Auto starts from Day's level, its fallback, and snaps to the
+     * dimmer's before the panel lights if the cluster answers in time. */
+    live_brightness_mode() = settings.brightness_mode;
+    live_auto_pct()        = settings.auto_brightness_pct;
+    backlight_pct() = settings.brightness_mode == core::BrightnessMode::Night
+                          ? settings.night_brightness
+                          : settings.day_brightness;
+    auto_brightness().start(backlight_pct(), platform.clock.millis());
+
     DisplayOrientation orientation
         = to_display_orientation(to_gui_orientation(settings.orientation));
 
@@ -2374,7 +2541,10 @@ FLASHMEM void setup()
     platform.display.set_orientation(orientation, flipped);
     platform.touch.begin();
     platform.touch.set_orientation(orientation, flipped);
-    platform.can.begin(CAN_TX_ID, CAN_RX_ID, CAN_BAUD);
+    uint32_t can_rx_lo;
+    uint32_t can_rx_hi;
+    core::uds_ecu_rx_range(can_rx_lo, can_rx_hi);
+    platform.can.begin(can_rx_lo, can_rx_hi, CAN_BAUD);
     platform.serial.begin(REMOTE_SERIAL_BAUD);
     platform.storage.begin();
     app.logger.begin();
@@ -2461,6 +2631,8 @@ FLASHMEM void setup()
 
     app.scheduler.every(
         INFO_SCREEN_REFRESH_MS, refresh_info_screen_task, nullptr);
+    app.scheduler.every(
+        AUTO_BRIGHTNESS_PERIOD_MS, auto_brightness_task, nullptr);
     app.scheduler.every(remote::server::AP_IDLE_CHECK_PERIOD_MS,
                         remote_ap_idle_check_task,
                         nullptr);
