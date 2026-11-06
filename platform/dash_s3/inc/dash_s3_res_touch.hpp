@@ -1,7 +1,6 @@
 /**
  * @file dash_s3_res_touch.hpp
- * @brief ITouch for an XPT2046 resistive touch controller over SPI -- the
- * ER-TFTM035-6 breakout's "optional resistive touch controller". Kept
+ * @brief ITouch for an XPT2046 resistive touch controller over SPI. Kept
  * alongside dash_s3_touch.hpp's capacitive FT6236 driver; see
  * dash_s3_platform.cpp for which is active.
  */

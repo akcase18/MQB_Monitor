@@ -37,7 +37,7 @@ static_assert(sizeof(DASH_S3_BUILD_VARIANT)
               "DASH_S3_HW_VARIANT is too long");
 static_assert(offsetof(DashS3FirmwareId, layout_tag)
                   == 16 + 16 + FIRMWARE_VERSION_LEN,
-              "the layout fields moved -- the update page reads them too");
+              "the layout fields moved, update page reads them too");
 
 /**
  * The log ring has to fit the LittleFS partition with room for the
@@ -60,11 +60,8 @@ namespace
      */
     __attribute__((section(".rodata_custom_desc"), used))
     const DashS3FirmwareId s_firmware_id = {
-        "MQB-DASH-S3",
-        DASH_S3_BUILD_VARIANT,
-        FW_VERSION,
-        { 'P', 'T', 'L', '1' },
-        FW_PARTITION_LAYOUT,
+        "MQB-DASH-S3",          DASH_S3_BUILD_VARIANT, FW_VERSION,
+        { 'P', 'T', 'L', '1' }, FW_PARTITION_LAYOUT,
     };
 
     /**
@@ -90,7 +87,7 @@ namespace
 /**
  * Overrides the Arduino core's weak default (esp32-hal-misc.c), which
  * returns false and so has initArduino() mark every image valid before
- * setup() even runs -- leaving rollback nothing to roll back from. With
+ * setup() even runs, leaving rollback nothing to roll back from. With
  * this, a new image stays on probation until platform_firmware_healthy().
  * C linkage, to match the C definition it replaces.
  */
@@ -144,8 +141,7 @@ FirmwareImageCheck dash_s3_check_image(const uint8_t *head,
     }
 
     uint32_t layout = LEGACY_PARTITION_LAYOUT;
-    if (memcmp(id.layout_tag, DASH_S3_LAYOUT_TAG, sizeof(id.layout_tag))
-        == 0)
+    if (memcmp(id.layout_tag, DASH_S3_LAYOUT_TAG, sizeof(id.layout_tag)) == 0)
     {
         layout = id.partition_layout;
     }
@@ -269,7 +265,7 @@ void platform_hang_watchdog(bool enabled)
 {
     /**
      * The Arduino core's loop watchdog: loopTask joins the task watchdog
-     * (5s, and it panics -- i.e. resets -- per the SDK's sdkconfig) and
+     * (5s, and it panics/resets, per the SDK's sdkconfig) and
      * feeds it on every pass through loop(). Tracked here because
      * enabling it twice logs an error.
      */

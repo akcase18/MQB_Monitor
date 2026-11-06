@@ -39,12 +39,14 @@ namespace
             case OtaResult::ErrNotFirmware:
                 return { 415, "That isn't a firmware file for this dash." };
             case OtaResult::ErrWrongHardware:
-                return { 409, "That firmware is for different dash "
-                              "hardware, or is a bench test build." };
+                return { 409,
+                         "That firmware is for different dash "
+                         "hardware, or is a bench test build." };
             case OtaResult::ErrNeedsUsb:
-                return { 409, "That firmware changes how the dash's flash "
-                              "is laid out, so it has to be installed "
-                              "over USB." };
+                return { 409,
+                         "That firmware changes how the dash's flash "
+                         "is laid out, so it has to be installed "
+                         "over USB." };
             case OtaResult::ErrTooLarge:
                 return { 413, "That file is too big to be dash firmware." };
             case OtaResult::ErrCorrupt:
@@ -54,8 +56,9 @@ namespace
             case OtaResult::ErrFlash:
             case OtaResult::ErrInterrupted:
             default:
-                return { 500, "The dash couldn't save the update. Try "
-                              "again." };
+                return { 500,
+                         "The dash couldn't save the update. Try "
+                         "again." };
         }
     }
 } // namespace
@@ -67,12 +70,10 @@ void DashS3Updater::attach(WebServer &server, esp32::RelayLink &link)
 
     server.on(UPDATE_URI, HTTP_GET, [this]() { handle_page(); });
     server.on("/api/version", HTTP_GET, [this]() { handle_version(); });
-    server.on("/api/update/request", HTTP_POST, [this]() {
-        handle_mode_request();
-    });
-    server.on("/api/update/status", HTTP_GET, [this]() {
-        handle_mode_status();
-    });
+    server.on(
+        "/api/update/request", HTTP_POST, [this]() { handle_mode_request(); });
+    server.on(
+        "/api/update/status", HTTP_GET, [this]() { handle_mode_status(); });
     server.addHandler(this);
 }
 
@@ -87,11 +88,7 @@ void DashS3Updater::on_frame(MsgType type, const uint8_t *payload, uint16_t len)
             break;
 
         case MsgType::CMD_OTA_DISARM:
-            mode_ = mode_ == Mode::Pending ? Mode::Declined : Mode::Off;
-            /**
-             * Out of update mode, nothing is installable -- even an image
-             * that was waiting on Install.
-             */
+            mode_       = mode_ == Mode::Pending ? Mode::Declined : Mode::Off;
             ready_slot_ = nullptr;
             break;
 
@@ -204,8 +201,8 @@ bool DashS3Updater::handle(WebServer &server, HTTPMethod method, String uri)
 
     /**
      * Only reached once the body has been read in full (an aborted one
-     * never gets an answer -- the phone has gone). No raw body at all
-     * means WebServer took it as a form, which the page never sends.
+     * never gets an answer). No raw body at all means WebServer took it as a
+     * form, which the page never sends.
      */
     if (!body_seen_)
     {
@@ -228,13 +225,13 @@ bool DashS3Updater::handle(WebServer &server, HTTPMethod method, String uri)
 
 void DashS3Updater::start_upload(size_t content_length)
 {
-    body_seen_ = true;
-    ota_begun_ = false;
-    result_    = OtaResult::Ok;
-    total_     = static_cast<uint32_t>(content_length);
-    written_   = 0;
-    reported_  = 0;
-    head_len_  = 0;
+    body_seen_  = true;
+    ota_begun_  = false;
+    result_     = OtaResult::Ok;
+    total_      = static_cast<uint32_t>(content_length);
+    written_    = 0;
+    reported_   = 0;
+    head_len_   = 0;
     version_[0] = '\0';
     /**
      * Whatever was waiting on a commit is about to be overwritten.
@@ -243,8 +240,7 @@ void DashS3Updater::start_upload(size_t content_length)
 
     /**
      * WebServer reads a raw body with Stream::readBytes(), which spins
-     * without yielding while it waits for data -- for up to the client's
-     * 5s timeout if the phone stalls. That would starve core 0's idle
+     * without yielding while it waits for data. That would starve core 0's idle
      * task right up against the task watchdog's own 5s and reset the
      * board mid-upload. Its watch is lifted for the upload's duration
      * instead; the Wi-Fi stack's tasks outrank this one and are
@@ -312,8 +308,7 @@ void DashS3Updater::take_bytes(const uint8_t *data, size_t len)
 
         /**
          * Sequential writes: each sector is erased as the image reaches
-         * it, rather than the whole 2MB slot up front -- seconds of
-         * blocking erase before the first byte went down.
+         * it, rather than the whole 2MB slot up front.
          */
         if (esp_ota_begin(slot_, OTA_WITH_SEQUENTIAL_WRITES, &ota_handle_)
             != ESP_OK)
@@ -374,8 +369,8 @@ void DashS3Updater::end_upload()
     else if (result_ == OtaResult::Ok)
     {
         /**
-         * Checks the image's checksum and appended SHA-256 -- a truncated
-         * or corrupted upload stops here. Frees the handle either way.
+         * Checks the image's checksum and appended SHA-256, will stop if upload
+         * is corrupted. Frees the handle either way.
          */
         esp_err_t err = esp_ota_end(ota_handle_);
         ota_begun_    = false;
@@ -410,10 +405,6 @@ void DashS3Updater::fail(OtaResult result)
     }
     result_ = result;
 
-    /**
-     * The panel only hears of uploads that got past identification, so
-     * only those get a result.
-     */
     if (ota_begun_)
     {
         esp_ota_abort(ota_handle_);
@@ -445,9 +436,6 @@ void DashS3Updater::commit()
 {
     if (ready_slot_ == nullptr || mode_ != Mode::Armed)
     {
-        /**
-         * Nothing verified to boot -- the panel's Ready was stale.
-         */
         send_result(OtaResult::ErrFlash);
         return;
     }

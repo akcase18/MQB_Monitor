@@ -19,14 +19,9 @@
 #include "synthetic_can_bus.hpp"
 
 /**
- * Which ITouch backend is active. The product panel is a capacitive
- * FT6236 over I2C; the ER-TFTM035-6 breakout on the bench may instead
- * carry the resistive XPT2046 over SPI. Same pattern as the Teensy's
- * TEENSY_TOUCH_USE_RESISTIVE, except overridable with a -D from
- * platformio.ini like the pins are, since which panel is on the bench is
- * a wiring fact rather than a code decision. Both drivers compile
- * unconditionally either way, so the inactive one can't silently
- * bit-rot.
+ * Selects which ITouch backend to use: resistive or capacitive.
+ * Resistive touch interacts with an XPT2046 touch controller over SPI.
+ * Capacitive touch interacts with an FT6236 touch controller over I2C.
  */
 #ifndef DASH_S3_TOUCH_USE_RESISTIVE
     #define DASH_S3_TOUCH_USE_RESISTIVE 0
@@ -41,11 +36,9 @@
 #endif
 
 /**
- * Which ICanBus is active. 0 = the TWAI controller (needs a transceiver
- * and a vehicle). 1 = the synthetic bus the simulator runs on, which
- * answers every UDS request instantly with a slowly drifting fabricated
- * value -- so the whole poll/decode/warn/render path runs flat out on a
- * bench with nothing but the panel attached. env:dash_s3_stress sets it.
+ * Which ICanBus is active.
+ * 0 = the TWAI controller (in-vehicle communication).
+ * 1 = the synthetic bus the simulator runs on. Used by the stress test builds.
  */
 #ifndef DASH_S3_FAKE_CAN
     #define DASH_S3_FAKE_CAN 0
@@ -72,19 +65,7 @@ namespace
 } // namespace
 
 /**
- * Internal RAM is what the Wi-Fi stack's transmit buffers come out of,
- * and with the SoftAP up there is only ~24KB of it to spare: the banded
- * draw buffers (DRAW_BUF_DIVISOR) and every LVGL object live there too.
- * Run short and the phone's page stalls mid-send and never finishes
- * loading -- which is what 4KB of always-resident update screen did.
- *
- * The SDK's default sends every malloc() up to 4096 bytes to internal RAM.
- * This lowers that to 2048, so the larger rarely-touched buffers -- the
- * config store's 4KB EEPROM mirror, the Wi-Fi screen's ~2.2KB QR canvas --
- * land in PSRAM instead. Smaller allocations (LVGL's objects, styles and
- * per-frame draw tasks) stay internal, so rendering is unaffected.
- * Must run before the config store first opens, i.e. before setup() gets
- * past platform_get().
+ * Reduce malloc() base allocation to 2048 bytes to improve memory utilization.
  */
 #ifndef DASH_S3_INTERNAL_MALLOC_LIMIT
     #define DASH_S3_INTERNAL_MALLOC_LIMIT 2048
@@ -100,9 +81,12 @@ Platform &platform_get()
     (void)s_heap_tuned;
 
     static Platform s_platform {
-        active_can(),                 DashS3Display::instance(),
-        DASH_S3_ACTIVE_TOUCH,         Esp32ConfigStore::instance(),
-        Esp32Clock::instance(),       DashS3Wireless::instance(),
+        active_can(),
+        DashS3Display::instance(),
+        DASH_S3_ACTIVE_TOUCH,
+        Esp32ConfigStore::instance(),
+        Esp32Clock::instance(),
+        DashS3Wireless::instance(),
         Esp32Storage::instance(),
     };
     return s_platform;

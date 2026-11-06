@@ -16,7 +16,7 @@ The MCU-level half (clock, NVS config store, LittleFS storage) lives in **[esp32
 | Nothing on the panel at all | RD not tied to 3V3; IM jumpers not set for 8-bit 8080; CS/DC swapped | `dash_s3_pins.hpp`, the panel module |
 | Torn or corrupt pixels, no error | Bus too fast for the wiring | `LCD_BUS_HZ` in `dash_s3_display.cpp` — start at 10 MHz |
 | Parts of the screen keep stale content until touched or redrawn | Whole-frame mode on quad PSRAM: LCD DMA starved of bandwidth (15 MHz and up failed on the N16R2) | `DASH_S3_LCD_BUS_HZ` — whole-frame defaults to 10 MHz |
-| Believable but wrong colours | RGB565 byte order | `swap_color_bytes` in `dash_s3_display.cpp` |
+| Believable but wrong colors | RGB565 byte order | `swap_color_bytes` in `dash_s3_display.cpp` |
 | Red and blue swapped | `MADCTL_BGR` | same |
 | Mirrored or rotated image | MADCTL rotation bits | same — and the touch transform is coupled to them |
 | Touch lands in the wrong place | The MADCTL/touch coupling above | `dash_s3_touch.cpp`'s `read()` |

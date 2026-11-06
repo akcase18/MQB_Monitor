@@ -20,28 +20,14 @@
 
 namespace
 {
-    constexpr uint16_t X_CMD       = 0x91;
-    constexpr uint16_t Y_CMD       = 0xD1;
-    constexpr uint16_t Z1_CMD      = 0xB1;
-    constexpr uint16_t Z2_CMD      = 0xC1;
-    constexpr int16_t  Z_THRESHOLD = 800;
-    /**
-     * Contact area shrinks as a finger lifts off, which skews the X/Y
-     * reading (often toward a screen edge) for the last poll or two before
-     * pressure finally drops below Z_THRESHOLD -- that transient still
-     * counts as "pressed" but its coordinates aren't trustworthy. Below
-     * this stricter threshold, keep reporting the last confident position
-     * instead of the fresh (possibly skewed) one.
-     */
+    constexpr uint16_t X_CMD                 = 0x91;
+    constexpr uint16_t Y_CMD                 = 0xD1;
+    constexpr uint16_t Z1_CMD                = 0xB1;
+    constexpr uint16_t Z2_CMD                = 0xC1;
+    constexpr int16_t  Z_THRESHOLD           = 800;
     constexpr int16_t  Z_CONFIDENT_THRESHOLD = 1000;
     constexpr uint32_t MIN_CYCLE_TIME        = 3;
-
-    /**
-     * XPT2046 tops out at 2.5MHz on its own clock; 1MHz matches the
-     * Teensy driver and is what the measured thresholds above were tuned
-     * against.
-     */
-    constexpr uint32_t SPI_HZ = 1000000;
+    constexpr uint32_t SPI_HZ                = 1000000;
 
     SPIClass s_spi(HSPI);
     uint32_t s_last_poll_tick = 0;
@@ -59,14 +45,10 @@ void DashS3ResTouch::begin()
     digitalWrite(DASH_S3_PIN_RTP_CS, HIGH);
 
     /**
-     * CS is driven by hand around each poll (the controller wants it held
-     * low across the whole burst of conversions), so -1 keeps the library
-     * from claiming a hardware CS pin.
+     * Prevent SPI library from controlling the CS pin
      */
-    s_spi.begin(DASH_S3_PIN_RTP_SCK,
-                DASH_S3_PIN_RTP_MISO,
-                DASH_S3_PIN_RTP_MOSI,
-                -1);
+    s_spi.begin(
+        DASH_S3_PIN_RTP_SCK, DASH_S3_PIN_RTP_MISO, DASH_S3_PIN_RTP_MOSI, -1);
 }
 
 void DashS3ResTouch::set_orientation(DisplayOrientation orientation,
@@ -129,11 +111,6 @@ void DashS3ResTouch::poll()
 
     if (z < Z_THRESHOLD)
     {
-        /**
-         * x_val_/y_val_ deliberately keep their last value here -- see the
-         * comment on read() below for why reporting (0,0) on release is
-         * wrong, not just cosmetically "less precise".
-         */
         z_val_           = 0;
         was_pressed_     = false;
         s_last_poll_tick = curr_tick;
@@ -143,19 +120,12 @@ void DashS3ResTouch::poll()
     z_val_ = z;
     /**
      * Always accept the first sample of a new press (no prior confident
-     * position to fall back on) -- only hold the last position once a
+     * position to fall back on). Only hold the last position once a
      * press is already established and pressure drops into the
      * low-confidence zone.
      */
     if (!was_pressed_ || z > Z_CONFIDENT_THRESHOLD)
     {
-        /**
-         * Both transforms are the Teensy driver's, measured on this panel
-         * against the same MADCTL values dash_s3_display.cpp sends. If a
-         * corner lands in the wrong place, this is where to swap or
-         * invert -- and the fix belongs in teensy_touch.cpp too, since
-         * the panel and rotation are shared.
-         */
         if (orientation_ == DisplayOrientation::Portrait)
         {
             x_val_ = 4095 - x;
@@ -178,18 +148,8 @@ bool DashS3ResTouch::read(TouchPoint &out)
 
     bool pressed = z_val_ >= Z_THRESHOLD;
     out.pressed  = pressed;
-    /**
-     * LVGL's indev core updates its internal "current point" from
-     * whatever this call reports even when state is released -- a widget
-     * being dragged (e.g. lv_slider) finalizes its value from that exact
-     * point on the release event. Reporting (0,0) here would make LVGL
-     * finish every single drag at the coordinate origin instead of
-     * wherever the finger actually was, so the last valid touch position
-     * is reported regardless of pressed state; `out.pressed` is what
-     * actually communicates press/release to LVGL.
-     */
-    out.x = (x_val_ * width_) / 4095;
-    out.y = (y_val_ * height_) / 4095;
+    out.x        = (x_val_ * width_) / 4095;
+    out.y        = (y_val_ * height_) / 4095;
     if (flipped_)
     {
         flip_touch_point(out, width_, height_);

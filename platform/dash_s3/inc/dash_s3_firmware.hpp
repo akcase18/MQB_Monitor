@@ -27,7 +27,7 @@
 /**
  * Which dash hardware a build is for. An image only installs over one
  * built for the same variant: the dev kit's pinout and PSRAM mode don't
- * boot on the PCB, nor the other way round.
+ * boot on the PCB, and vice versa.
  */
 #ifndef DASH_S3_HW_VARIANT
     #define DASH_S3_HW_VARIANT "pcb"
@@ -37,8 +37,7 @@
  * What goes in the descriptor's variant field: the hardware, marked
  * "-stress" for a bench build that fakes its CAN data. The marking is
  * automatic so no stress build can pass for real firmware -- a stress
- * image is refused by a dash running the real thing, and the other way
- * round.
+ * image is refused by a dash running the real thing, and vice versa.
  */
 #if DASH_S3_FAKE_CAN || STRESS_TEST
     #define DASH_S3_BUILD_VARIANT DASH_S3_HW_VARIANT "-stress"
@@ -71,15 +70,12 @@ constexpr uint32_t LEGACY_PARTITION_LAYOUT = 0x93e3eb34u;
 
 /**
  * esp_image_header_t (24) + esp_image_segment_header_t (8) +
- * esp_app_desc_t (256) -- checked against the real structs in
+ * esp_app_desc_t (256). Checked against the real structs in
  * dash_s3_firmware.cpp.
  */
 constexpr size_t FIRMWARE_ID_OFFSET = 288;
-/**
- * How much of an image has to arrive before it can be identified.
- */
-constexpr size_t FIRMWARE_ID_END = FIRMWARE_ID_OFFSET
-                                   + sizeof(DashS3FirmwareId);
+constexpr size_t FIRMWARE_ID_END
+    = FIRMWARE_ID_OFFSET + sizeof(DashS3FirmwareId);
 
 /**
  * This build's own id.
@@ -105,8 +101,8 @@ FirmwareImageCheck dash_s3_check_image(const uint8_t *head,
 
 /**
  * Records that the app slot at `slot_address` is about to be booted with
- * `version` in it -- call after switching slots, right before restarting.
- * The next boot compares it with where it actually came up, which is how
+ * `version` in it. Call after switching slots, right before restarting. The
+ * next boot compares it with where it actually came up, which is how
  * platform_take_failed_update() spots a rollback.
  */
 void dash_s3_note_install(uint32_t slot_address, const char *version);

@@ -66,26 +66,18 @@ namespace
     constexpr uint8_t MADCTL_BGR = 0x08;
 
     /**
-     * ILI948x_t4_mm's MADCTL_ARRAY indexed by its rotation number, and the
-     * two entries the Teensy driver uses: setRotation(3) for landscape
-     * and setRotation(0) for portrait (teensy_display.cpp,
-     * ROTATION_LANDSCAPE / ROTATION_PORTRAIT). Rotation 3 is the confirmed
-     * landscape mounting; portrait 0 is correct for the v3 PCB and would
-     * flip to 2 (MY|BGR) if the panel were ever mounted the other way up.
+     * Default display orientation, as defined by the ILI9488's MADCTL_ARRAY
+     * values.
      *
-     * Changing either REQUIRES a matching change in dash_s3_touch.cpp:
-     * flipping the panel 180 degrees inverts both screen axes, so the
-     * touch transform inverts with it. The two are only correct together.
+     * Changes here need corresponding changes in dash_s3_touch.cpp.
      */
     constexpr uint8_t MADCTL_LANDSCAPE
         = MADCTL_MX | MADCTL_MY | MADCTL_MV | MADCTL_BGR;       /* 0xE8 */
     constexpr uint8_t MADCTL_PORTRAIT = MADCTL_MX | MADCTL_BGR; /* 0x48 */
 
     /**
-     * The same two mountings turned 180 degrees (IDisplay::
-     * set_orientation's `flipped`) -- MX and MY both toggled, i.e. the
-     * Teensy's setRotation(1) and setRotation(2). Touch follows via
-     * flip_touch_point() rather than a new transform.
+     * Default display orientations, but flipped 180 degrees. flip_touch_point()
+     * handles the same operation for the touchscreen.
      */
     constexpr uint8_t MADCTL_LANDSCAPE_FLIPPED
         = MADCTL_LANDSCAPE ^ (MADCTL_MX | MADCTL_MY); /* 0x28 */
@@ -93,13 +85,10 @@ namespace
         = MADCTL_PORTRAIT ^ (MADCTL_MX | MADCTL_MY); /* 0x88 */
 
     /**
-     * Whole-frame rendering (see the file comment) only pays for itself
-     * when the push can wait for TE: without it the push lands mid-scan
-     * and tears anyway, while rendering into PSRAM and DMAing out of it
-     * costs real time. On the PCB (no TE, quad PSRAM) a full redraw took
-     * ~57ms whole-frame against ~33-46ms banded from internal SRAM with
-     * 1/5-screen bands (DRAW_BUF_DIVISOR in platformio.ini). So it
-     * follows the TE pin by default; set 0/1 to A/B on the bench.
+     * With PCB v5, I did not use an ESP32-S3 with OctalSPI PSRAM.
+     * Whole-frames writes are too slow without it, so do not use a full frame
+     * buffer for rendering. Tying this to the existance of a TE pin, since that
+     * will indicate updated hardware.
      */
 #ifndef DASH_S3_FRAME_BUFFERS
     #define DASH_S3_FRAME_BUFFERS (DASH_S3_PIN_LCD_TE >= 0)
@@ -110,8 +99,7 @@ namespace
      * is PSRAM bandwidth, not the panel: the LCD DMA reads the frame out
      * of PSRAM while LVGL renders and syncs the other buffer there too.
      * On the PCB's N16R2 (quad PSRAM, ~40MB/s at 80MHz) 20MHz and 15MHz
-     * both starved the DMA -- rows silently kept stale content until
-     * something redrew them -- and 10MHz is clean; the N16R8 dev kit's
+     * both starved the DMA, and 10MHz is clean. The N16R8 dev kit's
      * octal PSRAM runs 20MHz fine. Banded mode DMAs from internal SRAM,
      * so it has no such limit: 20MHz is the ILI9488's rated ~50ns write
      * cycle (the Teensy runs 40MHz on its ribbon, out of spec).
@@ -129,7 +117,7 @@ namespace
     constexpr uint32_t LCD_BUS_HZ = DASH_S3_LCD_BUS_HZ;
 
     /**
-     * One whole screen of RGB565, whichever way round it is mounted.
+     * One whole screen of RGB565.
      */
     constexpr size_t FRAME_BYTES
         = static_cast<size_t>(LCD_HORZ) * LCD_VERT * sizeof(uint16_t);
@@ -154,17 +142,9 @@ namespace
     constexpr UBaseType_t PUSH_TASK_PRIO  = 3;
 
     /**
-     * Backlight PWM. On the S3 PCB this pin drives the PAM2804's EN
-     * input. Unlike the Teensy board's TPS61169 (which filters its CTRL
-     * duty into an analog reference, and wants a 5kHz-100kHz carrier),
-     * EN is a plain enable: PWM on it gates the buck on and off, and
-     * every rising edge restarts the part through its soft-start. The
-     * datasheet's PWM-dimming figure is 500Hz (DS36403 "Application
-     * Information"); a 20kHz carrier has a 50us period, too short for the
-     * output to ever come up, so the LEDs stay dark. 500Hz is above
-     * visible flicker. 10-bit resolution gives finer steps at the dim
-     * end, where the soft-start eats into each on-pulse, and is trivial
-     * for the LEDC timer (500Hz * 1024 = 512kHz).
+     * Backlight PWM pin.
+     *
+     * Datasheet for backlight driver (PAM2804) specifies 500Hz.
      */
     constexpr uint8_t  BL_LEDC_CHANNEL = 0;
     constexpr uint32_t BL_PWM_FREQ_HZ  = 500;
@@ -172,7 +152,7 @@ namespace
     constexpr uint32_t BL_PWM_MAX      = (1u << BL_PWM_BITS) - 1;
 
     /**
-     * Hardware reset pulse, as ILI948x_t4_mm::begin() does it.
+     * Hardware reset pulse.
      */
     constexpr uint32_t RESET_HIGH_MS   = 15;
     constexpr uint32_t RESET_LOW_MS    = 15;
@@ -183,8 +163,8 @@ namespace
 
     /**
      * Given from the i80 driver's transfer-done ISR, taken at the top of
-     * flush() when a transfer is still in flight -- see flush(). Binary,
-     * not counting: at most one colour transfer is ever outstanding.
+     * flush() when a transfer is still in flight (see flush()). Binary,
+     * not counting: at most one color transfer is ever outstanding.
      */
     SemaphoreHandle_t s_trans_done = nullptr;
     bool              s_in_flight  = false;
@@ -310,14 +290,14 @@ namespace
         if (s_io == nullptr)
         {
             /**
-             * begin() failed and said so; every later call is a no-op so
-             * the rest of the firmware keeps running headless.
+             * begin() failed. Every later call is a no-op so the rest of the
+             * firmware keeps running headless.
              */
             return;
         }
 
         /**
-         * Never while a colour transfer is in flight: the parameter path
+         * Never while a color transfer is in flight: the parameter path
          * is synchronous and would interleave with the queued DMA.
          */
         wait_for_transfer();
@@ -342,10 +322,6 @@ namespace
 
     void init_panel()
     {
-        /**
-         * ILI948x_t4_mm.cpp, begin(), the #if defined(ILI9488) block --
-         * same registers, same values, same delays.
-         */
         cmd(CMD_SWRESET);
         delay(120);
         cmd(CMD_SLPOUT);
@@ -394,18 +370,14 @@ namespace
               0x0F }); /* Negative Gamma */
         cmd(CMD_MADCTL, { MADCTL_PORTRAIT });
         /**
-         * Tearing-effect line on, V-blank pulse only (mode 0). Costs
-         * nothing if the pin isn't wired.
+         * Tearing-effect line on, V-blank pulse only (mode 0).
          */
         cmd(CMD_TEON, { 0x00 });
         cmd(CMD_DISPON);
         delay(120);
 
         /**
-         * setBitDepth(16): RGB565, two bus beats per pixel. The ILI9488
-         * only accepts 16bpp on the parallel interface (SPI is 18bpp
-         * only), which is one of the reasons this panel is on a parallel
-         * bus in the first place.
+         * setBitDepth(16): RGB565.
          */
         cmd(CMD_COLMOD, { 0x55 });
         delay(10);
@@ -413,10 +385,8 @@ namespace
 
     /**
      * Deliberately not via cmd(): both callers have already established
-     * that nothing is in flight (flush() by its own wait_for_transfer,
-     * push_task by construction -- flush_end() waited before handing it
-     * anything), and cmd()'s wait would deadlock the push task, which
-     * runs while s_in_flight is true by definition.
+     * that nothing is in flight, and cmd()'s wait would deadlock the push task,
+     * which runs while s_in_flight is true by definition.
      */
     void set_window(int32_t x1, int32_t y1, int32_t x2, int32_t y2)
     {
@@ -433,7 +403,7 @@ namespace
     }
 
     /**
-     * Starts one colour DMA. On failure, releases the waiter that
+     * Starts one color DMA. On failure, releases the waiter that
      * flush()/flush_end() left behind, since no transfer-done ISR is
      * coming.
      */
@@ -457,9 +427,7 @@ namespace
     /**
      * Whole-frame mode's other half: waits for a band from flush_end(),
      * then for the panel's next TE edge, then issues the DMA. The edge
-     * it wants is the *next* one -- one that fired while nothing was
-     * pending marks a scan already under way -- so any stale give is
-     * drained first.
+     * it wants is the *next* one, so any stale give is drained first.
      */
     void push_task(void *)
     {
@@ -506,11 +474,8 @@ DashS3Display &DashS3Display::instance()
 void DashS3Display::begin()
 {
     /**
-     * Park the backlight low before touching the panel at all, and keep
-     * it there after init: the panel's GRAM is stale from power-on until
-     * the first real frame lands, so it is on the caller (see main.cpp's
-     * display_flush_cb) to light the backlight once that has happened.
-     * On the PAM2804 a held-low EN is a true shutdown (<1uA).
+     * Keep backlight off during initialization. Backlight should only be turned
+     * on once the first LVGL frame has been written.
      */
     pinMode(DASH_S3_PIN_LCD_BL, OUTPUT);
     digitalWrite(DASH_S3_PIN_LCD_BL, LOW);
@@ -550,7 +515,7 @@ void DashS3Display::begin()
     /**
      * Draw buffers are static arrays in internal SRAM (main.cpp), so
      * the PSRAM alignment is moot but must be non-zero. Anything DMA'd
-     * from here must be internal memory -- with SPIRAM_USE_MALLOC, a
+     * from here must be internal memory. With SPIRAM_USE_MALLOC, a
      * malloc() over 4KB lands in PSRAM, which the LCD DMA can't fetch
      * from at this alignment. main.cpp's buffers are `alignas(4)`
      * statics in .bss, which is exactly right.
@@ -569,28 +534,18 @@ void DashS3Display::begin()
     esp_lcd_panel_io_i80_config_t io_cfg = {};
     io_cfg.cs_gpio_num                   = DASH_S3_PIN_LCD_CS;
     io_cfg.pclk_hz                       = LCD_BUS_HZ;
+    io_cfg.trans_queue_depth             = 2;
+    io_cfg.on_color_trans_done           = trans_done_cb;
+    io_cfg.user_ctx                      = nullptr;
+    io_cfg.lcd_cmd_bits                  = 8;
+    io_cfg.lcd_param_bits                = 8;
+    io_cfg.dc_levels.dc_idle_level       = 0;
+    io_cfg.dc_levels.dc_cmd_level        = 0;
+    io_cfg.dc_levels.dc_dummy_level      = 0;
+    io_cfg.dc_levels.dc_data_level       = 1;
     /**
-     * One transfer in flight plus one queued is all flush() ever asks
-     * for -- see its comment.
-     */
-    io_cfg.trans_queue_depth        = 2;
-    io_cfg.on_color_trans_done      = trans_done_cb;
-    io_cfg.user_ctx                 = nullptr;
-    io_cfg.lcd_cmd_bits             = 8;
-    io_cfg.lcd_param_bits           = 8;
-    io_cfg.dc_levels.dc_idle_level  = 0;
-    io_cfg.dc_levels.dc_cmd_level   = 0;
-    io_cfg.dc_levels.dc_dummy_level = 0;
-    io_cfg.dc_levels.dc_data_level  = 1;
-    /**
-     * Byte order. LVGL renders RGB565 little-endian, i.e. the low byte
-     * of each pixel sits first in memory, while the panel wants the high
-     * byte on the first strobe (ILI948x_t4_mm's DMA path shifts out
-     * `buf >> 8` then `buf & 0xFF`). The LCD_CAM peripheral swaps
-     * adjacent bytes in hardware on the way out, for free. If colours
-     * come out subtly wrong (blues/greens smeared, reds washed out),
-     * this is the flag to suspect; the software fallback is to run
-     * lv_draw_sw_rgb565_swap() over the buffer inside flush().
+     * Byte order. LVGL renders RGB565 little-endian. Change if colors come out
+     * weird.
      */
     io_cfg.flags.swap_color_bytes = 1;
 
@@ -610,7 +565,7 @@ void DashS3Display::set_orientation(DisplayOrientation orientation,
                                     bool               flipped)
 {
     /**
-     * cmd() waits out any in-flight colour transfer first, so a live flip
+     * cmd() waits out any in-flight color transfer first, so a live flip
      * can't interleave with a frame still going out.
      */
     if (orientation == DisplayOrientation::Portrait)
@@ -646,11 +601,18 @@ void DashS3Display::flush(
     if (s_direct)
     {
         /**
-         * Whole-frame mode: `pixels` is the base of the frame buffer
-         * LVGL rendered this pass into, and (x1,y1)-(x2,y2) one of the
-         * areas it changed. Rows of a frame buffer are contiguous, so
-         * the union of the rows touched is one DMA at full width; x is
-         * irrelevant. Nothing moves until flush_end().
+         * Whole-frame mode.
+         *
+         * `pixels` is the base of the frame buffer LVGL rendered this pass
+         * into.
+         *
+         * (x1,y1)-(x2,y2) is one of the areas that changed with the most recent
+         * render.
+         *
+         * Rows of a frame buffer are contiguous, so the union of the
+         * rows touched is one DMA at full width.
+         *
+         * Nothing moves until flush_end().
          */
         (void)x1;
         (void)x2;
@@ -670,17 +632,9 @@ void DashS3Display::flush(
     }
 
     /**
-     * Banded mode. Same contract as the Teensy driver's
-     * pushPixels16bitDMA: block until any *prior* transfer has
-     * completed, then start this one and return -- so returning from
-     * here means the flush is issued, not that its pixels have landed.
-     * main.cpp calls lv_display_flush_ready synchronously on the
-     * strength of exactly this: LVGL alternates its two draw buffers, so
-     * the one still being DMA'd out is never the one it renders into
-     * next, and the next flush's own entry-wait covers the gap. The
-     * frame's last flush is genuinely still in flight on return, which
-     * is why main.cpp waits for the display to go quiet before lighting
-     * the backlight rather than trusting lv_display_flush_is_last().
+     * Banded mode.
+     *
+     * Follows pushPixels16bitDMA from ILI948x_t4_mm.
      */
     uint32_t wait_us = wait_for_transfer();
 
@@ -765,13 +719,6 @@ void DashS3Display::flush_end()
     }
     s_pass_dirty = false;
 
-    /**
-     * The wait here is what keeps the two buffers straight: LVGL renders
-     * the next pass into the other buffer, which is the one the previous
-     * push read from, so that push must be complete -- not merely
-     * started -- before this returns. It also means s_pending is free to
-     * overwrite: the task copied it before issuing that DMA.
-     */
     uint32_t wait_us = wait_for_transfer();
 
     s_pending.base  = s_pass_base;
@@ -798,15 +745,12 @@ void DashS3Display::set_backlight(uint8_t pct)
     }
 
     /**
-     * The user-facing 0-100% maps onto MIN_BACKLIGHT_PCT-100% duty, so
-     * "0%" is the dimmest the panel goes rather than off -- the
-     * distinction IDisplay::set_backlight_off() exists to draw.
+     * I don't want the lowest brightness on the display to actually be off when
+     * adjusted by the user, so 0-100% brightness doesn't actually go all the
+     * way down to 0%.
      *
-     * The floor keeps the dimmest setting visibly lit: each EN pulse
-     * starts with the PAM2804's soft-start, so at a 2ms period the
-     * shortest pulses deliver less current than their duty suggests.
-     * Raise it if the low end drops to black early, lower it if the
-     * dimmest setting is still too bright at night.
+     * For PCB v5, I found that 2% here is the lowest the backlight driver can
+     * go.
      */
     constexpr uint32_t MIN_BACKLIGHT_PCT = 2;
     uint32_t           effective_pct
@@ -818,12 +762,5 @@ void DashS3Display::set_backlight(uint8_t pct)
 
 void DashS3Display::set_backlight_off()
 {
-    /**
-     * Deliberately not set_backlight(0), which floors at
-     * MIN_BACKLIGHT_PCT and would leave the panel dimly lit -- still
-     * bright enough to show the transition this is meant to hide. Duty
-     * 0 holds the pin low continuously, which is the PAM2804's
-     * shutdown state.
-     */
     ledcWrite(BL_LEDC_CHANNEL, 0);
 }

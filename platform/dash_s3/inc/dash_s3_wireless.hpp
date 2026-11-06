@@ -3,7 +3,7 @@
  * @brief The S3's own Wi-Fi standing in for the ESP32-C3 relay. The C3's
  * whole relay (esp32::RelayApp: SoftAP lifecycle, the phone-facing config
  * form) runs in-process here, on its own task, and this class is the
- * ISerialLink main.cpp hands to remote::server -- the dash end of an
+ * ISerialLink main.cpp hands to remote::server, the dash end of an
  * in-memory pipe whose other end feeds the relay. Neither side changed:
  * remote::server still writes CMD_AP_ENABLE frames and waits for
  * EVT_AP_READY; RelayApp still decodes them and stands up the AP. Only
@@ -26,15 +26,7 @@ class DashS3Wireless : public ISerialLink
         void   begin(uint32_t baud) override;
         size_t read(uint8_t *buf, size_t len) override;
         size_t write(const uint8_t *buf, size_t len) override;
-
-        /**
-         * Whether the relay task has got through start-up -- Wi-Fi
-         * initialised, the config and update pages registered -- and is
-         * still coming round. A new firmware isn't kept without it
-         * (platform_update_path_ready()): the next update arrives through
-         * it.
-         */
-        bool relay_running() const;
+        bool   relay_running() const;
 
     private:
         DashS3Wireless() = default;

@@ -66,7 +66,7 @@ def _auto_span(payload: bytes) -> tuple[int, int]:
 class ByteStrip(QWidget):
     """The newest payload as byte cells. Bytes that differ across the
     samples are tinted amber; the field's bytes are outlined in the accent
-    colour. Click a byte, or drag across up to four, to pick the field."""
+    color. Click a byte, or drag across up to four, to pick the field."""
 
     rangeSelected = QtSignal(int, int)  # start, length
 

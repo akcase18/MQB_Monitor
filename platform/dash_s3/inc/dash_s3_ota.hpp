@@ -13,10 +13,9 @@
  *
  * Uploads are refused outside update mode, which only the panel can turn
  * on (CMD_OTA_ARM, once someone taps Start on its "Update firmware?"
- * popup) -- so a phone on the AP can't take over the dash's screen, let
- * alone its flash, without someone in the car agreeing first.
+ * popup).
  *
- * The body is streamed straight into the inactive app slot -- nothing is
+ * The body is streamed straight into the inactive app slot, nothing is
  * buffered beyond its first FIRMWARE_ID_END bytes, which are held back
  * until the image has been identified (dash_s3_check_image()), so a wrong
  * file is refused before anything is erased. esp_ota_end() then checks
@@ -24,9 +23,9 @@
  *
  * None of that changes what boots. The panel is told how it's going
  * (EVT_OTA_BEGIN/PROGRESS/RESULT) and the slot is only switched on
- * CMD_OTA_COMMIT, which the dash sends once someone taps Install there. Arduino's Update
- * library is deliberately not used: its end() switches the boot slot
- * itself.
+ * CMD_OTA_COMMIT, which the dash sends once someone taps Install there.
+ * Arduino's Update library is deliberately not used: its end() switches the
+ * boot slot itself.
  *
  * Runs entirely on the relay task, like the rest of RelayApp.
  */
@@ -39,7 +38,9 @@
 #include "relay_app.hpp"
 #include "remote_protocol.hpp"
 
-class DashS3Updater : public esp32::RelayExtension, private RequestHandler
+class DashS3Updater
+    : public esp32::RelayExtension
+    , private RequestHandler
 {
     public:
         void attach(WebServer &server, esp32::RelayLink &link) override;
@@ -112,19 +113,19 @@ class DashS3Updater : public esp32::RelayExtension, private RequestHandler
         bool                        ota_begun_         = false;
         bool                        idle_watchdog_off_ = false;
         remote::protocol::OtaResult result_ = remote::protocol::OtaResult::Ok;
-        const esp_partition_t      *slot_       = nullptr;
+        const esp_partition_t      *slot_   = nullptr;
         esp_ota_handle_t            ota_handle_ = 0;
         uint32_t                    total_      = 0;
         uint32_t                    written_    = 0;
         uint32_t                    reported_   = 0;
         uint8_t                     head_[FIRMWARE_ID_END];
-        size_t                      head_len_ = 0;
+        size_t                      head_len_                      = 0;
         char                        version_[FIRMWARE_VERSION_LEN] = "";
 
         /**
          * A verified image waiting on CMD_OTA_COMMIT; null when there's
          * none. Any new upload clears it -- it overwrites the same slot.
          */
-        const esp_partition_t *ready_slot_ = nullptr;
+        const esp_partition_t *ready_slot_                          = nullptr;
         char                   ready_version_[FIRMWARE_VERSION_LEN] = "";
 };

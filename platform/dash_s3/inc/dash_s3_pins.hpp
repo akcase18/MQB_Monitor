@@ -6,26 +6,20 @@
  * The defaults below are the dash PCB's pinout (ESP32-S3-WROOM-1 N16R2).
  * Each is a `-D` an `[env:]` can override, which is how
  * env:dash_s3_devkit puts back the old N16R8 DevKitC-1 bench wiring.
- * Changing one is a line in `platformio.ini`, not an edit to a driver.
+ * Changing one is a line in `platformio.ini`.
  *
  * ## Pins to avoid
  *
- * | Pins | Why not |
- * |---|---|
- * | 0, 3, 45, 46 | Strapping pins -- sampled at reset, so a pull on one changes boot mode |
- * | 19, 20 | Native USB D-/D+ (the console) |
- * | 26-32 | SPI flash bus |
- * | 33-37 | Octal PSRAM bus on R8 modules only. The PCB's R2 has quad PSRAM on the flash bus, which frees these; the panel uses 35-37 |
- *
- * The panel runs 8 data lines (PARALLEL_0-7 on the schematic);
- * PARALLEL_8-15 are no-connects.
+ * - 0, 3, 45, 46: Strapping pins.
+ * - 19, 20:       Dedicated USB D-/D+
+ * - 26, 32:       SPI flash bus
  */
 #pragma once
 
 /**
  * ----------------------------------------------------------------------
  * Display -- ILI9488 over an 8-bit 8080 parallel bus (LCD_CAM i80).
- * Write-only: RD is tied to 3V3 on the panel side, as on the Teensy.
+ * Write-only.
  * ---------------------------------------------------------------------
  */
 
@@ -53,9 +47,6 @@
 #ifndef DASH_S3_PIN_LCD_D7
     #define DASH_S3_PIN_LCD_D7 35
 #endif
-/**
- * Write strobe. The i80 peripheral calls this PCLK.
- */
 #ifndef DASH_S3_PIN_LCD_WR
     #define DASH_S3_PIN_LCD_WR 21
 #endif
@@ -92,8 +83,8 @@
 
 /**
  * ----------------------------------------------------------------------
- * Touch -- FT6236 over I2C at 0x38. INT (TOUCH_PEN_INT, IO12 on the
- * PCB) is not used (polled).
+ * Capacitive touch: FT6236 over I2C at 0x38. INT (TOUCH_PEN_INT, IO12 on
+ * the PCB) is not used (polled).
  * ---------------------------------------------------------------------
  */
 
@@ -109,7 +100,7 @@
 
 /**
  * ----------------------------------------------------------------------
- * Resistive touch -- XPT2046 over SPI, the alternative to the FT6236
+ * Resistive touch: XPT2046 over SPI, the alternative to the FT6236
  * above; only one is wired at a time (dash_s3_platform.cpp picks). On the
  * ER-TFTM035-6 breakout this is JP1 pins 30 (RTP_/CS), 32 (SDO -> MISO),
  * 33 (SCL -> SCK), 34 (SDI -> MOSI). /RTP_PEN (pin 31) is unused.
@@ -135,7 +126,7 @@
 
 /**
  * ----------------------------------------------------------------------
- * CAN -- the S3's TWAI controller, through an external 3.3V transceiver
+ * CAN: the S3's TWAI controller, through an external 3.3V transceiver
  * (SN65HVD230 / TJA1051T/3). TX goes to the transceiver's TXD (D), RX
  * comes from its RXD (R).
  * ---------------------------------------------------------------------

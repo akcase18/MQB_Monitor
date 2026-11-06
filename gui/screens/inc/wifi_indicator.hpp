@@ -21,7 +21,7 @@ namespace gui
             /**
              * Creates the glyph, hidden. Not tied to a screen, so a
              * screen rebuild (a new accent) must destroy() and init()
-             * it again to recolour it.
+             * it again to recolor it.
              */
             void init(const Theme &theme);
             void destroy();
@@ -33,8 +33,8 @@ namespace gui
             void set_state(bool active, bool phone_joined);
 
         private:
-            lv_obj_t  *icon_   = nullptr;
-            lv_color_t idle_   {};
+            lv_obj_t  *icon_ = nullptr;
+            lv_color_t idle_ {};
             lv_color_t joined_ {};
             bool       shows_joined_ = false;
     };

@@ -1,8 +1,7 @@
 /**
  * @file dash_s3_touch.hpp
  * @brief ITouch for the dash's FT6236 capacitive touch controller over
- * I2C. Same controller and same panel as the Teensy's teensy_cap_touch --
- * only the bus pins and the I2C library's timeout handling differ.
+ * I2C. Based off Teensy's capacitive touch library.
  */
 #pragma once
 
