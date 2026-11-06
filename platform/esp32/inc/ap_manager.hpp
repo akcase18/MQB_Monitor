@@ -17,14 +17,18 @@ namespace esp32
             void disable();
             bool is_enabled() const;
 
-            /** Fills `ip_out[4]` with the SoftAP's IPv4 address, matching
+            /**
+             * Fills `ip_out[4]` with the SoftAP's IPv4 address, matching
              * remote::protocol::ApReadyWire.ip's layout. Only meaningful
              * once is_enabled() is true — WiFi.softAP() is synchronous on
              * the Arduino-ESP32 core, so this is safe to call immediately
-             * after enable() returns. */
+             * after enable() returns.
+             */
             void get_ip(uint8_t ip_out[4]) const;
 
-            /** Phones joined to the AP; 0 while it's down. */
+            /**
+             * Phones joined to the AP; 0 while it's down.
+             */
             uint8_t station_count() const;
 
         private:

@@ -27,7 +27,8 @@ bool Esp32ConfigStore::read(uint32_t offset, void *buf, size_t len)
      * EEPROM needs none -- and adding one to the interface for this MCU
      * alone would make every other implementation carry an empty method.
      * So the region opens itself on first use, which is the same trick
-     * Esp32Storage uses for its mount. */
+     * Esp32Storage uses for its mount.
+     */
     begin();
 
     if (!began_ || buf == nullptr || (offset + len) > CAPACITY_BYTES)
@@ -53,7 +54,8 @@ bool Esp32ConfigStore::write(uint32_t offset, const void *buf, size_t len)
     /**
      * Committed here rather than batched -- see the header. IConfigStore
      * has no flush, so a caller is entitled to assume durability on
-     * return. */
+     * return.
+     */
     return EEPROM.commit();
 }
 

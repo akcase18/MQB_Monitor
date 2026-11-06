@@ -7,9 +7,11 @@ namespace core
     {
         constexpr uint8_t SID_READ_DATA_BY_ID = 0x22;
 
-        /* requestCorrectlyReceived-ResponsePending: the one NRC that does
+        /**
+         * requestCorrectlyReceived-ResponsePending: the one NRC that does
          * not end a request. Everything else is a final (if unhappy)
-         * answer. */
+         * answer.
+         */
         constexpr uint8_t NRC_RESPONSE_PENDING = 0x78;
     } // namespace
 
@@ -61,11 +63,13 @@ namespace core
             priority_count = count;
         }
 
-        /* An unchanged list rebuilds to exactly the same table, and
+        /**
+         * An unchanged list rebuilds to exactly the same table, and
          * rebuilding resets every entry's cadence and backoff state. This
          * is called from a periodic backstop task as well as from the
          * config-change callbacks, so bailing here is what keeps the
-         * backstop free. */
+         * backstop free.
+         */
         if (count == active_count_ && priority_count == active_priority_count_)
         {
             bool same = true;
@@ -147,10 +151,12 @@ namespace core
                 entry.period_ms = spec.cycle_time_ms;
                 entry.misses    = 0;
                 entry.priority  = priority;
-                /* Due immediately: a freshly displayed panel should fill
+                /**
+                 * Due immediately: a freshly displayed panel should fill
                  * in as fast as the ECU will answer rather than sitting
                  * on "--" for a cycle. Flow control still serializes the
-                 * resulting rush. */
+                 * resulting rush.
+                 */
                 entry.next_due_ms = now;
             }
         }
@@ -161,10 +167,12 @@ namespace core
             has_background_ = has_background_ || !entries_[i].priority;
         }
 
-        /* Whatever was outstanding belongs to the old table, and
+        /**
+         * Whatever was outstanding belongs to the old table, and
          * in_flight_idx_ indexes into one that no longer exists. Its
          * response will still reach SignalStore through
-         * UdsClient::poll(); it just no longer gates the next send. */
+         * UdsClient::poll(); it just no longer gates the next send.
+         */
         in_flight_ = false;
     }
 
@@ -178,9 +186,11 @@ namespace core
 
         for (uint8_t i = 0; i < count_; i++)
         {
-            /* Signed difference so this wraps correctly across millis()
+            /**
+             * Signed difference so this wraps correctly across millis()
              * overflow, the same way core::Scheduler::tick() relies on
-             * unsigned subtraction wrapping. */
+             * unsigned subtraction wrapping.
+             */
             int32_t overdue
                 = static_cast<int32_t>(now_ms - entries_[i].next_due_ms);
             if (overdue < 0)
@@ -188,13 +198,15 @@ namespace core
                 continue;
             }
 
-            /* Most-overdue-first, not round-robin by index. When demand
+            /**
+             * Most-overdue-first, not round-robin by index. When demand
              * exceeds what the ECU can serve, index order would let the
              * front of the table permanently starve the back -- which is
              * the failure being fixed here. Overdue-ness accumulates on
              * whoever is being skipped, so every entry in a tier gets
              * served and they degrade proportionally to their cycle
-             * times. */
+             * times.
+             */
             uint8_t tier = entries_[i].priority ? 1 : 0;
             if (best[tier] < 0 || overdue > best_overdue[tier])
             {
@@ -304,9 +316,11 @@ namespace core
         Entry &entry = entries_[in_flight_idx_];
         if (entry.ecu != ecu || entry.byte1 != byte1 || entry.byte2 != byte2)
         {
-            /* Some other tester's traffic, or a late answer to a request
+            /**
+             * Some other tester's traffic, or a late answer to a request
              * that already timed out. Either way it is not what this slot
-             * is waiting on, so it must not free it. */
+             * is waiting on, so it must not free it.
+             */
             return;
         }
 
@@ -326,19 +340,23 @@ namespace core
 
         if (nrc == NRC_RESPONSE_PENDING)
         {
-            /* "Still working, keep waiting" -- restarting the deadline is
+            /**
+             * "Still working, keep waiting" -- restarting the deadline is
              * the entire point of this NRC. Freeing the slot instead
              * would put the next request on the wire while the ECU is
-             * still composing this one's answer. */
+             * still composing this one's answer.
+             */
             sent_at_ms_ = clock_.millis();
             return;
         }
 
-        /* Any other NRC is a final answer: the request is done, badly.
+        /**
+         * Any other NRC is a final answer: the request is done, badly.
          * Releasing the slot now rather than sitting out the full timeout
          * is most of the point of reading these at all. It counts as a
          * miss, so a DID this ECU consistently rejects backs off exactly
-         * like one that never answers. */
+         * like one that never answers.
+         */
         Entry &entry = entries_[in_flight_idx_];
         if (entry.misses < MISSES_BEFORE_BACKOFF)
         {

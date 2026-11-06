@@ -1,12 +1,11 @@
 /**
  * @file platform.hpp
- * @brief Hardware abstraction interfaces. Implemented once per supported
- * board under platform/<board>/. Exactly one implementation is linked into
- * a given build (see platformio.ini's per-env build_src_filter) so nothing
- * outside platform/ ever needs an #ifdef to pick a board. IStorage is an
- * exception: platform/teensy compiles two implementations (Micro-SD and
- * onboard flash) simultaneously, switched via a single #define in
- * teensy_platform.cpp -- see that file.
+ * @brief Hardware abstraction interfaces, with 1 implementation per supported
+ * board in platform/. Exactly one implementation is linked into a given build
+ * (see platformio.ini's per-env build_src_filter) so nothing outside platform/
+ * ever needs an #ifdef to pick a board. IStorage is an exception:
+ * platform/teensy compiles two implementations (Micro-SD and onboard flash)
+ * simultaneously, switched via a single #define in teensy_platform.cpp.
  */
 #pragma once
 
@@ -44,11 +43,15 @@ constexpr uint8_t SNIFF_FLAG_REMOTE   = 0x02;
 
 struct SniffStats
 {
-        /** Frames taken off the bus since sniff_begin(). */
+        /**
+         * Frames taken off the bus since sniff_begin().
+         */
         uint32_t rx;
 
-        /** Frames lost because the sniff ring was full -- the host fell
-         * behind. Nonzero means the capture has gaps. */
+        /**
+         * Frames lost because the sniff ring was full -- the host fell
+         * behind. Nonzero means the capture has gaps.
+         */
         uint32_t dropped;
 };
 
@@ -91,7 +94,7 @@ class ICanBus
          */
         virtual bool receive(CanFrame &out) = 0;
 
-        /*
+        /**
          * Sniffer mode -- an opt-in that boards without it never have to
          * think about: every default below reports "unsupported".
          *
@@ -115,16 +118,22 @@ class ICanBus
             return false;
         }
 
-        virtual void sniff_end() {}
+        virtual void sniff_end()
+        {
+        }
 
-        /** Non-blocking; oldest buffered frame first. */
+        /**
+         * Non-blocking; oldest buffered frame first.
+         */
         virtual bool sniff_read(SniffFrame &out)
         {
             (void)out;
             return false;
         }
 
-        /** Ignored (returns false) when sniffing listen-only. */
+        /**
+         * Ignored (returns false) when sniffing listen-only.
+         */
         virtual bool sniff_send(const SniffFrame &frame)
         {
             (void)frame;
@@ -133,7 +142,7 @@ class ICanBus
 
         virtual SniffStats sniff_stats() const
         {
-            return SniffStats{0, 0};
+            return SniffStats { 0, 0 };
         }
 };
 
@@ -170,8 +179,7 @@ class IDisplay
          * panel mid-change.
          */
         virtual void set_orientation(DisplayOrientation orientation,
-                                     bool               flipped)
-            = 0;
+                                     bool               flipped) = 0;
 
         /**
          * Reports the panel's current resolution (post-rotation).
@@ -286,8 +294,7 @@ class ITouch
          * rules.
          */
         virtual void set_orientation(DisplayOrientation orientation,
-                                     bool               flipped)
-            = 0;
+                                     bool               flipped) = 0;
 
         /**
          * Polls touch controller. Fills `out` if data is available.
@@ -366,9 +373,9 @@ class ISerialLink
 
 enum class StorageFileMode
 {
-        Read,  /* Existing file; fails if missing. */
-        Write, /* Create/truncate from scratch. */
-        Append /* Create if missing, else write from end-of-file. */
+    Read,  /* Existing file; fails if missing. */
+    Write, /* Create/truncate from scratch. */
+    Append /* Create if missing, else write from end-of-file. */
 };
 
 /**
@@ -379,9 +386,9 @@ enum class StorageFileMode
  */
 enum class StorageMedium
 {
-        Flash,        /* The MCU's own internal program flash. */
-        SdCard,       /* A removable Micro-SD card. */
-        HostDirectory /* A plain directory -- the desktop simulator. */
+    Flash,        /* The MCU's own internal program flash. */
+    SdCard,       /* A removable Micro-SD card. */
+    HostDirectory /* A plain directory -- the desktop simulator. */
 };
 
 /**
@@ -440,10 +447,12 @@ class IStorage
         virtual size_t write(const void *buf, size_t len) = 0;
 
         virtual bool exists(const char *path) const = 0;
-        virtual bool remove(const char *path)        = 0;
+        virtual bool remove(const char *path)       = 0;
 
-        /** Which medium is behind this store. Compile-time constant per
-         * implementation; see StorageMedium. */
+        /**
+         * Which medium is behind this store. Compile-time constant per
+         * implementation; see StorageMedium.
+         */
         virtual StorageMedium medium() const = 0;
 };
 
@@ -506,10 +515,14 @@ Platform &platform_get();
  * that reports nothing to do.
  =============================================================================*/
 
-/** Version strings, NUL included, are at most this long. */
+/**
+ * Version strings, NUL included, are at most this long.
+ */
 constexpr size_t FIRMWARE_VERSION_LEN = 32;
 
-/** The running firmware's version, for showing the user. Never null. */
+/**
+ * The running firmware's version, for showing the user. Never null.
+ */
 const char *platform_firmware_version();
 
 /**

@@ -21,7 +21,8 @@ namespace
     constexpr uint8_t FT6236_I2C_ADDR      = 0x38;
     constexpr uint8_t FT6236_REG_TD_STATUS = 0x02;
 
-    /* Touch-detection threshold: how hard a press has to be before the
+    /**
+     * Touch-detection threshold: how hard a press has to be before the
      * controller reports it. LOWER = lighter touches register.
      *
      * IMPORTANT -- the register address here is NOT confirmed against a
@@ -39,7 +40,8 @@ namespace
      *
      * Set FT6236_THRESHOLD to 0 to leave the controller's default alone.
      * The controller holds this in RAM, not flash, so it is re-applied on
-     * every boot by design. */
+     * every boot by design.
+     */
     constexpr uint8_t  FT6236_REG_THRESHOLD = 0x80;
     constexpr uint8_t  FT6236_THRESHOLD     = 0; /* 0 = leave default */
     constexpr uint32_t RESET_LOW_MS         = 10;
@@ -52,22 +54,28 @@ namespace
 
     constexpr uint32_t I2C_FREQ_HZ = 400000;
 
-    /* Arduino-ESP32's Wire defaults to a 50ms timeout per transaction.
+    /**
+     * Arduino-ESP32's Wire defaults to a 50ms timeout per transaction.
      * read() runs every 10ms from LVGL's indev timer, so a controller
      * that is unplugged, unpowered or wedged would stall the UI for five
      * times longer than the poll period on every poll. A 5-byte read at
-     * 400kHz is ~150us; 5ms is thirty times that. */
+     * 400kHz is ~150us; 5ms is thirty times that.
+     */
     constexpr uint16_t I2C_TIMEOUT_MS = 5;
 
-    /* The panel's LONG edge, and the full span of the controller's raw Y
+    /**
+     * The panel's LONG edge, and the full span of the controller's raw Y
      * axis. Both orientations invert against this same 480 because raw Y
      * always runs along the long edge, whichever way the display is
      * rotated -- see read(). Must track dash_s3_display.cpp's LCD_HORZ;
      * duplicated here rather than shared since ITouch::set_orientation()
-     * doesn't pass a resolution. */
+     * doesn't pass a resolution.
+     */
     constexpr uint16_t LCD_HORZ = 480;
-    /* The short edge -- only needed to rotate a point 180 degrees within
-     * the screen (see flip_touch_point()). */
+    /**
+     * The short edge -- only needed to rotate a point 180 degrees within
+     * the screen (see flip_touch_point()).
+     */
     constexpr uint16_t LCD_VERT = 320;
 } // namespace
 
@@ -119,10 +127,12 @@ void DashS3Touch::begin()
     Wire.begin(DASH_S3_PIN_TOUCH_SDA, DASH_S3_PIN_TOUCH_SCL, I2C_FREQ_HZ);
     Wire.setTimeOut(I2C_TIMEOUT_MS);
 
-    /* Read the threshold back before touching it -- see FT6236_REG_THRESHOLD.
+    /**
+     * Read the threshold back before touching it -- see FT6236_REG_THRESHOLD.
      * This is the only evidence we have that the address is real. It
      * doubles as the presence probe: on a bench with no touch panel
-     * wired, read() must not spend every poll timing out on the bus. */
+     * wired, read() must not spend every poll timing out on the bus.
+     */
     uint8_t before = 0;
     present_       = read_reg(FT6236_REG_THRESHOLD, before);
     if (present_)
@@ -184,11 +194,14 @@ bool DashS3Touch::read(TouchPoint &out)
         }
     }
 
-    /* Last valid position retained across release -- LVGL finalizes a
-     * drag-release from this exact point. */
+    /**
+     * Last valid position retained across release -- LVGL finalizes a
+     * drag-release from this exact point.
+     */
     out.pressed = pressed;
 
-    /* The FT6236 reports in the panel's NATIVE portrait frame regardless of
+    /**
+     * The FT6236 reports in the panel's NATIVE portrait frame regardless of
      * how the display is rotated: raw X spans 0-319 (the panel's short
      * edge), raw Y spans 0-479 (the long edge).
      *
@@ -204,7 +217,8 @@ bool DashS3Touch::read(TouchPoint &out)
      * because raw Y always runs along the panel's LONG edge whichever way
      * the display is rotated. That asymmetry is real, not a typo. If the
      * MADCTL values in the display driver change, re-derive these from
-     * the Teensy's measurements rather than re-measuring from scratch. */
+     * the Teensy's measurements rather than re-measuring from scratch.
+     */
     if (orientation_ == DisplayOrientation::Portrait)
     {
         out.x = x_val_;

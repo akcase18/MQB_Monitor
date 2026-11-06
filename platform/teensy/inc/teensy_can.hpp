@@ -24,7 +24,9 @@ class TeensyCanBus : public ICanBus
     private:
         TeensyCanBus() = default;
 
-        /* begin()'s arguments, so sniff_end() can put them back. */
+        /**
+         * begin()'s arguments, so sniff_end() can put them back.
+         */
         uint32_t rx_id_lo_ = 0;
         uint32_t rx_id_hi_ = 0;
         uint32_t baud_     = 0;

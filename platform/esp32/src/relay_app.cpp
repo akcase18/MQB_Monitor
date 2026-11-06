@@ -10,8 +10,10 @@ namespace esp32
 
     namespace
     {
-        /* How often the station count is read. A phone leaving shows on
-         * the panel within this. */
+        /**
+         * How often the station count is read. A phone leaving shows on
+         * the panel within this.
+         */
         constexpr uint32_t STATIONS_POLL_MS = 500;
     } // namespace
 
@@ -25,7 +27,8 @@ namespace esp32
 
     void RelayApp::begin()
     {
-        /* Touching WiFi for the first time lazily inside on_frame() (on
+        /**
+         * Touching WiFi for the first time lazily inside on_frame() (on
          * the first real CMD_AP_ENABLE, which could arrive at any point
          * after boot) races the ESP-IDF lwIP task's own startup --
          * observed as a hard crash ("assert failed: tcpip_send_msg_wait_sem
@@ -33,7 +36,8 @@ namespace esp32
          * mode transition once here instead gives that internal task the
          * rest of boot to settle before anything calls into WiFi again.
          * Stays disconnected (no AP broadcasting) until a real
-         * CMD_AP_ENABLE. */
+         * CMD_AP_ENABLE.
+         */
         WiFi.mode(WIFI_AP);
         WiFi.softAPdisconnect(true);
 
@@ -52,9 +56,11 @@ namespace esp32
         report_stations(now_ms);
     }
 
-    /* Polled rather than taken from Wi-Fi's station events, which run on
+    /**
+     * Polled rather than taken from Wi-Fi's station events, which run on
      * the Wi-Fi task: this way the count only ever goes out from the
-     * relay's own loop, like every other frame. */
+     * relay's own loop, like every other frame.
+     */
     void RelayApp::report_stations(uint32_t now_ms)
     {
         if (now_ms - stations_checked_ms_ < STATIONS_POLL_MS)

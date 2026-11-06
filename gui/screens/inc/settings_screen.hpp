@@ -51,39 +51,53 @@ namespace gui
     class SettingsScreen
     {
         public:
-            /** Fired every time this screen hands control away — the X
+            /**
+             * Fired every time this screen hands control away — the X
              * button, but also the Theme and WiFi rows. Those two used to
              * navigate off without reporting anything, so a panel-count or
              * brightness edit made just before tapping one was silently
              * dropped: the Theme row's pick rebuilds every screen from the
              * config store, and the WiFi row's AP hands the phone whatever
              * the store currently holds. Both then read back values the
-             * user had already changed on screen. */
+             * user had already changed on screen.
+             */
             using CommitCallback = void (*)(void          *ctx,
                                             uint8_t        day_brightness_pct,
                                             uint8_t        night_brightness_pct,
                                             uint8_t        auto_brightness_pct,
                                             BrightnessMode brightness_mode,
                                             uint8_t        num_panels);
-            /** Fired only when the X button closes the screen, after
+            /**
+             * Fired only when the X button closes the screen, after
              * CommitCallback — purely the caller's cue to navigate back to
-             * the dashboard, which a hand-off to Theme/WiFi must not do. */
+             * the dashboard, which a hand-off to Theme/WiFi must not do.
+             */
             using DoneCallback = void (*)(void *ctx);
-            /** Fired immediately on every slider move and mode toggle —
+            /**
+             * Fired immediately on every slider move and mode toggle —
              * lets the caller preview the change on the real backlight
              * without waiting for Done. `brightness_pct` is the slider:
-             * the level in Day/Night, the shift's position in Auto. */
+             * the level in Day/Night, the shift's position in Auto.
+             */
             using PreviewBrightnessCallback = void (*)(void          *ctx,
                                                        BrightnessMode mode,
                                                        uint8_t brightness_pct);
-            /** Fired when the Theme row is tapped. */
+            /**
+             * Fired when the Theme row is tapped.
+             */
             using PickThemeCallback = void (*)(void *ctx);
-            /** Fired when the WiFi row is tapped. */
+            /**
+             * Fired when the WiFi row is tapped.
+             */
             using PickWirelessCallback = void (*)(void *ctx);
-            /** Fired when the Orientation row is tapped. */
+            /**
+             * Fired when the Orientation row is tapped.
+             */
             using PickOrientationCallback = void (*)(void *ctx);
 
-            /** firmware_version is shown small beside the title. */
+            /**
+             * firmware_version is shown small beside the title.
+             */
             void init(const Theme              &theme,
                       const char               *firmware_version,
                       uint8_t                   initial_day_brightness_pct,
@@ -133,23 +147,33 @@ namespace gui
             static void pick_wireless_cb_handler(lv_event_t *e);
             static void pick_orientation_cb_handler(lv_event_t *e);
 
-            /** Pulls the live slider and panel-count matrix into
+            /**
+             * Pulls the live slider and panel-count matrix into
              * day_/night_brightness_pct_/num_panels_, then hands all three
              * to commit_cb_. Runs on every exit from this screen, not just
-             * Done — see CommitCallback. */
+             * Done — see CommitCallback.
+             */
             void commit_pending();
 
-            /** Pushes the cached values below into every widget. */
+            /**
+             * Pushes the cached values below into every widget.
+             */
             void sync_widgets();
             void refresh_theme_swatch();
-            /** Brings the toggle's glyph in line with mode_. */
+            /**
+             * Brings the toggle's glyph in line with mode_.
+             */
             void refresh_mode_widgets();
-            /** Stores the slider's current value into whichever of day_/
+            /**
+             * Stores the slider's current value into whichever of day_/
              * night_/auto_brightness_pct_ the toggle currently selects —
              * called before every read of those members, so an edit made
-             * just before Done/toggling/closing is never lost. */
+             * just before Done/toggling/closing is never lost.
+             */
             void capture_slider_value();
-            /** The stored value for mode_ -- what the slider shows. */
+            /**
+             * The stored value for mode_ -- what the slider shows.
+             */
             uint8_t slider_value_for_mode() const;
 
             lv_obj_t *screen_             = nullptr;
@@ -163,7 +187,9 @@ namespace gui
             uint8_t           night_brightness_pct_ = 20;
             uint8_t           auto_brightness_pct_  = 50;
             BrightnessMode    mode_                 = BrightnessMode::Day;
-            /* Sun/moon glyphs, and the text font Auto's label uses. */
+            /**
+             * Sun/moon glyphs, and the text font Auto's label uses.
+             */
             const lv_font_t  *icon_font_            = nullptr;
             const lv_font_t  *mode_text_font_       = nullptr;
             uint8_t           num_panels_           = 5;

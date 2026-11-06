@@ -19,23 +19,33 @@ namespace protocol = remote::protocol;
 
 namespace
 {
-    /* Long enough that the spinner registers before the QR code. */
+    /**
+     * Long enough that the spinner registers before the QR code.
+     */
     constexpr uint32_t AP_START_MS = 400;
 
-    /* A plausible image: about what env:dash_s3 builds to. */
+    /**
+     * A plausible image: about what env:dash_s3 builds to.
+     */
     constexpr uint32_t    UPLOAD_BYTES   = 1235121;
     constexpr uint32_t    UPLOAD_MS      = 6000;
     constexpr uint32_t    PROGRESS_STEP  = 64u * 1024u; /* as DashS3Updater */
     constexpr const char *UPLOAD_VERSION = "v9.9.9-sim";
 
-    /* Long enough to see "Restarting..." before the window does. */
+    /**
+     * Long enough to see "Restarting..." before the window does.
+     */
     constexpr uint32_t INSTALL_MS = 1500;
 
-    /* 192.168.4.1, the S3 SoftAP's address. */
+    /**
+     * 192.168.4.1, the S3 SoftAP's address.
+     */
     constexpr uint8_t AP_IP[4] = { 192, 168, 4, 1 };
 
-    /* As index.html's KEEPALIVE_MS: well inside the dash's 60 s session
-     * timeout. */
+    /**
+     * As index.html's KEEPALIVE_MS: well inside the dash's 60 s session
+     * timeout.
+     */
     constexpr uint32_t PAGE_KEEPALIVE_MS = 20000;
 } // namespace
 
@@ -235,7 +245,9 @@ void SimulatorRelay::on_frame(const protocol::DecodedFrame &frame,
             break;
 
         default:
-            /* RESP_APPLY_RESULT: the fake page doesn't check. */
+            /**
+             * RESP_APPLY_RESULT: the fake page doesn't check.
+             */
             break;
     }
 }
@@ -297,7 +309,9 @@ void SimulatorRelay::run_upload(uint32_t now)
     }
 }
 
-/* Only a joined phone can open a page or ask for an update. */
+/**
+ * Only a joined phone can open a page or ask for an update.
+ */
 void SimulatorRelay::join_phone()
 {
     if (!phone_joined_)
@@ -308,7 +322,9 @@ void SimulatorRelay::join_phone()
     }
 }
 
-/* As the page's load(): read the state, and preview it once it's back. */
+/**
+ * As the page's load(): read the state, and preview it once it's back.
+ */
 void SimulatorRelay::open_page()
 {
     page_open_      = true;
@@ -317,10 +333,12 @@ void SimulatorRelay::open_page()
     printf("[sim] page opened\n");
 }
 
-/* RESP_STATE is the settings, the panels, the catalog, then each
+/**
+ * RESP_STATE is the settings, the panels, the catalog, then each
  * signal's config. A preview is the same minus the catalog, plus a value
  * per signal -- here part-way up each one's display range, so bars and
- * gauges show something. */
+ * gauges show something.
+ */
 void SimulatorRelay::preview_from_state(const protocol::DecodedFrame &state,
                                         uint32_t                      now)
 {

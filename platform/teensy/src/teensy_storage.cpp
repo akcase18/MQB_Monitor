@@ -12,7 +12,8 @@
 
 namespace
 {
-    /* This board's flash is 16MB; after firmware, teensy_size reports
+    /**
+     * This board's flash is 16MB; after firmware, teensy_size reports
      * ~16.02MB actually free for files. Sized against
      * core::CHUNK_COUNT * core::CHUNK_SIZE_BYTES (13MiB, see
      * core/logging/inc/logger.hpp) plus headroom for LittleFS's own
@@ -22,7 +23,8 @@ namespace
      * retention short of a bigger chip, and it's a small one: the ~15.3MB
      * ceiling is only ~18% above today's 14MB. Must stay the same
      * across begin()/is_present() calls -- LittleFS_Program carves this
-     * region out of flash by size, not by a persisted offset. */
+     * region out of flash by size, not by a persisted offset.
+     */
     constexpr uint32_t STORAGE_SIZE_BYTES = 14u * 1024u * 1024u;
 } // namespace
 

@@ -67,9 +67,11 @@ bool TeensyCanBus::begin(uint32_t rx_id_lo, uint32_t rx_id_hi, uint32_t baud)
 
 namespace
 {
-    /* Both payload arrays are 8 bytes (CanFrame::data, CAN_message_t::buf),
+    /**
+     * Both payload arrays are 8 bytes (CanFrame::data, CAN_message_t::buf),
      * so this only ever clamps a frame claiming a length longer than a
-     * classic CAN frame can hold. */
+     * classic CAN frame can hold.
+     */
     uint8_t clamped_len(uint8_t len)
     {
         return len > 8 ? 8 : len;
@@ -126,17 +128,21 @@ namespace
     volatile uint32_t s_rx      = 0;
     volatile uint32_t s_dropped = 0;
 
-    /* FLASHMEM by another name. Plain FLASHMEM here collides with the
+    /**
+     * FLASHMEM by another name. Plain FLASHMEM here collides with the
      * template's own FLASHMEM members (setBaudRate et al.), which GCC emits
      * as COMDAT into the same ".flashmem" section -- the same "section type
      * conflict" begin()'s setMBFilterRange note above dodges. The linker
      * script collects *(.flashmem*), so a subsection lands in flash all
-     * the same. */
+     * the same.
+     */
     #define SNIFF_FLASHMEM __attribute__((section(".flashmem.sniff")))
 
-    /* Called from the CAN3 ISR -- FlexCAN_T4 dispatches onReceive handlers
+    /**
+     * Called from the CAN3 ISR -- FlexCAN_T4 dispatches onReceive handlers
      * directly from flexcan_interrupt() as long as events() is never
-     * called, which nothing in this firmware does. */
+     * called, which nothing in this firmware does.
+     */
     void sniff_isr(const CAN_message_t &msg)
     {
         s_rx = s_rx + 1;
@@ -191,8 +197,10 @@ SNIFF_FLASHMEM void TeensyCanBus::sniff_end()
     s_bus.onReceive(nullptr);
     sniffing_ = false;
 
-    /* begin() soft-resets the controller and drops the FIFO, so this is
-     * the exact boot-time REJECT_ALL + response-id mailbox setup again. */
+    /**
+     * begin() soft-resets the controller and drops the FIFO, so this is
+     * the exact boot-time REJECT_ALL + response-id mailbox setup again.
+     */
     begin(rx_id_lo_, rx_id_hi_, baud_);
 }
 

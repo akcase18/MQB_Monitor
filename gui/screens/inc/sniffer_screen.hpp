@@ -27,8 +27,10 @@ namespace gui
 
     enum class SnifferChannel : uint8_t
     {
-        /** Confirmed on the panel, but the host hasn't sent SLCAN's
-         * open (L/O) yet -- or has closed it again. */
+        /**
+         * Confirmed on the panel, but the host hasn't sent SLCAN's
+         * open (L/O) yet -- or has closed it again.
+         */
         Closed,
         ListenOnly,
         Normal
@@ -41,29 +43,39 @@ namespace gui
             uint32_t frames_per_sec = 0;
             uint32_t total_frames   = 0;
 
-            /** Frames lost because the host fell behind. Any nonzero
+            /**
+             * Frames lost because the host fell behind. Any nonzero
              * value means the capture has gaps, so it's painted in
-             * warn_hi. */
+             * warn_hi.
+             */
             uint32_t dropped_frames = 0;
     };
 
     class SnifferScreen
     {
         public:
-            /** Fired when Stop is pressed. Runs inside the button's own
+            /**
+             * Fired when Stop is pressed. Runs inside the button's own
              * click handler, so the caller must not destroy() from it
-             * directly -- defer with lv_async_call(). */
+             * directly -- defer with lv_async_call().
+             */
             using StopCallback = void (*)(void *ctx);
 
-            /** Builds the screen. Does not load it. */
+            /**
+             * Builds the screen. Does not load it.
+             */
             void create(const Theme &theme, StopCallback stop_cb, void *ctx);
 
-            /** Deletes the screen. It must not be the loaded screen. */
+            /**
+             * Deletes the screen. It must not be the loaded screen.
+             */
             void destroy();
 
             void refresh(const SnifferViewModel &vm);
 
-            /** Null when not created. */
+            /**
+             * Null when not created.
+             */
             lv_obj_t *screen() const
             {
                 return screen_;

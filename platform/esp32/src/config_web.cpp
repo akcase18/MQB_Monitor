@@ -9,8 +9,10 @@ namespace esp32
 
     namespace
     {
-        /* Not on the loopTask stack, same reasoning as RelayLink's
-         * frame_scratch_. Only one handler runs at a time. */
+        /**
+         * Not on the loopTask stack, same reasoning as RelayLink's
+         * frame_scratch_. Only one handler runs at a time.
+         */
         LazyBuffer<uint8_t, protocol::FRAME_MAX_PAYLOAD> s_bytes;
         LazyBuffer<char, 2 * protocol::FRAME_MAX_PAYLOAD + 1> s_hex;
 
@@ -42,8 +44,10 @@ namespace esp32
             return -1;
         }
 
-        /** @returns The decoded length, or -1 if `hex` isn't an even run of
-         * hex digits that fits in `cap` bytes. */
+        /**
+         * @returns The decoded length, or -1 if `hex` isn't an even run of
+         * hex digits that fits in `cap` bytes.
+         */
         int from_hex(const String &hex, uint8_t *out, size_t cap)
         {
             size_t len = hex.length();
@@ -88,8 +92,10 @@ namespace esp32
 
     void ConfigWebHandler::handle_page()
     {
-        /* no-store: a reflashed C3 must not have the phone keep running
-         * the old page against a changed wire format. */
+        /**
+         * no-store: a reflashed C3 must not have the phone keep running
+         * the old page against a changed wire format.
+         */
         server_->sendHeader("Cache-Control", "no-store");
         server_->sendHeader("Content-Encoding", "gzip");
         server_->send_P(200,

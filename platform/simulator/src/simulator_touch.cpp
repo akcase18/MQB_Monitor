@@ -18,8 +18,10 @@ namespace
     int16_t s_y       = 0;
     bool    s_pressed = false;
 
-    /* Must track simulator_display.cpp's window size -- only needed to
-     * rotate a click 180 degrees within it. */
+    /**
+     * Must track simulator_display.cpp's window size -- only needed to
+     * rotate a click 180 degrees within it.
+     */
     constexpr uint16_t SIM_HOR_RES = 480;
     constexpr uint16_t SIM_VER_RES = 320;
 } // namespace
@@ -38,11 +40,13 @@ void SimulatorTouch::begin()
 void SimulatorTouch::set_orientation(DisplayOrientation orientation,
                                      bool               flipped)
 {
-    /* Landscape/Portrait needs no remap -- SDL mouse events already
+    /**
+     * Landscape/Portrait needs no remap -- SDL mouse events already
      * report coordinates in the live window's pixel space, and
      * SimulatorDisplay::set_orientation() resizes that window to match.
      * A flip does: the window shows the frame rotated 180 degrees, so a
-     * click has to be rotated back into it (see read()). */
+     * click has to be rotated back into it (see read()).
+     */
     orientation_ = orientation;
     flipped_     = flipped;
 }
@@ -74,8 +78,10 @@ bool SimulatorTouch::read(TouchPoint &out)
                 }
                 break;
 
-            /* This is the one SDL event pump, so the relay's keys come
-             * through here too (see simulator_relay.hpp). */
+            /**
+             * This is the one SDL event pump, so the relay's keys come
+             * through here too (see simulator_relay.hpp).
+             */
             case SDL_KEYDOWN:
                 if (event.key.repeat == 0 && event.key.keysym.sym >= 'a'
                     && event.key.keysym.sym <= 'z')

@@ -6,9 +6,11 @@ namespace gui
 
     namespace
     {
-        /* Inset from the corner. The top layer has no padding, so this
+        /**
+         * Inset from the corner. The top layer has no padding, so this
          * adds the screen margin to land where InfoScreen's recording LED
-         * sits from its own corner. */
+         * sits from its own corner.
+         */
         constexpr lv_coord_t ICON_MARGIN = 8;
     } // namespace
 
@@ -20,7 +22,9 @@ namespace gui
         }
 
         lv_coord_t inset = ICON_MARGIN + theme.metrics.screen_margin;
-        /* The same grey as the screens' hint text. */
+        /**
+         * The same grey as the screens' hint text.
+         */
         idle_   = theme.palette.panel_border;
         joined_ = theme.palette.accent;
 

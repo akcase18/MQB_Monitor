@@ -68,13 +68,15 @@ class SyntheticCanBus : public ICanBus
             uint8_t byte1 = frame.data[2];
             uint8_t byte2 = frame.data[3];
 
-            /* A per-signal base, plus a slow triangular sweep so values
+            /**
+             * A per-signal base, plus a slow triangular sweep so values
              * actually move over time. The sweep is not cosmetic: with a
              * constant response per signal, core::Logger's on-change
              * recording correctly writes nothing at all, which left the
              * entire logging path impossible to exercise in the simulator
              * (and every panel reading frozen). The phase is offset per
-             * signal so they don't sweep in lockstep. */
+             * signal so they don't sweep in lockstep.
+             */
             int32_t base
                 = static_cast<int32_t>((byte1 * 173u + byte2 * 37u) % 4096u);
 
@@ -125,11 +127,13 @@ class SyntheticCanBus : public ICanBus
             return true;
         }
 
-        /** The raw value the most recent send() fabricated a response
+        /**
+         * The raw value the most recent send() fabricated a response
          * with. Exists for tests: fabricated values include a slow drift
          * (see send()), so a test can no longer recompute the expected
          * value from a fixed formula and must assert against what was
-         * actually sent. */
+         * actually sent.
+         */
         uint16_t last_fake_raw() const
         {
             return last_fake_raw_;
@@ -146,9 +150,11 @@ class SyntheticCanBus : public ICanBus
         uint8_t  tail_              = 0;
         uint8_t  count_             = 0;
 
-        /* Monotonic response counter driving the slow value drift in
+        /**
+         * Monotonic response counter driving the slow value drift in
          * send() -- see there for why fabricated values can't be
-         * constant. */
+         * constant.
+         */
         uint32_t tick_          = 0;
         uint16_t last_fake_raw_ = 0;
         uint32_t sends_per_step_;

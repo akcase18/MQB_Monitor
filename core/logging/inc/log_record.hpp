@@ -16,9 +16,11 @@ namespace core
 
     #pragma pack(push, 1)
 
-    /** One sampled signal value. Written only when a signal's value
+    /**
+     * One sampled signal value. Written only when a signal's value
      * actually changes (see Logger::sample()) -- a gap for a given
-     * signal_id simply means it still held its last-logged value. */
+     * signal_id simply means it still held its last-logged value.
+     */
     struct LogRecord
     {
             uint32_t timestamp_ms; /* SignalValue::last_update_ms, boot-
@@ -33,13 +35,15 @@ namespace core
     constexpr uint32_t LOG_MAGIC   = 0x4C4F4731; /* ASCII "LOG1" */
     constexpr uint8_t  LOG_VERSION = 1;
 
-    /** Leads every chunk file. No record-count field -- a reader derives
+    /**
+     * Leads every chunk file. No record-count field -- a reader derives
      * how many records follow from how many bytes it actually receives
      * past the header (see Logger::dump()), which sidesteps needing to
      * patch this header after the fact once IStorage's lack of seek is
      * accounted for (records are appended over many flushes across a
      * chunk's lifetime, so the true count isn't known when this header is
-     * first written). */
+     * first written).
+     */
     struct ChunkHeader
     {
             uint32_t magic;      /* LOG_MAGIC */
@@ -75,10 +79,12 @@ namespace core
      * incomplete one rather than a wrong one.
      *=================================================================*/
 
-    /** One capture. `first_chunk_seq`/`last_chunk_seq` bound which chunks
+    /**
+     * One capture. `first_chunk_seq`/`last_chunk_seq` bound which chunks
      * hold its records, which is what makes eviction detectable: once the
      * ring has lapped past `last_chunk_seq`, every byte of this capture
-     * is gone and the entry goes with it. */
+     * is gone and the entry goes with it.
+     */
     struct LogIndexEntry
     {
             uint32_t log_id;
@@ -102,15 +108,19 @@ namespace core
 
     #pragma pack(pop)
 
-    /** Path of the index file. Deliberately not matching `/log_%03u.bin`
-     * so Logger::begin()'s chunk scan can't mistake it for a chunk. */
+    /**
+     * Path of the index file. Deliberately not matching `/log_%03u.bin`
+     * so Logger::begin()'s chunk scan can't mistake it for a chunk.
+     */
     constexpr const char *LOG_INDEX_PATH = "/log_index.bin";
 
-    /** How many captures the index can track at once. Sized well past
+    /**
+     * How many captures the index can track at once. Sized well past
      * what the ring can realistically hold distinct captures of, but it
      * is a cap: take more than this many very short captures and the
      * oldest entries are dropped early (they're the next to be evicted
-     * anyway). 128 * 20 bytes = 2.5KB, in RAM and on disk. */
+     * anyway). 128 * 20 bytes = 2.5KB, in RAM and on disk.
+     */
     constexpr uint16_t MAX_LOG_ENTRIES = 128;
 
 } // namespace core

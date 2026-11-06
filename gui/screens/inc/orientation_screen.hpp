@@ -32,12 +32,16 @@ namespace gui
     class OrientationScreen
     {
         public:
-            /** Fired when Confirm is pressed on the layout popup. The
+            /**
+             * Fired when Confirm is pressed on the layout popup. The
              * caller persists `orientation` and restarts -- this screen
-             * doesn't expect control back. */
+             * doesn't expect control back.
+             */
             using LayoutConfirmCallback
                 = void (*)(void *ctx, LayoutOrientation orientation);
-            /** Fired on every tap of Rotate 180. */
+            /**
+             * Fired on every tap of Rotate 180.
+             */
             using RotateCallback = void (*)(void *ctx);
 
             void init(const Theme          &theme,
@@ -46,8 +50,10 @@ namespace gui
                       RotateCallback        rotate_cb,
                       void                 *rotate_ctx);
 
-            /** Opens the screen with `orientation` checked -- the layout
-             * the panel is actually in right now. */
+            /**
+             * Opens the screen with `orientation` checked -- the layout
+             * the panel is actually in right now.
+             */
             void open(LayoutOrientation orientation, lv_obj_t *return_screen);
 
             lv_obj_t *screen() const
@@ -62,19 +68,25 @@ namespace gui
             static void layout_cancel_cb(lv_event_t *e);
             static void rotate_clicked_cb(lv_event_t *e);
 
-            /** Checks whichever matrix button matches orientation_. */
+            /**
+             * Checks whichever matrix button matches orientation_.
+             */
             void sync_layout_matrix();
 
-            /* Stashed so layout_changed_cb() can style the popup it
-             * opens long after init(). */
+            /**
+             * Stashed so layout_changed_cb() can style the popup it
+             * opens long after init().
+             */
             const Theme *theme_ = nullptr;
 
             lv_obj_t *screen_        = nullptr;
             lv_obj_t *return_screen_ = nullptr;
             lv_obj_t *layout_matrix_ = nullptr;
-            /* Transient -- created in layout_changed_cb(), destroyed by
+            /**
+             * Transient -- created in layout_changed_cb(), destroyed by
              * whichever of layout_confirm_cb()/layout_cancel_cb() fires
-             * next. Only valid while the popup is on screen. */
+             * next. Only valid while the popup is on screen.
+             */
             lv_obj_t        *confirm_mbox_ = nullptr;
             LayoutOrientation pending_orientation_
                 = LayoutOrientation::Horizontal;

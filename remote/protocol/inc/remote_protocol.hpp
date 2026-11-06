@@ -14,10 +14,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* This link runs rarely (a batch config load/save, an AP enable/disable)
+/**
+ * This link runs rarely (a batch config load/save, an AP enable/disable)
  * and never on a hot path, so every function and large buffer in remote/
  * carries FLASHMEM/DMAMEM as a matter of course -- see
- * platform/mem_placement.hpp for what they do and when not to use them. */
+ * platform/mem_placement.hpp for what they do and when not to use them.
+ */
 #include "mem_placement.hpp"
 
 namespace remote::protocol
@@ -58,11 +60,15 @@ namespace remote::protocol
     constexpr uint32_t FRAME_TIMEOUT_MS = 1000;
 
     constexpr uint8_t WIRE_NAME_LEN = 24; /* matches gui::PANEL_NAME_LEN */
-    /* A firmware version string plus NUL -- matches the dash's update
-     * descriptor (platform/dash_s3/inc/dash_s3_firmware.hpp). */
+    /**
+     * A firmware version string plus NUL -- matches the dash's update
+     * descriptor (platform/dash_s3/inc/dash_s3_firmware.hpp).
+     */
     constexpr uint8_t WIRE_VERSION_LEN = 32;
 
-    /** REQ_REVERT_PREVIEW's optional payload byte. */
+    /**
+     * REQ_REVERT_PREVIEW's optional payload byte.
+     */
     constexpr uint8_t REVERT_PAGE_LEFT = 1;
 
     enum class MsgType : uint8_t
@@ -73,7 +79,8 @@ namespace remote::protocol
         RESP_APPLY_RESULT = 0x04, /* Teensy -> C3 */
         RESP_ERROR
         = 0x05, /* Teensy -> C3, fallback for malformed/unknown REQ_* */
-        /* REQ_APPLY_CONFIG's payload, then a u16 count and that many f32
+        /**
+         * REQ_APPLY_CONFIG's payload, then a u16 count and that many f32
          * values (metric, one per catalog signal, NaN = no value) for the
          * panel to show in place of live ones. Applied to the live config
          * but never saved. The first one starts a preview session and
@@ -89,25 +96,31 @@ namespace remote::protocol
          * without it (a page loaded before it existed) still parses and
          * leaves the profile as it was. RESP_STATE carries the same
          * block, preceded by a u8 core::LogSource, just before its
-         * trailing byte. */
+         * trailing byte.
+         */
         REQ_PREVIEW_CONFIG = 0x06, /* C3 -> Teensy */
-        /* C3 -> Teensy. Empty: the page's Discard. One byte,
+        /**
+         * C3 -> Teensy. Empty: the page's Discard. One byte,
          * REVERT_PAGE_LEFT: the page is going away (closed, switched
          * from, phone locked), so the panel goes back to the QR code
-         * rather than staying on the dashboard. */
+         * rather than staying on the dashboard.
+         */
         REQ_REVERT_PREVIEW = 0x07,
 
         CMD_AP_ENABLE   = 0x10, /* Teensy -> C3 */
         EVT_AP_READY    = 0x11, /* C3 -> Teensy, async */
         CMD_AP_DISABLE  = 0x12, /* Teensy -> C3 */
         EVT_AP_DISABLED = 0x13, /* C3 -> Teensy, best-effort ack */
-        /* C3 -> Teensy, u8: how many phones are joined to the AP, sent
+        /**
+         * C3 -> Teensy, u8: how many phones are joined to the AP, sent
          * whenever that changes while it's up. A phone that walks out of
          * range counts until the AP deauths it (RelayApp's inactive
-         * time); one that leaves the network drops out at once. */
+         * time); one that leaves the network drops out at once.
+         */
         EVT_AP_STATIONS = 0x14,
 
-        /* Firmware update -- the ESP32-S3 dash only, whose relay writes
+        /**
+         * Firmware update -- the ESP32-S3 dash only, whose relay writes
          * an uploaded image into the inactive app slot itself (see
          * platform/dash_s3/OTA_PLAN.md). These keep the panel informed,
          * and carry the two things the relay must not decide alone:
@@ -115,18 +128,23 @@ namespace remote::protocol
          * Install. The relay refuses uploads outside update mode.
          * EVT_OTA_BEGIN goes out only once an upload has passed its
          * identity check, so a rejected file never reaches the panel;
-         * every BEGIN ends in an EVT_OTA_RESULT. */
+         * every BEGIN ends in an EVT_OTA_RESULT.
+         */
         EVT_OTA_BEGIN    = 0x20, /* relay -> dash: OtaBeginWire */
         EVT_OTA_PROGRESS = 0x21, /* relay -> dash: u32 bytes written */
         EVT_OTA_RESULT   = 0x22, /* relay -> dash: u8 OtaResult */
-        /* dash -> relay, empty: boot the image the last EVT_OTA_RESULT
+        /**
+         * dash -> relay, empty: boot the image the last EVT_OTA_RESULT
          * Ok reported. The relay restarts the board; a failure to switch
-         * slots comes back as another EVT_OTA_RESULT. */
+         * slots comes back as another EVT_OTA_RESULT.
+         */
         CMD_OTA_COMMIT = 0x23,
-        /* Update mode. The phone asks (EVT_OTA_REQUEST, empty); the
+        /**
+         * Update mode. The phone asks (EVT_OTA_REQUEST, empty); the
          * panel answers CMD_OTA_ARM (empty) once someone taps Start, or
          * CMD_OTA_DISARM (empty) if they decline. DISARM also ends update
-         * mode later on, and drops any image still awaiting a commit. */
+         * mode later on, and drops any image still awaiting a commit.
+         */
         EVT_OTA_REQUEST = 0x24, /* relay -> dash */
         CMD_OTA_ARM     = 0x25, /* dash -> relay */
         CMD_OTA_DISARM  = 0x26, /* dash -> relay */
@@ -154,23 +172,28 @@ namespace remote::protocol
         ErrNeedsUsb      = 8, /* built for another partition table */
     };
 
-    /** Standard CRC-16/CCITT-FALSE: poly 0x1021, init 0xFFFF, no reflect,
+    /**
+     * Standard CRC-16/CCITT-FALSE: poly 0x1021, init 0xFFFF, no reflect,
      * no post-XOR. Table-driven (built once at static-init) — not for
      * speed (frames here are rare), but because a lookup table is
      * trivially identical across compilers, unlike a hand-rolled bit
      * loop. Computed over everything after SYNC and before the CRC
-     * itself (MSG_TYPE || LEN || PAYLOAD). */
+     * itself (MSG_TYPE || LEN || PAYLOAD).
+     */
     uint16_t crc16_ccitt(const uint8_t *data, size_t len);
 
-    /** Folds `len` more bytes into a running CRC — lets a CRC be computed
+    /**
+     * Folds `len` more bytes into a running CRC — lets a CRC be computed
      * over non-contiguous spans (a header and a separately-buffered
      * payload, say) by chaining calls. crc16_ccitt(data, len) is exactly
-     * crc16_ccitt_continue(0xFFFF, data, len). */
+     * crc16_ccitt_continue(0xFFFF, data, len).
+     */
     uint16_t crc16_ccitt_continue(uint16_t       crc,
                                   const uint8_t *data,
                                   size_t         len);
 
-    /** Wraps `payload` into a full SYNC/TYPE/LEN/PAYLOAD/CRC frame.
+    /**
+     * Wraps `payload` into a full SYNC/TYPE/LEN/PAYLOAD/CRC frame.
      *
      * @returns Bytes written to `out`, or 0 if `out_cap` is too small or
      * `payload_len` exceeds FRAME_MAX_PAYLOAD.
@@ -248,7 +271,8 @@ namespace remote::protocol
              */
             LazyBuffer<uint8_t, FRAME_MAX_PAYLOAD> buf_;
 #else
-            /* static, not a plain member: GCC rejects a `section`
+            /**
+             * static, not a plain member: GCC rejects a `section`
              * attribute on a non-static data member (there's no
              * independent storage to place — it's part of whatever object
              * contains it), so DMAMEM placement needs static storage
@@ -260,7 +284,8 @@ namespace remote::protocol
              * FrameReaders mid-frame at once. Never read before being
              * written (bounded by payload_len), so it doesn't need — and
              * DMAMEM's .bss.dma section doesn't guarantee — zero-
-             * initialization at startup. */
+             * initialization at startup.
+             */
             static uint8_t buf_[FRAME_MAX_PAYLOAD];
 #endif
             DecodedFrame   frame_ {};
@@ -282,12 +307,18 @@ namespace remote::protocol
             uint8_t  num_panels       = 0;
             uint8_t  orientation      = 0; /* 0=Horizontal, 1=Vertical */
             uint32_t accent_color     = 0;
-            /* Bit 0: the horizontal layout turned 180 degrees, bit 1: the
-             * vertical one (Settings::flipped_horizontal/_vertical). */
+            /**
+             * Bit 0: the horizontal layout turned 180 degrees, bit 1: the
+             * vertical one (Settings::flipped_horizontal/_vertical).
+             */
             uint8_t  flips            = 0;
-            /* core::BrightnessMode: 0=Day, 1=Night, 2=Auto. */
+            /**
+             * core::BrightnessMode: 0=Day, 1=Night, 2=Auto.
+             */
             uint8_t  brightness_mode  = 0;
-            /* Settings::auto_brightness_pct, 0-100 (50 = no shift). */
+            /**
+             * Settings::auto_brightness_pct, 0-100 (50 = no shift).
+             */
             uint8_t  auto_brightness  = 0;
     };
     uint8_t       *encode_settings(uint8_t *p, const SettingsWire &v);
@@ -339,8 +370,10 @@ namespace remote::protocol
     const uint8_t *decode_signal_config(const uint8_t    *p,
                                         SignalConfigWire &out);
 
-    /** WPA2 max sizes + NUL. Generated fresh in RAM by the Teensy on every
-     * Wireless Setup activation, never persisted. */
+    /**
+     * WPA2 max sizes + NUL. Generated fresh in RAM by the Teensy on every
+     * Wireless Setup activation, never persisted.
+     */
     struct ApEnableWire
     {
             char ssid[33]     = "";

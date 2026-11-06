@@ -47,11 +47,13 @@ namespace core
             static constexpr uint8_t MAX_ACTIVE_REQUESTS
                 = MAX_ACTIVE_SIGNALS * MAX_REQUESTS_PER_SIGNAL;
 
-            /* Comfortably past a single-frame 0x22 round trip (single
+            /**
+             * Comfortably past a single-frame 0x22 round trip (single
              * digits to low tens of ms on this ECU) without being so long
              * that one dead DID stalls everything else for a visible
              * beat. An ECU that needs longer is required to say so with
-             * an 0x78 NRC, which restarts this rather than expiring it. */
+             * an 0x78 NRC, which restarts this rather than expiring it.
+             */
             static constexpr uint32_t RESPONSE_TIMEOUT_MS = 60;
 
             /**
@@ -64,13 +66,15 @@ namespace core
              */
             static constexpr uint32_t MULTI_FRAME_GRACE_MS = 200;
 
-            /* A DID this ECU will never answer -- unsupported on the car,
+            /**
+             * A DID this ECU will never answer -- unsupported on the car,
              * or gated behind a diagnostic session this client does not
              * open -- would otherwise burn a RESPONSE_TIMEOUT_MS slot
              * every period forever, crowding out the signals that do
              * answer. That is the same starvation this class exists to
              * remove, so after a few consecutive misses the entry drops to
-             * a slow retry and stays there until one comes back. */
+             * a slow retry and stays there until one comes back.
+             */
             static constexpr uint8_t  MISSES_BEFORE_BACKOFF = 3;
             static constexpr uint32_t BACKOFF_PERIOD_MS     = 2000;
 

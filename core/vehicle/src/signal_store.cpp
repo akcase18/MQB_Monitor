@@ -5,7 +5,9 @@ namespace core
 
     namespace
     {
-        /* Ported from the old Info::round(). */
+        /**
+         * Ported from the old Info::round().
+         */
         float round_half_up(float value, uint8_t decimal_places)
         {
             int32_t scale = 1;
@@ -113,11 +115,13 @@ namespace core
         {
             const SignalSpec &spec = SIGNAL_CATALOG[i];
 
-            /* A signal that owns none of this response's requests can't
+            /**
+             * A signal that owns none of this response's requests can't
              * have changed state, so there's nothing to re-evaluate for
              * it -- skipping straight past keeps the per-frame cost
              * proportional to how many signals actually match rather
-             * than re-walking every catalog entry's requests twice. */
+             * than re-walking every catalog entry's requests twice.
+             */
             bool matched = false;
             for (uint8_t r = 0; r < spec.num_requests; r++)
             {
@@ -155,9 +159,11 @@ namespace core
 
             if (all_received)
             {
-                /* set_at(i), not set(spec.id) -- the catalog index is
+                /**
+                 * set_at(i), not set(spec.id) -- the catalog index is
                  * already in hand here, so re-deriving it from the id
-                 * would be a pointless second scan of the catalog. */
+                 * would be a pointless second scan of the catalog.
+                 */
                 set_at(static_cast<int>(i),
                        spec.transform(request_raw_[i], spec.num_requests),
                        now_ms);

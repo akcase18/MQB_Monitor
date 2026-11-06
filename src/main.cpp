@@ -57,30 +57,38 @@ namespace
     constexpr uint16_t LCD_HORZ = 480;
     constexpr uint16_t LCD_VERT = 320;
 
-    /* Standard OBD2 enhanced-diagnostic-session request/response arbitration
+    /**
+     * Standard OBD2 enhanced-diagnostic-session request/response arbitration
      * IDs, ported from the old can_handler.cpp. Real-vehicle validation is a
-     * Phase 7 hardware-flash-test concern. */
+     * Phase 7 hardware-flash-test concern.
+     */
     constexpr uint32_t CAN_BAUD  = 500000;
 
-    /* Teensy<->ESP32-C3 wireless-configuration link. See remote/protocol
-     * for the framing this carries. */
+    /**
+     * Teensy<->ESP32-C3 wireless-configuration link. See remote/protocol
+     * for the framing this carries.
+     */
     constexpr uint32_t REMOTE_SERIAL_BAUD = 115200;
 
-    /* 20Hz. Was 200ms (5Hz) from the Phase 6 rework until 2026-08-25 --
+    /**
+     * 20Hz. Was 200ms (5Hz) from the Phase 6 rework until 2026-08-25 --
      * an architectural default carried over when the old "update the
      * screen every loop iteration" model became a scheduled task, not a
      * measured choice. 5Hz did not read as smooth on real hardware. The
      * pre-rework code invalidated every panel label on every loop pass
      * and let LVGL coalesce it to its own 20ms tick, so 50Hz redraws are
-     * known to have run on this panel; 20Hz is well inside that. */
+     * known to have run on this panel; 20Hz is well inside that.
+     */
     constexpr uint32_t INFO_SCREEN_REFRESH_MS = 50;
 
-    /* Backstop cadence for re-pointing core::SignalPoller at the displayed
+    /**
+     * Backstop cadence for re-pointing core::SignalPoller at the displayed
      * panel set. Every path that can change that set calls
      * sync_active_signals() directly, so this only ever catches a future
      * one that forgets to -- half a second is imperceptible for a change
      * the user just made by hand, and an unchanged list costs a six-entry
-     * comparison. */
+     * comparison.
+     */
     constexpr uint32_t ACTIVE_SIGNAL_SYNC_MS = 500;
 
     /**
@@ -90,7 +98,8 @@ namespace
      */
     constexpr uint32_t AUTO_BRIGHTNESS_PERIOD_MS = 40;
 
-    /* How often LVGL polls the touch driver. lv_indev_create() defaults
+    /**
+     * How often LVGL polls the touch driver. lv_indev_create() defaults
      * this to LV_DEF_REFR_PERIOD (20ms, lib/lv_conf.h), which is the
      * screen redraw cadence rather than anything chosen for input -- so a
      * press could sit up to 20ms before LVGL saw it, and a drag sampled
@@ -99,25 +108,33 @@ namespace
      * 10ms halves the worst-case press latency and doubles the sample
      * density along a drag, for one extra I2C transaction per 10ms
      * (5 bytes off the FT6236). loop() calls lv_timer_handler() every
-     * pass with no rate limit, so there is headroom for it. */
+     * pass with no rate limit, so there is headroom for it.
+     */
     constexpr uint32_t TOUCH_POLL_MS              = 10;
     constexpr uint32_t WIRELESS_SCREEN_REFRESH_MS = 500;
-    /* Firmware update screen: quick enough that the bar visibly moves
+    /**
+     * Firmware update screen: quick enough that the bar visibly moves
      * through a ~15s upload and the Install popup follows the upload's
-     * end without a noticeable gap. */
+     * end without a noticeable gap.
+     */
     constexpr uint32_t FIRMWARE_UPDATE_REFRESH_MS = 200;
-    /* How long a freshly installed firmware has to run normally -- loop()
+    /**
+     * How long a freshly installed firmware has to run normally -- loop()
      * coming round under the hang watchdog, frames reaching the panel,
      * the relay up (platform_update_path_ready()) -- before it is declared
      * good and the previous one stops being the fallback (see
-     * platform_firmware_healthy()). */
+     * platform_firmware_healthy()).
+     */
     constexpr uint32_t FIRMWARE_HEALTHY_AFTER_MS = 10 * 1000;
-    /* Slower than the info screen's: nothing here changes faster than
+    /**
+     * Slower than the info screen's: nothing here changes faster than
      * once a minute except the capture toggle, which repaints itself on
-     * press rather than waiting for this. */
+     * press rather than waiting for this.
+     */
     constexpr uint32_t LOGGING_SCREEN_REFRESH_MS = 1000;
 
-    /* How often the logger *looks*, not how often it writes -- the write
+    /**
+     * How often the logger *looks*, not how often it writes -- the write
      * rate per signal is floored at core::LOG_MIN_INTERVAL_MS (50ms)
      * inside Logger::sample() itself. Matching the catalog's fastest
      * cadence (20ms, see signal_catalog.generated.inc) means a 20ms
@@ -126,15 +143,19 @@ namespace
      * coarser tick would give once scheduler jitter is in play. Slower
      * signals (100ms and up) are unaffected either way -- they're logged
      * at their own arrival cadence. Sampling twice as often costs
-     * essentially nothing: each tick walks at most MAX_PANELS entries. */
-    /* Half core::LOG_MIN_INTERVAL_MS, preserving the relationship the
+     * essentially nothing: each tick walks at most MAX_PANELS entries.
+     */
+    /**
+     * Half core::LOG_MIN_INTERVAL_MS, preserving the relationship the
      * original 20/40 pair had: the tick has to be finer than the floor,
      * or a signal arriving exactly on the floor gets skipped whenever
      * jitter puts its arrival a hair inside the window and the next tick
-     * a hair outside. Was 20 while the floor was 40. */
+     * a hair outside. Was 20 while the floor was 40.
+     */
     constexpr uint32_t LOG_SAMPLE_PERIOD_MS = 25;
 
-    /* RGB565 (2 bytes/pixel), NOT lv_color_t: with LV_COLOR_DEPTH 16 LVGL
+    /**
+     * RGB565 (2 bytes/pixel), NOT lv_color_t: with LV_COLOR_DEPTH 16 LVGL
      * renders into the draw buffer in the display's own color format,
      * which is what display_flush_cb() below already reinterprets these
      * as. lv_color_t is a 3-byte {b,g,r} struct regardless of
@@ -150,16 +171,19 @@ namespace
      *
      * Only the fallback: a platform whose display offers whole-screen
      * buffers (IDisplay::get_frame_buffers -- the S3, out of its PSRAM)
-     * renders DIRECT into those instead, and these go unused. */
+     * renders DIRECT into those instead, and these go unused.
+     */
 #ifndef DRAW_BUF_DIVISOR
     #define DRAW_BUF_DIVISOR 10
 #endif
 
-    /* core::Logger's ring, in CHUNK_SIZE_BYTES chunks. A board with less
+    /**
+     * core::Logger's ring, in CHUNK_SIZE_BYTES chunks. A board with less
      * room for logs than the default 13MiB sets it from platformio.ini --
      * env:dash_s3 does, to fit its second OTA app slot. The ring never
      * asks the storage how big it is (see TODO.md), so this has to agree
-     * with the partition by hand. */
+     * with the partition by hand.
+     */
 #ifndef LOG_CHUNK_COUNT
     #define LOG_CHUNK_COUNT core::CHUNK_COUNT
 #endif
@@ -203,16 +227,20 @@ namespace
             gui::WirelessSetupScreen  wireless_setup_screen;
             gui::FirmwareUpdateScreen firmware_update_screen;
             gui::WifiIndicator        wifi_indicator;
-            /* Not built by build_screens() -- created and destroyed around
-             * each sniffer session (see enter_sniff()). */
+            /**
+             * Not built by build_screens() -- created and destroyed around
+             * each sniffer session (see enter_sniff()).
+             */
             gui::SnifferScreen sniffer_screen;
 
             const char *signal_names[core::SIGNAL_CATALOG_COUNT];
             uint16_t    signal_ids[core::SIGNAL_CATALOG_COUNT];
             bool        signal_is_state[core::SIGNAL_CATALOG_COUNT];
 
-            /* FLASHMEM: runs once, and its member initializers are a
-             * kilobyte of code RAM1 can't spare. */
+            /**
+             * FLASHMEM: runs once, and its member initializers are a
+             * kilobyte of code RAM1 can't spare.
+             */
             FLASHMEM explicit Composition(Platform &platform)
                 : config_store(platform.config_store)
                 , uds_client(platform.can, core::UDS_ECUS, core::UDS_ECU_COUNT)
@@ -310,8 +338,10 @@ namespace
                    : DisplayOrientation::Landscape;
     }
 
-    /** The 180-degree flag belonging to `orientation` -- each layout
-     * keeps its own, so rotating one never turns the other over. */
+    /**
+     * The 180-degree flag belonging to `orientation` -- each layout
+     * keeps its own, so rotating one never turns the other over.
+     */
     bool &flipped_for(core::Settings         &settings,
                       core::LayoutOrientation orientation)
     {
@@ -367,27 +397,35 @@ namespace
      * panel at the moment it is reported.
      *-----------------------------------------------------------------*/
 
-    /* Pass 1 is the initial full paint; the ones after it are the
+    /**
+     * Pass 1 is the initial full paint; the ones after it are the
      * readouts filling in. Three leaves a pass of margin over the two
      * that were actually needed when measured -- cheap, at one
      * INFO_SCREEN_REFRESH_MS each, and the failure it guards against
-     * (lighting mid-populate) is the visible one. */
+     * (lighting mid-populate) is the visible one.
+     */
     constexpr uint8_t BOOT_SETTLE_PASSES = 3;
 
-    /* Rebuild path only, where the landing screen is static and this is
+    /**
+     * Rebuild path only, where the landing screen is static and this is
      * really just "has rendering stopped". Only needs to exceed the gap
      * between flushes *within* one pass (~17ms measured), so there is
      * generous margin; it is not tuned against the redraw cadence and
-     * does not move with INFO_SCREEN_REFRESH_MS. */
+     * does not move with INFO_SCREEN_REFRESH_MS.
+     */
     constexpr uint32_t BACKLIGHT_QUIET_MS = 100;
 
-    /* Backstop for both paths: light the panel regardless once this long
+    /**
+     * Backstop for both paths: light the panel regardless once this long
      * has passed since it went dark. A signal that never arrives would
      * otherwise leave the dashboard dark indefinitely -- the one failure
-     * mode this mechanism must not have. */
+     * mode this mechanism must not have.
+     */
     constexpr uint32_t BACKLIGHT_SETTLE_MAX_MS = 750;
 
-    /* How often the watchdog above runs. */
+    /**
+     * How often the watchdog above runs.
+     */
     constexpr uint32_t BACKLIGHT_WATCH_POLL_MS = 25;
 
     enum class BacklightState
@@ -402,38 +440,48 @@ namespace
 
     BacklightState &backlight_state()
     {
-        /* Boot starts here: the pin is already low out of
+        /**
+         * Boot starts here: the pin is already low out of
          * TeensyDisplay::begin(), and counting render passes is what
-         * eventually lights it. */
+         * eventually lights it.
+         */
         static BacklightState state = BacklightState::AwaitingBootPasses;
         return state;
     }
 
-    /** When display_flush_cb last ran, in clock millis -- the input to
+    /**
+     * When display_flush_cb last ran, in clock millis -- the input to
      * the quiet test. Updated on every flush, not just a pass's last, so
-     * a pass still in progress keeps pushing the deadline out. */
+     * a pass still in progress keeps pushing the deadline out.
+     */
     uint32_t &last_flush_ms()
     {
         static uint32_t ms = 0;
         return ms;
     }
 
-    /** Completed render passes seen since boot, capped by
-     * BOOT_SETTLE_PASSES. */
+    /**
+     * Completed render passes seen since boot, capped by
+     * BOOT_SETTLE_PASSES.
+     */
     uint8_t &boot_passes()
     {
         static uint8_t passes = 0;
         return passes;
     }
 
-    /** The repeating watchdog, live while the panel is dark. */
+    /**
+     * The repeating watchdog, live while the panel is dark.
+     */
     lv_timer_t *&backlight_settle_timer()
     {
         static lv_timer_t *timer = nullptr;
         return timer;
     }
 
-    /** When the current Settling wait began -- the input to the backstop. */
+    /**
+     * When the current Settling wait began -- the input to the backstop.
+     */
     uint32_t &settle_started_ms()
     {
         static uint32_t ms = 0;
@@ -498,9 +546,11 @@ namespace
         }
     }
 
-    /** Sets the brightness, now if the panel is lit and on the way back
+    /**
+     * Sets the brightness, now if the panel is lit and on the way back
      * up if it isn't -- so a slider move that lands mid-blank isn't
-     * either lost or allowed to light the panel early. */
+     * either lost or allowed to light the panel early.
+     */
     void apply_backlight(uint8_t pct)
     {
         backlight_pct() = pct;
@@ -510,9 +560,11 @@ namespace
         }
     }
 
-    /** The one place the panel is ever lit. Tears down the watchdog on
+    /**
+     * The one place the panel is ever lit. Tears down the watchdog on
      * the way out -- deleting a timer from inside its own callback is
-     * supported, lv_timer_handler() guards for exactly that. */
+     * supported, lv_timer_handler() guards for exactly that.
+     */
     void light_backlight()
     {
         backlight_state() = BacklightState::Live;
@@ -526,9 +578,11 @@ namespace
         }
     }
 
-    /* Runs while the panel is dark. Owns the rebuild path's quiet test
+    /**
+     * Runs while the panel is dark. Owns the rebuild path's quiet test
      * and the backstop for both paths; boot's pass counting lives in
-     * display_flush_cb, where the passes actually arrive. */
+     * display_flush_cb, where the passes actually arrive.
+     */
     void backlight_watch_cb(lv_timer_t *timer)
     {
         (void)timer;
@@ -551,12 +605,14 @@ namespace
         }
     }
 
-    /** Starts (or restarts) the dark period: records when it began and
+    /**
+     * Starts (or restarts) the dark period: records when it began and
      * makes sure the watchdog is running.
      *
      * Safe to call from inside display_flush_cb even though that runs
      * within LVGL's own timer handler -- lv_timer_create() flags the list
-     * as changed and the handler restarts its iteration (lv_timer.c). */
+     * as changed and the handler restarts its iteration (lv_timer.c).
+     */
     void begin_backlight_wait()
     {
         settle_started_ms() = platform_get().clock.millis();
@@ -567,17 +623,21 @@ namespace
         }
     }
 
-    /** Kills the light until whatever is about to happen on screen has
+    /**
+     * Kills the light until whatever is about to happen on screen has
      * finished. Something must walk the state back to Live afterwards,
      * or the panel stays dark -- see settings_screen_loaded_cb, the only
-     * caller's counterpart. */
+     * caller's counterpart.
+     */
     void blank_backlight()
     {
 #if STRESS_TEST
-        /* Bench stress builds leave the panel lit through the theme
+        /**
+         * Bench stress builds leave the panel lit through the theme
          * rebuild so the transition itself can be watched.
          * settings_screen_loaded_cb is a no-op unless the state is
-         * Blanked, so skipping this leaves nothing dangling. */
+         * Blanked, so skipping this leaves nothing dangling.
+         */
         return;
 #endif
         backlight_state() = BacklightState::Blanked;
@@ -589,11 +649,13 @@ namespace
                           const lv_area_t *area,
                           uint8_t         *px_map)
     {
-        /* One render pass reaches here as several flush() calls -- one
+        /**
+         * One render pass reaches here as several flush() calls -- one
          * per band in partial mode, one per invalidated area in direct
          * mode -- and lv_display_flush_is_last() marks the one that
          * completes it. flush_end() lets a display that holds its push
-         * back (DashS3Display) send the whole pass as one transfer. */
+         * back (DashS3Display) send the whole pass as one transfer.
+         */
         bool last = lv_display_flush_is_last(disp);
         platform_get().display.flush(
             area->x1,
@@ -609,9 +671,11 @@ namespace
 
         last_flush_ms() = platform_get().clock.millis();
 
-        /* Boot counts completed passes -- see BacklightState for why it
+        /**
+         * Boot counts completed passes -- see BacklightState for why it
          * counts rather than timing them, and why the rebuild path
-         * doesn't. */
+         * doesn't.
+         */
         if (backlight_state() == BacklightState::AwaitingBootPasses && last)
         {
             if (++boot_passes() >= BOOT_SETTLE_PASSES)
@@ -625,7 +689,9 @@ namespace
     {
         (void)indev;
 
-        /* Also pumps the simulator's SDL event queue (window close, etc). */
+        /**
+         * Also pumps the simulator's SDL event queue (window close, etc).
+         */
         TouchPoint point {};
         bool       pressed = platform_get().touch.read(point);
 
@@ -846,9 +912,11 @@ namespace
         (void)ctx;
         Composition &app = composition();
 
-        /* Paused for a firmware update. The relay is erasing and writing
+        /**
+         * Paused for a firmware update. The relay is erasing and writing
          * flash on the other core, which stalls this one on every
-         * operation anyway, and an update ends in a restart. */
+         * operation anyway, and an update ends in a restart.
+         */
         if (app.remote_ota.state() != remote::server::OtaState::Idle)
         {
             return;
@@ -886,14 +954,18 @@ namespace
         composition().signal_store.on_uds_response(
             ecu, byte1, byte2, payload, len, platform_get().clock.millis());
 
-        /* Closes the flow-control loop: this is what frees the poller's
-         * single in-flight slot so the next request can go out. */
+        /**
+         * Closes the flow-control loop: this is what frees the poller's
+         * single in-flight slot so the next request can go out.
+         */
         composition().uds_poller.on_response(ecu, byte1, byte2);
     }
 
-    /* A rejection still ends the request it rejects, so handing these to
+    /**
+     * A rejection still ends the request it rejects, so handing these to
      * the poller is what stops a DID the ECU refuses from costing a full
-     * response timeout every time it comes due. */
+     * response timeout every time it comes due.
+     */
     void on_uds_negative_response(void   *ctx,
                                   uint8_t ecu,
                                   uint8_t service,
@@ -903,27 +975,33 @@ namespace
         composition().uds_poller.on_negative_response(ecu, service, nrc);
     }
 
-    /** Whether a revert in progress came from the panel (the AP going
-     * down) rather than from the phone -- see remote_config_event_cb. */
+    /**
+     * Whether a revert in progress came from the panel (the AP going
+     * down) rather than from the phone -- see remote_config_event_cb.
+     */
     bool &reverting_locally()
     {
         static bool local = false;
         return local;
     }
 
-    /** Whether a revert in progress is for the phone having gone -- off
+    /**
+     * Whether a revert in progress is for the phone having gone -- off
      * the AP (phone_left()) or silent past REMOTE_SESSION_TIMEOUT_MS --
      * and should land on the Wi-Fi screen's QR code, as the page closing
-     * does (ConfigEvent::PageLeft). */
+     * does (ConfigEvent::PageLeft).
+     */
     bool &reverting_for_lost_phone()
     {
         static bool lost = false;
         return lost;
     }
 
-    /** Throws away the phone's unsaved preview, if there is one. For when
+    /**
+     * Throws away the phone's unsaved preview, if there is one. For when
      * the session ends without a Save: the panel's X, or the AP timing
-     * out. */
+     * out.
+     */
     FLASHMEM void revert_remote_preview()
     {
         reverting_locally() = true;
@@ -931,42 +1009,52 @@ namespace
         reverting_locally() = false;
     }
 
-    /* How long the phone's page can go without a request before its
+    /**
+     * How long the phone's page can go without a request before its
      * preview session is ended for it. The page pings well inside this
      * while it's open (see index.html); a phone that walked out of range,
      * or a browser killed without its pagehide firing, sends nothing --
      * and the panel shouldn't go on showing sample values for the rest of
-     * the AP's idle timeout. */
+     * the AP's idle timeout.
+     */
     constexpr uint32_t REMOTE_SESSION_TIMEOUT_MS = 60 * 1000;
 
-    /** When the phone last changed anything -- see
-     * REMOTE_SESSION_TIMEOUT_MS. */
+    /**
+     * When the phone last changed anything -- see
+     * REMOTE_SESSION_TIMEOUT_MS.
+     */
     uint32_t &remote_last_request_ms()
     {
         static uint32_t ms = 0;
         return ms;
     }
 
-    /** The settings as of the last phone-side change (or the AP coming
+    /**
+     * The settings as of the last phone-side change (or the AP coming
      * up) -- what a preview is compared against to see which brightness
-     * it touched. */
+     * it touched.
+     */
     core::Settings &remote_last_settings()
     {
         static core::Settings settings {};
         return settings;
     }
 
-    /** Which brightness a phone-side change shows: the level it last
-     * edited, else the mode it picked. See remote_config_event_cb. */
+    /**
+     * Which brightness a phone-side change shows: the level it last
+     * edited, else the mode it picked. See remote_config_event_cb.
+     */
     core::BrightnessMode &remote_shown_mode()
     {
         static core::BrightnessMode mode = core::BrightnessMode::Day;
         return mode;
     }
 
-    /* The Wi-Fi glyph follows the AP: shown only while it's Active.
+    /**
+     * The Wi-Fi glyph follows the AP: shown only while it's Active.
      * Called wherever the AP state can change, and after a screen
-     * rebuild, which recreates the glyph hidden. */
+     * rebuild, which recreates the glyph hidden.
+     */
     FLASHMEM void sync_wifi_indicator()
     {
         Composition &app = composition();
@@ -975,17 +1063,21 @@ namespace
             app.remote_ap.station_count() > 0);
     }
 
-    /* The last phone left the AP, which stays up. Whatever it was
+    /**
+     * The last phone left the AP, which stays up. Whatever it was
      * previewing goes, and the dashboard it left behind -- previewing, or
      * back on live values after its page closed -- gives way to the QR
      * code, ready for the next one. Anywhere else, someone at the panel
-     * is using it: stay put. */
+     * is using it: stay put.
+     */
     FLASHMEM void phone_left()
     {
         Composition &app = composition();
         if (app.remote_server.preview_active())
         {
-            /* remote_config_event_cb does the navigating. */
+            /**
+             * remote_config_event_cb does the navigating.
+             */
             reverting_for_lost_phone() = true;
             revert_remote_preview();
             reverting_for_lost_phone() = false;
@@ -998,10 +1090,12 @@ namespace
         }
     }
 
-    /* Request/response pairs are handled internally by
+    /**
+     * Request/response pairs are handled internally by
      * RemoteConfigLink::poll(); this only ever sees the async EVT_*
      * messages -- the AP's and a firmware update's. Each controller
-     * ignores the other's. */
+     * ignores the other's.
+     */
     FLASHMEM void remote_evt_cb(void                     *ctx,
                                 remote::protocol::MsgType type,
                                 const uint8_t            *payload,
@@ -1015,8 +1109,10 @@ namespace
         app.remote_ota.on_event(type, payload, len, now);
         sync_wifi_indicator();
 
-        /* Only while the AP is still up: its going down zeroes the count
-         * too, and has its own handling (remote_ap_idle_check_task). */
+        /**
+         * Only while the AP is still up: its going down zeroes the count
+         * too, and has its own handling (remote_ap_idle_check_task).
+         */
         if (phones > 0 && app.remote_ap.station_count() == 0
             && app.remote_ap.state() == remote::server::ApState::Active)
         {
@@ -1024,9 +1120,11 @@ namespace
         }
     }
 
-    /* Registered once at remote::server::AP_IDLE_CHECK_PERIOD_MS via
+    /**
+     * Registered once at remote::server::AP_IDLE_CHECK_PERIOD_MS via
      * core::Scheduler — a no-op unless RemoteApController actually has a
-     * timeout to act on (see remote::server::RemoteApController::tick()). */
+     * timeout to act on (see remote::server::RemoteApController::tick()).
+     */
     FLASHMEM void remote_ap_idle_check_task(void *ctx)
     {
         (void)ctx;
@@ -1034,17 +1132,21 @@ namespace
         app.remote_ap.tick(platform_get().clock.millis());
         sync_wifi_indicator();
 
-        /* The AP timed out (or otherwise went down) with the phone's
+        /**
+         * The AP timed out (or otherwise went down) with the phone's
          * edits still unsaved -- nobody is left to Save them. Keyed on the
          * AP *leaving* Active rather than on it not being Active, so this
-         * runs once per AP session, not on every check while it's down. */
+         * runs once per AP session, not on every check while it's down.
+         */
         static bool was_active = false;
         bool active = app.remote_ap.state() == remote::server::ApState::Active;
         if (was_active && !active)
         {
             revert_remote_preview();
-            /* Update mode lives on the AP too: the phone that asked for
-             * it is gone. Each is a no-op outside its own state. */
+            /**
+             * Update mode lives on the AP too: the phone that asked for
+             * it is gone. Each is a no-op outside its own state.
+             */
             app.remote_ota.decline();
             app.remote_ota.leave();
         }
@@ -1066,10 +1168,12 @@ namespace
         return binding->build_view_model(rank);
     }
 
-    /** While the phone holds an unsaved preview, the dashboard is showing
+    /**
+     * While the phone holds an unsaved preview, the dashboard is showing
      * the phone's edits, not something to edit locally -- any local save()
      * would quietly persist them. A tap or swipe instead goes back to the
-     * Wireless screen, whose X is the way out (and reverts). */
+     * Wireless screen, whose X is the way out (and reverts).
+     */
     FLASHMEM __attribute__((noinline)) bool divert_to_wireless_if_previewing()
     {
         Composition &app = composition();
@@ -1152,10 +1256,12 @@ namespace
         composition().vehicle_binding.apply_warning_change(signal_id, result);
     }
 
-    /* Fired immediately on every brightness slider move / mode toggle
+    /**
+     * Fired immediately on every brightness slider move / mode toggle
      * — pushes straight to the real backlight so switching (or tuning
      * either value) is actually useful mid-drive, not just a setting
-     * that takes effect after leaving Settings. */
+     * that takes effect after leaving Settings.
+     */
     void settings_preview_brightness_cb(void                *ctx,
                                         gui::BrightnessMode  mode,
                                         uint8_t              brightness_pct)
@@ -1165,12 +1271,14 @@ namespace
                                  brightness_pct);
     }
 
-    /* Runs on every exit from SettingsScreen — the X button and the
+    /**
+     * Runs on every exit from SettingsScreen — the X button and the
      * Theme/WiFi hand-offs alike — so an edit is in the store before
      * anything downstream (a screen rebuild, the phone's config page)
      * reads the store back. Persist only; settings_done_cb owns the
      * navigation, since a hand-off to Theme/WiFi must not bounce to the
-     * dashboard. */
+     * dashboard.
+     */
     void settings_commit_cb(void               *ctx,
                             uint8_t             day_brightness_pct,
                             uint8_t             night_brightness_pct,
@@ -1179,18 +1287,22 @@ namespace
                             uint8_t             num_panels)
     {
         (void)ctx;
-        /* No set_backlight() here — settings_preview_brightness_cb already
+        /**
+         * No set_backlight() here — settings_preview_brightness_cb already
          * pushed the real backlight live on every slider move and mode
          * toggle, so it's already showing whichever mode was actually
          * active when the screen was left. Re-applying
          * day_brightness_pct unconditionally here was wrong: it stomped
          * over a Night-mode edit with the (usually untouched, 100%) Day
-         * value on every exit. */
+         * value on every exit.
+         */
 
         core::Settings &settings = composition().config_store.get().settings;
 
-        /* Orientation isn't touched here — OrientationScreen persists
-         * its own changes (see the orientation_* callbacks below). */
+        /**
+         * Orientation isn't touched here — OrientationScreen persists
+         * its own changes (see the orientation_* callbacks below).
+         */
         settings.day_brightness   = day_brightness_pct;
         settings.night_brightness = night_brightness_pct;
         settings.auto_brightness_pct = auto_brightness_pct;
@@ -1204,12 +1316,14 @@ namespace
     void settings_done_cb(void *ctx)
     {
         (void)ctx;
-        /* InfoScreen reflows against active_orientation() (set once at
+        /**
+         * InfoScreen reflows against active_orientation() (set once at
          * boot, never touched again) rather than settings.orientation,
          * since orientation is a boot-time-only setting (see
          * platform.hpp's DisplayOrientation/set_orientation() doc
          * comments) -- the physical panel hasn't rotated just because
-         * Done was pressed. */
+         * Done was pressed.
+         */
         composition().info_screen.rebuild(
             composition().config_store.get().settings.num_panels,
             to_gui_orientation(active_orientation()));
@@ -1220,54 +1334,68 @@ namespace
     {
         (void)ctx;
         Composition &app = composition();
-        /* active_orientation(), not settings.orientation -- the screen
+        /**
+         * active_orientation(), not settings.orientation -- the screen
          * should show the layout the panel is actually in, not one a
-         * phone has staged for the next boot. */
+         * phone has staged for the next boot.
+         */
         app.orientation_screen.open(to_gui_orientation(active_orientation()),
                                     app.settings_screen.screen());
     }
 
-    /* Fired when Confirm is pressed on OrientationScreen's layout popup.
+    /**
+     * Fired when Confirm is pressed on OrientationScreen's layout popup.
      * Swapping width and height can't happen live -- the lv_display_t and
      * every screen are sized from it once, at boot -- so this persists
-     * the pick and restarts, which is what the popup told the user. */
+     * the pick and restarts, which is what the popup told the user.
+     */
     FLASHMEM void orientation_layout_confirm_cb(
         void *ctx, gui::LayoutOrientation orientation)
     {
         (void)ctx;
         core::Settings &settings = composition().config_store.get().settings;
         settings.orientation     = to_core_orientation(orientation);
-        /* Comes back up on OrientationScreen, so the result can be checked
-         * (or undone) without navigating back to it. */
+        /**
+         * Comes back up on OrientationScreen, so the result can be checked
+         * (or undone) without navigating back to it.
+         */
         settings.open_orientation_on_boot = true;
         composition().config_store.save();
 
-        /* Dark from here on: the reset itself, then boot, which keeps the
+        /**
+         * Dark from here on: the reset itself, then boot, which keeps the
          * panel off until its first frames have landed in the new
-         * orientation (see BacklightState). */
+         * orientation (see BacklightState).
+         */
         platform_get().display.set_backlight_off();
         platform_restart();
     }
 
-    /** Whether the panel is turned 180 degrees right now. Set at boot
+    /**
+     * Whether the panel is turned 180 degrees right now. Set at boot
      * and by apply_panel_flip(), so a phone-side change can tell whether
-     * the flag it brings differs from what's on the glass. */
+     * the flag it brings differs from what's on the glass.
+     */
     bool &panel_flipped()
     {
         static bool instance = false;
         return instance;
     }
 
-    /* Unlike a layout change, a 180-degree turn applies live: it keeps
+    /**
+     * Unlike a layout change, a 180-degree turn applies live: it keeps
      * the resolution, so nothing needs rebuilding -- the panel and touch
-     * are re-rotated in place and the current screen redrawn. */
+     * are re-rotated in place and the current screen redrawn.
+     */
     FLASHMEM void apply_panel_flip(bool flipped)
     {
         panel_flipped() = flipped;
 
-        /* What's in the panel's GRAM is upside down the moment MADCTL
+        /**
+         * What's in the panel's GRAM is upside down the moment MADCTL
          * changes, until the redraw below replaces it -- not something to
-         * show. */
+         * show.
+         */
         blank_backlight();
 
         DisplayOrientation orientation
@@ -1275,41 +1403,51 @@ namespace
         platform_get().display.set_orientation(orientation, flipped);
         platform_get().touch.set_orientation(orientation, flipped);
 
-        /* Redrawn now rather than on the next refresh tick, so the quiet
+        /**
+         * Redrawn now rather than on the next refresh tick, so the quiet
          * test below starts counting from a flush that has actually
          * happened -- otherwise the watchdog could find the display
          * "quiet" before the redraw even began and light the stale
          * frame. Safe from an event handler: flush completes
-         * synchronously (display_flush_cb calls flush_ready itself). */
+         * synchronously (display_flush_cb calls flush_ready itself).
+         */
         lv_obj_invalidate(lv_screen_active());
         lv_refr_now(nullptr);
 
-        /* No load animation to wait out here, so straight to the same
+        /**
+         * No load animation to wait out here, so straight to the same
          * quiet-period settle the theme rebuild ends on. Guarded for
-         * STRESS_TEST builds, where blank_backlight() leaves it lit. */
+         * STRESS_TEST builds, where blank_backlight() leaves it lit.
+         */
         if (backlight_state() == BacklightState::Blanked)
         {
             backlight_state() = BacklightState::Settling;
         }
     }
 
-    /* Fired on every tap of OrientationScreen's Rotate 180. */
+    /**
+     * Fired on every tap of OrientationScreen's Rotate 180.
+     */
     FLASHMEM void orientation_rotate_cb(void *ctx)
     {
         (void)ctx;
         core::Settings &settings = composition().config_store.get().settings;
-        /* active_orientation(), not settings.orientation: the flag to
-         * toggle is the one for the layout the panel is actually in. */
+        /**
+         * active_orientation(), not settings.orientation: the flag to
+         * toggle is the one for the layout the panel is actually in.
+         */
         bool &flipped = flipped_for(settings, active_orientation());
         flipped       = !flipped;
         composition().config_store.save();
         apply_panel_flip(flipped);
     }
 
-    /** Snapshot of everything LoggingScreen shows, assembled from the
+    /**
+     * Snapshot of everything LoggingScreen shows, assembled from the
      * Logger and the active IStorage. Rebuilt per open/refresh rather
      * than cached -- all of it is in-RAM reads (see Logger's status
-     * accessors -- and IStorage::medium(), a compile-time constant). */
+     * accessors -- and IStorage::medium(), a compile-time constant).
+     */
     gui::LoggingViewModel build_logging_view_model()
     {
         Composition &app     = composition();
@@ -1333,16 +1471,18 @@ namespace
                                                     : cfg.log_count;
         vm.storage_ready = app.logger.is_ready();
         vm.log_count     = app.logger.log_count();
+        /**
+         * Whole minutes, no hour rollover -- see the view model.
+         */
         vm.total_logged_min
-            = app.logger.total_logged_ms() / 60000u; /* whole minutes,
-                                                      * no hour rollover
-                                                      * -- see the view
-                                                      * model */
+            = app.logger.total_logged_ms() / 60000u;
         vm.ring_capacity_bytes = app.logger.ring_capacity_bytes();
         vm.used_bytes          = app.logger.used_bytes();
 
-        /* The one place platform::StorageMedium is translated for gui/,
-         * which has no platform:: dependency of its own. */
+        /**
+         * The one place platform::StorageMedium is translated for gui/,
+         * which has no platform:: dependency of its own.
+         */
         const char *label = "Unknown";
         switch (storage.medium())
         {
@@ -1395,10 +1535,12 @@ namespace
         app.info_screen.set_logging_active(enabled && app.logger.is_ready());
     }
 
-    /** core::Logger::erase(), with the hang watchdog off around it:
+    /**
+     * core::Logger::erase(), with the hang watchdog off around it:
      * reformatting the whole log partition can block for longer than the
      * watchdog allows. noinline: its callers sit in ITCM, and GCC would
-     * otherwise inline it right back there. */
+     * otherwise inline it right back there.
+     */
     FLASHMEM __attribute__((noinline)) void erase_logs()
     {
         platform_hang_watchdog(false);
@@ -1406,7 +1548,8 @@ namespace
         platform_hang_watchdog(true);
     }
 
-    /* Fired once LoggingScreen's erase popup is confirmed -- the GUI
+    /**
+     * Fired once LoggingScreen's erase popup is confirmed -- the GUI
      * counterpart of the LOGCLEAR serial command below, and the same one
      * call.
      *
@@ -1420,7 +1563,8 @@ namespace
      *
      * The screen is refreshed here rather than left to
      * refresh_logging_screen_task's next tick -- this is a button press,
-     * and the readouts should be zero by the time the popup is gone. */
+     * and the readouts should be zero by the time the popup is gone.
+     */
     void logging_erase_cb(void *ctx)
     {
         (void)ctx;
@@ -1438,10 +1582,12 @@ namespace
         app.logging_screen.refresh(build_logging_view_model());
     }
 
-    /* Keeps the capture count and recorded-minutes readouts advancing
+    /**
+     * Keeps the capture count and recorded-minutes readouts advancing
      * while the screen is up. Cheap enough to run unconditionally: like
      * refresh_wireless_screen_task, it only does real work when its
-     * screen is actually loaded. */
+     * screen is actually loaded.
+     */
     void refresh_logging_screen_task(void *ctx)
     {
         (void)ctx;
@@ -1453,19 +1599,23 @@ namespace
     }
 
 #ifdef ARDUINO
-    /* USB-serial log retrieval -- a small bespoke line command set,
+    /**
+     * USB-serial log retrieval -- a small bespoke line command set,
      * sharing the USB port with sniffer mode's SLCAN (see
      * handle_usb_line() below, which routes between the two). Deliberately
      * blocking --
      * this is meant to run as its own dedicated offload action (park,
      * plug in, dump), not interleaved with driving, so freezing
-     * everything else (CAN polling, GUI) for the duration is fine. */
+     * everything else (CAN polling, GUI) for the duration is fine.
+     */
     FLASHMEM void handle_log_command(const char *cmd, size_t len)
     {
         if (len == 7 && memcmp(cmd, "LOGDUMP", 7) == 0)
         {
-            /* Megabytes over USB: far longer than the hang watchdog
-             * allows loop() -- and blocking here is the point. */
+            /**
+             * Megabytes over USB: far longer than the hang watchdog
+             * allows loop() -- and blocking here is the point.
+             */
             platform_hang_watchdog(false);
 
             IStorage &storage = platform_get().storage;
@@ -1491,7 +1641,8 @@ namespace
         }
         else if (len == 8 && memcmp(cmd, "LOGCLEAR", 8) == 0)
         {
-            /* Same one call LoggingScreen's erase button makes (see
+            /**
+             * Same one call LoggingScreen's erase button makes (see
              * logging_erase_cb): format the store, then rebuild rotation
              * state and the index against the empty result, leaving the
              * capture count honestly at zero. Recording is deliberately
@@ -1499,7 +1650,8 @@ namespace
              * this command is issued from a host with the car parked, and
              * silently changing a persisted setting out from under the
              * user over a debug serial link is a surprise the GUI's own
-             * confirmation popup doesn't have to be. */
+             * confirmation popup doesn't have to be.
+             */
             erase_logs();
         }
         else if (len == 9 && memcmp(cmd, "LOGSTATUS", 9) == 0)
@@ -1557,8 +1709,10 @@ namespace
         Active
     };
 
-    /* SLCAN's bus/serial side for the dash: ICanBus's sniff_* hooks and
-     * the USB port. */
+    /**
+     * SLCAN's bus/serial side for the dash: ICanBus's sniff_* hooks and
+     * the USB port.
+     */
     class DashSniffPort : public core::slcan::IPort
     {
         public:
@@ -1591,11 +1745,15 @@ namespace
     lv_obj_t  *s_sniff_ring       = nullptr; /* popup's countdown */
     uint32_t   s_sniff_pending_ms = 0;
 
-    /* frames/s, sampled at SNIFF_SCREEN_REFRESH_MS */
+    /**
+     * frames/s, sampled at SNIFF_SCREEN_REFRESH_MS
+     */
     uint32_t s_sniff_rate_ms = 0;
     uint32_t s_sniff_rate_rx = 0;
 
-    /* When `Serial` last read true -- see host_gone(). */
+    /**
+     * When `Serial` last read true -- see host_gone().
+     */
     uint32_t s_sniff_host_ms = 0;
 
     FLASHMEM void usb_reply(const char *text)
@@ -1643,8 +1801,10 @@ namespace
     {
         Composition &app = composition();
 
-        /* Closing the SLCAN channel is what calls sniff_end(), which puts
-         * the bus back exactly as begin() left it at boot. */
+        /**
+         * Closing the SLCAN channel is what calls sniff_end(), which puts
+         * the bus back exactly as begin() left it at boot.
+         */
         s_sniff_session.reset();
         s_sniff_state = SniffState::Off;
 
@@ -1660,16 +1820,20 @@ namespace
         {
             exit_sniff();
 
-            /* Unprompted, unlike every other reply: the host is otherwise
+            /**
+             * Unprompted, unlike every other reply: the host is otherwise
              * left streaming from a dash that quietly went back to the
-             * gauges. */
+             * gauges.
+             */
             usb_reply("SNIFFSTOP");
         }
     }
 
-    /* Fires from inside the Stop button's own click handler, and
+    /**
+     * Fires from inside the Stop button's own click handler, and
      * exit_sniff() deletes that button -- the same reentrancy
-     * rebuild_screens_for_theme_change() defers around. */
+     * rebuild_screens_for_theme_change() defers around.
+     */
     FLASHMEM void sniff_stop_cb(void *ctx)
     {
         (void)ctx;
@@ -1708,10 +1872,12 @@ namespace
             return; /* the popup's already asking */
         }
 
-        /* Only from the gauges. Pulling the panel out from under
+        /**
+         * Only from the gauges. Pulling the panel out from under
          * Settings or the configurator would skip their own exit paths
          * (Settings' done callback is what saves, for one), so a menu
-         * just says no and the driver retries from the gauges. */
+         * just says no and the driver retries from the gauges.
+         */
         if (lv_screen_active() != app.info_screen.screen())
         {
             usb_reply("SNIFFBUSY");
@@ -1735,8 +1901,10 @@ namespace
         s_sniff_pending_ms = platform_get().clock.millis();
         s_sniff_host_ms    = s_sniff_pending_ms; /* the host just wrote */
 
-        /* Tells the host a person is being asked, so it can tell this
-         * wait apart from a plain SLCAN device that will never answer. */
+        /**
+         * Tells the host a person is being asked, so it can tell this
+         * wait apart from a plain SLCAN device that will never answer.
+         */
         usb_reply("SNIFFWAIT");
     }
 
@@ -1760,7 +1928,8 @@ namespace
         s_sniff_rate_rx = stats.rx;
     }
 
-    /* Per-loop while active: hand buffered frames to USB, but only as many
+    /**
+     * Per-loop while active: hand buffered frames to USB, but only as many
      * as its TX buffer takes without blocking. A host that stops reading
      * then backs frames up into the sniff ring (counted as dropped once
      * it's full) rather than freezing loop() -- and with it the Stop
@@ -1770,7 +1939,8 @@ namespace
      * path but the ISR: RAM1 code sits a few hundred bytes under a 32 KB
      * ITCM block boundary, and crossing it costs 32 KB of RAM1 data. It
      * only ever runs with the dashboard paused, and a loop this small
-     * stays resident in the I-cache. */
+     * stays resident in the I-cache.
+     */
     FLASHMEM void pump_sniff()
     {
         if (!s_sniff_session.is_open())
@@ -1791,20 +1961,24 @@ namespace
         }
     }
 
-    /** Only called while not Off -- loop() checks that itself, so the
+    /**
+     * Only called while not Off -- loop() checks that itself, so the
      * normal dash path pays for one compare, not a flash call.
      *
      * @returns True while sniffing -- loop() skips the dashboard.
      *
      * noinline, like handle_usb_line(): each has exactly one caller in
      * ITCM code, and GCC will happily inline a FLASHMEM function into it
-     * -- which lands the body right back in ITCM. */
-    /* True once the host has been gone for SNIFF_HOST_GONE_MS. `Serial`
+     * -- which lands the body right back in ITCM.
+     */
+    /**
+     * True once the host has been gone for SNIFF_HOST_GONE_MS. `Serial`
      * alone is too twitchy: Teensy's operator bool reads false for 15 ms
      * after *any* DTR/RTS change, and opening the port (pyserial raises
      * DTR, then RTS) is exactly such a change -- a SNIFFREQ sent straight
      * after open would otherwise see the host "leave" and be declined
-     * before the popup was even drawn. */
+     * before the popup was even drawn.
+     */
     FLASHMEM bool host_gone(uint32_t now)
     {
         if (Serial)
@@ -1828,8 +2002,10 @@ namespace
             }
             else if (s_sniff_ring != nullptr)
             {
-                /* Tenths of a second; lv_arc_set_value() ignores a repeat,
-                 * so this redraws the ring ten times a second at most. */
+                /**
+                 * Tenths of a second; lv_arc_set_value() ignores a repeat,
+                 * so this redraws the ring ten times a second at most.
+                 */
                 lv_arc_set_value(
                     s_sniff_ring,
                     (SNIFF_CONFIRM_TIMEOUT_MS - (now - s_sniff_pending_ms))
@@ -1838,8 +2014,10 @@ namespace
             return false;
         }
 
-        /* DTR drops when the host closes the port or the cable comes
-         * out -- either way nobody is listening any more. */
+        /**
+         * DTR drops when the host closes the port or the cable comes
+         * out -- either way nobody is listening any more.
+         */
         if (host_gone(now))
         {
             exit_sniff();
@@ -1879,8 +2057,10 @@ namespace
         }
         else if (s_sniff_state == SniffState::Active && !log_cmd)
         {
-            /* LOG* excluded explicitly: "LOGDUMP" would otherwise read as
-             * SLCAN's 'L' (open listen-only). */
+            /**
+             * LOG* excluded explicitly: "LOGDUMP" would otherwise read as
+             * SLCAN's 'L' (open listen-only).
+             */
             s_sniff_session.handle(cmd, len);
         }
         else if (s_sniff_state == SniffState::Off && log_cmd)
@@ -1903,8 +2083,10 @@ namespace
             char c = static_cast<char>(Serial.read());
             if (c == '\r' || c == '\n')
             {
-                /* A bare CR is an SLCAN no-op that still wants its CR
-                 * back; a bare LF is just the tail of a CRLF. */
+                /**
+                 * A bare CR is an SLCAN no-op that still wants its CR
+                 * back; a bare LF is just the tail of a CRLF.
+                 */
                 if (cmd_len > 0
                     || (c == '\r' && s_sniff_state == SniffState::Active))
                 {
@@ -1927,15 +2109,19 @@ namespace
     void rebuild_screens_for_theme_change(void *user_data);
     void settings_screen_loaded_cb(lv_event_t *e);
 
-    /** The accent every screen was last built against -- a config whose
-     * accent differs needs a rebuild before it shows. */
+    /**
+     * The accent every screen was last built against -- a config whose
+     * accent differs needs a rebuild before it shows.
+     */
     uint32_t &built_accent()
     {
         static uint32_t accent = 0;
         return accent;
     }
 
-    /** Where a queued rebuild lands. */
+    /**
+     * Where a queued rebuild lands.
+     */
     enum class RebuildTarget : uint8_t
     {
         Settings,
@@ -1970,12 +2156,14 @@ namespace
         }
         rebuild_pending() = true;
 
-        /* Every screen is about to be deleted and rebuilt, which is not
+        /**
+         * Every screen is about to be deleted and rebuilt, which is not
          * something the panel should be showing: the blank transition
          * screen destroy_screens() loads reads as a white flash. Killed
          * here rather than inside the rebuild so the panel is already dark
          * before the triggering press-release even finishes drawing. The
-         * rebuild arranges for it to come back. */
+         * rebuild arranges for it to come back.
+         */
         blank_backlight();
         lv_async_call(rebuild_screens_for_theme_change, nullptr);
     }
@@ -2001,7 +2189,8 @@ namespace
         request_rebuild(RebuildTarget::Settings);
     }
 
-    /* The other half of theme_picker_done_cb's blank_backlight(). Fires
+    /**
+     * The other half of theme_picker_done_cb's blank_backlight(). Fires
      * on the rebuilt SettingsScreen once it has finished loading --
      * including the 220ms slide-down animation SettingsScreen::open()
      * starts, since LVGL sends this from the load animation's own
@@ -2012,7 +2201,8 @@ namespace
      *
      * Registered once per screen build and left in place: it's a no-op
      * unless the display was deliberately blanked, so ordinary trips
-     * into Settings pass straight through it. */
+     * into Settings pass straight through it.
+     */
     void settings_screen_loaded_cb(lv_event_t *e)
     {
         (void)e;
@@ -2021,16 +2211,20 @@ namespace
             return;
         }
 
-        /* Guarded above so a second SCREEN_LOADED -- the event fires on
+        /**
+         * Guarded above so a second SCREEN_LOADED -- the event fires on
          * every trip into Settings -- can't restart the wait for a panel
-         * that is already lit. */
+         * that is already lit.
+         */
         backlight_state() = BacklightState::Settling;
     }
 
-    /* Opening this screen activates the AP immediately — no separate
+    /**
+     * Opening this screen activates the AP immediately — no separate
      * Activate step (see wireless_setup_screen.hpp's file doc comment).
      * activate() is a no-op unless the AP is currently Idle, so reopening
-     * while already Active/Activating just shows the current state. */
+     * while already Active/Activating just shows the current state.
+     */
     void settings_pick_wireless_cb(void *ctx)
     {
         (void)ctx;
@@ -2042,7 +2236,8 @@ namespace
                                        app.settings_screen.screen());
     }
 
-    /* Fired by RemoteConfigServer whenever a phone-side request changes the
+    /**
+     * Fired by RemoteConfigServer whenever a phone-side request changes the
      * live config: a preview (unsaved), a Save, or the end of the phone's
      * preview session. In
      * every case the config store already holds the values to show; this
@@ -2060,7 +2255,8 @@ namespace
      * change this doesn't restart on its own, since that would drop the
      * phone's session mid-edit. The 180-degree flip is applied, since it
      * can be: the page has no control for it, but a config loaded from a
-     * file carries one, and a discard can put it back. */
+     * file carries one, and a discard can put it back.
+     */
     FLASHMEM void remote_config_event_cb(
         void *ctx, remote::server::RemoteConfigServer::ConfigEvent event)
     {
@@ -2108,18 +2304,24 @@ namespace
             apply_panel_flip(flipped);
         }
 
-        /* A remote change can rewrite priorities[] and num_panels
-         * wholesale, so the poller's request table has to follow it. */
+        /**
+         * A remote change can rewrite priorities[] and num_panels
+         * wholesale, so the poller's request table has to follow it.
+         */
         sync_active_signals();
 
-        /* The phone's mock shows sample values; the panel shows the same
-         * ones for as long as the phone is driving it. */
+        /**
+         * The phone's mock shows sample values; the panel shows the same
+         * ones for as long as the phone is driving it.
+         */
         app.vehicle_binding.set_value_override(
             app.remote_server.preview_values());
 
-        /* Kept in step even mid-preview: SettingsScreen commits its own
+        /**
+         * Kept in step even mid-preview: SettingsScreen commits its own
          * copy of these on every exit, which would otherwise write stale
-         * values back over whatever the phone just did. */
+         * values back over whatever the phone just did.
+         */
         app.settings_screen.set_values(
             settings.day_brightness,
             settings.night_brightness,
@@ -2128,13 +2330,15 @@ namespace
             settings.num_panels,
                                        settings.accent_color);
 
-        /* The phone's own edits (and its Discard) land on the dashboard,
+        /**
+         * The phone's own edits (and its Discard) land on the dashboard,
          * which is what they change. A session that ended because the
          * phone went -- its page closed, it left the AP, it fell silent --
          * goes back to the QR code, ready for it to come back: the
          * dashboard it was driving would otherwise just drop to live
          * values with no sign of why. The panel's X ends it too, but stays
-         * put: it's already on its way back to Settings. */
+         * put: it's already on its way back to Settings.
+         */
         bool phone_gone = reverting_for_lost_phone()
                           || event == Event::PageLeft;
         bool to_dashboard
@@ -2178,12 +2382,14 @@ namespace
         sync_wifi_indicator();
     }
 
-    /* Registered at a modest cadence (see WIRELESS_SCREEN_REFRESH_MS) so
+    /**
+     * Registered at a modest cadence (see WIRELESS_SCREEN_REFRESH_MS) so
      * the Activating -> Active transition (an async round trip to the C3)
      * and an idle-timeout auto-deactivation both show up while this
      * screen is on-screen — unconditional like refresh_info_screen_task,
      * since WirelessSetupScreen::refresh() is a cheap no-op unless the
-     * phase actually changed. */
+     * phase actually changed.
+     */
     void refresh_wireless_screen_task(void *ctx)
     {
         (void)ctx;
@@ -2194,9 +2400,11 @@ namespace
     FLASHMEM void firmware_install_cb(void *ctx);
     FLASHMEM void firmware_leave_cb(void *ctx);
 
-    /* Takes the update screen down -- it exists only in update mode (see
+    /**
+     * Takes the update screen down -- it exists only in update mode (see
      * firmware_update_screen.hpp for what it cost to keep). If it's
-     * showing, back to the Wi-Fi screen the phone is connected over. */
+     * showing, back to the Wi-Fi screen the phone is connected over.
+     */
     FLASHMEM void leave_firmware_update()
     {
         Composition &app = composition();
@@ -2221,8 +2429,10 @@ namespace
             app.remote_binding.build_update_view_model());
     }
 
-    /* Fired by the Install popup. The relay switches app slots and
-     * restarts the board; the screen says so in the meantime. */
+    /**
+     * Fired by the Install popup. The relay switches app slots and
+     * restarts the board; the screen says so in the meantime.
+     */
     FLASHMEM void firmware_install_cb(void *ctx)
     {
         (void)ctx;
@@ -2232,9 +2442,11 @@ namespace
             app.remote_binding.build_update_view_model());
     }
 
-    /* Fired by the update screen's X and the Install popup's Cancel: out
+    /**
+     * Fired by the update screen's X and the Install popup's Cancel: out
      * of update mode. A verified image stays unused in the spare slot
-     * until the next upload overwrites it. */
+     * until the next upload overwrites it.
+     */
     FLASHMEM void firmware_leave_cb(void *ctx)
     {
         (void)ctx;
@@ -2296,12 +2508,14 @@ namespace
             remote::server::OTA_REQUEST_TIMEOUT_MS / 100);
     }
 
-    /* Follows RemoteOtaController: the request popup while the phone is
+    /**
+     * Follows RemoteOtaController: the request popup while the phone is
      * asking, then the update screen for as long as update mode lasts --
      * put back up if anything else loads over it -- and back to the Wi-Fi
      * screen when it ends. Also keeps the AP's idle timeout from cutting
      * off update mode underneath it; the X is the way out, or
-     * remote::server::OTA_WAIT_TIMEOUT_MS if nothing is ever sent. */
+     * remote::server::OTA_WAIT_TIMEOUT_MS if nothing is ever sent.
+     */
     FLASHMEM void firmware_update_task(void *ctx)
     {
         (void)ctx;
@@ -2317,7 +2531,9 @@ namespace
             }
             else
             {
-                /* Tenths of a second, like the sniffer's ring. */
+                /**
+                 * Tenths of a second, like the sniffer's ring.
+                 */
                 uint32_t waited = now - app.remote_ota.state_entered_ms();
                 uint32_t left
                     = waited < remote::server::OTA_REQUEST_TIMEOUT_MS
@@ -2328,7 +2544,9 @@ namespace
         }
         else
         {
-            /* Answered, or timed out (tick() just declined it). */
+            /**
+             * Answered, or timed out (tick() just declined it).
+             */
             close_update_request_popup();
         }
 
@@ -2355,12 +2573,14 @@ namespace
         }
     }
 
-    /* Ends a new firmware's probation (platform_firmware_healthy()) once
+    /**
+     * Ends a new firmware's probation (platform_firmware_healthy()) once
      * it has run FIRMWARE_HEALTHY_AFTER_MS -- this task's first run --
      * with frames reaching the panel and the relay that serves the update
      * page up, so the next update can get in. Until then any reset, the
      * hang watchdog's included, rolls the update back. Runs on after
-     * that, but the platform call does nothing a second time. */
+     * that, but the platform call does nothing a second time.
+     */
     FLASHMEM void firmware_health_task(void *ctx)
     {
         (void)ctx;
@@ -2376,8 +2596,10 @@ namespace
             static_cast<lv_obj_t *>(lv_event_get_user_data(e)));
     }
 
-    /* The board came back up on its old firmware after an update. Said
-     * once, over whatever screen boot lands on. */
+    /**
+     * The board came back up on its old firmware after an update. Said
+     * once, over whatever screen boot lands on.
+     */
     FLASHMEM void show_failed_update_notice()
     {
         char failed[FIRMWARE_VERSION_LEN];
@@ -2397,14 +2619,18 @@ namespace
             popup.confirm_btn, close_notice_cb, LV_EVENT_CLICKED, popup.mbox);
     }
 
-    /* A tap on the dashboard that isn't on a panel: the gaps, and the
+    /**
+     * A tap on the dashboard that isn't on a panel: the gaps, and the
      * preview banner's strip. Only means something mid-preview, where it
-     * is what the banner promises. */
+     * is what the banner promises.
+     */
     FLASHMEM void info_screen_clicked_cb(lv_event_t *e)
     {
         (void)e;
-        /* A swipe that started off a panel -- see
-         * InfoScreen::panel_clicked_cb. */
+        /**
+         * A swipe that started off a panel -- see
+         * InfoScreen::panel_clicked_cb.
+         */
         if (lv_indev_get_gesture_dir(lv_indev_active()) != LV_DIR_NONE)
         {
             return;
@@ -2527,11 +2753,13 @@ namespace
                             LV_EVENT_SCREEN_LOADED,
                             nullptr);
 
-        /* active_orientation(), not settings.orientation -- this runs
+        /**
+         * active_orientation(), not settings.orientation -- this runs
          * again from rebuild_screens_for_theme_change() mid-session, by
          * which point settings.orientation may already hold a phone's
          * staged pick that hasn't taken effect yet (see
-         * active_orientation()). */
+         * active_orientation()).
+         */
         app.info_screen.rebuild(settings.num_panels,
                                 to_gui_orientation(active_orientation()));
     }
@@ -2561,8 +2789,10 @@ namespace
         lv_obj_delete(app.theme_picker_screen.screen());
         lv_obj_delete(app.orientation_screen.screen());
         lv_obj_delete(app.wireless_setup_screen.screen());
-        /* Not built by build_screens(): firmware_update_task builds it
-         * again against the new theme if update mode is still on. */
+        /**
+         * Not built by build_screens(): firmware_update_task builds it
+         * again against the new theme if update mode is still on.
+         */
         app.firmware_update_screen.destroy();
         app.wifi_indicator.destroy();
 
@@ -2583,11 +2813,13 @@ namespace
     {
         (void)user_data;
 
-        /* Re-seed from the saved config rather than assuming the caller
+        /**
+         * Re-seed from the saved config rather than assuming the caller
          * already set it. theme_picker_done_cb does set runtime_theme()'s
          * accent before calling here, but the remote-apply path changes
          * settings.accent_color in the config store without going anywhere
-         * near that function -- reading it back here covers both. */
+         * near that function -- reading it back here covers both.
+         */
         runtime_theme().palette.accent = lv_color_hex(
             composition().config_store.get().settings.accent_color);
 
@@ -2598,9 +2830,11 @@ namespace
 
         if (rebuild_target() == RebuildTarget::Dashboard)
         {
-            /* The dashboard has no load animation to wait out, and never
+            /**
+             * The dashboard has no load animation to wait out, and never
              * goes quiet (its readouts refresh constantly), so it settles
-             * the way boot does: by counting render passes. */
+             * the way boot does: by counting render passes.
+             */
             lv_screen_load(composition().info_screen.screen());
             boot_passes()     = 0;
             backlight_state() = BacklightState::AwaitingBootPasses;
@@ -2611,9 +2845,11 @@ namespace
             app.wireless_setup_screen.open(
                 app.remote_binding.build_view_model(),
                 app.settings_screen.screen());
-            /* A still screen once its load animation ends, so the same
+            /**
+             * A still screen once its load animation ends, so the same
              * quiet-period settle as Settings. Guarded for STRESS_TEST
-             * builds, where blank_backlight() leaves it lit. */
+             * builds, where blank_backlight() leaves it lit.
+             */
             if (backlight_state() == BacklightState::Blanked)
             {
                 backlight_state() = BacklightState::Settling;
@@ -2621,7 +2857,9 @@ namespace
         }
         else
         {
-            /* settings_screen_loaded_cb brings the light back. */
+            /**
+             * settings_screen_loaded_cb brings the light back.
+             */
             composition().settings_screen.open();
         }
         lv_obj_delete(transition);
@@ -2636,20 +2874,26 @@ FLASHMEM void setup()
 
     Platform &platform = platform_get();
 
-    /* Loaded before display/touch begin() so settings.orientation is
+    /**
+     * Loaded before display/touch begin() so settings.orientation is
      * known up front -- orientation is a boot-time-only choice (see
      * platform.hpp's DisplayOrientation doc comments), and the one
      * lv_display_t created below has to be sized correctly from the
-     * start since nothing resizes it live. */
+     * start since nothing resizes it live.
+     */
     Composition    &app      = composition();
     core::Settings &settings = app.config_store.get().settings;
     app.config_store.load();
 
     active_orientation() = settings.orientation;
 
-    /* The saved level from the first lit frame -- see backlight_pct(). */
-    /* Auto starts from Day's level, its fallback, and snaps to the
-     * dimmer's before the panel lights if the cluster answers in time. */
+    /**
+     * The saved level from the first lit frame -- see backlight_pct().
+     */
+    /**
+     * Auto starts from Day's level, its fallback, and snaps to the
+     * dimmer's before the panel lights if the cluster answers in time.
+     */
     live_brightness_mode() = settings.brightness_mode;
     live_auto_pct()        = settings.auto_brightness_pct;
     backlight_pct() = settings.brightness_mode == core::BrightnessMode::Night
@@ -2684,8 +2928,10 @@ FLASHMEM void setup()
     lv_display_t *display = lv_display_create(width, height);
     lv_display_set_flush_cb(display, display_flush_cb);
 
-    /* Whole-screen buffers from the platform if it has them (see
-     * s_draw_buf_1's comment), else the banded partial pair here. */
+    /**
+     * Whole-screen buffers from the platform if it has them (see
+     * s_draw_buf_1's comment), else the banded partial pair here.
+     */
     uint16_t *frame_buf_1;
     uint16_t *frame_buf_2;
     size_t    frame_buf_bytes;
@@ -2712,11 +2958,13 @@ FLASHMEM void setup()
     lv_indev_set_read_cb(indev, touch_read_cb);
     lv_timer_set_period(lv_indev_get_read_timer(indev), TOUCH_POLL_MS);
 
-    /* Guard against an accent_color that isn't one of gui::ACCENT_PRESETS
+    /**
+     * Guard against an accent_color that isn't one of gui::ACCENT_PRESETS
      * (e.g. 0 from a config saved before this field existed) — silently
      * building every screen against black-on-black accent styling is a
      * much worse failure mode than just falling back to a real default,
-     * and this also self-heals the saved value so it doesn't recur. */
+     * and this also self-heals the saved value so it doesn't recur.
+     */
     bool valid_accent = false;
     for (uint8_t i = 0; i < gui::ACCENT_PRESET_COUNT; i++)
     {
@@ -2732,11 +2980,13 @@ FLASHMEM void setup()
         app.config_store.save();
     }
 
-    /* Seed runtime_theme()'s accent and metrics from whatever was last
+    /**
+     * Seed runtime_theme()'s accent and metrics from whatever was last
      * saved, before the first build_screens() call — otherwise every
      * screen would briefly be built against THEME_DEFAULT's hardcoded
      * green/landscape-metrics instead of the user's actual saved
-     * preference. */
+     * preference.
+     */
     runtime_theme().palette.accent = lv_color_hex(settings.accent_color);
     runtime_theme().metrics        = orientation == DisplayOrientation::Portrait
                                          ? gui::METRICS_PORTRAIT
@@ -2756,10 +3006,12 @@ FLASHMEM void setup()
         take_profile_snapshot();
     }
 
-    /* No per-signal scheduler task any more -- core::SignalPoller paces
+    /**
+     * No per-signal scheduler task any more -- core::SignalPoller paces
      * itself from loop() off its own due times and its outstanding
      * request, which a fixed-period task cannot express. This only has to
-     * tell it what to ask for. */
+     * tell it what to ask for.
+     */
     sync_active_signals();
     app.scheduler.every(
         ACTIVE_SIGNAL_SYNC_MS, sync_active_signals_task, nullptr);
@@ -2781,27 +3033,33 @@ FLASHMEM void setup()
     app.scheduler.every(
         FIRMWARE_HEALTHY_AFTER_MS, firmware_health_task, nullptr);
 
-    /* Arms the backstop for the boot blank. The panel is already dark
+    /**
+     * Arms the backstop for the boot blank. The panel is already dark
      * (TeensyDisplay::begin() holds the pin low) and display_flush_cb's
      * pass counting is what normally lights it -- this is purely so a
      * boot where those passes never arrive still ends with a lit
      * dashboard rather than a black one. Has to come after lv_init(),
-     * since it creates an lv_timer. */
+     * since it creates an lv_timer.
+     */
     begin_backlight_wait();
 
     if (settings.open_orientation_on_boot)
     {
-        /* Cleared first, so a crash on the way up can't make every later
-         * boot land here too. */
+        /**
+         * Cleared first, so a crash on the way up can't make every later
+         * boot land here too.
+         */
         settings.open_orientation_on_boot = false;
         app.config_store.save();
 
         app.orientation_screen.open(to_gui_orientation(active_orientation()),
                                     app.settings_screen.screen());
 
-        /* A static screen never produces the BOOT_SETTLE_PASSES the
+        /**
+         * A static screen never produces the BOOT_SETTLE_PASSES the
          * dashboard does, so it settles like orientation_rotate_cb: draw
-         * it now, then light once the display goes quiet. */
+         * it now, then light once the display goes quiet.
+         */
         lv_refr_now(nullptr);
         backlight_state() = BacklightState::Settling;
     }
@@ -2812,9 +3070,11 @@ FLASHMEM void setup()
 
     show_failed_update_notice();
 
-    /* Last, so nothing above -- the first LittleFS mount after a
+    /**
+     * Last, so nothing above -- the first LittleFS mount after a
      * partition change can format it -- runs against it. From here on a
-     * loop() that stops coming round resets the board. */
+     * loop() that stops coming round resets the board.
+     */
     platform_hang_watchdog(true);
 }
 
@@ -2825,7 +3085,9 @@ void loop()
 #ifdef ARDUINO
     poll_usb_serial();
 
-    /* Sniffer mode pauses the whole dashboard -- see its block comment. */
+    /**
+     * Sniffer mode pauses the whole dashboard -- see its block comment.
+     */
     if (s_sniff_state != SniffState::Off && sniff_tick())
     {
         lv_timer_handler();
@@ -2835,9 +3097,11 @@ void loop()
 
     app.scheduler.tick();
 
-    /* Drain first, send second: a response landing this iteration frees
+    /**
+     * Drain first, send second: a response landing this iteration frees
      * the poller's in-flight slot, so tick() can put the next request on
-     * the wire in the same pass instead of a loop later. */
+     * the wire in the same pass instead of a loop later.
+     */
     app.uds_client.poll(
         on_uds_response, nullptr, on_uds_negative_response, nullptr);
     app.uds_poller.tick();

@@ -20,8 +20,10 @@
 
 namespace
 {
-    /* In-memory IConfigStore test double — avoids touching the real
-     * simulator's sim_config.bin file, so tests stay hermetic. */
+    /**
+     * In-memory IConfigStore test double — avoids touching the real
+     * simulator's sim_config.bin file, so tests stay hermetic.
+     */
     class FakeConfigStore : public IConfigStore
     {
         public:
@@ -130,7 +132,9 @@ void test_load_round_trips_after_modification()
         store.save();
     }
 
-    /* Fresh ConfigStore instance over the same backing bytes. */
+    /**
+     * Fresh ConfigStore instance over the same backing bytes.
+     */
     core::ConfigStore store2(backing);
     store2.load();
 
@@ -213,8 +217,10 @@ void test_unrecognized_version_resets_to_defaults()
 {
     FakeConfigStore backing;
 
-    /* Craft a header with a valid magic but an unrecognized (older)
-     * version, and garbage settings behind it. */
+    /**
+     * Craft a header with a valid magic but an unrecognized (older)
+     * version, and garbage settings behind it.
+     */
     core::ConfigHeader header { core::ConfigStore::MAGIC_NUMBER, 0 };
     backing.write(0, &header, sizeof(header));
 
@@ -230,8 +236,10 @@ void test_newer_version_loads_defaults_without_overwriting()
 {
     FakeConfigStore backing;
 
-    /* Settings saved by newer firmware, then the board rolled back to
-     * this one: a layout this build doesn't know, behind a valid magic. */
+    /**
+     * Settings saved by newer firmware, then the board rolled back to
+     * this one: a layout this build doesn't know, behind a valid magic.
+     */
     core::ConfigHeader header {
         core::ConfigStore::MAGIC_NUMBER,
         static_cast<uint8_t>(core::ConfigStore::CURRENT_VERSION + 1)
@@ -244,7 +252,9 @@ void test_newer_version_loads_defaults_without_overwriting()
     store.load();
     TEST_ASSERT_EQUAL_UINT8(5, store.get().settings.num_panels);
 
-    /* Still there for the newer firmware, should it be reinstalled. */
+    /**
+     * Still there for the newer firmware, should it be reinstalled.
+     */
     core::ConfigHeader stored {};
     uint8_t            stored_settings = 0;
     backing.read(0, &stored, sizeof(stored));
@@ -267,8 +277,10 @@ void test_partial_save_over_newer_version_writes_whole_config()
     core::ConfigStore store(backing);
     store.load();
 
-    /* A slot write alone would leave the newer header in place over
-     * this layout's bytes; it has to become a full save instead. */
+    /**
+     * A slot write alone would leave the newer header in place over
+     * this layout's bytes; it has to become a full save instead.
+     */
     store.get().priorities[3].signal_id = 7;
     store.save_priority(3);
 
@@ -282,7 +294,9 @@ void test_partial_save_over_newer_version_writes_whole_config()
     TEST_ASSERT_EQUAL_UINT16(7, store2.get().priorities[3].signal_id);
     TEST_ASSERT_EQUAL_UINT8(5, store2.get().settings.num_panels);
 
-    /* Once it's this layout, partial writes are partial again. */
+    /**
+     * Once it's this layout, partial writes are partial again.
+     */
     store2.get().signals[6].warn.use_hi = true;
     store2.save_signal(22);
     core::ConfigStore store3(backing);
@@ -323,7 +337,9 @@ void test_v6_config_survives_the_upgrade()
     v6.settings.accent_color     = 0x123456;
     v6.priorities[0].signal_id   = 22;
     v6.priorities[0].display_mode = core::DisplayMode::Gauge;
-    /* v8's brightness_mode byte was padding in v6: anything at all. */
+    /**
+     * v8's brightness_mode byte was padding in v6: anything at all.
+     */
     v6.settings.brightness_mode = static_cast<core::BrightnessMode>(0xCD);
     write_old_head(backing, 6, v6.settings, v6.priorities);
 

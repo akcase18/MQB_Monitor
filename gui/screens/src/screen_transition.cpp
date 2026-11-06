@@ -7,8 +7,10 @@ namespace gui
 #if GUI_SNAPSHOT_TRANSITIONS
     namespace
     {
-        /* One slide's state, owned by the transition screen and freed with
-         * it (transition_deleted_cb). */
+        /**
+         * One slide's state, owned by the transition screen and freed with
+         * it (transition_deleted_cb).
+         */
         struct Transition
         {
                 lv_obj_t      *target;
@@ -39,14 +41,18 @@ namespace gui
             auto     *t     = static_cast<Transition *>(
                 lv_obj_get_user_data(trans));
 
-            /* Something else loaded a screen mid-slide (a remote event,
-             * say): that load wins, and this one just cleans up. */
+            /**
+             * Something else loaded a screen mid-slide (a remote event,
+             * say): that load wins, and this one just cleans up.
+             */
             if (lv_screen_active() == trans)
             {
                 lv_screen_load(t->target);
             }
 
-            /* Not lv_obj_delete(): `img` is this animation's own var. */
+            /**
+             * Not lv_obj_delete(): `img` is this animation's own var.
+             */
             lv_obj_delete_async(trans);
         }
     } // namespace
@@ -110,12 +116,14 @@ namespace gui
         lv_image_set_src(img, snapshot);
         exec(img, from);
 
-        /* Load without redrawing: the panel still holds the outgoing
+        /**
+         * Load without redrawing: the panel still holds the outgoing
          * screen, and every area the slide invalidates from here on is
          * one the image covers. The layout pass has to happen in here
          * too -- left to the next refresh, sizing the screen and the
          * image invalidates the whole screen, and `trans` has no
-         * background, so that frame comes out white. */
+         * background, so that frame comes out white.
+         */
         lv_display_enable_invalidation(nullptr, false);
         lv_screen_load(trans);
         lv_obj_update_layout(trans);

@@ -14,7 +14,9 @@
 
 namespace
 {
-    /* CS1 */
+    /**
+     * CS1
+     */
     constexpr uint8_t CS_PIN = 0;
 
     constexpr uint16_t X_CMD       = 0x91;
@@ -22,12 +24,14 @@ namespace
     constexpr uint16_t Z1_CMD      = 0xB1;
     constexpr uint16_t Z2_CMD      = 0xC1;
     constexpr int16_t  Z_THRESHOLD = 800;
-    /* Contact area shrinks as a finger lifts off, which skews the X/Y
+    /**
+     * Contact area shrinks as a finger lifts off, which skews the X/Y
      * reading (often toward a screen edge) for the last poll or two before
      * pressure finally drops below Z_THRESHOLD — that transient still
      * counts as "pressed" but its coordinates aren't trustworthy. Below
      * this stricter threshold, keep reporting the last confident position
-     * instead of the fresh (possibly skewed) one. */
+     * instead of the fresh (possibly skewed) one.
+     */
     constexpr int16_t  Z_CONFIDENT_THRESHOLD = 1000;
     constexpr uint32_t MIN_CYCLE_TIME        = 3;
 
@@ -107,9 +111,11 @@ void TeensyTouch::poll()
 
     if (z < Z_THRESHOLD)
     {
-        /* x_val_/y_val_ deliberately keep their last value here — see the
+        /**
+         * x_val_/y_val_ deliberately keep their last value here — see the
          * comment on read() below for why reporting (0,0) on release is
-         * wrong, not just cosmetically "less precise". */
+         * wrong, not just cosmetically "less precise".
+         */
         z_val_           = 0;
         was_pressed_     = false;
         s_last_poll_tick = curr_tick;
@@ -117,31 +123,37 @@ void TeensyTouch::poll()
     }
 
     z_val_ = z;
-    /* Always accept the first sample of a new press (no prior confident
+    /**
+     * Always accept the first sample of a new press (no prior confident
      * position to fall back on) — only hold the last position once a
      * press is already established and pressure drops into the
-     * low-confidence zone. */
+     * low-confidence zone.
+     */
     if (!was_pressed_ || z > Z_CONFIDENT_THRESHOLD)
     {
         if (orientation_ == DisplayOrientation::Portrait)
         {
-            /* Confirmed on real hardware: touching the bottom-right
+            /**
+             * Confirmed on real hardware: touching the bottom-right
              * corner registered as top-right, bottom-left as top-left,
              * top-left as bottom-left -- X was already correct, Y came
              * out mirrored. This also lines up with teensy_display.cpp's
              * own Portrait fix (setRotation() corrected from the guessed
              * 0 to the confirmed-correct 2, a 180-degree difference) --
              * x_val_ is unchanged from the original guess since it was
-             * already right, y_val_ is now inverted to match. */
+             * already right, y_val_ is now inverted to match.
+             */
             x_val_ = 4095 - x;
             y_val_ = 4095 - y;
         }
         else
         {
-            /* rotation 2, matching the old driver's unchanged default,
+            /**
+             * rotation 2, matching the old driver's unchanged default,
              * then flipped 180 -- x_val_/y_val_ each negated relative to
              * their 0-4095 range -- to track the display's
-             * setRotation(3) (see teensy_display.cpp). */
+             * setRotation(3) (see teensy_display.cpp).
+             */
             x_val_ = 4095 - y;
             y_val_ = x;
         }
@@ -157,14 +169,16 @@ bool TeensyTouch::read(TouchPoint &out)
 
     bool pressed = z_val_ >= Z_THRESHOLD;
     out.pressed  = pressed;
-    /* LVGL's indev core updates its internal "current point" from
+    /**
+     * LVGL's indev core updates its internal "current point" from
      * whatever this call reports even when state is released — a widget
      * being dragged (e.g. lv_slider) finalizes its value from that exact
      * point on the release event. Reporting (0,0) here would make LVGL
      * finish every single drag at the coordinate origin instead of
      * wherever the finger actually was, so the last valid touch position
      * is reported regardless of pressed state; `out.pressed` is what
-     * actually communicates press/release to LVGL. */
+     * actually communicates press/release to LVGL.
+     */
     out.x = (x_val_ * width_) / 4095;
     out.y = (y_val_ * height_) / 4095;
     if (flipped_)

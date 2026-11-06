@@ -39,14 +39,16 @@ namespace core
              */
             float get_display_value(uint16_t id, bool is_metric) const;
 
-            /* Catalog-index overloads of the three accessors above, for
+            /**
+             * Catalog-index overloads of the three accessors above, for
              * callers that already hold an index (gui::VehicleBinding,
              * core::Logger, on_uds_response() below). The id-keyed forms
              * are just signal_table_find() -- a linear scan of the whole
              * catalog -- in front of these, and the hot paths were paying
              * for it two or three times per panel per refresh to look up
              * an index they had already computed. Out-of-range indices
-             * behave like an unknown id: no-op / s_invalid / 0.0f. */
+             * behave like an unknown id: no-op / s_invalid / 0.0f.
+             */
             void set_at(int idx, float value, uint32_t now_ms);
 
             const SignalValue &get_at(int idx) const;
@@ -70,12 +72,16 @@ namespace core
                                  uint32_t       now_ms);
 
         private:
-            /* const, so it lands in flash rather than costing a
-             * SignalValue's worth of RAM for a value that never changes. */
+            /**
+             * const, so it lands in flash rather than costing a
+             * SignalValue's worth of RAM for a value that never changes.
+             */
             static const SignalValue s_invalid;
 
-            /* The whole table, internal signals included: they're fed
-             * and read exactly like the user-facing ones. */
+            /**
+             * The whole table, internal signals included: they're fed
+             * and read exactly like the user-facing ones.
+             */
             SignalValue values_[SIGNAL_TABLE_COUNT];
             float request_raw_[SIGNAL_TABLE_COUNT][MAX_REQUESTS_PER_SIGNAL]
                 = {};

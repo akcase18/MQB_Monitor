@@ -7,7 +7,9 @@ namespace core
 
     namespace
     {
-        /** `pct` clamped to 0-100; NaN reads as 0. */
+        /**
+         * `pct` clamped to 0-100; NaN reads as 0.
+         */
         float clamp_pct(float pct)
         {
             if (!(pct > 0.0f))

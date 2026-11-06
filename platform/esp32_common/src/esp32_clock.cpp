@@ -10,6 +10,8 @@ Esp32Clock &Esp32Clock::instance()
 
 uint32_t Esp32Clock::millis() const
 {
-    /* Qualified, because this class has a member of the same name. */
+    /**
+     * Qualified, because this class has a member of the same name.
+     */
     return ::millis();
 }

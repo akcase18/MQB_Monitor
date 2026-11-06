@@ -33,15 +33,19 @@ namespace esp32
         public:
             explicit ConfigWebHandler(RelayLink &relay);
 
-            /** Registers every route above on `server`. Must be called
-             * before `server` starts handling requests. */
+            /**
+             * Registers every route above on `server`. Must be called
+             * before `server` starts handling requests.
+             */
             void attach(WebServer &server);
 
         private:
             void handle_page();
             void handle_state();
-            /** Relays the hex body of the current POST as `type` and
-             * answers with the one-byte ApplyResult, as a decimal digit. */
+            /**
+             * Relays the hex body of the current POST as `type` and
+             * answers with the one-byte ApplyResult, as a decimal digit.
+             */
             void handle_change(remote::protocol::MsgType type);
 
             RelayLink &relay_;

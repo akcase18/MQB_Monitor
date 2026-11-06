@@ -7,9 +7,11 @@
 namespace core
 {
 
-    /* flipped_horizontal/flipped_vertical and open_orientation_on_boot
+    /**
+     * flipped_horizontal/flipped_vertical and open_orientation_on_boot
      * were added into padding without a version bump (see config.hpp);
-     * this is what makes that safe. */
+     * this is what makes that safe.
+     */
     static_assert(offsetof(Settings, brightness_mode) == 3
                       && offsetof(Settings, accent_color) == 12
                       && offsetof(Settings, auto_brightness_pct) == 16
@@ -17,13 +19,15 @@ namespace core
                       && sizeof(Settings) == 20,
                   "Settings layout moved -- bump CURRENT_VERSION");
 
-    /* The stored layout for CURRENT_VERSION. Dashes in the field hold
+    /**
+     * The stored layout for CURRENT_VERSION. Dashes in the field hold
      * real settings now, so changing it -- a field added, moved or
      * resized, or SIGNAL_CONFIG_SLOTS raised (promoting a signal no
      * longer changes it) -- needs a CURRENT_VERSION bump and a migrate() step that carries the
      * old values across. Without the step, load() would reset everyone's
      * settings; without the bump, it would misread them. Update these
-     * numbers with it. */
+     * numbers with it.
+     */
     static_assert(ConfigStore::CURRENT_VERSION == 10 && sizeof(Config) == 1924
                       && offsetof(Config, settings) == 4
                       && offsetof(Config, priorities) == 24
@@ -287,10 +291,12 @@ namespace core
             config_.priorities[rank] = DEFAULT_PRIORITIES[rank];
         }
 
-        /* Whole SignalConfig, not just .warn -- this has to leave every
+        /**
+         * Whole SignalConfig, not just .warn -- this has to leave every
          * field at its default rather than relying on config_ never
          * having been loaded into, so migrate() can call it before
-         * reading the old records in. */
+         * reading the old records in.
+         */
         for (size_t s = 0; s < SIGNAL_CONFIG_SLOTS; s++)
         {
             config_.signals[s] = SignalConfig {};

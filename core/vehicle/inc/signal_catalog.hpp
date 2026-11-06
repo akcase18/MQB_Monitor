@@ -134,14 +134,18 @@ namespace core
      */
     void uds_ecu_rx_range(uint32_t &lo, uint32_t &hi);
 
-    /* Both synced by tools/gen_catalog.py. */
+    /**
+     * Both synced by tools/gen_catalog.py.
+     */
     inline constexpr size_t SIGNAL_CATALOG_COUNT = 50;
     inline constexpr size_t INTERNAL_SIGNAL_COUNT = 1;
     inline constexpr size_t SIGNAL_TABLE_COUNT
         = SIGNAL_CATALOG_COUNT + INTERNAL_SIGNAL_COUNT;
 
-    /** A signal's effective display range — either SignalSpec's compiled-in
-     * default or a user-calibrated override. */
+    /**
+     * A signal's effective display range — either SignalSpec's compiled-in
+     * default or a user-calibrated override.
+     */
     struct DisplayRange
     {
             float min;

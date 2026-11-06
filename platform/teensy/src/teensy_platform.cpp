@@ -15,7 +15,8 @@
 #include "teensy_display.hpp"
 #include "teensy_serial_link.hpp"
 
-/* Which IStorage backend is active. No Micro-SD slot exists on the board
+/**
+ * Which IStorage backend is active. No Micro-SD slot exists on the board
  * today -- flip this to 1 if/when one is added back. Only the active
  * backend's header is included below: SdFat.h and LittleFS.h both define
  * conflicting FILE_READ/FILE_WRITE macros (different numeric values), so
@@ -23,7 +24,8 @@
  * teensy_sd_card.cpp and teensy_storage.cpp still compile unconditionally
  * either way (see platformio.ini's teensymm build_src_filter), each in its
  * own isolated translation unit, so the inactive one can't silently
- * bit-rot. */
+ * bit-rot.
+ */
 #define TEENSY_STORAGE_USE_SD 0
 
 #if TEENSY_STORAGE_USE_SD
@@ -34,13 +36,15 @@
     #define TEENSY_ACTIVE_STORAGE TeensyStorage::instance()
 #endif
 
-/* Which ITouch backend is active. The new PCB uses a capacitive FT6236
+/**
+ * Which ITouch backend is active. The new PCB uses a capacitive FT6236
  * over I2C -- flip this to 1 to go back to the resistive XPT2046. Only the
  * active backend's header is included below (SPI.h vs Wire.h aren't known
  * to collide the way SdFat/LittleFS did, but gating the include is cheap
  * and keeps the pattern consistent with TEENSY_STORAGE_USE_SD). Both
  * teensy_touch.cpp and teensy_cap_touch.cpp still compile unconditionally
- * either way, so the inactive one can't silently bit-rot. */
+ * either way, so the inactive one can't silently bit-rot.
+ */
 #define TEENSY_TOUCH_USE_RESISTIVE 0
 
 #if TEENSY_TOUCH_USE_RESISTIVE
@@ -51,10 +55,12 @@
     #define TEENSY_ACTIVE_TOUCH TeensyCapTouch::instance()
 #endif
 
-/* Which ICanBus is active. 0 = FlexCAN on the car. 1 = the synthetic bus
+/**
+ * Which ICanBus is active. 0 = FlexCAN on the car. 1 = the synthetic bus
  * the simulator runs on, sweeping fast and wide, so the whole
  * poll/decode/warn/render path runs on a bench with no vehicle attached.
- * env:teensymm_stress sets it; same switch as dash_s3's DASH_S3_FAKE_CAN. */
+ * env:teensymm_stress sets it; same switch as dash_s3's DASH_S3_FAKE_CAN.
+ */
 #ifndef TEENSY_FAKE_CAN
     #define TEENSY_FAKE_CAN 0
 #endif
@@ -89,20 +95,24 @@ Platform &platform_get()
 
 void platform_restart()
 {
-    /* SYSRESETREQ through the ARM AIRCR register (0x05FA is the write
+    /**
+     * SYSRESETREQ through the ARM AIRCR register (0x05FA is the write
      * key) -- the same full-chip reset the bootloader's own reboot uses.
      * The reset lands within a few cycles; the loop just satisfies
-     * [[noreturn]]. */
+     * [[noreturn]].
+     */
     SCB_AIRCR = 0x05FA0004;
     for (;;)
     {
     }
 }
 
-/* No field updates on this board -- see platform.hpp's FIRMWARE section --
+/**
+ * No field updates on this board -- see platform.hpp's FIRMWARE section --
  * but it is release hardware, so it carries the `git describe` version
  * tools/fw_version.py stamps.
- * FLASHMEM: none of these is on a hot path, and RAM1 code is tight. */
+ * FLASHMEM: none of these is on a hot path, and RAM1 code is tight.
+ */
 FLASHMEM const char *platform_firmware_version()
 {
     return FW_VERSION;

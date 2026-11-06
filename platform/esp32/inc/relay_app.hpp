@@ -34,11 +34,15 @@ namespace esp32
         public:
             virtual ~RelayExtension() = default;
 
-            /** Registers routes on `server` and keeps `link` for sending
-             * events. Called once, from RelayApp::begin(). */
+            /**
+             * Registers routes on `server` and keeps `link` for sending
+             * events. Called once, from RelayApp::begin().
+             */
             virtual void attach(WebServer &server, RelayLink &link) = 0;
 
-            /** Offered every frame RelayApp doesn't handle itself. */
+            /**
+             * Offered every frame RelayApp doesn't handle itself.
+             */
             virtual void on_frame(remote::protocol::MsgType type,
                                   const uint8_t            *payload,
                                   uint16_t                  len)
@@ -48,21 +52,27 @@ namespace esp32
     class RelayApp
     {
         public:
-            /** `stream` is the link to the dash side: whatever carries
+            /**
+             * `stream` is the link to the dash side: whatever carries
              * remote::protocol frames to and from remote::server.
-             * `extension`, if any, must outlive this. */
+             * `extension`, if any, must outlive this.
+             */
             explicit RelayApp(Stream         &stream,
                               RelayExtension *extension = nullptr);
 
-            /** Brings Wi-Fi to AP mode (idle, nothing broadcasting) and
+            /**
+             * Brings Wi-Fi to AP mode (idle, nothing broadcasting) and
              * starts the web server. Call once, from the task that will
-             * then call poll() -- WiFi and WebServer stay on one task. */
+             * then call poll() -- WiFi and WebServer stay on one task.
+             */
             void begin();
 
-            /** One iteration of the relay's loop: drain the link, serve
+            /**
+             * One iteration of the relay's loop: drain the link, serve
              * any HTTP client. Never overlaps RelayLink's blocking
              * request path, because that only runs inside a handler
-             * this call invokes. */
+             * this call invokes.
+             */
             void poll(uint32_t now_ms);
 
 

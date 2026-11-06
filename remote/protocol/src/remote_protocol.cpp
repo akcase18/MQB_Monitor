@@ -86,7 +86,8 @@ namespace remote::protocol
         constexpr uint16_t CRC16_POLY = 0x1021;
     } // namespace
 
-    /* Bitwise rather than the usual 256-entry lookup table. The table
+    /**
+     * Bitwise rather than the usual 256-entry lookup table. The table
      * would be 512 bytes of RAM (a static constructor's worth of boot
      * work to fill, since the CRC polynomial loop isn't foldable at
      * compile time under this file's oldest target standard) or 512 bytes
@@ -94,7 +95,8 @@ namespace remote::protocol
      * carries a batch config load/save and an AP enable/disable, nothing
      * per-frame -- which is exactly why every function in this file is
      * FLASHMEM. Eight shifts per byte on a 600MHz M7 is microseconds
-     * across a whole maximum-sized frame. */
+     * across a whole maximum-sized frame.
+     */
     FLASHMEM uint16_t crc16_ccitt_continue(uint16_t       crc,
                                            const uint8_t *data,
                                            size_t         len)
@@ -228,9 +230,11 @@ namespace remote::protocol
             case State::CrcHi: {
                 crc_received_ = static_cast<uint16_t>(crc_received_ | (b << 8));
 
-                /* CRC covers MSG_TYPE || LEN || PAYLOAD — header and
+                /**
+                 * CRC covers MSG_TYPE || LEN || PAYLOAD — header and
                  * payload aren't contiguous in memory here, so the CRC is
-                 * chained across two calls via crc16_ccitt_update(). */
+                 * chained across two calls via crc16_ccitt_update().
+                 */
                 uint8_t header[3]
                     = { msg_type_,
                         static_cast<uint8_t>(len_ & 0xFF),
@@ -243,8 +247,11 @@ namespace remote::protocol
                 uint8_t  type        = msg_type_;
                 uint16_t payload_len = len_;
 
-                reset(); /* clears len_/received_ — must run after both are
-                          * captured above, not before */
+                /**
+                 * Clears len_/received_ — must run after both are captured
+                 * above, not before.
+                 */
+                reset();
 
                 if (!ok)
                 {
@@ -396,7 +403,9 @@ namespace remote::protocol
     {
         p = get_u32(p, out.total_bytes);
         p = get_bytes(p, out.version, sizeof(out.version));
-        /* From the wire, so not trusted to be terminated. */
+        /**
+         * From the wire, so not trusted to be terminated.
+         */
         out.version[sizeof(out.version) - 1] = '\0';
         return p;
     }

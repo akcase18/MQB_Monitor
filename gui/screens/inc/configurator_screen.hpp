@@ -39,10 +39,12 @@ namespace gui
                                           DisplayMode mode);
             using SettingsCallback
                 = void (*)(void *ctx, uint8_t rank, uint16_t signal_id);
-            /** Fired when the Signal row is tapped — `current_signal_id` is
+            /**
+             * Fired when the Signal row is tapped — `current_signal_id` is
              * the pending selection (not necessarily what the panel was
              * opened with, if the user already picked a different one and
-             * came back). */
+             * came back).
+             */
             using PickSignalCallback
                 = void (*)(void *ctx, uint16_t current_signal_id);
 
@@ -70,16 +72,20 @@ namespace gui
                       PickSignalCallback       pick_signal_cb,
                       void                    *pick_signal_ctx);
 
-            /** Opens the screen for `rank`, pre-selecting
-             * `signal_id`/`is_metric`/`mode`. */
+            /**
+             * Opens the screen for `rank`, pre-selecting
+             * `signal_id`/`is_metric`/`mode`.
+             */
             void open(uint8_t     rank,
                       uint16_t    signal_id,
                       bool        is_metric,
                       DisplayMode mode);
 
-            /** Updates the pending signal selection and the Signal row's
+            /**
+             * Updates the pending signal selection and the Signal row's
              * displayed name — called after SignalPickerScreen returns,
-             * before this screen is shown again. */
+             * before this screen is shown again.
+             */
             void set_selected_signal(uint16_t signal_id);
 
             lv_obj_t *screen() const

@@ -18,14 +18,18 @@ namespace gui
     class WifiIndicator
     {
         public:
-            /** Creates the glyph, hidden. Not tied to a screen, so a
+            /**
+             * Creates the glyph, hidden. Not tied to a screen, so a
              * screen rebuild (a new accent) must destroy() and init()
-             * it again to recolour it. */
+             * it again to recolour it.
+             */
             void init(const Theme &theme);
             void destroy();
 
-            /** `phone_joined` only matters while `active`. Cheap to
-             * repeat with the same values. */
+            /**
+             * `phone_joined` only matters while `active`. Cheap to
+             * repeat with the same values.
+             */
             void set_state(bool active, bool phone_joined);
 
         private:

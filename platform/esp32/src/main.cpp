@@ -25,7 +25,8 @@
 
 namespace
 {
-    /* Relay UART. Defaults are the XIAO ESP32-C3's Serial1 pins: GPIO21 is
+    /**
+     * Relay UART. Defaults are the XIAO ESP32-C3's Serial1 pins: GPIO21 is
      * TX (silkscreen D6), GPIO20 is RX (D7). Change these if the board
      * routes the link elsewhere.
      *
@@ -35,7 +36,8 @@ namespace
      *
      * The Teensy end is Serial2, not Serial4: MicroMod swaps those two
      * relative to a Teensy 4.0, so 16/17 is Serial2 (LPUART3) here. See
-     * platform/teensy/src/teensy_serial_link.cpp. */
+     * platform/teensy/src/teensy_serial_link.cpp.
+     */
     constexpr int      RELAY_RX_PIN = 20;
     constexpr int      RELAY_TX_PIN = 21;
     constexpr uint32_t RELAY_BAUD   = 115200; /* must match
@@ -47,18 +49,22 @@ namespace
 
 void setup()
 {
-    /* USB-CDC is debug output only -- the relay is on Serial1. The
+    /**
+     * USB-CDC is debug output only -- the relay is on Serial1. The
      * version is what tools/fw_version.py stamped; it has to match the
-     * Teensy's, since the two share no protocol version. */
+     * Teensy's, since the two share no protocol version.
+     */
     Serial.begin(115200);
     Serial.print("MQB relay " FW_VERSION "\n");
 
-    /* The default RX ring is 256 bytes, but RESP_STATE's payload alone can
+    /**
+     * The default RX ring is 256 bytes, but RESP_STATE's payload alone can
      * exceed 1200, and RelayLink only drains the port once per loop() pass
      * -- so a large frame overruns the buffer before it is read, which
      * showed up as send_request_and_wait() timing out on every real
      * REQ_GET_STATE round trip. Must be set before begin(), which would
-     * otherwise install the 256 default. */
+     * otherwise install the 256 default.
+     */
     Serial1.setRxBufferSize(remote::protocol::FRAME_MAX_PAYLOAD + 8);
     Serial1.begin(RELAY_BAUD, SERIAL_8N1, RELAY_RX_PIN, RELAY_TX_PIN);
 

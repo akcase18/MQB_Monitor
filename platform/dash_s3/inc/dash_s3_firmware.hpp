@@ -24,18 +24,22 @@
 
 #include "platform.hpp"
 
-/* Which dash hardware a build is for. An image only installs over one
+/**
+ * Which dash hardware a build is for. An image only installs over one
  * built for the same variant: the dev kit's pinout and PSRAM mode don't
- * boot on the PCB, nor the other way round. */
+ * boot on the PCB, nor the other way round.
+ */
 #ifndef DASH_S3_HW_VARIANT
     #define DASH_S3_HW_VARIANT "pcb"
 #endif
 
-/* What goes in the descriptor's variant field: the hardware, marked
+/**
+ * What goes in the descriptor's variant field: the hardware, marked
  * "-stress" for a bench build that fakes its CAN data. The marking is
  * automatic so no stress build can pass for real firmware -- a stress
  * image is refused by a dash running the real thing, and the other way
- * round. */
+ * round.
+ */
 #if DASH_S3_FAKE_CAN || STRESS_TEST
     #define DASH_S3_BUILD_VARIANT DASH_S3_HW_VARIANT "-stress"
 #else
@@ -47,29 +51,39 @@ struct DashS3FirmwareId
         char magic[16];      /* DASH_S3_FIRMWARE_MAGIC */
         char hw_variant[16]; /* DASH_S3_BUILD_VARIANT */
         char version[FIRMWARE_VERSION_LEN];
-        /* Added after the first OTA-capable release, so an older image
+        /**
+         * Added after the first OTA-capable release, so an older image
          * has whatever its linker put next instead; the tag is how the
          * check tells. Untagged images all predate any change to the
-         * table, so they count as LEGACY_PARTITION_LAYOUT. */
+         * table, so they count as LEGACY_PARTITION_LAYOUT.
+         */
         char     layout_tag[4];    /* DASH_S3_LAYOUT_TAG */
         uint32_t partition_layout; /* FW_PARTITION_LAYOUT, little-endian */
 };
 
 constexpr char DASH_S3_FIRMWARE_MAGIC[] = "MQB-DASH-S3";
 constexpr char DASH_S3_LAYOUT_TAG[4]    = { 'P', 'T', 'L', '1' };
-/* tools/partition_table.py's layout_crc() of partitions_dash.csv as of
- * 7b61dd0, the table every untagged dash image was built for. */
+/**
+ * tools/partition_table.py's layout_crc() of partitions_dash.csv as of
+ * 7b61dd0, the table every untagged dash image was built for.
+ */
 constexpr uint32_t LEGACY_PARTITION_LAYOUT = 0x93e3eb34u;
 
-/* esp_image_header_t (24) + esp_image_segment_header_t (8) +
+/**
+ * esp_image_header_t (24) + esp_image_segment_header_t (8) +
  * esp_app_desc_t (256) -- checked against the real structs in
- * dash_s3_firmware.cpp. */
+ * dash_s3_firmware.cpp.
+ */
 constexpr size_t FIRMWARE_ID_OFFSET = 288;
-/* How much of an image has to arrive before it can be identified. */
+/**
+ * How much of an image has to arrive before it can be identified.
+ */
 constexpr size_t FIRMWARE_ID_END = FIRMWARE_ID_OFFSET
                                    + sizeof(DashS3FirmwareId);
 
-/** This build's own id. */
+/**
+ * This build's own id.
+ */
 const DashS3FirmwareId &dash_s3_firmware_id();
 
 enum class FirmwareImageCheck : uint8_t

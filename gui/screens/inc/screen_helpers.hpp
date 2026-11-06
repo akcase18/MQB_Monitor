@@ -21,32 +21,41 @@ namespace gui
             lv_obj_t *label;
     };
 
-    /** A new top-level (parentless) screen object sized/colored from `theme`.
+    /**
+     * A new top-level (parentless) screen object sized/colored from `theme`.
      */
     lv_obj_t *create_screen(const Theme &theme);
 
-    /** A borderless, shadowless top-right X close button — the exit control
+    /**
+     * A borderless, shadowless top-right X close button — the exit control
      * every screen but InfoScreen uses, freeing the rest of the screen for
      * a nav bar (title + this button) over stacked, divider-separated
-     * sections. */
+     * sections.
+     */
     DoneButton create_close_button(lv_obj_t *parent, const Theme &theme);
 
-    /** A full-width, theme-colored 2px horizontal rule at `y` — separates
-     * the stacked sections under a nav bar. */
+    /**
+     * A full-width, theme-colored 2px horizontal rule at `y` — separates
+     * the stacked sections under a nav bar.
+     */
     lv_obj_t *create_divider(lv_obj_t    *parent,
                              const Theme &theme,
                              lv_coord_t   y);
 
-    /** The top-left title label of a screen's nav bar, in the theme's
+    /**
+     * The top-left title label of a screen's nav bar, in the theme's
      * title font. Pass `text == nullptr` to leave it empty for a caller
      * that fills it in per-open (WarningConfigScreen shows the signal's
-     * name); the returned handle is only needed in that case. */
+     * name); the returned handle is only needed in that case.
+     */
     lv_obj_t *create_nav_title(lv_obj_t    *parent,
                                const Theme &theme,
                                const char  *text);
 
-    /** A tappable settings-list row: label on the left, chevron on the
-     * right, transparent at rest and accent-tinted while pressed. */
+    /**
+     * A tappable settings-list row: label on the left, chevron on the
+     * right, transparent at rest and accent-tinted while pressed.
+     */
     struct ListRow
     {
             lv_obj_t *btn;
@@ -82,10 +91,12 @@ namespace gui
                            const Theme &theme,
                            lv_coord_t   item_pad);
 
-    /** The pieces of a confirm popup a caller has to wire up itself. The
+    /**
+     * The pieces of a confirm popup a caller has to wire up itself. The
      * popup is modal and parentless (it floats over whatever screen is
      * loaded), so closing it is the caller's job too --
-     * lv_msgbox_close_async() from both handlers. */
+     * lv_msgbox_close_async() from both handlers.
+     */
     struct ConfirmPopup
     {
             lv_obj_t *mbox;
@@ -128,14 +139,16 @@ namespace gui
                                   const Theme        &theme,
                                   int32_t             range);
 
-    /** A status tile: fixed caption above, value below, both left-
+    /**
+     * A status tile: fixed caption above, value below, both left-
      * aligned. Returns the value label, which is the only half that ever
      * changes.
      *
      * Stacked rather than caption-left/value-right so the value gets the
      * tile's full width. Captions sit back in panel_border, the theme's
      * "structural, not content" tone, which keeps the eye on the numbers.
-     * Shared by LoggingScreen and SnifferScreen. */
+     * Shared by LoggingScreen and SnifferScreen.
+     */
     lv_obj_t *create_status_tile(lv_obj_t    *parent,
                                  const Theme &theme,
                                  const char  *caption,

@@ -24,22 +24,28 @@ class SimulatorDisplay : public IDisplay
         void set_backlight(uint8_t pct) override;
         void set_backlight_off() override;
 
-        /* Writes the window's current on-screen position to disk so the
+        /**
+         * Writes the window's current on-screen position to disk so the
          * next launch can reopen there instead of recentering — see
          * begin()'s load side in simulator_display.cpp. Public so the
          * atexit/SIGTERM/SIGINT handlers registered in begin() can call it
          * however the dev workflow kills the simulator binary (window
-         * close, pkill, Ctrl+C). */
+         * close, pkill, Ctrl+C).
+         */
         void save_position() const;
 
     private:
         SimulatorDisplay() = default;
 
-        /** Copies the whole texture to the window. */
+        /**
+         * Copies the whole texture to the window.
+         */
         void present();
 
-        /* Opaque to keep SDL2 out of this header, matching how platform/
-         * vendor headers stay confined to the .cpp files. */
+        /**
+         * Opaque to keep SDL2 out of this header, matching how platform/
+         * vendor headers stay confined to the .cpp files.
+         */
         void *window_   = nullptr;
         void *renderer_ = nullptr;
         void *texture_  = nullptr;
@@ -47,6 +53,8 @@ class SimulatorDisplay : public IDisplay
         uint16_t width_   = 480;
         uint16_t height_  = 320;
         bool     flipped_ = false;
-        /* See set_backlight(). */
+        /**
+         * See set_backlight().
+         */
         bool shown_ = false;
 };

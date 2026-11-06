@@ -44,21 +44,27 @@ namespace gui
     {
             WirelessSetupPhase phase = WirelessSetupPhase::Idle;
 
-            /** "http://<ip>" — opens the config site, same value as
+            /**
+             * "http://<ip>" — opens the config site, same value as
              * url_text below. Not a Wi-Fi-join QR: the AP is deliberately
              * open (see RemoteApController's file doc comment), so joining
              * is just picking the SSID by hand; scanning this QR is the
              * second step, once already on the network. Fed straight to
-             * lv_qrcode_update(). Valid only when phase==Active. */
+             * lv_qrcode_update(). Valid only when phase==Active.
+             */
             char qr_payload[WIRELESS_QR_PAYLOAD_LEN] = "";
 
-            /** Shown as text underneath the QR code — a scan fallback for
+            /**
+             * Shown as text underneath the QR code — a scan fallback for
              * anyone who'd rather type it in by hand. Valid only when
-             * phase==Active. */
+             * phase==Active.
+             */
             char ssid[WIRELESS_SSID_LEN] = "";
 
-            /** "http://<ip>" — for anyone who's already joined the
-             * network. Valid only when phase==Active. */
+            /**
+             * "http://<ip>" — for anyone who's already joined the
+             * network. Valid only when phase==Active.
+             */
             char url_text[WIRELESS_URL_LEN] = "";
     };
 
@@ -71,20 +77,24 @@ namespace gui
                       DeactivateCallback deactivate_cb,
                       void              *deactivate_ctx);
 
-            /** Opens the screen showing `vm`'s current phase. Callers
+            /**
+             * Opens the screen showing `vm`'s current phase. Callers
              * activate the AP (see gui::RemoteBinding::activate()) before
-             * calling this, not this screen — see the file doc comment. */
+             * calling this, not this screen — see the file doc comment.
+             */
             void open(const WirelessSetupViewModel &vm,
                       lv_obj_t                     *return_screen);
 
-            /** Re-pulls the current phase/QR payload without changing
+            /**
+             * Re-pulls the current phase/QR payload without changing
              * screens — called periodically (see main.cpp) so the
              * Activating -> Active transition (an async round trip to the
              * C3) shows up while this screen is on-screen, and so an idle
              * timeout auto-deactivation is reflected if the user is still
              * looking at it. A no-op visual refresh when nothing changed
              * (set_view_model() below only touches widgets that actually
-             * need it). */
+             * need it).
+             */
             void refresh(const WirelessSetupViewModel &vm);
 
             lv_obj_t *screen() const
@@ -99,8 +109,10 @@ namespace gui
 
             lv_obj_t *screen_        = nullptr;
             lv_obj_t *return_screen_ = nullptr;
-            /** Spinner + status text, shown for both Idle and Activating
-             * — see WirelessSetupPhase::Idle's doc comment above. */
+            /**
+             * Spinner + status text, shown for both Idle and Activating
+             * — see WirelessSetupPhase::Idle's doc comment above.
+             */
             lv_obj_t *connecting_group_ = nullptr;
             lv_obj_t *active_group_     = nullptr;
             lv_obj_t *qrcode_           = nullptr;

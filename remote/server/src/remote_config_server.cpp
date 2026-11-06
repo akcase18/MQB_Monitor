@@ -16,9 +16,11 @@ namespace remote::server
 
     namespace
     {
-        /* Wire sizes of each record -- see the encode_*() functions in
+        /**
+         * Wire sizes of each record -- see the encode_*() functions in
          * remote_protocol.cpp. A config batch is settings, MAX_PANELS
-         * panels, the signal count and one SignalConfigWire per signal. */
+         * panels, the signal count and one SignalConfigWire per signal.
+         */
         constexpr size_t SETTINGS_BYTES = 11;
         constexpr size_t PANEL_BYTES    = 4;
         constexpr size_t SIGNAL_BYTES   = 19;
@@ -56,12 +58,14 @@ namespace remote::server
                       "RESP_STATE for a full catalog no longer fits a frame "
                       "-- raise FRAME_MAX_PAYLOAD");
 
-        /* Clamps both thresholds into the signal's range, and puts a
+        /**
+         * Clamps both thresholds into the signal's range, and puts a
          * reversed pair back in order -- but only when both are in use. A
          * disabled threshold keeps whatever value it was last left at,
          * which is routinely on the "wrong" side of the enabled one (a
          * high warning set to 1.6 below an untouched low of 2.0); swapping
-         * then would silently move the warning the user actually set. */
+         * then would silently move the warning the user actually set.
+         */
         FLASHMEM void clamp_thresholds(float &lo,
                                        float &hi,
                                        bool   use_lo,
@@ -79,12 +83,14 @@ namespace remote::server
             }
         }
 
-        /* Field by field rather than memcmp, which would also compare
+        /**
+         * Field by field rather than memcmp, which would also compare
          * struct padding. A threshold or custom range only counts while
          * it's switched on: apply_to_live() clamps every threshold into
          * range whether it's in use or not, so a never-set (0, 0) pair on
          * a signal whose range excludes 0 comes back from a round trip
-         * through the phone moved, with nothing actually changed. */
+         * through the phone moved, with nothing actually changed.
+         */
         FLASHMEM bool configs_equal(const core::Config &a, const core::Config &b)
         {
             const core::Settings &sa = a.settings;
@@ -249,10 +255,12 @@ namespace remote::server
             return ApplyResult::Ok;
         }
 
-        /* Captured before apply_to_live() touches anything, so it is the
+        /**
+         * Captured before apply_to_live() touches anything, so it is the
          * saved config even when this first preview is the one rejected
          * below -- a rejection leaves the live config alone, and the
-         * snapshot then simply equals it. */
+         * snapshot then simply equals it.
+         */
         bool starting_preview
             = req_type == MsgType::REQ_PREVIEW_CONFIG && !preview_active_;
         if (starting_preview)
@@ -290,7 +298,9 @@ namespace remote::server
         else
         {
             config_.save();
-            /* What a later revert goes back to is now this. */
+            /**
+             * What a later revert goes back to is now this.
+             */
             saved_before_preview_ = config_.get();
             unsaved_              = false;
             notify(ConfigEvent::Committed);
@@ -428,9 +438,11 @@ namespace remote::server
         uint16_t       len,
         size_t         log_at)
     {
-        /* The batch comes from browser-side JS rather than this
+        /**
+         * The batch comes from browser-side JS rather than this
          * firmware's own encoder, so a short one is checked here instead
-         * of being decoded off the end of the frame buffer. */
+         * of being decoded off the end of the frame buffer.
+         */
         if (payload == nullptr || len < HEAD_LEN)
         {
             return ApplyResult::ErrTruncated;
@@ -459,8 +471,10 @@ namespace remote::server
             return ApplyResult::ErrTruncated;
         }
 
-        /* Validate the whole batch before mutating anything — a rejected
-         * Save should never leave the config half-applied. */
+        /**
+         * Validate the whole batch before mutating anything — a rejected
+         * Save should never leave the config half-applied.
+         */
         if (settings.brightness_mode
             > static_cast<uint8_t>(core::BrightnessMode::Auto))
         {
@@ -527,11 +541,13 @@ namespace remote::server
             }
         }
 
-        /* Every check above passed — commit. Per signal, resolve the
+        /**
+         * Every check above passed — commit. Per signal, resolve the
          * (possibly just-submitted) custom range first, then clamp that
          * signal's thresholds against it, so a range and its thresholds
          * changing in the same batch are bounded consistently rather than
-         * against the range that's about to be replaced. */
+         * against the range that's about to be replaced.
+         */
         core::Config &cfg = config_.get();
 
         cfg.settings.day_brightness = clamp_u8(settings.day_brightness, 0, 100);

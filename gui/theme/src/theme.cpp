@@ -2,11 +2,13 @@
 
 extern "C"
 {
-    /* JetBrains Mono (SIL OFL 1.1) — one family for the numeric readouts
+    /**
+     * JetBrains Mono (SIL OFL 1.1) — one family for the numeric readouts
      * (Bold weight, digits-only subset), labels/UI text (Regular weight),
      * and nav bar titles (Bold weight, full charset). The readout sizes
      * are a ladder PanelWidget picks from per cell (DATA_FONTS below).
-     * License lives in gui/assets/font-licenses/. */
+     * License lives in gui/assets/font-licenses/.
+     */
     extern const lv_font_t jetbrains_mono_bold_30;
     extern const lv_font_t jetbrains_mono_bold_38;
     extern const lv_font_t jetbrains_mono_bold_54;
@@ -20,16 +22,20 @@ extern "C"
     extern const lv_font_t jetbrains_mono_24;
     extern const lv_font_t jetbrains_mono_bold_24;
 
-    /* Font Awesome Free Solid (SIL OFL 1.1, license in
+    /**
+     * Font Awesome Free Solid (SIL OFL 1.1, license in
      * gui/assets/font-licenses/) — just the sun/moon glyphs (gui::
-     * ICON_SUN/ICON_MOON), for SettingsScreen's Day/Night toggle. */
+     * ICON_SUN/ICON_MOON), for SettingsScreen's Day/Night toggle.
+     */
     extern const lv_font_t icon_day_night_28;
 
-    /* Font Awesome 5 (same license) — just the four LV_SYMBOL_ glyphs
+    /**
+     * Font Awesome 5 (same license) — just the four LV_SYMBOL_ glyphs
      * symbol_lg draws: close, right chevron, plus and minus. Cut the way
      * LVGL cuts its built-in fonts (lib/lvgl/scripts/built_in_font), so
      * they match the built-in symbols elsewhere; Montserrat 32 carried
-     * them before, at ~10x the flash. */
+     * them before, at ~10x the flash.
+     */
     extern const lv_font_t symbols_32;
 }
 
@@ -59,26 +65,32 @@ namespace gui
      * on a 480x320 panel.
      */
     const Theme THEME_DEFAULT = {
-        /* palette */
+        /**
+         * palette
+         */
         {
             lv_color_black(),                      /* bg */
             lv_color_white(),                      /* fg */
             lv_palette_main(LV_PALETTE_GREEN),     /* accent */
-            /* Kept several shades off the palette main, because that is
+            /**
+             * Kept several shades off the palette main, because that is
              * exactly what ACCENT_PRESETS' blue and red are: a warning
              * paints the whole panel while the Bar/Gauge on top of it
              * stays accent-colored, and at darken(2) a red accent on a red
              * warning was near enough to read as one solid block. Darker
              * rather than lighter — the separation works in either
              * direction, but white readout text over a light blue/red
-             * panel does not. */
+             * panel does not.
+             */
             lv_palette_darken(LV_PALETTE_BLUE, 3), /* warn_lo */
             lv_palette_darken(LV_PALETTE_RED, 3),  /* warn_hi */
             lv_palette_darken(LV_PALETTE_GREY, 1), /* panel_border */
             lv_palette_main(LV_PALETTE_AMBER),     /* range_overflow */
             lv_palette_main(LV_PALETTE_RED),       /* rec_indicator */
         },
-        /* typography */
+        /**
+         * typography
+         */
         {
             DATA_FONTS,
             sizeof(DATA_FONTS) / sizeof(DATA_FONTS[0]),
@@ -93,7 +105,9 @@ namespace gui
             &lv_font_montserrat_18, /* LV_FONT_DEFAULT, so already linked */
             &jetbrains_mono_bold_24,
         },
-        /* metrics */
+        /**
+         * metrics
+         */
         {
             480,
             320,
@@ -117,12 +131,14 @@ namespace gui
         THEME_DEFAULT.metrics.panel_height_lg_pct,
     };
 
-    /* Values match LVGL's built-in palette mains (lv_palette_main()) so a
+    /**
+     * Values match LVGL's built-in palette mains (lv_palette_main()) so a
      * preset reads as the same color it would if picked via that API —
      * plain hex here rather than calling lv_palette_main() at static-init
      * time, since these need to be usable from core::Settings::
      * accent_color's default too (see config_store.cpp), which has no
-     * lv_color_t/LVGL dependency at all. */
+     * lv_color_t/LVGL dependency at all.
+     */
     const uint32_t ACCENT_PRESETS[ACCENT_PRESET_COUNT] = {
         0x4CAF50, /* green (THEME_DEFAULT's default accent) */
         0x00BCD4, /* cyan */

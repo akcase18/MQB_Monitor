@@ -28,17 +28,22 @@ namespace esp32
 
             explicit RelayLink(Stream &stream);
 
-            /** Call once per loop() iteration. */
+            /**
+             * Call once per loop() iteration.
+             */
             void poll(FrameCallback cb, void *ctx, uint32_t now_ms);
 
-            /** Wraps `payload` into a full frame and writes it straight to
+            /**
+             * Wraps `payload` into a full frame and writes it straight to
              * the stream — the outbound counterpart to send_command() on
-             * the Teensy side, used here for EVT_AP_READY/EVT_AP_DISABLED. */
+             * the Teensy side, used here for EVT_AP_READY/EVT_AP_DISABLED.
+             */
             void send_event(remote::protocol::MsgType type,
                             const uint8_t            *payload,
                             uint16_t                  len);
 
-            /** Sends `req_type`/`req_payload`, then blocks — busy-polling
+            /**
+             * Sends `req_type`/`req_payload`, then blocks — busy-polling
              * `stream_` for incoming bytes, yielding via delay(1) between
              * checks so the WiFi/lwIP background task isn't starved into
              * tripping the idle-task watchdog — until a frame of
@@ -67,13 +72,15 @@ namespace esp32
             Stream                       &stream_;
             remote::protocol::FrameReader reader_;
 
-            /* Scratch space for an outbound frame, shared by
+            /**
+             * Scratch space for an outbound frame, shared by
              * send_event() and send_request_and_wait(): each encodes and
              * writes its frame before returning. Not a stack array: a
              * handler building a multi-KB HTML response on the same
              * loopTask stack while also holding a FRAME_MAX_PAYLOAD+8
              * (4104-byte) request buffer AND resp_buf is a real overflow
-             * risk on a C3. In PSRAM on the S3 (see LazyBuffer). */
+             * risk on a C3. In PSRAM on the S3 (see LazyBuffer).
+             */
             LazyBuffer<uint8_t, remote::protocol::FRAME_MAX_PAYLOAD + 8>
                 frame_scratch_;
     };

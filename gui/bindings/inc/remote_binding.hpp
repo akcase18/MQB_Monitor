@@ -24,18 +24,24 @@ namespace gui
             RemoteBinding(remote::server::RemoteApController  &ap,
                           remote::server::RemoteOtaController &ota);
 
-            /** No-op unless the AP is currently Idle — see
-             * RemoteApController::activate(). */
+            /**
+             * No-op unless the AP is currently Idle — see
+             * RemoteApController::activate().
+             */
             void activate();
 
-            /** No-op unless the AP is currently Active — see
-             * RemoteApController::deactivate(). */
+            /**
+             * No-op unless the AP is currently Active — see
+             * RemoteApController::deactivate().
+             */
             void deactivate();
 
             WirelessSetupViewModel build_view_model() const;
 
-            /** Only meaningful in update mode
-             * (RemoteOtaController::in_update_mode()). */
+            /**
+             * Only meaningful in update mode
+             * (RemoteOtaController::in_update_mode()).
+             */
             FirmwareUpdateViewModel build_update_view_model() const;
 
         private:

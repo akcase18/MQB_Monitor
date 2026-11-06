@@ -43,22 +43,32 @@ namespace remote::server
                                   size_t             resp_cap,
                                   protocol::MsgType &resp_type);
 
-            /** What a request just did to the live config -- see
-             * ConfigCallback. */
+            /**
+             * What a request just did to the live config -- see
+             * ConfigCallback.
+             */
             enum class ConfigEvent : uint8_t
             {
-                /* A REQ_PREVIEW_CONFIG landed: the live config (and the
-                 * preview values) changed but nothing was saved. */
+                /**
+                 * A REQ_PREVIEW_CONFIG landed: the live config (and the
+                 * preview values) changed but nothing was saved.
+                 */
                 Previewed,
-                /* A REQ_APPLY_CONFIG landed: the live config has been
-                 * saved. A preview session, if any, carries on. */
+                /**
+                 * A REQ_APPLY_CONFIG landed: the live config has been
+                 * saved. A preview session, if any, carries on.
+                 */
                 Committed,
-                /* The preview session ended: the live config is back to
-                 * what was last saved, and live values are back. */
+                /**
+                 * The preview session ended: the live config is back to
+                 * what was last saved, and live values are back.
+                 */
                 Reverted,
-                /* As Reverted, but because the page went away (a
+                /**
+                 * As Reverted, but because the page went away (a
                  * REQ_REVERT_PREVIEW carrying REVERT_PAGE_LEFT) rather
-                 * than the phone's Discard. */
+                 * than the phone's Discard.
+                 */
                 PageLeft,
             };
 
@@ -92,8 +102,10 @@ namespace remote::server
                 return preview_active_;
             }
 
-            /** True when the live config holds previewed edits that have
-             * not been saved. */
+            /**
+             * True when the live config holds previewed edits that have
+             * not been saved.
+             */
             bool has_unsaved_changes() const
             {
                 return unsaved_;
@@ -110,35 +122,45 @@ namespace remote::server
                 return preview_active_ ? &preview_values_ : nullptr;
             }
 
-            /** Ends the preview session: restores the last saved config
+            /**
+             * Ends the preview session: restores the last saved config
              * and goes back to live values. No-op (and no callback) unless
              * preview_active(). For the composition root to call when the
              * phone goes away -- the AP going down, or the page falling
-             * silent. */
+             * silent.
+             */
             void revert_preview();
 
         private:
             size_t handle_get_state(uint8_t *out, size_t cap);
-            /** REQ_PREVIEW_CONFIG/REQ_APPLY_CONFIG/REQ_REVERT_PREVIEW --
-             * everything that answers with a RESP_APPLY_RESULT. */
+            /**
+             * REQ_PREVIEW_CONFIG/REQ_APPLY_CONFIG/REQ_REVERT_PREVIEW --
+             * everything that answers with a RESP_APPLY_RESULT.
+             */
             protocol::ApplyResult
             handle_config_change(protocol::MsgType req_type,
                                  const uint8_t    *payload,
                                  uint16_t          len);
-            /** Validates `payload` as a whole batch and, only if all of
+            /**
+             * Validates `payload` as a whole batch and, only if all of
              * it passes, writes it into the live config. Shared by
              * REQ_PREVIEW_CONFIG and REQ_APPLY_CONFIG, which differ only
              * in what happens afterwards. `log_at` is where the optional
              * log profile would start; a body that ends there leaves the
-             * profile alone. */
+             * profile alone.
+             */
             protocol::ApplyResult apply_to_live(const uint8_t *payload,
                                                 uint16_t       len,
                                                 size_t         log_at);
-            /** Reads the preview values that follow a REQ_PREVIEW_CONFIG's
-             * config batch into preview_values_. */
+            /**
+             * Reads the preview values that follow a REQ_PREVIEW_CONFIG's
+             * config batch into preview_values_.
+             */
             void read_preview_values(const uint8_t *p, size_t len);
             void notify(ConfigEvent event);
-            /** revert_preview(), reporting `event`. */
+            /**
+             * revert_preview(), reporting `event`.
+             */
             void end_preview(ConfigEvent event);
 
             core::ConfigStore &config_;
@@ -148,12 +170,14 @@ namespace remote::server
             bool               preview_active_ = false;
             bool               unsaved_        = false;
             core::SignalStore  preview_values_;
-            /* The saved config, captured when a preview session begins
+            /**
+             * The saved config, captured when a preview session begins
              * and refreshed by each Save within it. static for
              * the same reason as FrameReader::buf_ (DMAMEM placement needs
              * static storage; RAM1 is tight on Teensy) -- there is only
              * ever one RemoteConfigServer in the real app. On the ESP32 it
-             * lives in PSRAM instead (see psram_new()). */
+             * lives in PSRAM instead (see psram_new()).
+             */
 #if defined(ARDUINO_ARCH_ESP32)
             static core::Config &saved_before_preview_;
 #else

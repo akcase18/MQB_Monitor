@@ -38,7 +38,8 @@
 namespace core
 {
 
-    /* Sized for roughly a few hours of retention in the worst case --
+    /**
+     * Sized for roughly a few hours of retention in the worst case --
      * all MAX_PANELS panels showing 20ms-cadence signals, every one of
      * them genuinely changing every sample -- against the dashboard's
      * real per-signal cadences (see core/logging/README.md for the
@@ -55,11 +56,13 @@ namespace core
      *
      * (see teensy_storage.cpp's STORAGE_SIZE_BYTES), leaving headroom for
      * LittleFS's own block metadata and firmware growth. core::Config is
-     * not in that region -- TeensyConfigStore keeps it in EEPROM. */
+     * not in that region -- TeensyConfigStore keeps it in EEPROM.
+     */
     constexpr uint32_t CHUNK_SIZE_BYTES = 256u * 1024u;
     constexpr uint16_t CHUNK_COUNT      = 52;
 
-    /* Floor on how often any one signal may be recorded. A signal
+    /**
+     * Floor on how often any one signal may be recorded. A signal
      * arriving faster than this (the catalog's 20ms group) is logged at
      * 40ms spacing; a signal arriving slower (100ms, 500ms, ...) is
      * logged at its own arrival cadence, untouched -- this is a floor,
@@ -70,27 +73,32 @@ namespace core
      *
      * Nothing in the catalog sits between 20ms and 100ms
      * (signal_catalog.generated.inc), so this coarsens exactly the 20ms
-     * group it's meant to and leaves every other signal alone. */
+     * group it's meant to and leaves every other signal alone.
+     */
     constexpr uint32_t LOG_MIN_INTERVAL_MS = 50; /* was 40 before the
                                                   * 2026-08-25 cadence
                                                   * floor -- see below */
 
-    /** Writes `path` as `/log_%03u.bin` for `chunk_index` (0..CHUNK_COUNT-1)
+    /**
+     * Writes `path` as `/log_%03u.bin` for `chunk_index` (0..CHUNK_COUNT-1)
      * into `out` (must be at least CHUNK_PATH_LEN bytes) -- shared between
      * Logger's own rotation and any external reader (see src/main.cpp's
      * LOGDUMP handler) so the naming convention lives in exactly one
-     * place. */
+     * place.
+     */
     constexpr size_t CHUNK_PATH_LEN = 16;
     void             chunk_path(uint16_t chunk_index, char *out);
 
     class Logger
     {
         public:
-            /** `chunk_size_bytes`/`chunk_count` default to the production
+            /**
+             * `chunk_size_bytes`/`chunk_count` default to the production
              * sizing (CHUNK_SIZE_BYTES/CHUNK_COUNT above) -- overridable
              * purely so tests can exercise rotation/wraparound without
              * needing to write tens of megabytes per test case (see
-             * test/test_core_logging). */
+             * test/test_core_logging).
+             */
             explicit Logger(IStorage &backing,
                             uint32_t  chunk_size_bytes = CHUNK_SIZE_BYTES,
                             uint16_t  chunk_count      = CHUNK_COUNT);
@@ -176,9 +184,11 @@ namespace core
                         uint8_t            count,
                         uint32_t           now_ms);
 
-            /** Read-only status for a USB/wireless retrieval command to
+            /**
+             * Read-only status for a USB/wireless retrieval command to
              * report back (see src/main.cpp's LOGSTATUS handler) --
-             * doesn't affect capture/rotation in any way. */
+             * doesn't affect capture/rotation in any way.
+             */
             bool is_ready() const
             {
                 return ready_;
@@ -199,32 +209,40 @@ namespace core
              * touching storage.
              *=========================================================*/
 
-            /** How many captures still have at least some data in the
+            /**
+             * How many captures still have at least some data in the
              * ring. Drops as the ring laps past old captures -- see
              * log_record.hpp's LogIndexEntry. A capture whose earliest
              * chunks have been overwritten but whose later ones survive
-             * still counts: part of it is still readable. */
+             * still counts: part of it is still readable.
+             */
             uint16_t log_count() const
             {
                 return entry_count_;
             }
 
-            /** Summed duration of every capture still counted above.
+            /**
+             * Summed duration of every capture still counted above.
              * Excludes captures already evicted, so it tracks what's
-             * actually retrievable rather than what was ever recorded. */
+             * actually retrievable rather than what was ever recorded.
+             */
             uint32_t total_logged_ms() const;
 
-            /** True between the tick that saw logging switch on and the
+            /**
+             * True between the tick that saw logging switch on and the
              * one that saw it switch off -- i.e. a capture is open and
-             * accruing into the newest index entry. */
+             * accruing into the newest index entry.
+             */
             bool is_capturing() const
             {
                 return was_enabled_;
             }
 
-            /** Total bytes the chunk ring can hold, this Logger's actual
+            /**
+             * Total bytes the chunk ring can hold, this Logger's actual
              * configured sizing rather than the CHUNK_* defaults (tests
-             * override them). */
+             * override them).
+             */
             uint64_t ring_capacity_bytes() const
             {
                 return static_cast<uint64_t>(chunk_size_bytes_)
@@ -245,7 +263,8 @@ namespace core
             uint64_t used_bytes() const;
 
         private:
-            /* ~3.5s worth of records at worst-case write rate -- in
+            /**
+             * ~3.5s worth of records at worst-case write rate -- in
              * practice the buffer filling up is the usual flush trigger
              * (not FLUSH_INTERVAL_MS's timer), trading a bit more flash-
              * write frequency for keeping this comfortably small in
@@ -257,22 +276,29 @@ namespace core
              * ~30KB fixed linker-layout cost from this module existing at
              * all rather than scaling with BUFFER_CAPACITY -- so a
              * smaller buffer recovers real headroom without meaningfully
-             * hurting flush batching. */
+             * hurting flush batching.
+             */
             static constexpr uint16_t BUFFER_CAPACITY   = 512;
             static constexpr uint32_t FLUSH_INTERVAL_MS = 5000;
 
             void flush();
             void start_new_chunk();
 
-            /** Reads `/log_index.bin` into entries_, or starts an empty
-             * index if it's missing/corrupt. */
+            /**
+             * Reads `/log_index.bin` into entries_, or starts an empty
+             * index if it's missing/corrupt.
+             */
             void load_index();
             void save_index();
-            /** Drops entries the ring has already lapped past. Called
+            /**
+             * Drops entries the ring has already lapped past. Called
              * after begin()'s scan and again on every rotation, since
-             * eviction happens as chunks are reused, not only at boot. */
+             * eviction happens as chunks are reused, not only at boot.
+             */
             void prune_index();
-            /** chunk_seq of the oldest chunk still in the ring. */
+            /**
+             * chunk_seq of the oldest chunk still in the ring.
+             */
             uint32_t oldest_live_chunk_seq() const;
             void     begin_capture(uint32_t now_ms);
             void     end_capture(uint32_t now_ms);
@@ -285,7 +311,8 @@ namespace core
             LogRecord buffer_[BUFFER_CAPACITY];
             uint16_t  buffer_count_ = 0;
 
-            /* Per-catalog-index (not per signal_id -- ids aren't
+            /**
+             * Per-catalog-index (not per signal_id -- ids aren't
              * contiguous, see signal_catalog.generated.inc) state behind
              * sample()'s decision to write a record or not.
              *
@@ -301,46 +328,57 @@ namespace core
              * in_record_set_ is whether the signal was in the set during
              * the previous sample() call. entered_ms_ is when it last
              * entered, and awaiting_first_ whether a value fresher than
-             * that has been written yet -- see sample()'s doc comment. */
+             * that has been written yet -- see sample()'s doc comment.
+             */
             uint32_t last_seen_ms_[SIGNAL_CATALOG_COUNT] = {};
             float    last_value_[SIGNAL_CATALOG_COUNT];
             bool     in_record_set_[SIGNAL_CATALOG_COUNT]  = {};
             uint32_t entered_ms_[SIGNAL_CATALOG_COUNT]     = {};
             bool     awaiting_first_[SIGNAL_CATALOG_COUNT] = {};
 
-            /* Whether Settings::logging_enabled was set on the previous
+            /**
+             * Whether Settings::logging_enabled was set on the previous
              * sample() call -- lets the off-transition be caught once
              * (flush what's buffered, drop the primed baselines) instead
-             * of every tick while logging stays off. */
+             * of every tick while logging stays off.
+             */
             bool was_enabled_ = false;
 
-            /* Log index -- see log_record.hpp. entries_ is ordered oldest
-             * capture first, so pruning is always a front-truncation. */
+            /**
+             * Log index -- see log_record.hpp. entries_ is ordered oldest
+             * capture first, so pruning is always a front-truncation.
+             */
             LogIndexEntry entries_[MAX_LOG_ENTRIES] = {};
             uint16_t      entry_count_              = 0;
             uint32_t      next_log_id_              = 1;
-            /* Boot-relative start of the capture currently open, so its
+            /**
+             * Boot-relative start of the capture currently open, so its
              * duration can be recomputed each tick rather than
-             * accumulated (which would drift). */
+             * accumulated (which would drift).
+             */
             uint32_t active_capture_start_ms_ = 0;
             uint32_t last_index_save_ms_      = 0;
 
-            /* The index is rewritten whole (it's only ~2.5KB), so it's
+            /**
+             * The index is rewritten whole (it's only ~2.5KB), so it's
              * saved on capture start/stop and otherwise only this often
              * -- a power cut mid-capture then costs at most this much
              * accuracy in that capture's recorded duration, never any
-             * actual log data, which lives in the chunks. */
+             * actual log data, which lives in the chunks.
+             */
             static constexpr uint32_t INDEX_SAVE_INTERVAL_MS = 30000;
 
             uint32_t session_id_          = 1;
             uint32_t next_chunk_seq_      = 0;
             uint16_t current_chunk_index_ = 0;
             uint32_t chunk_bytes_written_ = 0;
-            /* Whether the chunk at current_chunk_index_ has actually been
+            /**
+             * Whether the chunk at current_chunk_index_ has actually been
              * created on disk yet. Chunks are created lazily, on the
              * first flush that has something to put in them, so that
              * neither booting nor stopping a capture on a chunk boundary
-             * costs a ring slot -- see begin(). */
+             * costs a ring slot -- see begin().
+             */
             bool     chunk_open_    = false;
             uint32_t last_flush_ms_ = 0;
     };

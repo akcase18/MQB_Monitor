@@ -10,11 +10,13 @@ namespace gui
 
     namespace
     {
-        /* Nav bar, the four status tiles, then Stop. Same tile geometry as
+        /**
+         * Nav bar, the four status tiles, then Stop. Same tile geometry as
          * LoggingScreen -- 2x2 in Landscape, one column in Portrait -- so
          * the two read as siblings. Stop sits at the bottom where
          * LoggingScreen's erase does, but at the toggle's weight: it's the
-         * only control here. */
+         * only control here.
+         */
         constexpr lv_coord_t HEADER_DIVIDER_Y = 50;
 
         constexpr lv_coord_t STAT_FIRST_Y    = 66;

@@ -25,19 +25,19 @@ namespace core
      * 0x62 and the 2 identifier bytes). `len == 0` is the legacy auto
      * decode: u8 for a 1-byte payload, s16 from bytes 0-1. Otherwise
      * `len` bytes from `start`, big-endian unless `little_endian` (most
-     * VW data is big-endian, but not all of it), optionally narrowed to `bit_len`
-     * bits starting `bit_shift` bits up, sign-extended at the field's width
-     * when `is_signed`. This is how several signals each read their own
+     * VW data is big-endian, but not all of it), optionally narrowed to
+     * `bit_len` bits starting `bit_shift` bits up, sign-extended at the field's
+     * width when `is_signed`. This is how several signals each read their own
      * value out of one multi-value DID. Mirrored by the monitor tool's
      * decode_field() (tools/monitor/mqb_monitor/catalog.py).
      */
     struct UdsField
     {
-            uint8_t start     = 0;
-            uint8_t len       = 0; /* bytes, 1-4; 0 = legacy auto */
-            bool    is_signed = false;
-            uint8_t bit_shift = 0;
-            uint8_t bit_len   = 0; /* 0 = the whole field */
+            uint8_t start         = 0;
+            uint8_t len           = 0; /* bytes, 1-4; 0 = legacy auto */
+            bool    is_signed     = false;
+            uint8_t bit_shift     = 0;
+            uint8_t bit_len       = 0; /* 0 = the whole field */
             bool    little_endian = false;
     };
 

@@ -38,7 +38,9 @@ namespace gui
         constexpr lv_coord_t STAT_FIRST_Y   = 140;
         constexpr lv_coord_t STAT_HEIGHT    = 50;
         constexpr lv_coord_t STAT_STEP      = 54;
-        /* Landscape only -- Portrait stacks all four in one column. */
+        /**
+         * Landscape only -- Portrait stacks all four in one column.
+         */
         constexpr uint8_t    STAT_COLUMNS   = 2;
         constexpr lv_coord_t STAT_COLUMN_GAP = 16;
 
@@ -46,13 +48,15 @@ namespace gui
         constexpr lv_coord_t ERASE_ROW_Y     = 260;
         constexpr lv_coord_t ERASE_HEIGHT    = 44;
 
-        /* Portrait has ~160px more height to spend, so everything gets
+        /**
+         * Portrait has ~160px more height to spend, so everything gets
          * taller and further apart rather than sitting in a cluster at
          * the top -- the same treatment SettingsScreen's Portrait pass
          * applies for the same reason. The four tiles stay in one column
          * (a 2x2 grid at 320px wide would leave the usage figure a cell
          * too narrow), and there's still room for the erase button under
-         * them. */
+         * them.
+         */
         constexpr lv_coord_t PORTRAIT_TOGGLE_ROW_Y     = 66;
         constexpr lv_coord_t PORTRAIT_TOGGLE_HEIGHT    = 78;
         constexpr lv_coord_t PORTRAIT_TOGGLE_DIVIDER_Y = 158;
@@ -168,9 +172,11 @@ namespace gui
         lv_coord_t step   = portrait ? PORTRAIT_STAT_STEP : STAT_STEP;
         lv_coord_t height = portrait ? PORTRAIT_STAT_HEIGHT : STAT_HEIGHT;
 
-        /* One column in Portrait, two in Landscape -- so the same four
+        /**
+         * One column in Portrait, two in Landscape -- so the same four
          * tiles walk down a single column or fill a 2x2 grid without two
-         * separate placement loops. */
+         * separate placement loops.
+         */
         uint8_t    columns = portrait ? 1 : STAT_COLUMNS;
         lv_coord_t tile_width
             = portrait
@@ -206,10 +212,12 @@ namespace gui
                        theme,
                        portrait ? PORTRAIT_ERASE_DIVIDER_Y : ERASE_DIVIDER_Y);
 
-        /* Same full-width shape as the toggle, deliberately not the same
+        /**
+         * Same full-width shape as the toggle, deliberately not the same
          * weight: bordered in warn_hi rather than filled, so it reads as
          * the one destructive control on the screen without competing
-         * with the control the user actually came here for. */
+         * with the control the user actually came here for.
+         */
         erase_btn_ = lv_btn_create(screen_);
         lv_obj_set_size(erase_btn_,
                         row_width,
@@ -312,11 +320,13 @@ namespace gui
                           vm.storage_label[0] != '\0' ? vm.storage_label
                                                       : "--");
 
-        /* Used against the ring's total. Not "remaining": the ring
+        /**
+         * Used against the ring's total. Not "remaining": the ring
          * overwrites rather than filling up, so past the first lap this
          * pins at full and recording simply continues, dropping the
          * oldest chunk each time around. A countdown-to-zero would sit
-         * at zero for the life of the device. */
+         * at zero for the life of the device.
+         */
         format_usage(vm.used_bytes, vm.ring_capacity_bytes, buf, sizeof(buf));
         lv_label_set_text(capacity_value_, buf);
 
@@ -375,9 +385,11 @@ namespace gui
             snprintf(hint, sizeof(hint), "not set up");
         }
 
-        /* Recording reads as a solid accent fill, the same treatment
+        /**
+         * Recording reads as a solid accent fill, the same treatment
          * every other checked/active control in this app uses (see
-         * screen_helpers' style_flat_matrix()). */
+         * screen_helpers' style_flat_matrix()).
+         */
         lv_obj_set_style_bg_color(b.btn, active ? pal.accent : pal.bg, 0);
         lv_obj_set_style_text_color(
             b.lbl, dim ? pal.panel_border : pal.fg, 0);
@@ -394,10 +406,12 @@ namespace gui
             return;
         }
 
-        /* Nothing mounted means nothing to wipe. Dimmed rather than
+        /**
+         * Nothing mounted means nothing to wipe. Dimmed rather than
          * hidden, for the same reason the toggle is: the screen should
          * still explain its own shape when storage is missing, not lose
-         * half its controls. */
+         * half its controls.
+         */
         lv_color_t tone = storage_ready_ ? theme_->palette.warn_hi
                                          : theme_->palette.panel_border;
         lv_obj_set_style_border_color(erase_btn_, tone, 0);
@@ -418,12 +432,14 @@ namespace gui
             return; /* nothing to erase -- see refresh_erase() */
         }
 
-        /* Unlike the toggle, this is not undoable by pressing again, so
+        /**
+         * Unlike the toggle, this is not undoable by pressing again, so
          * it asks first -- the same Cancel/Confirm popup rotating the
          * display sits behind. The body names the one surprising side
          * effect: the caller stops recording as part of erasing, rather
          * than wiping the store out from under a capture still writing
-         * into it. */
+         * into it.
+         */
         ConfirmPopup popup = create_confirm_popup(*self->theme_,
                                                   "Erase all logs?",
                                                   "Stops recording. No undo.",
@@ -446,11 +462,13 @@ namespace gui
         lv_msgbox_close_async(self->erase_confirm_mbox_);
         self->erase_confirm_mbox_ = nullptr;
 
-        /* No local state is touched here. The caller wipes the store and
+        /**
+         * No local state is touched here. The caller wipes the store and
          * pushes a fresh view-model straight back through refresh(),
          * which is what zeroes the readouts and drops the toggle to OFF
          * -- guessing at the result locally could only disagree with what
-         * actually happened. */
+         * actually happened.
+         */
         if (self->erase_cb_ != nullptr)
         {
             self->erase_cb_(self->erase_ctx_);
@@ -510,7 +528,9 @@ namespace gui
 
         if (self->return_screen_ != nullptr)
         {
-            /* No slide out, matching Settings: the screen just goes. */
+            /**
+             * No slide out, matching Settings: the screen just goes.
+             */
             lv_screen_load(self->return_screen_);
         }
     }

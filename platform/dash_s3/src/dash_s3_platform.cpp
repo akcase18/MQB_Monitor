@@ -18,14 +18,16 @@
 #include "esp32_storage.hpp"
 #include "synthetic_can_bus.hpp"
 
-/* Which ITouch backend is active. The product panel is a capacitive
+/**
+ * Which ITouch backend is active. The product panel is a capacitive
  * FT6236 over I2C; the ER-TFTM035-6 breakout on the bench may instead
  * carry the resistive XPT2046 over SPI. Same pattern as the Teensy's
  * TEENSY_TOUCH_USE_RESISTIVE, except overridable with a -D from
  * platformio.ini like the pins are, since which panel is on the bench is
  * a wiring fact rather than a code decision. Both drivers compile
  * unconditionally either way, so the inactive one can't silently
- * bit-rot. */
+ * bit-rot.
+ */
 #ifndef DASH_S3_TOUCH_USE_RESISTIVE
     #define DASH_S3_TOUCH_USE_RESISTIVE 0
 #endif
@@ -38,11 +40,13 @@
     #define DASH_S3_ACTIVE_TOUCH DashS3Touch::instance()
 #endif
 
-/* Which ICanBus is active. 0 = the TWAI controller (needs a transceiver
+/**
+ * Which ICanBus is active. 0 = the TWAI controller (needs a transceiver
  * and a vehicle). 1 = the synthetic bus the simulator runs on, which
  * answers every UDS request instantly with a slowly drifting fabricated
  * value -- so the whole poll/decode/warn/render path runs flat out on a
- * bench with nothing but the panel attached. env:dash_s3_stress sets it. */
+ * bench with nothing but the panel attached. env:dash_s3_stress sets it.
+ */
 #ifndef DASH_S3_FAKE_CAN
     #define DASH_S3_FAKE_CAN 0
 #endif
@@ -52,11 +56,13 @@ namespace
     ICanBus &active_can()
     {
 #if DASH_S3_FAKE_CAN
-        /* Step every response, half-range swing: each value sweeps its
+        /**
+         * Step every response, half-range swing: each value sweeps its
          * whole triangle in ~512 responses, a few seconds at this poll
          * rate, so the panels visibly move and cross their thresholds.
          * The simulator's defaults (8, 256) are a gentle wobble tuned
-         * for exercising the logger, and read as frozen on a bench. */
+         * for exercising the logger, and read as frozen on a bench.
+         */
         static SyntheticCanBus s_bus(1, 2048);
         return s_bus;
 #else
@@ -65,7 +71,8 @@ namespace
     }
 } // namespace
 
-/* Internal RAM is what the Wi-Fi stack's transmit buffers come out of,
+/**
+ * Internal RAM is what the Wi-Fi stack's transmit buffers come out of,
  * and with the SoftAP up there is only ~24KB of it to spare: the banded
  * draw buffers (DRAW_BUF_DIVISOR) and every LVGL object live there too.
  * Run short and the phone's page stalls mid-send and never finishes
@@ -77,7 +84,8 @@ namespace
  * land in PSRAM instead. Smaller allocations (LVGL's objects, styles and
  * per-frame draw tasks) stay internal, so rendering is unaffected.
  * Must run before the config store first opens, i.e. before setup() gets
- * past platform_get(). */
+ * past platform_get().
+ */
 #ifndef DASH_S3_INTERNAL_MALLOC_LIMIT
     #define DASH_S3_INTERNAL_MALLOC_LIMIT 2048
 #endif

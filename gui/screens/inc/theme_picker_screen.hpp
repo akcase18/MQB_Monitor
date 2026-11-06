@@ -25,8 +25,10 @@ namespace gui
 
             void init(const Theme &theme, DoneCallback done_cb, void *ctx);
 
-            /** Opens the screen, marking whichever preset matches
-             * `current_accent_color` (if any) as selected. */
+            /**
+             * Opens the screen, marking whichever preset matches
+             * `current_accent_color` (if any) as selected.
+             */
             void open(uint32_t current_accent_color, lv_obj_t *return_screen);
 
             lv_obj_t *screen() const

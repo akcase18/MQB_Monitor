@@ -34,7 +34,8 @@ Platform &platform_get()
 
 void platform_restart()
 {
-    /* A dev host has nothing to reset, so the closest equivalent is
+    /**
+     * A dev host has nothing to reset, so the closest equivalent is
      * replacing this process with a fresh copy of the same binary --
      * setup() runs again from scratch, reading the config file the
      * caller just saved. exec skips atexit handlers, so the window
@@ -45,7 +46,8 @@ void platform_restart()
      * one harmless line from AppKit on the way back up -- "Task policy
      * set failed: 4" -- since the new image tries to set the process's
      * app role again, which macOS only allows once per process. Tested:
-     * SDL_Quit() first and POSIX_SPAWN_SETEXEC both still print it. */
+     * SDL_Quit() first and POSIX_SPAWN_SETEXEC both still print it.
+     */
     SimulatorDisplay::instance().save_position();
 
     char path[1024] = {};
@@ -63,14 +65,18 @@ void platform_restart()
         execv(path, argv);
     }
 
-    /* Only reached if the exec itself failed -- quitting beats carrying
-     * on in an orientation the window no longer matches. */
+    /**
+     * Only reached if the exec itself failed -- quitting beats carrying
+     * on in an orientation the window no longer matches.
+     */
     perror("platform_restart: exec failed");
     exit(1);
 }
 
-/* No field updates on this board -- see platform.hpp's FIRMWARE section.
- * (SimulatorRelay fakes the update *screens*; nothing is installed.) */
+/**
+ * No field updates on this board -- see platform.hpp's FIRMWARE section.
+ * (SimulatorRelay fakes the update *screens*; nothing is installed.)
+ */
 const char *platform_firmware_version()
 {
     return "simulator";

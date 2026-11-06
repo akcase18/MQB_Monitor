@@ -49,8 +49,10 @@ namespace
         SimulatorDisplay::instance().save_position();
     }
 
-    /* exit() (rather than the signal's default terminate-immediately
-     * behavior) so the atexit_save_position handler above still runs. */
+    /**
+     * exit() (rather than the signal's default terminate-immediately
+     * behavior) so the atexit_save_position handler above still runs.
+     */
     void handle_terminating_signal(int)
     {
         exit(0);
@@ -71,12 +73,14 @@ void SimulatorDisplay::begin()
     int win_y = SDL_WINDOWPOS_CENTERED;
     load_saved_position(win_x, win_y);
 
-    /* Hidden until the first set_backlight() -- the stand-in for the
+    /**
+     * Hidden until the first set_backlight() -- the stand-in for the
      * panel's boot blank. Shown straight away, the window appeared at
      * Landscape size, visibly resized itself once set_orientation() ran,
      * and lost the presents made while that resize was in flight: a
      * static screen (OrientationScreen, landed on after a layout
-     * restart) then stayed partly black, since nothing redraws it. */
+     * restart) then stayed partly black, since nothing redraws it.
+     */
     SDL_Window *window = SDL_CreateWindow("MQB Monitor Simulator",
                                           win_x,
                                           win_y,
@@ -105,8 +109,10 @@ void SimulatorDisplay::begin()
 void SimulatorDisplay::set_orientation(DisplayOrientation orientation,
                                        bool               flipped)
 {
-    /* Drawn upside-down in the window (see flush()), so a flip is visible
-     * on a dev host the way it would be on a panel left mounted as-is. */
+    /**
+     * Drawn upside-down in the window (see flush()), so a flip is visible
+     * on a dev host the way it would be on a panel left mounted as-is.
+     */
     flipped_ = flipped;
 
     if (orientation == DisplayOrientation::Portrait)
@@ -120,11 +126,13 @@ void SimulatorDisplay::set_orientation(DisplayOrientation orientation,
         height_ = SIM_VER_RES;
     }
 
-    /* src/main.cpp calls begin() before this (TeensyDisplay needs its
+    /**
+     * src/main.cpp calls begin() before this (TeensyDisplay needs its
      * SPI/panel init done first, so that's the shared call order) -- the
      * window/texture begin() already created at the old size need to be
      * resized/recreated here to match, rather than just updating
-     * width_/height_ for a future begin() to read. */
+     * width_/height_ for a future begin() to read.
+     */
     SDL_Window *window = static_cast<SDL_Window *>(window_);
     if (window == nullptr)
     {
@@ -194,7 +202,8 @@ void SimulatorDisplay::present()
 
 void SimulatorDisplay::set_backlight(uint8_t pct)
 {
-    /* No real backlight to dim on a dev host, but the first call is when
+    /**
+     * No real backlight to dim on a dev host, but the first call is when
      * the panel would first light up -- the frame is finished by now, so
      * the window appears showing it rather than building it. Re-presented
      * once shown, since presents to a hidden window aren't kept.
@@ -202,7 +211,8 @@ void SimulatorDisplay::set_backlight(uint8_t pct)
      * Raised too: macOS only brings a newly shown window forward if the
      * process launching it is frontmost (cooperative activation), so
      * without this it opened behind everything -- after a restart as
-     * well as from a terminal. */
+     * well as from a terminal.
+     */
     (void)pct;
     if (!shown_ && window_ != nullptr)
     {
@@ -216,10 +226,12 @@ void SimulatorDisplay::set_backlight(uint8_t pct)
 
 void SimulatorDisplay::set_backlight_off()
 {
-    /* Nothing to switch off either -- which also means the transitions
+    /**
+     * Nothing to switch off either -- which also means the transitions
      * this hides on real hardware (see IDisplay::set_backlight_off) stay
      * fully visible here. That's the useful behavior for a dev host:
      * blanking the window would hide the very rebuild being worked on.
      * Only boot is hidden (see begin()), since there's nothing to watch
-     * there but a window resizing itself. */
+     * there but a window resizing itself.
+     */
 }

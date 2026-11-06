@@ -35,7 +35,9 @@ namespace core
         {
             Task &task = tasks_[i];
 
-            /* Unsigned subtraction wraps correctly across millis() overflow. */
+            /**
+             * Unsigned subtraction wraps correctly across millis() overflow.
+             */
             if ((now - task.last_run_ms) >= task.period_ms)
             {
                 task.last_run_ms = now;

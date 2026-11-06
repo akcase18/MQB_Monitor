@@ -13,15 +13,18 @@ namespace gui
         constexpr lv_coord_t STEP_BTN_WIDTH  = 64;
         constexpr lv_coord_t STEP_BTN_HEIGHT = 56;
         constexpr lv_coord_t ROW_GAP         = 20;
-        /* Fixed, not LV_SIZE_CONTENT — the value label's text length varies
+        /**
+         * Fixed, not LV_SIZE_CONTENT — the value label's text length varies
          * per signal/unit ("32 °F" vs "7000 rpm"), and a content-sized
          * label would resize the row around it, shifting the +/- buttons
          * left/right. A fixed width keeps both buttons at the same on-
          * screen position for every row and every signal; wide enough for
-         * the longest realistic case ("369 lb-ft"). */
+         * the longest realistic case ("369 lb-ft").
+         */
         constexpr lv_coord_t VALUE_LBL_WIDTH = 170;
 
-        /* Landscape's [-][value][+] row (2*STEP_BTN_WIDTH + 2*ROW_GAP +
+        /**
+         * Landscape's [-][value][+] row (2*STEP_BTN_WIDTH + 2*ROW_GAP +
          * VALUE_LBL_WIDTH = 338px) fits comfortably in 480px but overflows
          * Portrait's 320 — the + button was getting clipped off the right
          * edge entirely. Rather than just shrinking that row to fit,
@@ -29,11 +32,13 @@ namespace gui
          * line above the buttons (not sandwiched between them, which is
          * what made the row so wide), and the two buttons — closer
          * together than Landscape's spread, since they no longer need to
-         * flank a 170px-wide label — sit centered below it. */
+         * flank a 170px-wide label — sit centered below it.
+         */
         constexpr lv_coord_t PORTRAIT_STEP_BTN_WIDTH = 56;
         constexpr lv_coord_t PORTRAIT_BUTTON_GAP      = 32;
 
-        /* Layout is a top nav bar (name + close) freeing the rest of the
+        /**
+         * Layout is a top nav bar (name + close) freeing the rest of the
          * screen for two identical sections — the old bottom-right
          * checkmark button could collide with the low-warning row's plus
          * button once the row's true fixed width was known (see
@@ -50,15 +55,18 @@ namespace gui
          * their own box rather than centered in it, Portrait included
          * (Portrait's sections are taller, but nothing here scales with
          * that — see PORTRAIT_VALUE_Y/PORTRAIT_BUTTONS_Y below, which are
-         * just as top-anchored as Landscape's own offsets). */
+         * just as top-anchored as Landscape's own offsets).
+         */
         constexpr lv_coord_t HEADER_DIVIDER_Y  = 50;
         constexpr lv_coord_t HI_LABEL_Y        = 64;
         constexpr lv_coord_t HI_SWITCH_Y       = 66;
         constexpr lv_coord_t HI_ROW_Y          = 102;
 
-        /* Portrait's own top-anchored rhythm — label/switch offsets
+        /**
+         * Portrait's own top-anchored rhythm — label/switch offsets
          * mirror Landscape's (14/16 from section top), then value and
-         * buttons stack below rather than sharing Landscape's single row. */
+         * buttons stack below rather than sharing Landscape's single row.
+         */
         constexpr lv_coord_t PORTRAIT_LABEL_Y   = 14;
         constexpr lv_coord_t PORTRAIT_SWITCH_Y  = 16;
         constexpr lv_coord_t PORTRAIT_VALUE_Y   = 60;
@@ -105,8 +113,10 @@ namespace gui
 
         screen_ = create_screen(theme);
 
-        /* Nav bar: signal name + close, standing in for the bottom-right
-         * checkmark every other screen uses (see the file doc comment). */
+        /**
+         * Nav bar: signal name + close, standing in for the bottom-right
+         * checkmark every other screen uses (see the file doc comment).
+         */
         name_lbl_ = create_nav_title(screen_, theme, nullptr);
 
         DoneButton close = create_close_button(screen_, theme);
@@ -147,12 +157,14 @@ namespace gui
         lv_obj_add_event_cb(
             hi_sel_, hi_toggle_cb, LV_EVENT_VALUE_CHANGED, this);
 
-        /* Portrait: the value sits on its own centered line above the
+        /**
+         * Portrait: the value sits on its own centered line above the
          * button row (see PORTRAIT_STEP_BTN_WIDTH's comment) — created as
          * a direct child of screen_, not hi_row, and given no fixed width
          * since LV_ALIGN_TOP_MID centers by the label's own (content-
          * sized) bounds. Landscape keeps the value inside hi_row, between
-         * the buttons, as before. */
+         * the buttons, as before.
+         */
         if (portrait)
         {
             hi_value_lbl_ = lv_label_create(screen_);
@@ -180,8 +192,10 @@ namespace gui
         {
             hi_value_lbl_ = lv_label_create(hi_row);
             lv_obj_set_style_text_color(hi_value_lbl_, theme.palette.fg, 0);
-            /* Not data_sm — that's a digits-only font (see theme.hpp) and
-             * this label's text includes a unit suffix (e.g. "80 °F"). */
+            /**
+             * Not data_sm — that's a digits-only font (see theme.hpp) and
+             * this label's text includes a unit suffix (e.g. "80 °F").
+             */
             lv_obj_set_style_text_font(
                 hi_value_lbl_, theme.typography.ui, 0);
             lv_obj_set_style_text_align(
@@ -397,9 +411,11 @@ namespace gui
         }
         else if (code == LV_EVENT_CLICKED)
         {
-            /* CLICKED still fires on release even after a long press —
+            /**
+             * CLICKED still fires on release even after a long press —
              * only take it as a step if the hold path didn't already step
-             * this press cycle (see the struct's doc comment). */
+             * this press cycle (see the struct's doc comment).
+             */
             if (!ctx->stepped_by_hold)
             {
                 ctx->screen->step_value(ctx->is_hi, ctx->direction);

@@ -8,13 +8,15 @@ namespace
     /**
      * The one open handle. A file object rather than a pointer so there is
      * nothing to leak; `operator bool` is how LittleFS reports whether it
-     * refers to anything. */
+     * refers to anything.
+     */
     File s_file;
 
     /**
      * Formats on a failed mount. First boot after flashing has no
      * filesystem at all, and refusing to create one would mean logging
-     * never worked until somebody ran a format by hand. */
+     * never worked until somebody ran a format by hand.
+     */
     constexpr bool FORMAT_ON_FAIL = true;
 } // namespace
 
@@ -41,7 +43,8 @@ bool Esp32Storage::is_present()
      * Not const, and re-attempts the mount: the interface allows this
      * because a removable medium can appear later. Internal flash cannot,
      * but a first mount that failed for a transient reason can succeed on
-     * a retry, and the caller gets the same answer either way. */
+     * a retry, and the caller gets the same answer either way.
+     */
     if (!mounted_)
     {
         begin();
@@ -55,7 +58,8 @@ bool Esp32Storage::format()
     {
         /**
          * Refuse rather than format out from under an open handle -- the
-         * interface says close() first, and core::Logger does. */
+         * interface says close() first, and core::Logger does.
+         */
         return false;
     }
 
@@ -99,7 +103,8 @@ bool Esp32Storage::open(const char *path, StorageFileMode mode)
          * Read of a missing file fails rather than creating an empty one
          * -- core::Logger distinguishes "this chunk does not exist yet"
          * from "this chunk is empty", and an auto-created file would make
-         * them the same. */
+         * them the same.
+         */
         return false;
     }
 

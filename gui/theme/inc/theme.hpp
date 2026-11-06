@@ -21,20 +21,26 @@ namespace gui
             lv_color_t accent;  /* pressed-button highlight */
             lv_color_t warn_lo; /* low-warning highlight */
             lv_color_t warn_hi; /* high-warning highlight */
-            /* Panel outline — panels share the screen's own bg color, so
+            /**
+             * Panel outline — panels share the screen's own bg color, so
              * without a visible border a panel's bounds are only implied
-             * by the gap between it and its neighbors. */
+             * by the gap between it and its neighbors.
+             */
             lv_color_t panel_border;
-            /* Bar/Gauge fill when the value is outside SignalSpec::
+            /**
+             * Bar/Gauge fill when the value is outside SignalSpec::
              * display_min/max — distinct from warn_lo/warn_hi (a
              * configured "this is bad" threshold) since a value can peg
-             * a graphic at 100%/0% without ever crossing a warning. */
+             * a graphic at 100%/0% without ever crossing a warning.
+             */
             lv_color_t range_overflow;
-            /* InfoScreen's blinking capture indicator. Its own token
+            /**
+             * InfoScreen's blinking capture indicator. Its own token
              * rather than reusing warn_hi: both are red by convention,
              * but a warning means "something is wrong" and this means
              * "recording", and a reskin should be free to keep the
-             * recording light red while moving warnings elsewhere. */
+             * recording light red while moving warnings elsewhere.
+             */
             lv_color_t rec_indicator;
     };
 
@@ -108,26 +114,32 @@ namespace gui
 
     extern const Theme THEME_DEFAULT;
 
-    /** THEME_DEFAULT.metrics with screen_width/screen_height swapped for a
+    /**
+     * THEME_DEFAULT.metrics with screen_width/screen_height swapped for a
      * portrait-mounted panel (320x480, see platform::DisplayOrientation).
      * The composition root (src/main.cpp) assigns this into
      * runtime_theme().metrics once at boot, matching whichever orientation
      * core::Settings::orientation says is active — gui/theme can't depend
      * on gui/screens (where LayoutOrientation lives), so the selection
-     * itself stays in main.cpp. */
+     * itself stays in main.cpp.
+     */
     extern const Metrics METRICS_PORTRAIT;
 
-    /** User-selectable accent-color presets (ThemePickerScreen), packed
+    /**
+     * User-selectable accent-color presets (ThemePickerScreen), packed
      * 0xRRGGBB — plain hex rather than lv_color_t so this list, and the
      * uint32_t core::Settings::accent_color persisted from it, both stay
-     * independent of any particular color type's in-memory layout. */
+     * independent of any particular color type's in-memory layout.
+     */
     constexpr uint8_t     ACCENT_PRESET_COUNT = 9;
     extern const uint32_t ACCENT_PRESETS[ACCENT_PRESET_COUNT];
 
-    /** Glyphs from Typography::icon_day_night (Font Awesome Free Solid's
+    /**
+     * Glyphs from Typography::icon_day_night (Font Awesome Free Solid's
      * fa-sun/fa-moon, U+F185/U+F186) — plain UTF-8 string literals, the
      * same way LVGL's own LV_SYMBOL_* macros work, since these two icons
-     * aren't part of that built-in set. */
+     * aren't part of that built-in set.
+     */
     constexpr const char *ICON_SUN  = "\xEF\x86\x85";
     constexpr const char *ICON_MOON = "\xEF\x86\x86";
 

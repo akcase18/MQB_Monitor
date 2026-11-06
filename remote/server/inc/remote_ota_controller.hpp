@@ -39,20 +39,28 @@ namespace remote::server
         Installing, /* commit sent; the board is about to restart */
     };
 
-    /* How long the "Update firmware?" popup waits for an answer before
-     * declining on its own. */
+    /**
+     * How long the "Update firmware?" popup waits for an answer before
+     * declining on its own.
+     */
     constexpr uint32_t OTA_REQUEST_TIMEOUT_MS = 30 * 1000;
-    /* How long update mode waits for an upload before giving up -- the
+    /**
+     * How long update mode waits for an upload before giving up -- the
      * phone asks as soon as its update page opens, and may never send
-     * anything. Restarts after a failed upload. */
+     * anything. Restarts after a failed upload.
+     */
     constexpr uint32_t OTA_WAIT_TIMEOUT_MS = 5 * 60 * 1000;
-    /* Generous next to the relay's own 5s socket timeout, which ends a
+    /**
+     * Generous next to the relay's own 5s socket timeout, which ends a
      * stalled upload with EVT_OTA_RESULT well before this -- this only
-     * covers that result never arriving. */
+     * covers that result never arriving.
+     */
     constexpr uint32_t OTA_STALL_TIMEOUT_MS = 15 * 1000;
-    /* Switching slots re-verifies the whole image (a SHA-256 over ~1.2MB)
+    /**
+     * Switching slots re-verifies the whole image (a SHA-256 over ~1.2MB)
      * before the relay restarts the board; far longer than that means the
-     * commit was lost. */
+     * commit was lost.
+     */
     constexpr uint32_t OTA_INSTALL_TIMEOUT_MS = 10 * 1000;
 
     class RemoteOtaController
@@ -60,31 +68,43 @@ namespace remote::server
         public:
             explicit RemoteOtaController(RemoteConfigLink &link);
 
-            /** Feed from RemoteConfigLink::poll()'s EventCallback. Ignores
-             * everything but EVT_OTA_*. */
+            /**
+             * Feed from RemoteConfigLink::poll()'s EventCallback. Ignores
+             * everything but EVT_OTA_*.
+             */
             void on_event(protocol::MsgType type,
                           const uint8_t    *payload,
                           uint16_t          len,
                           uint32_t          now_ms);
 
-            /** Call periodically -- a no-op unless a timeout above has
-             * elapsed. */
+            /**
+             * Call periodically -- a no-op unless a timeout above has
+             * elapsed.
+             */
             void tick(uint32_t now_ms);
 
-            /** Requested -> Armed: sends CMD_OTA_ARM. */
+            /**
+             * Requested -> Armed: sends CMD_OTA_ARM.
+             */
             void accept(uint32_t now_ms);
 
-            /** Requested -> Idle: sends CMD_OTA_DISARM. */
+            /**
+             * Requested -> Idle: sends CMD_OTA_DISARM.
+             */
             void decline();
 
-            /** Ends update mode from Armed or Ready (the image, if any,
+            /**
+             * Ends update mode from Armed or Ready (the image, if any,
              * goes unused): sends CMD_OTA_DISARM. Mid-upload or
              * mid-install it does nothing -- there is no clean way out of
-             * either, and both end on their own. */
+             * either, and both end on their own.
+             */
             void leave();
 
-            /** Ready -> Installing: sends CMD_OTA_COMMIT. No-op in any
-             * other state. */
+            /**
+             * Ready -> Installing: sends CMD_OTA_COMMIT. No-op in any
+             * other state.
+             */
             void install(uint32_t now_ms);
 
             OtaState state() const
@@ -92,30 +112,40 @@ namespace remote::server
                 return state_;
             }
 
-            /** Armed or past it: the update screen's states. */
+            /**
+             * Armed or past it: the update screen's states.
+             */
             bool in_update_mode() const
             {
                 return state_ >= OtaState::Armed;
             }
 
-            /** The incoming image's version. Valid from Receiving on. */
+            /**
+             * The incoming image's version. Valid from Receiving on.
+             */
             const char *version() const
             {
                 return version_;
             }
 
-            /** 0-100 through the upload; 0 when its size is unknown. */
+            /**
+             * 0-100 through the upload; 0 when its size is unknown.
+             */
             uint8_t percent() const;
 
-            /** How the last upload or install in this update mode ended
-             * (Ok if none has). */
+            /**
+             * How the last upload or install in this update mode ended
+             * (Ok if none has).
+             */
             protocol::OtaResult last_result() const
             {
                 return last_result_;
             }
 
-            /** When the current state began -- the Requested countdown's
-             * starting point. */
+            /**
+             * When the current state began -- the Requested countdown's
+             * starting point.
+             */
             uint32_t state_entered_ms() const
             {
                 return state_entered_ms_;
@@ -123,7 +153,9 @@ namespace remote::server
 
         private:
             void enter(OtaState state, uint32_t now_ms);
-            /** An upload or install failed: back to waiting for a file. */
+            /**
+             * An upload or install failed: back to waiting for a file.
+             */
             void fail(protocol::OtaResult result, uint32_t now_ms);
             void send(protocol::MsgType type);
 

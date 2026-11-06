@@ -26,16 +26,20 @@ namespace remote::server
                 }
                 else if (state_ == OtaState::Armed)
                 {
-                    /* Already agreed to -- a reloaded page asking again.
-                     * Say yes again rather than leaving it waiting. */
+                    /**
+                     * Already agreed to -- a reloaded page asking again.
+                     * Say yes again rather than leaving it waiting.
+                     */
                     send(MsgType::CMD_OTA_ARM);
                 }
                 break;
 
             case MsgType::EVT_OTA_BEGIN: {
-                /* The relay only takes uploads in update mode, so outside
+                /**
+                 * The relay only takes uploads in update mode, so outside
                  * it this can't be ours to show. A new upload supersedes
-                 * one waiting at Ready -- it overwrites the same slot. */
+                 * one waiting at Ready -- it overwrites the same slot.
+                 */
                 if (len < protocol::OTA_BEGIN_BYTES
                     || (state_ != OtaState::Armed && state_ != OtaState::Ready
                         && state_ != OtaState::Receiving))
@@ -81,9 +85,11 @@ namespace remote::server
                 else if (state_ == OtaState::Receiving
                          || state_ == OtaState::Installing)
                 {
-                    /* A failed upload, or a commit the relay couldn't
+                    /**
+                     * A failed upload, or a commit the relay couldn't
                      * carry out -- either way the running firmware stays,
-                     * and the phone can send again. */
+                     * and the phone can send again.
+                     */
                     fail(result, now_ms);
                 }
                 break;

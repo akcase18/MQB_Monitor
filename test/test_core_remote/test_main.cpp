@@ -23,8 +23,10 @@ namespace
     using namespace remote::protocol;
     using namespace remote::server;
 
-    /* In-memory IConfigStore test double, same pattern test_core_config
-     * already uses — avoids touching sim_config.bin. */
+    /**
+     * In-memory IConfigStore test double, same pattern test_core_config
+     * already uses — avoids touching sim_config.bin.
+     */
     class FakeConfigStore : public IConfigStore
     {
         public:
@@ -64,8 +66,10 @@ namespace
             uint8_t bytes_[CAPACITY];
     };
 
-    /* Deterministic IClock test double, same pattern test_core_vehicle
-     * already uses. */
+    /**
+     * Deterministic IClock test double, same pattern test_core_vehicle
+     * already uses.
+     */
     class FakeClock : public IClock
     {
         public:
@@ -77,8 +81,10 @@ namespace
             uint32_t now_ms = 0;
     };
 
-    /* ISerialLink test double: a byte queue to "receive" and a capture
-     * buffer for what gets "sent". */
+    /**
+     * ISerialLink test double: a byte queue to "receive" and a capture
+     * buffer for what gets "sent".
+     */
     class FakeSerialLink : public ISerialLink
     {
         public:
@@ -125,14 +131,18 @@ namespace
             size_t  write_len_       = 0;
     };
 
-    /* Feeds a fully-encoded frame through a fresh FrameReader and returns
+    /**
+     * Feeds a fully-encoded frame through a fresh FrameReader and returns
      * the decoded frame — used to check what a RemoteConfigLink actually
-     * wrote onto the wire. */
+     * wrote onto the wire.
+     */
     DecodedFrame decode_one_frame(const uint8_t *bytes, size_t len)
     {
-        static FrameReader reader; /* static: DecodedFrame::payload aliases
-                                    * its internal buffer, must outlive
-                                    * the caller's use of the result */
+        /**
+         * Static: DecodedFrame::payload aliases its internal buffer, must
+         * outlive the caller's use of the result.
+         */
+        static FrameReader reader;
         reader = FrameReader {};
         for (size_t i = 0; i < len; i++)
         {
@@ -221,7 +231,9 @@ void test_corrupted_frame_resyncs_on_next_frame()
 
     FrameReader reader;
 
-    /* Corrupt one payload byte so the CRC fails. */
+    /**
+     * Corrupt one payload byte so the CRC fails.
+     */
     uint8_t corrupted[16];
     memcpy(corrupted, frame_bytes, frame_len);
     corrupted[4] ^= 0xFF; /* sync,type,lenlo,lenhi,payload[0] */
@@ -233,8 +245,10 @@ void test_corrupted_frame_resyncs_on_next_frame()
     }
     TEST_ASSERT_FALSE(completed); /* CRC mismatch, silently dropped */
 
-    /* A subsequent real frame must still decode correctly — the corrupt
-     * frame can't wedge the reader. */
+    /**
+     * A subsequent real frame must still decode correctly — the corrupt
+     * frame can't wedge the reader.
+     */
     completed = false;
     for (size_t i = 0; i < frame_len; i++)
     {
@@ -280,8 +294,10 @@ void test_stalled_frame_times_out()
                                     sizeof(frame_bytes));
 
     FrameReader reader;
-    /* Feed everything up to (not including) the last payload byte, then
-     * stall past FRAME_TIMEOUT_MS before finishing it. */
+    /**
+     * Feed everything up to (not including) the last payload byte, then
+     * stall past FRAME_TIMEOUT_MS before finishing it.
+     */
     for (size_t i = 0; i < frame_len - 3; i++)
     {
         reader.on_byte(frame_bytes[i], 0);
@@ -291,7 +307,9 @@ void test_stalled_frame_times_out()
         = reader.on_byte(frame_bytes[frame_len - 3], FRAME_TIMEOUT_MS + 1);
     TEST_ASSERT_FALSE(completed);
 
-    /* The reader must have reset — a fresh frame starting now succeeds. */
+    /**
+     * The reader must have reset — a fresh frame starting now succeeds.
+     */
     completed = false;
     for (size_t i = 0; i < frame_len; i++)
     {
@@ -403,9 +421,11 @@ void test_get_state_reports_defaults()
 
 namespace
 {
-    /* Builds a valid REQ_APPLY_CONFIG payload matching the current
+    /**
+     * Builds a valid REQ_APPLY_CONFIG payload matching the current
      * defaults, so individual tests only need to override what they're
-     * testing. */
+     * testing.
+     */
     size_t build_apply_payload(const core::Config &defaults,
                                uint8_t            *out,
                                float              *lo_override   = nullptr,
@@ -492,8 +512,10 @@ void test_apply_config_persists_valid_batch()
     TEST_ASSERT_TRUE(MsgType::RESP_APPLY_RESULT == resp_type);
     TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ApplyResult::Ok), resp[0]);
 
-    /* Persisted for real — a fresh ConfigStore over the same backing sees
-     * it. */
+    /**
+     * Persisted for real — a fresh ConfigStore over the same backing sees
+     * it.
+     */
     core::ConfigStore reloaded(backing);
     reloaded.load();
     TEST_ASSERT_EQUAL_UINT8(100, reloaded.get().settings.day_brightness);
@@ -508,7 +530,9 @@ void test_apply_config_round_trips_flips()
 
     RemoteConfigServer server(config, signals);
 
-    /* The settings record's flips byte: only the vertical layout turned. */
+    /**
+     * The settings record's flips byte: only the vertical layout turned.
+     */
     uint8_t req[FRAME_MAX_PAYLOAD];
     size_t  req_len = build_apply_payload(config.get(), req);
     req[8]          = 2;
@@ -544,8 +568,10 @@ void test_apply_config_round_trips_brightness_settings()
 
     RemoteConfigServer server(config, signals);
 
-    /* The settings record's mode byte, 2 = Auto, and the Auto slider
-     * after it, past its 100 max. */
+    /**
+     * The settings record's mode byte, 2 = Auto, and the Auto slider
+     * after it, past its 100 max.
+     */
     uint8_t req[FRAME_MAX_PAYLOAD];
     size_t  req_len = build_apply_payload(config.get(), req);
     req[9]          = 2;
@@ -574,7 +600,9 @@ void test_apply_config_round_trips_brightness_settings()
     TEST_ASSERT_EQUAL_UINT8(2, settings.brightness_mode);
     TEST_ASSERT_EQUAL_UINT8(100, settings.auto_brightness);
 
-    /* A mode this firmware doesn't have is refused, and changes nothing. */
+    /**
+     * A mode this firmware doesn't have is refused, and changes nothing.
+     */
     req[9] = 3;
     server.handle_request(MsgType::REQ_APPLY_CONFIG,
                           req,
@@ -620,7 +648,9 @@ void test_apply_config_rejects_signal_count_mismatch()
 
     TEST_ASSERT_EQUAL_UINT8(
         static_cast<uint8_t>(ApplyResult::ErrSignalCountMismatch), resp[0]);
-    /* Untouched — still whatever load() defaulted to. */
+    /**
+     * Untouched — still whatever load() defaulted to.
+     */
     TEST_ASSERT_EQUAL_UINT8(100, config.get().settings.day_brightness);
 }
 
@@ -876,10 +906,12 @@ void test_apply_config_clamps_thresholds_to_effective_range()
 
     RemoteConfigServer server(config, signals);
 
-    /* Signal 0 (Coolant Temp): catalog range is -40..130. Submit a custom
+    /**
+     * Signal 0 (Coolant Temp): catalog range is -40..130. Submit a custom
      * range (0..50) *and* thresholds outside it in the same batch — the
      * thresholds must clamp against the custom range just submitted, not
-     * the catalog default. */
+     * the catalog default.
+     */
     float   lo = -100.0f;
     float   hi = 500.0f;
     uint8_t req[FRAME_MAX_PAYLOAD];
@@ -945,14 +977,18 @@ void test_apply_config_keeps_lone_threshold_on_its_side()
 
     RemoteConfigServer server(config, signals);
 
-    /* High warning at 10, an unused low left at 90 -- the pair is
-     * "reversed", but only one side is live, so nothing should swap. */
+    /**
+     * High warning at 10, an unused low left at 90 -- the pair is
+     * "reversed", but only one side is live, so nothing should swap.
+     */
     float   lo = 90.0f;
     float   hi = 10.0f;
     uint8_t req[FRAME_MAX_PAYLOAD];
     size_t  req_len = build_apply_payload(config.get(), req, &lo, &hi);
-    /* Signal 0's record starts after settings (11), the panels (24) and
-     * the count (2); use_lo is its 9th byte. */
+    /**
+     * Signal 0's record starts after settings (11), the panels (24) and
+     * the count (2); use_lo is its 9th byte.
+     */
     req[11 + 24 + 2 + 8] = 0;
 
     uint8_t resp[16];
@@ -994,8 +1030,10 @@ namespace
         }
     }
 
-    /* Sends one config-changing request and returns its ApplyResult
-     * byte. */
+    /**
+     * Sends one config-changing request and returns its ApplyResult
+     * byte.
+     */
     uint8_t send_change(RemoteConfigServer &server,
                         MsgType             type,
                         const uint8_t      *payload,
@@ -1014,7 +1052,9 @@ namespace
         return resp[0];
     }
 
-    /* A valid batch equal to `cfg` but with day brightness `day`. */
+    /**
+     * A valid batch equal to `cfg` but with day brightness `day`.
+     */
     size_t build_payload_with_day(const core::Config &cfg,
                                   uint8_t             day,
                                   uint8_t            *out)
@@ -1049,13 +1089,17 @@ void test_preview_changes_live_config_without_saving()
     TEST_ASSERT_TRUE(RemoteConfigServer::ConfigEvent::Previewed
                      == log.events[0]);
 
-    /* Nothing reached the store. */
+    /**
+     * Nothing reached the store.
+     */
     core::ConfigStore reloaded(backing);
     reloaded.load();
     TEST_ASSERT_EQUAL_UINT8(100, reloaded.get().settings.day_brightness);
 
-    /* RESP_STATE's trailing byte reports the session (bit 0) and its
-     * unsaved edits (bit 1). */
+    /**
+     * RESP_STATE's trailing byte reports the session (bit 0) and its
+     * unsaved edits (bit 1).
+     */
     uint8_t resp[FRAME_MAX_PAYLOAD];
     MsgType resp_type;
     size_t  resp_len = server.handle_request(
@@ -1063,8 +1107,10 @@ void test_preview_changes_live_config_without_saving()
     TEST_ASSERT_EQUAL_UINT8(3, resp[resp_len - 1]);
     TEST_ASSERT_TRUE(server.has_unsaved_changes());
 
-    /* Previewing the saved config again is a session with nothing to
-     * save -- what the phone's page sends when it first opens. */
+    /**
+     * Previewing the saved config again is a session with nothing to
+     * save -- what the phone's page sends when it first opens.
+     */
     req_len = build_payload_with_day(config.get(), 100, req);
     send_change(server, MsgType::REQ_PREVIEW_CONFIG, req, req_len);
     TEST_ASSERT_TRUE(server.preview_active());
@@ -1091,8 +1137,10 @@ void test_apply_during_preview_saves_and_keeps_session()
         static_cast<uint8_t>(ApplyResult::Ok),
         send_change(server, MsgType::REQ_APPLY_CONFIG, req, req_len));
 
-    /* The phone's page is still open, so the session carries on -- only
-     * the unsaved flag clears. */
+    /**
+     * The phone's page is still open, so the session carries on -- only
+     * the unsaved flag clears.
+     */
     TEST_ASSERT_TRUE(server.preview_active());
     TEST_ASSERT_FALSE(server.has_unsaved_changes());
     TEST_ASSERT_EQUAL_UINT8(2, log.count);
@@ -1103,8 +1151,10 @@ void test_apply_during_preview_saves_and_keeps_session()
     reloaded.load();
     TEST_ASSERT_EQUAL_UINT8(55, reloaded.get().settings.day_brightness);
 
-    /* Ending the session now goes back to the save, not to what was
-     * saved before the session began. */
+    /**
+     * Ending the session now goes back to the save, not to what was
+     * saved before the session began.
+     */
     TEST_ASSERT_EQUAL_UINT8(
         static_cast<uint8_t>(ApplyResult::Ok),
         send_change(server, MsgType::REQ_REVERT_PREVIEW, nullptr, 0));
@@ -1112,7 +1162,9 @@ void test_apply_during_preview_saves_and_keeps_session()
     TEST_ASSERT_FALSE(server.preview_active());
     TEST_ASSERT_EQUAL_UINT8(3, log.count);
 
-    /* With no session, a revert is a no-op. */
+    /**
+     * With no session, a revert is a no-op.
+     */
     send_change(server, MsgType::REQ_REVERT_PREVIEW, nullptr, 0);
     TEST_ASSERT_EQUAL_UINT8(3, log.count);
 }
@@ -1127,8 +1179,10 @@ void test_preview_values_replace_live_ones_for_the_session()
     RemoteConfigServer server(config, signals);
     TEST_ASSERT_NULL(server.preview_values());
 
-    /* The batch, then one value per signal: 87.5 for the first, NaN (no
-     * value) for the second, 0 for the rest. */
+    /**
+     * The batch, then one value per signal: 87.5 for the first, NaN (no
+     * value) for the second, 0 for the rest.
+     */
     uint8_t  req[FRAME_MAX_PAYLOAD];
     size_t   req_len = build_apply_payload(config.get(), req);
     uint8_t *p       = req + req_len;
@@ -1149,7 +1203,9 @@ void test_preview_values_replace_live_ones_for_the_session()
     TEST_ASSERT_FALSE(values->get_at(1).has_data);
     TEST_ASSERT_TRUE(values->get_at(2).has_data);
 
-    /* A preview without values shows none. */
+    /**
+     * A preview without values shows none.
+     */
     send_change(server, MsgType::REQ_PREVIEW_CONFIG, req, req_len);
     TEST_ASSERT_FALSE(server.preview_values()->get_at(0).has_data);
 
@@ -1168,8 +1224,10 @@ void test_revert_restores_config_from_before_first_preview()
     EventLog           log;
     server.set_config_callback(record_event, &log);
 
-    /* Two previews in a row: the revert target is the saved config, not
-     * the first preview. */
+    /**
+     * Two previews in a row: the revert target is the saved config, not
+     * the first preview.
+     */
     uint8_t req[FRAME_MAX_PAYLOAD];
     size_t  req_len = build_payload_with_day(config.get(), 40, req);
     send_change(server, MsgType::REQ_PREVIEW_CONFIG, req, req_len);
@@ -1187,8 +1245,10 @@ void test_revert_restores_config_from_before_first_preview()
     TEST_ASSERT_TRUE(RemoteConfigServer::ConfigEvent::Reverted
                      == log.events[2]);
 
-    /* The composition root's path (AP going down) behaves the same, and
-     * is a no-op once nothing is pending. */
+    /**
+     * The composition root's path (AP going down) behaves the same, and
+     * is a no-op once nothing is pending.
+     */
     req_len = build_payload_with_day(config.get(), 30, req);
     send_change(server, MsgType::REQ_PREVIEW_CONFIG, req, req_len);
     server.revert_preview();
@@ -1196,7 +1256,9 @@ void test_revert_restores_config_from_before_first_preview()
     TEST_ASSERT_EQUAL_UINT8(100, config.get().settings.day_brightness);
     TEST_ASSERT_EQUAL_UINT8(5, log.count);
 
-    /* The page closing reverts the same, but says so. */
+    /**
+     * The page closing reverts the same, but says so.
+     */
     req_len = build_payload_with_day(config.get(), 20, req);
     send_change(server, MsgType::REQ_PREVIEW_CONFIG, req, req_len);
     uint8_t left = REVERT_PAGE_LEFT;
@@ -1231,7 +1293,9 @@ void test_rejected_preview_leaves_live_config_untouched()
     TEST_ASSERT_FALSE(server.preview_active());
     TEST_ASSERT_EQUAL_UINT8(0, log.count);
 
-    /* Cut short mid-signal-list. */
+    /**
+     * Cut short mid-signal-list.
+     */
     req_len = build_apply_payload(config.get(), req);
     TEST_ASSERT_EQUAL_UINT8(
         static_cast<uint8_t>(ApplyResult::ErrTruncated),
@@ -1305,11 +1369,15 @@ void test_ap_controller_activate_sends_command_and_reaches_active()
     ApEnableWire wire {};
     decode_ap_enable(sent.payload, wire);
     TEST_ASSERT_EQUAL_STRING("MQB-Monitor-Setup", wire.ssid);
-    /* Deliberately open AP — see RemoteApController's file doc comment. */
+    /**
+     * Deliberately open AP — see RemoteApController's file doc comment.
+     */
     TEST_ASSERT_EQUAL_STRING("", wire.password);
 
-    /* Simulate the C3 replying, via the same poll()/evt_cb path a real
-     * link would use. */
+    /**
+     * Simulate the C3 replying, via the same poll()/evt_cb path a real
+     * link would use.
+     */
     link.clear_write();
     uint8_t     evt_frame[16];
     ApReadyWire ready { { 192, 168, 4, 1 } };
@@ -1357,8 +1425,10 @@ void test_ap_controller_idle_timeout_disables()
     controller.tick(AP_IDLE_TIMEOUT_MS + 1);
     TEST_ASSERT_TRUE(ApState::Deactivating == controller.state());
 
-    /* No EVT_AP_DISABLED ever arrives — the grace-period fallback must
-     * still return to Idle rather than staying wedged. */
+    /**
+     * No EVT_AP_DISABLED ever arrives — the grace-period fallback must
+     * still return to Idle rather than staying wedged.
+     */
     controller.tick(AP_IDLE_TIMEOUT_MS + 1 + AP_DISABLE_GRACE_MS + 1);
     TEST_ASSERT_TRUE(ApState::Idle == controller.state());
 }
@@ -1382,7 +1452,9 @@ void test_ap_controller_activity_restarts_idle_timeout()
     encode_ap_ready(payload, wire);
     controller.on_event(MsgType::EVT_AP_READY, payload, sizeof(payload), 0);
 
-    /* A phone still editing near the end of the window keeps it open. */
+    /**
+     * A phone still editing near the end of the window keeps it open.
+     */
     controller.note_activity(AP_IDLE_TIMEOUT_MS - 10);
     controller.tick(AP_IDLE_TIMEOUT_MS + 1);
     TEST_ASSERT_TRUE(ApState::Active == controller.state());
@@ -1404,7 +1476,9 @@ void test_ap_controller_counts_stations_only_while_active()
     FakeClock          clock;
     RemoteApController controller(remote_link, clock);
 
-    /* Before the AP is up, a stray count is ignored. */
+    /**
+     * Before the AP is up, a stray count is ignored.
+     */
     uint8_t one = 1;
     controller.activate();
     controller.on_event(MsgType::EVT_AP_STATIONS, &one, 1, 0);
@@ -1419,11 +1493,15 @@ void test_ap_controller_counts_stations_only_while_active()
     controller.on_event(MsgType::EVT_AP_STATIONS, &one, 1, 100);
     TEST_ASSERT_EQUAL_UINT8(1, controller.station_count());
 
-    /* A phone joining is activity: the idle timeout runs from it. */
+    /**
+     * A phone joining is activity: the idle timeout runs from it.
+     */
     controller.tick(AP_IDLE_TIMEOUT_MS + 1);
     TEST_ASSERT_TRUE(ApState::Active == controller.state());
 
-    /* Going down forgets the phones, and coming back up starts at 0. */
+    /**
+     * Going down forgets the phones, and coming back up starts at 0.
+     */
     controller.deactivate();
     TEST_ASSERT_EQUAL_UINT8(0, controller.station_count());
     controller.on_event(MsgType::EVT_AP_DISABLED, nullptr, 0, 200);
@@ -1476,11 +1554,13 @@ void test_ap_controller_reactivate_from_deactivating_resends_enable()
     controller.deactivate();
     TEST_ASSERT_TRUE(ApState::Deactivating == controller.state());
 
-    /* Reopening Wireless Setup before EVT_AP_DISABLED (or the grace-period
+    /**
+     * Reopening Wireless Setup before EVT_AP_DISABLED (or the grace-period
      * fallback) arrives — the screen's own close (X) button doesn't wait
      * around for it, so this is a real workflow, not just a race. Must
      * resend CMD_AP_ENABLE rather than silently no-op and strand the
-     * screen on its spinner. */
+     * screen on its spinner.
+     */
     link.clear_write();
     controller.activate();
     TEST_ASSERT_TRUE(ApState::Activating == controller.state());
@@ -1495,7 +1575,9 @@ void test_ap_controller_reactivate_from_deactivating_resends_enable()
 
 namespace
 {
-    /* Everything a RemoteOtaController needs, wired as main.cpp does. */
+    /**
+     * Everything a RemoteOtaController needs, wired as main.cpp does.
+     */
     struct OtaFixture
     {
             FakeConfigStore     backing;
@@ -1538,8 +1620,10 @@ namespace
                 ota.on_event(MsgType::EVT_OTA_REQUEST, nullptr, 0, now_ms);
             }
 
-            /* Into update mode, as the panel's Start does, discarding
-             * the CMD_OTA_ARM it sends. */
+            /**
+             * Into update mode, as the panel's Start does, discarding
+             * the CMD_OTA_ARM it sends.
+             */
             void arm(uint32_t now_ms)
             {
                 request(now_ms);
@@ -1547,7 +1631,9 @@ namespace
                 link.clear_write();
             }
 
-            /* The one frame the controller last wrote; clears it. */
+            /**
+             * The one frame the controller last wrote; clears it.
+             */
             DecodedFrame take_sent()
             {
                 DecodedFrame sent
@@ -1573,7 +1659,9 @@ void test_ota_begin_round_trips()
     TEST_ASSERT_EQUAL_UINT32(1220736, out.total_bytes);
     TEST_ASSERT_EQUAL_STRING("v1.2-3-gabc1234-dirty", out.version);
 
-    /* An unterminated version off the wire still decodes to a string. */
+    /**
+     * An unterminated version off the wire still decodes to a string.
+     */
     memset(buf + 4, 'x', WIRE_VERSION_LEN);
     decode_ota_begin(buf, out);
     TEST_ASSERT_EQUAL(WIRE_VERSION_LEN - 1, strlen(out.version));
@@ -1584,7 +1672,9 @@ void test_ota_controller_request_then_upload_then_install()
     OtaFixture f;
     TEST_ASSERT_TRUE(OtaState::Idle == f.ota.state());
 
-    /* The phone asks; nothing goes to the relay until the panel agrees. */
+    /**
+     * The phone asks; nothing goes to the relay until the panel agrees.
+     */
     f.request(0);
     TEST_ASSERT_TRUE(OtaState::Requested == f.ota.state());
     TEST_ASSERT_FALSE(f.ota.in_update_mode());
@@ -1619,15 +1709,19 @@ void test_ota_controller_upload_needs_update_mode()
 {
     OtaFixture f;
 
-    /* An upload the relay somehow reported outside update mode is not
-     * shown, let alone installable. */
+    /**
+     * An upload the relay somehow reported outside update mode is not
+     * shown, let alone installable.
+     */
     f.begin(1000, "v2.0", 0);
     f.result(OtaResult::Ok, 10);
     TEST_ASSERT_TRUE(OtaState::Idle == f.ota.state());
     f.ota.install(20);
     TEST_ASSERT_EQUAL(0, f.link.write_len_);
 
-    /* Asked but not yet agreed to: still nothing. */
+    /**
+     * Asked but not yet agreed to: still nothing.
+     */
     f.request(30);
     f.begin(1000, "v2.0", 40);
     TEST_ASSERT_TRUE(OtaState::Requested == f.ota.state());
@@ -1642,7 +1736,9 @@ void test_ota_controller_decline_and_request_timeout()
     TEST_ASSERT_TRUE(OtaState::Idle == f.ota.state());
     TEST_ASSERT_TRUE(MsgType::CMD_OTA_DISARM == f.take_sent().type);
 
-    /* Nobody answers the popup: it declines on its own. */
+    /**
+     * Nobody answers the popup: it declines on its own.
+     */
     f.request(1000);
     f.ota.tick(1000 + OTA_REQUEST_TIMEOUT_MS - 1);
     TEST_ASSERT_TRUE(OtaState::Requested == f.ota.state());
@@ -1676,7 +1772,9 @@ void test_ota_controller_failed_upload_waits_for_another()
     f.ota.install(30);
     TEST_ASSERT_EQUAL(0, f.link.write_len_);
 
-    /* The next try starts clean. */
+    /**
+     * The next try starts clean.
+     */
     f.begin(1000, "v2.1", 40);
     TEST_ASSERT_TRUE(OtaState::Receiving == f.ota.state());
     TEST_ASSERT_TRUE(OtaResult::Ok == f.ota.last_result());
@@ -1686,13 +1784,17 @@ void test_ota_controller_leave_ends_update_mode()
 {
     OtaFixture f;
 
-    /* From waiting... */
+    /**
+     * From waiting...
+     */
     f.arm(0);
     f.ota.leave();
     TEST_ASSERT_TRUE(OtaState::Idle == f.ota.state());
     TEST_ASSERT_TRUE(MsgType::CMD_OTA_DISARM == f.take_sent().type);
 
-    /* ...and from Ready, leaving the image unused. */
+    /**
+     * ...and from Ready, leaving the image unused.
+     */
     f.arm(10);
     f.begin(1000, "v2.0", 10);
     f.result(OtaResult::Ok, 20);
@@ -1700,7 +1802,9 @@ void test_ota_controller_leave_ends_update_mode()
     TEST_ASSERT_TRUE(OtaState::Idle == f.ota.state());
     TEST_ASSERT_TRUE(MsgType::CMD_OTA_DISARM == f.take_sent().type);
 
-    /* Not mid-upload: there's no clean way out of that. */
+    /**
+     * Not mid-upload: there's no clean way out of that.
+     */
     f.arm(30);
     f.begin(1000, "v2.0", 30);
     f.ota.leave();
@@ -1727,18 +1831,24 @@ void test_ota_controller_timeouts_fall_back()
     OtaFixture f;
     f.arm(0);
 
-    /* Progress keeps a slow upload alive... */
+    /**
+     * Progress keeps a slow upload alive...
+     */
     f.begin(1000, "v2.0", 0);
     f.progress(100, OTA_STALL_TIMEOUT_MS - 1);
     f.ota.tick(OTA_STALL_TIMEOUT_MS + 1);
     TEST_ASSERT_TRUE(OtaState::Receiving == f.ota.state());
 
-    /* ...but one that goes silent is given up on. */
+    /**
+     * ...but one that goes silent is given up on.
+     */
     f.ota.tick(2 * OTA_STALL_TIMEOUT_MS);
     TEST_ASSERT_TRUE(OtaState::Armed == f.ota.state());
     TEST_ASSERT_TRUE(OtaResult::ErrInterrupted == f.ota.last_result());
 
-    /* A commit the board never acts on doesn't strand the panel. */
+    /**
+     * A commit the board never acts on doesn't strand the panel.
+     */
     f.begin(1000, "v2.0", 0);
     f.result(OtaResult::Ok, 0);
     f.ota.install(0);
@@ -1747,7 +1857,9 @@ void test_ota_controller_timeouts_fall_back()
     f.ota.tick(OTA_INSTALL_TIMEOUT_MS + 1);
     TEST_ASSERT_TRUE(OtaState::Armed == f.ota.state());
 
-    /* Ready waits on the person in the car as long as it takes. */
+    /**
+     * Ready waits on the person in the car as long as it takes.
+     */
     f.begin(1000, "v2.0", 0);
     f.result(OtaResult::Ok, 0);
     f.ota.tick(10 * OTA_WAIT_TIMEOUT_MS);
@@ -1765,7 +1877,9 @@ void test_ota_controller_update_mode_gives_up_waiting()
     TEST_ASSERT_TRUE(OtaState::Idle == f.ota.state());
     TEST_ASSERT_TRUE(MsgType::CMD_OTA_DISARM == f.take_sent().type);
 
-    /* A failed upload restarts the wait. */
+    /**
+     * A failed upload restarts the wait.
+     */
     f.arm(0);
     f.begin(1000, "v2.0", 0);
     f.result(OtaResult::ErrCorrupt, OTA_WAIT_TIMEOUT_MS);

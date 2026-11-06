@@ -13,8 +13,10 @@ namespace core
                 return "0123456789ABCDEF"[nibble & 0x0F];
             }
 
-            /* Parses `count` hex chars from `s` into a value. Returns false
-             * on any non-hex char. */
+            /**
+             * Parses `count` hex chars from `s` into a value. Returns false
+             * on any non-hex char.
+             */
             FLASHMEM bool parse_hex(const char *s, uint8_t count, uint32_t &out)
             {
                 uint32_t v = 0;
@@ -45,10 +47,12 @@ namespace core
             }
         } // namespace
 
-        /* Per-frame, but FLASHMEM all the same: on the dash it only runs in
+        /**
+         * Per-frame, but FLASHMEM all the same: on the dash it only runs in
          * sniffer mode, with the dashboard paused, and RAM1 code there sits
          * just under a 32 KB ITCM block boundary (see main.cpp's
-         * pump_sniff()). */
+         * pump_sniff()).
+         */
         FLASHMEM size_t encode(const SniffFrame &frame, bool timestamps, char *out)
         {
             size_t n   = 0;
@@ -136,8 +140,10 @@ namespace core
             baud_        = DEFAULT_BAUD;
         }
 
-        /* Ignored (but ACKed) in listen-only so python-can's periodic
-         * keep-alives can't fault the bus. */
+        /**
+         * Ignored (but ACKed) in listen-only so python-can's periodic
+         * keep-alives can't fault the bus.
+         */
         FLASHMEM void
         Session::handle_transmit(const char *line, size_t len, bool ext)
         {

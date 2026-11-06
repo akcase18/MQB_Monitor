@@ -19,11 +19,13 @@ namespace core
         , chunk_size_bytes_(chunk_size_bytes)
         , chunk_count_(chunk_count)
     {
-        /* NaN compares unequal to every value including itself, which is
+        /**
+         * NaN compares unequal to every value including itself, which is
          * exactly the "nothing logged for this signal yet, so whatever
          * arrives first is new" baseline sample() wants -- see the member
          * declaration. Not expressible as a member initializer on an
-         * array, hence the loop. */
+         * array, hence the loop.
+         */
         for (uint16_t i = 0; i < SIGNAL_CATALOG_COUNT; i++)
         {
             last_value_[i] = NAN;
@@ -38,8 +40,10 @@ namespace core
             return false;
         }
 
-        /* Recover rotation state purely from what's already on disk --
-         * see the header comment on begin(). */
+        /**
+         * Recover rotation state purely from what's already on disk --
+         * see the header comment on begin().
+         */
         bool     has_any        = false;
         uint32_t max_chunk_seq  = 0;
         uint32_t max_session_id = 0;
@@ -61,8 +65,11 @@ namespace core
             if (n != sizeof(header) || header.magic != LOG_MAGIC
                 || header.version != LOG_VERSION)
             {
-                continue; /* blank/corrupt/foreign -- self-heals by
-                           * treating it the same as never-written */
+                /**
+                 * Blank/corrupt/foreign -- self-heals by treating it the same
+                 * as never-written.
+                 */
+                continue;
             }
 
             if (!has_any || header.chunk_seq > max_chunk_seq)
@@ -81,16 +88,20 @@ namespace core
         current_chunk_index_
             = static_cast<uint16_t>(next_chunk_seq_ % chunk_count_);
 
-        /* Deliberately does NOT create a chunk here. Creating one costs
+        /**
+         * Deliberately does NOT create a chunk here. Creating one costs
          * a ring slot (start_new_chunk() truncates whatever occupied it),
          * and booting is not recording -- now that logging is opt-in, a
          * run of ignition cycles with the recorder off would otherwise
          * chew through the whole ring and destroy captures the user never
-         * touched. The first flush() of the first capture creates it. */
+         * touched. The first flush() of the first capture creates it.
+         */
         chunk_open_ = false;
 
-        /* After rotation state is known, so prune_index() can tell which
-         * captures the ring has already lapped past. */
+        /**
+         * After rotation state is known, so prune_index() can tell which
+         * captures the ring has already lapped past.
+         */
         load_index();
         prune_index();
         save_index();
@@ -101,10 +112,12 @@ namespace core
 
     bool Logger::erase()
     {
-        /* Dropped before the format, not after: begin() below rebuilds
+        /**
+         * Dropped before the format, not after: begin() below rebuilds
          * everything that describes what is *on disk*, but knows nothing
          * about the in-RAM tail of a capture in progress. See the header
-         * comment for what each of these would otherwise survive into. */
+         * comment for what each of these would otherwise survive into.
+         */
         buffer_count_ = 0;
         chunk_open_   = false;
         was_enabled_  = false;
@@ -119,8 +132,10 @@ namespace core
             return false;
         }
 
-        /* Rebuilds rotation state and the index against the empty store,
-         * which is what leaves log_count() honestly at zero. */
+        /**
+         * Rebuilds rotation state and the index against the empty store,
+         * which is what leaves log_count() honestly at zero.
+         */
         return begin();
     }
 
@@ -131,13 +146,17 @@ namespace core
             return 0; /* nothing has ever been written */
         }
 
-        /* next_chunk_seq_ is the open chunk's seq while one is open, and
+        /**
+         * next_chunk_seq_ is the open chunk's seq while one is open, and
          * the seq the *next* one will take otherwise -- so the newest
-         * chunk actually on disk is one back in the latter case. */
+         * chunk actually on disk is one back in the latter case.
+         */
         uint32_t newest = chunk_open_ ? next_chunk_seq_ : next_chunk_seq_ - 1;
 
-        /* The ring holds the chunk_count_ most recent seqs ending there.
-         * Before the first full lap nothing has been evicted yet. */
+        /**
+         * The ring holds the chunk_count_ most recent seqs ending there.
+         * Before the first full lap nothing has been evicted yet.
+         */
         if (newest + 1 < chunk_count_)
         {
             return 0;
@@ -149,8 +168,10 @@ namespace core
     {
         uint32_t oldest = oldest_live_chunk_seq();
 
-        /* entries_ is oldest-first, so everything evicted is a prefix --
-         * find how much and shift the rest down. */
+        /**
+         * entries_ is oldest-first, so everything evicted is a prefix --
+         * find how much and shift the rest down.
+         */
         uint16_t drop = 0;
         while (drop < entry_count_ && entries_[drop].last_chunk_seq < oldest)
         {
@@ -185,8 +206,11 @@ namespace core
             || header.entry_count > MAX_LOG_ENTRIES)
         {
             backing_.close();
-            return; /* corrupt/foreign -- same self-healing treatment a
-                     * bad chunk header gets: treat as never-written */
+            /**
+             * Corrupt/foreign -- same self-healing treatment a bad chunk
+             * header gets: treat as never-written.
+             */
+            return;
         }
 
         for (uint16_t i = 0; i < header.entry_count; i++)
@@ -194,8 +218,11 @@ namespace core
             LogIndexEntry entry {};
             if (backing_.read(&entry, sizeof(entry)) != sizeof(entry))
             {
-                break; /* truncated (power cut mid-save) -- keep what
-                        * parsed cleanly and drop the rest */
+                /**
+                 * Truncated (power cut mid-save) -- keep what parsed cleanly
+                 * and drop the rest.
+                 */
+                break;
             }
             entries_[entry_count_++] = entry;
         }
@@ -233,8 +260,10 @@ namespace core
     {
         if (entry_count_ == MAX_LOG_ENTRIES)
         {
-            /* Full -- drop the oldest, which is the next one the ring
-             * would have evicted anyway. */
+            /**
+             * Full -- drop the oldest, which is the next one the ring
+             * would have evicted anyway.
+             */
             for (uint16_t i = 1; i < entry_count_; i++)
             {
                 entries_[i - 1] = entries_[i];
@@ -267,10 +296,12 @@ namespace core
     {
         uint64_t capacity = ring_capacity_bytes();
 
-        /* next_chunk_seq_ is also the count of chunks completed before
+        /**
+         * next_chunk_seq_ is also the count of chunks completed before
          * the current one, since seqs run 0,1,2,... without gaps. Once
          * that reaches chunk_count_ every slot has been written at least
-         * once and the ring is full for good. */
+         * once and the ring is full for good.
+         */
         uint64_t completed = next_chunk_seq_;
         if (completed >= chunk_count_)
         {
@@ -283,8 +314,10 @@ namespace core
             used += chunk_bytes_written_;
         }
 
-        /* A chunk rotates at >= chunk_size_bytes_, so the last one can
-         * overshoot slightly; don't report more than the ring holds. */
+        /**
+         * A chunk rotates at >= chunk_size_bytes_, so the last one can
+         * overshoot slightly; don't report more than the ring holds.
+         */
         return used > capacity ? capacity : used;
     }
 
@@ -320,12 +353,14 @@ namespace core
         {
             if (was_enabled_)
             {
-                /* Don't strand whatever was buffered when the user
+                /**
+                 * Don't strand whatever was buffered when the user
                  * switched off. Clearing in_record_set_ makes every
                  * signal start over from a fresh value when logging
                  * resumes, so the gap doesn't get bridged by a stale
                  * pre-pause one. flush() first, so end_capture() records
-                 * the chunk the last records actually landed in. */
+                 * the chunk the last records actually landed in.
+                 */
                 flush();
                 for (uint16_t i = 0; i < SIGNAL_CATALOG_COUNT; i++)
                 {
@@ -339,10 +374,12 @@ namespace core
 
         if (!was_enabled_)
         {
-            /* Switching on opens a new capture -- a new "log" in the
+            /**
+             * Switching on opens a new capture -- a new "log" in the
              * user's sense, independent of session_id (which only counts
              * power cycles). Several captures per boot is the normal
-             * case. */
+             * case.
+             */
             was_enabled_ = true;
             begin_capture(now_ms);
         }
@@ -359,15 +396,20 @@ namespace core
             int idx = signal_catalog_find(ids[i]);
             if (idx < 0 || now_in_set[idx])
             {
-                continue; /* not in this build's catalog, or a repeat --
-                           * two panels showing one signal log it once */
+                /**
+                 * Not in this build's catalog, or a repeat -- two panels
+                 * showing one signal log it once.
+                 */
+                continue;
             }
 
             now_in_set[idx] = true;
 
-            /* Index-keyed: get(id) would re-scan the whole catalog to
+            /**
+             * Index-keyed: get(id) would re-scan the whole catalog to
              * recover the index signal_catalog_find() just produced, and
-             * this runs for every signal on every sample tick. */
+             * this runs for every signal on every sample tick.
+             */
             const SignalValue &v = signals.get_at(idx);
 
             if (!in_record_set_[idx])
@@ -457,9 +499,11 @@ namespace core
             last_flush_ms_ = now_ms;
         }
 
-        /* Extend the open capture to wherever writing has reached.
+        /**
+         * Extend the open capture to wherever writing has reached.
          * Recomputed from its start rather than accumulated, so it can't
-         * drift. */
+         * drift.
+         */
         if (entry_count_ > 0)
         {
             LogIndexEntry &active  = entries_[entry_count_ - 1];
@@ -502,10 +546,12 @@ namespace core
 
         if (chunk_bytes_written_ >= chunk_size_bytes_)
         {
-            /* Advance, but leave the next chunk uncreated until there's
+            /**
+             * Advance, but leave the next chunk uncreated until there's
              * something to put in it -- same reasoning as begin(). A
              * capture that stops right on a chunk boundary shouldn't
-             * evict anything on its way out. */
+             * evict anything on its way out.
+             */
             next_chunk_seq_++;
             current_chunk_index_
                 = static_cast<uint16_t>(next_chunk_seq_ % chunk_count_);
@@ -530,10 +576,12 @@ namespace core
         chunk_bytes_written_ = sizeof(ChunkHeader);
         chunk_open_          = true;
 
-        /* StorageFileMode::Write truncated this slot, so whatever chunk
+        /**
+         * StorageFileMode::Write truncated this slot, so whatever chunk
          * previously occupied it is gone -- along with any capture whose
          * last chunk that was. This is the one and only point at which
-         * data is actually evicted, so it's where pruning belongs. */
+         * data is actually evicted, so it's where pruning belongs.
+         */
         prune_index();
     }
 

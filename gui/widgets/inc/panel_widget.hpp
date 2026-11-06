@@ -46,8 +46,10 @@ namespace gui
              */
             bool is_text = false;
 
-            /** Value's position within its signal's display range, 0..1.
-             * Only meaningful for Bar/Gauge — ignored for Digital. */
+            /**
+             * Value's position within its signal's display range, 0..1.
+             * Only meaningful for Bar/Gauge — ignored for Digital.
+             */
             float range_pct = 0.0f;
     };
 
@@ -69,12 +71,16 @@ namespace gui
              */
             void init(lv_obj_t *parent, const Theme &theme);
 
-            /** Applies a new view-model: text, display mode, warning
-             * highlight. */
+            /**
+             * Applies a new view-model: text, display mode, warning
+             * highlight.
+             */
             void set_view_model(const PanelViewModel &vm);
 
-            /** Shows/hides the panel without destroying it (for reflows where
-             * the active panel count shrinks). */
+            /**
+             * Shows/hides the panel without destroying it (for reflows where
+             * the active panel count shrinks).
+             */
             void set_visible(bool visible);
 
             lv_obj_t *button() const
@@ -83,13 +89,17 @@ namespace gui
             }
 
         private:
-            /** Picks the caption, value and unit fonts and sizes/places
+            /**
+             * Picks the caption, value and unit fonts and sizes/places
              * the graphic, all from the panel's current size. Only on a
-             * change of cell, mode, name or (for words) value. */
+             * change of cell, mode, name or (for words) value.
+             */
             void resize_contents(const PanelViewModel &vm, bool name_changed);
 
-            /** Centers data_ (and unit_ beside it) across the panel at
-             * data_y_. */
+            /**
+             * Centers data_ (and unit_ beside it) across the panel at
+             * data_y_.
+             */
             void place_value();
 
             lv_obj_t    *btn_   = nullptr;
@@ -100,7 +110,8 @@ namespace gui
             lv_obj_t    *label_ = nullptr;
             const Theme *theme_ = nullptr;
 
-            /** The last view-model actually applied, so set_view_model()
+            /**
+             * The last view-model actually applied, so set_view_model()
              * can skip the LVGL work for whatever didn't change. On the
              * refresh path (every panel, several times a second) the
              * usual case is that only value_str moved -- name, unit,
@@ -110,12 +121,15 @@ namespace gui
              * cache invalidation and marks the panel's area dirty for
              * redraw whether or not the value it's setting differs.
              * `applied_valid_` starts false so the first call after
-             * init() always writes everything. */
+             * init() always writes everything.
+             */
             PanelViewModel applied_ {};
             bool           applied_valid_ = false;
 
-            /** data_'s y in the content box, and unit_'s y relative to
-             * it -- worked out with the fonts, kept for place_value(). */
+            /**
+             * data_'s y in the content box, and unit_'s y relative to
+             * it -- worked out with the fonts, kept for place_value().
+             */
             lv_coord_t data_y_  = 0;
             lv_coord_t unit_dy_ = 0;
     };

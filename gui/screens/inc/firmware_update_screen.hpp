@@ -38,22 +38,30 @@ namespace gui
     {
             FirmwareUpdatePhase phase   = FirmwareUpdatePhase::Waiting;
             uint8_t             percent = 0;
-            /** Waiting only: the last upload (or install) failed, so the
-             * phone should send the file again. */
+            /**
+             * Waiting only: the last upload (or install) failed, so the
+             * phone should send the file again.
+             */
             bool upload_failed = false;
-            /** The incoming firmware's version. */
+            /**
+             * The incoming firmware's version.
+             */
             char version[FIRMWARE_VERSION_TEXT_LEN] = "";
     };
 
     class FirmwareUpdateScreen
     {
         public:
-            /** Fired on the popup's Install. The caller commits the
-             * update; this screen then shows Installing. */
+            /**
+             * Fired on the popup's Install. The caller commits the
+             * update; this screen then shows Installing.
+             */
             using InstallCallback = void (*)(void *ctx);
-            /** Fired on the X (while waiting) and on the popup's Cancel.
+            /**
+             * Fired on the X (while waiting) and on the popup's Cancel.
              * The caller leaves update mode and loads whatever screen
-             * comes next. */
+             * comes next.
+             */
             using LeaveCallback = void (*)(void *ctx);
 
             void create(const Theme    &theme,
@@ -62,22 +70,30 @@ namespace gui
                         LeaveCallback   leave_cb,
                         void           *leave_ctx);
 
-            /** Deletes the screen (deferred, so it's safe from the
+            /**
+             * Deletes the screen (deferred, so it's safe from the
              * screen's own X) and closes the Install popup if it's up.
              * Load another screen first if this one is showing. No-op if
-             * not created. */
+             * not created.
+             */
             void destroy();
 
-            /** Loads the screen. Only once created. */
+            /**
+             * Loads the screen. Only once created.
+             */
             void open(const FirmwareUpdateViewModel &vm);
 
-            /** Re-pulls progress and phase without changing screens --
+            /**
+             * Re-pulls progress and phase without changing screens --
              * called periodically while an update is under way. Opens the
              * popup on reaching Ready, and closes it if the phase moves
-             * on without it (a new upload superseding this one). */
+             * on without it (a new upload superseding this one).
+             */
             void refresh(const FirmwareUpdateViewModel &vm);
 
-            /** Null when not created. */
+            /**
+             * Null when not created.
+             */
             lv_obj_t *screen() const
             {
                 return screen_;
@@ -90,8 +106,10 @@ namespace gui
             void set_view_model(const FirmwareUpdateViewModel &vm);
             void close_popup();
 
-            /* Stashed so set_view_model() can style the popup it opens
-             * long after init(). */
+            /**
+             * Stashed so set_view_model() can style the popup it opens
+             * long after init().
+             */
             const Theme *theme_ = nullptr;
 
             lv_obj_t *screen_      = nullptr;
@@ -102,8 +120,10 @@ namespace gui
             lv_obj_t *hint_lbl_    = nullptr;
             lv_coord_t hint_y_progress_ = 0;
             lv_coord_t hint_y_waiting_  = 0;
-            /* Transient: open only while Ready. Parentless (it floats on
-             * LVGL's top layer), so destroy() closes it explicitly. */
+            /**
+             * Transient: open only while Ready. Parentless (it floats on
+             * LVGL's top layer), so destroy() closes it explicitly.
+             */
             lv_obj_t *popup_ = nullptr;
 
             FirmwareUpdatePhase last_phase_   = FirmwareUpdatePhase::Waiting;

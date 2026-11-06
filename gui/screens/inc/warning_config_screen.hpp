@@ -36,18 +36,22 @@ namespace gui
             float lo     = 0.0f;
             float hi     = 0.0f;
 
-            /** Bounds/step for the +/- editor, from the signal's
+            /**
+             * Bounds/step for the +/- editor, from the signal's
              * SignalSpec::display_min/max and core::warning_step() —
              * already converted to whichever unit system `is_metric`
-             * says, same as lo/hi. */
+             * says, same as lo/hi.
+             */
             float   min_value = 0.0f;
             float   max_value = 100.0f;
             float   step      = 1.0f;
             uint8_t decimals  = 0;
 
-            /** Display-only context, shown on screen; round-tripped through
+            /**
+             * Display-only context, shown on screen; round-tripped through
              * Done so apply_warning_change() knows which unit system to
-             * convert lo/hi back from. */
+             * convert lo/hi back from.
+             */
             char name[WARNING_NAME_LEN]             = "";
             char unit_label[WARNING_UNIT_LABEL_LEN] = "";
             bool is_metric                          = true;
@@ -63,8 +67,10 @@ namespace gui
 
             void init(const Theme &theme, DoneCallback done_cb, void *ctx);
 
-            /** Opens the screen for `signal_id`, pre-populated from `vm`;
-             * returns to `return_screen` on Done. */
+            /**
+             * Opens the screen for `signal_id`, pre-populated from `vm`;
+             * returns to `return_screen` on Done.
+             */
             void open(uint16_t                         signal_id,
                       const WarningThresholdViewModel &vm,
                       lv_obj_t                        *return_screen);
@@ -75,11 +81,13 @@ namespace gui
             }
 
         private:
-            /** Shared by all 4 +/- buttons — each one steps its own row's
+            /**
+             * Shared by all 4 +/- buttons — each one steps its own row's
              * value by +/-step, on both a short tap (CLICKED) and every
              * tick of a held long press (LONG_PRESSED_REPEAT). CLICKED
              * still fires after a long press releases, so `stepped_by_hold`
-             * tells that trailing CLICKED not to double-step. */
+             * tells that trailing CLICKED not to double-step.
+             */
             struct StepButtonCtx
             {
                     WarningConfigScreen *screen          = nullptr;
@@ -127,10 +135,12 @@ namespace gui
             float   step_      = 1.0f;
             uint8_t decimals_  = 0;
 
-            /** Carried from the opening WarningThresholdViewModel through
+            /**
+             * Carried from the opening WarningThresholdViewModel through
              * to refresh_value_labels() (unit suffix) and done_cb_handler()
              * (so apply_warning_change() knows which unit system to convert
-             * lo/hi back from). */
+             * lo/hi back from).
+             */
             char unit_label_[WARNING_UNIT_LABEL_LEN] = "";
             bool is_metric_                          = true;
 

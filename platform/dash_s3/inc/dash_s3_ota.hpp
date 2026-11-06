@@ -48,11 +48,13 @@ class DashS3Updater : public esp32::RelayExtension, private RequestHandler
                       uint16_t                  len) override;
 
     private:
-        /* RequestHandler, for POST /update. A handler of its own rather
+        /**
+         * RequestHandler, for POST /update. A handler of its own rather
          * than server.on(): that routes a multipart body to the same
          * callback as a raw one, and server.raw() is null for the
          * former. This one takes raw bodies only -- a multipart post is
-         * parsed and discarded by WebServer, then refused in handle(). */
+         * parsed and discarded by WebServer, then refused in handle().
+         */
         bool canHandle(HTTPMethod method, String uri) override;
         bool canRaw(String uri) override;
         void raw(WebServer &server, String uri, HTTPRaw &raw) override;
@@ -65,25 +67,33 @@ class DashS3Updater : public esp32::RelayExtension, private RequestHandler
 
         void start_upload(size_t content_length);
         void take_bytes(const uint8_t *data, size_t len);
-        /** @returns False (having failed the upload) if the flash write
-         * didn't take. */
+        /**
+         * @returns False (having failed the upload) if the flash write
+         * didn't take.
+         */
         bool write_image(const uint8_t *data, size_t len);
         void end_upload();
         void abort_upload();
-        /** Fails the upload as `result`, unless it already has: drops a
+        /**
+         * Fails the upload as `result`, unless it already has: drops a
          * half-written image, and tells the panel if it was told the
-         * upload began. The rest of the body is then drained unread. */
+         * upload began. The rest of the body is then drained unread.
+         */
         void fail(remote::protocol::OtaResult result);
         void send_result(remote::protocol::OtaResult result);
-        /** Undoes start_upload()'s disableCore0WDT() -- see there. */
+        /**
+         * Undoes start_upload()'s disableCore0WDT() -- see there.
+         */
         void restore_idle_watchdog();
         void commit();
 
         WebServer        *server_ = nullptr;
         esp32::RelayLink *link_   = nullptr;
 
-        /* Update mode, as the phone sees it. Declined sticks until the
-         * phone asks again, so a poll can't miss it. */
+        /**
+         * Update mode, as the phone sees it. Declined sticks until the
+         * phone asks again, so a poll can't miss it.
+         */
         enum class Mode : uint8_t
         {
             Off,
@@ -93,9 +103,11 @@ class DashS3Updater : public esp32::RelayExtension, private RequestHandler
         };
         Mode mode_ = Mode::Off;
 
-        /* The upload in progress. `result_` stays Ok until something
+        /**
+         * The upload in progress. `result_` stays Ok until something
          * fails. `body_seen_` tells handle() a raw body came with this
-         * request, as opposed to a form WebServer parsed itself. */
+         * request, as opposed to a form WebServer parsed itself.
+         */
         bool                        body_seen_         = false;
         bool                        ota_begun_         = false;
         bool                        idle_watchdog_off_ = false;
@@ -109,8 +121,10 @@ class DashS3Updater : public esp32::RelayExtension, private RequestHandler
         size_t                      head_len_ = 0;
         char                        version_[FIRMWARE_VERSION_LEN] = "";
 
-        /* A verified image waiting on CMD_OTA_COMMIT; null when there's
-         * none. Any new upload clears it -- it overwrites the same slot. */
+        /**
+         * A verified image waiting on CMD_OTA_COMMIT; null when there's
+         * none. Any new upload clears it -- it overwrites the same slot.
+         */
         const esp_partition_t *ready_slot_ = nullptr;
         char                   ready_version_[FIRMWARE_VERSION_LEN] = "";
 };

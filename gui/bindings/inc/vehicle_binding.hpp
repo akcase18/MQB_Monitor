@@ -19,16 +19,20 @@
 namespace gui
 {
 
-    /* The core::DisplayMode <-> gui::DisplayMode translation. gui/bindings
+    /**
+     * The core::DisplayMode <-> gui::DisplayMode translation. gui/bindings
      * is the declared core::/gui:: boundary (see the file doc comment), so
      * these live here rather than being re-implemented by each caller --
      * the composition root needs the gui:: direction too, to hand
-     * ConfiguratorScreen the mode a tapped panel is currently in. */
+     * ConfiguratorScreen the mode a tapped panel is currently in.
+     */
     DisplayMode       to_gui_display_mode(core::DisplayMode mode);
     core::DisplayMode to_core_display_mode(DisplayMode mode);
 
-    /* Likewise core::BrightnessMode <-> gui::BrightnessMode, for
-     * SettingsScreen's mode toggle. */
+    /**
+     * Likewise core::BrightnessMode <-> gui::BrightnessMode, for
+     * SettingsScreen's mode toggle.
+     */
     BrightnessMode       to_gui_brightness_mode(core::BrightnessMode mode);
     core::BrightnessMode to_core_brightness_mode(BrightnessMode mode);
 
@@ -44,27 +48,33 @@ namespace gui
              */
             PanelViewModel build_view_model(uint8_t rank) const;
 
-            /** Reassigns rank to a different signal/unit system/display
-             * mode, persisted immediately. */
+            /**
+             * Reassigns rank to a different signal/unit system/display
+             * mode, persisted immediately.
+             */
             void apply_configurator_change(uint8_t          rank,
                                            uint16_t         new_signal_id,
                                            core::UnitSystem units,
                                            DisplayMode      mode);
 
-            /** Reads signal_id's current warning thresholds, for opening
+            /**
+             * Reads signal_id's current warning thresholds, for opening
              * WarningConfigScreen. `is_metric` is the unit system of the
              * panel that's opening the editor — lo/hi/min_value/max_value/
              * step come back already converted to that unit system, since
              * editing e.g. a Fahrenheit-displayed signal's threshold in its
              * native Celsius storage unit would show a confusingly wrong
-             * number. */
+             * number.
+             */
             WarningThresholdViewModel read_warning_thresholds(
                 uint16_t signal_id, bool is_metric) const;
 
-            /** Updates signal_id's warning thresholds, persisted immediately.
+            /**
+             * Updates signal_id's warning thresholds, persisted immediately.
              * `vm.lo`/`vm.hi` are converted from `vm.is_metric`'s unit
              * system back to the signal's native (metric) storage unit
-             * before saving. */
+             * before saving.
+             */
             void apply_warning_change(uint16_t signal_id,
                                       const WarningThresholdViewModel &vm);
 

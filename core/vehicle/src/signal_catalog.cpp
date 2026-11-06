@@ -32,9 +32,11 @@ namespace core
             return raw_values[0];
         }
 
-        /* Generic two-request combiners for compound signals built via the
+        /**
+         * Generic two-request combiners for compound signals built via the
          * monitor tool's Registry "New Compound Signal..." dialog -- no new
-         * C++ needed per combination. */
+         * C++ needed per combination.
+         */
         float transform_sum(const float *raw_values, uint8_t n)
         {
             (void)n;
@@ -116,8 +118,10 @@ namespace core
         return -1;
     }
 
-    /* Off the hot path -- the poller's table rebuild and a few id-keyed
-     * lookups -- so flash, unlike signal_catalog_find(). */
+    /**
+     * Off the hot path -- the poller's table rebuild and a few id-keyed
+     * lookups -- so flash, unlike signal_catalog_find().
+     */
     FLASHMEM int signal_table_find(uint16_t id)
     {
         for (size_t i = 0; i < SIGNAL_TABLE_COUNT; i++)

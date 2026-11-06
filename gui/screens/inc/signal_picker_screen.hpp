@@ -36,8 +36,10 @@ namespace gui
                       DoneCallback             done_cb,
                       void                    *ctx);
 
-            /** Opens the screen, pre-selecting `current_signal_id`; returns
-             * to `return_screen` when closed. */
+            /**
+             * Opens the screen, pre-selecting `current_signal_id`; returns
+             * to `return_screen` when closed.
+             */
             void open(uint16_t current_signal_id, lv_obj_t *return_screen);
 
             lv_obj_t *screen() const

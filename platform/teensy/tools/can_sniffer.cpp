@@ -34,8 +34,10 @@
 
 namespace
 {
-    /* FIFO + a deep software RX ring: the MQB bus is busy and USB drain can
-     * briefly stall, so over-provision to avoid dropping frames. */
+    /**
+     * FIFO + a deep software RX ring: the MQB bus is busy and USB drain can
+     * briefly stall, so over-provision to avoid dropping frames.
+     */
     FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> g_can;
 
     class SnifferPort : public core::slcan::IPort
@@ -52,8 +54,10 @@ namespace
                 return true;
             }
 
-            /* FlexCAN_T4 has no explicit end(); re-begin on next open
-             * re-inits. Marking closed stops us draining/emitting frames. */
+            /**
+             * FlexCAN_T4 has no explicit end(); re-begin on next open
+             * re-inits. Marking closed stops us draining/emitting frames.
+             */
             void close() override
             {
                 open_ = false;
@@ -101,7 +105,9 @@ namespace
             }
             else if (c == '\n' || c == '\0')
             {
-                /* ignore */
+                /**
+                 * ignore
+                 */
             }
             else if (g_cmd_len < sizeof(g_cmd) - 1)
             {
@@ -109,7 +115,9 @@ namespace
             }
             else
             {
-                /* overflow -- reset the line and error */
+                /**
+                 * overflow -- reset the line and error
+                 */
                 g_cmd_len = 0;
                 g_port.write(&core::slcan::BELL, 1);
             }
@@ -124,8 +132,10 @@ namespace
         }
 
         CAN_message_t msg;
-        /* Drain everything queued this iteration so a burst doesn't back up
-         * into an RX overrun. */
+        /**
+         * Drain everything queued this iteration so a burst doesn't back up
+         * into an RX overrun.
+         */
         while (g_can.read(msg))
         {
             SniffFrame frame;

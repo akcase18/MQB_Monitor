@@ -9,14 +9,18 @@ namespace gui
     namespace
     {
         constexpr lv_coord_t HEADER_DIVIDER_Y = 50;
-        /* 3x3 for ACCENT_PRESET_COUNT=9 — smaller than the original 4x2's
-         * swatches since a 3rd row has to fit in the same screen height. */
+        /**
+         * 3x3 for ACCENT_PRESET_COUNT=9 — smaller than the original 4x2's
+         * swatches since a 3rd row has to fit in the same screen height.
+         */
         constexpr lv_coord_t SWATCH_SIZE = 76;
         constexpr lv_coord_t GRID_GAP    = 12;
         constexpr uint8_t    GRID_COLS   = 3;
         constexpr uint8_t    GRID_ROWS   = 3;
-        /* Thicker than the unselected outline so the current pick reads
-         * clearly at a glance against 8 otherwise-identical swatches. */
+        /**
+         * Thicker than the unselected outline so the current pick reads
+         * clearly at a glance against 8 otherwise-identical swatches.
+         */
         constexpr lv_coord_t SELECTED_BORDER_WIDTH = 4;
     } // namespace
 
@@ -42,11 +46,13 @@ namespace gui
             = GRID_COLS * SWATCH_SIZE + (GRID_COLS - 1) * GRID_GAP;
         lv_coord_t start_x = (theme.metrics.screen_width - grid_width) / 2;
 
-        /* Vertically center the grid within whatever height is actually
+        /**
+         * Vertically center the grid within whatever height is actually
          * available below the header divider, rather than a fixed
          * GRID_START_Y tuned only for Landscape's 270px — Portrait's 430px
          * left the grid stranded near the top with a large dead zone
-         * below it. */
+         * below it.
+         */
         lv_coord_t grid_height
             = GRID_ROWS * SWATCH_SIZE + (GRID_ROWS - 1) * GRID_GAP;
         lv_coord_t available_height
@@ -107,11 +113,13 @@ namespace gui
             = static_cast<ThemePickerScreen *>(lv_event_get_user_data(e));
         lv_obj_t *target = static_cast<lv_obj_t *>(lv_event_get_target(e));
 
-        /* Unlike SignalPickerScreen, navigation after a pick is done_cb_'s
+        /**
+         * Unlike SignalPickerScreen, navigation after a pick is done_cb_'s
          * job (matching ConfiguratorScreen's pattern), not this screen's —
          * applying an accent color means rebuilding every other screen
          * against the new color (see main.cpp), which can't safely happen
-         * synchronously from inside this very button's own click handler. */
+         * synchronously from inside this very button's own click handler.
+         */
         for (uint8_t i = 0; i < ACCENT_PRESET_COUNT; i++)
         {
             if (self->swatches_[i] == target)

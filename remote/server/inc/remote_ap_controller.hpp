@@ -39,27 +39,37 @@ namespace remote::server
         public:
             RemoteApController(RemoteConfigLink &link, IClock &clock);
 
-            /** No-op unless state()==Idle. Sends CMD_AP_ENABLE. */
+            /**
+             * No-op unless state()==Idle. Sends CMD_AP_ENABLE.
+             */
             void activate();
 
-            /** No-op unless state()==Active. Sends CMD_AP_DISABLE. */
+            /**
+             * No-op unless state()==Active. Sends CMD_AP_DISABLE.
+             */
             void deactivate();
 
-            /** Feed from RemoteConfigLink::poll()'s EventCallback. */
+            /**
+             * Feed from RemoteConfigLink::poll()'s EventCallback.
+             */
             void on_event(protocol::MsgType type,
                           const uint8_t    *payload,
                           uint16_t          len,
                           uint32_t          now_ms);
 
-            /** Call periodically (e.g. from a core::Scheduler task at
+            /**
+             * Call periodically (e.g. from a core::Scheduler task at
              * AP_IDLE_CHECK_PERIOD_MS) — a no-op unless a timeout above
-             * has actually elapsed. */
+             * has actually elapsed.
+             */
             void tick(uint32_t now_ms);
 
-            /** Restarts the idle timeout -- call whenever the phone does
+            /**
+             * Restarts the idle timeout -- call whenever the phone does
              * something, so a session that is still editing isn't cut off
              * AP_IDLE_TIMEOUT_MS after the AP came up. No-op unless
-             * Active. */
+             * Active.
+             */
             void note_activity(uint32_t now_ms);
 
             ApState state() const
@@ -75,8 +85,10 @@ namespace remote::server
                 return ip_text_;
             }
 
-            /** Phones joined to the AP, per the relay's EVT_AP_STATIONS.
-             * Always 0 unless state()==Active. */
+            /**
+             * Phones joined to the AP, per the relay's EVT_AP_STATIONS.
+             * Always 0 unless state()==Active.
+             */
             uint8_t station_count() const
             {
                 return state_ == ApState::Active ? stations_ : 0;

@@ -18,7 +18,8 @@ namespace core
     {
         public:
             static constexpr uint16_t MAGIC_NUMBER = 0xFEA7;
-            /* v2: added PanelConfig::display_mode. v3: added
+            /**
+             * v2: added PanelConfig::display_mode. v3: added
              * Settings::accent_color. v4: added SignalConfig::
              * use_custom_range/custom_min/custom_max. v5: Config.panels[]
              * (screen-slot-indexed) renamed to Config.priorities[]
@@ -31,7 +32,8 @@ namespace core
              * growing Settings by 4 bytes. v10: added Settings::
              * log_source (in padding) and the log profile after signals[].
              * migrate() carries v6-v9 across; anything older resets to
-             * defaults. */
+             * defaults.
+             */
             static constexpr uint8_t CURRENT_VERSION = 10;
 
             explicit ConfigStore(IConfigStore &backing);
@@ -55,7 +57,9 @@ namespace core
              */
             void load();
 
-            /** Writes the full config back to storage. */
+            /**
+             * Writes the full config back to storage.
+             */
             void save();
 
             /**
@@ -93,7 +97,9 @@ namespace core
 
             IConfigStore &backing_;
             Config        config_ {};
-            /* Storage still holds a newer firmware's config (see load()). */
+            /**
+             * Storage still holds a newer firmware's config (see load()).
+             */
             bool          stored_is_newer_ = false;
     };
 

@@ -13,15 +13,19 @@ namespace
 {
     constexpr const char *UPDATE_URI = "/update";
 
-    /* EVT_OTA_PROGRESS granularity: ~20 reports across a 1.2MB image,
+    /**
+     * EVT_OTA_PROGRESS granularity: ~20 reports across a 1.2MB image,
      * plenty for a progress bar, and each one a frame through the pipe to
-     * the dash rather than a flood of them. */
+     * the dash rather than a flood of them.
+     */
     constexpr uint32_t PROGRESS_STEP_BYTES = 64u * 1024u;
 
     static_assert(protocol::WIRE_VERSION_LEN == FIRMWARE_VERSION_LEN,
                   "EVT_OTA_BEGIN's version field must fit a firmware id's");
 
-    /* What the phone is told, by result. */
+    /**
+     * What the phone is told, by result.
+     */
     struct Reply
     {
             int         code;
@@ -84,8 +88,10 @@ void DashS3Updater::on_frame(MsgType type, const uint8_t *payload, uint16_t len)
 
         case MsgType::CMD_OTA_DISARM:
             mode_ = mode_ == Mode::Pending ? Mode::Declined : Mode::Off;
-            /* Out of update mode, nothing is installable -- even an image
-             * that was waiting on Install. */
+            /**
+             * Out of update mode, nothing is installable -- even an image
+             * that was waiting on Install.
+             */
             ready_slot_ = nullptr;
             break;
 
@@ -100,8 +106,10 @@ void DashS3Updater::on_frame(MsgType type, const uint8_t *payload, uint16_t len)
 
 void DashS3Updater::handle_page()
 {
-    /* no-store for the same reason as the config page (config_web.cpp):
-     * a phone must never keep running an old copy against new firmware. */
+    /**
+     * no-store for the same reason as the config page (config_web.cpp):
+     * a phone must never keep running an old copy against new firmware.
+     */
     server_->sendHeader("Cache-Control", "no-store");
     server_->sendHeader("Content-Encoding", "gzip");
     server_->send_P(200,
@@ -116,9 +124,11 @@ void DashS3Updater::handle_version()
     server_->send(200, "text/plain", platform_firmware_version());
 }
 
-/* Answers at once rather than waiting on the panel: the person might take
+/**
+ * Answers at once rather than waiting on the panel: the person might take
  * half a minute to tap, and this server serves one request at a time. The
- * page polls /api/update/status for the answer. */
+ * page polls /api/update/status for the answer.
+ */
 void DashS3Updater::handle_mode_request()
 {
     if (mode_ != Mode::Armed)
@@ -192,9 +202,11 @@ bool DashS3Updater::handle(WebServer &server, HTTPMethod method, String uri)
         return false;
     }
 
-    /* Only reached once the body has been read in full (an aborted one
+    /**
+     * Only reached once the body has been read in full (an aborted one
      * never gets an answer -- the phone has gone). No raw body at all
-     * means WebServer took it as a form, which the page never sends. */
+     * means WebServer took it as a form, which the page never sends.
+     */
     if (!body_seen_)
     {
         server.send(400, "text/plain", "Send the .bin as the request body.");
@@ -224,16 +236,20 @@ void DashS3Updater::start_upload(size_t content_length)
     reported_  = 0;
     head_len_  = 0;
     version_[0] = '\0';
-    /* Whatever was waiting on a commit is about to be overwritten. */
+    /**
+     * Whatever was waiting on a commit is about to be overwritten.
+     */
     ready_slot_ = nullptr;
 
-    /* WebServer reads a raw body with Stream::readBytes(), which spins
+    /**
+     * WebServer reads a raw body with Stream::readBytes(), which spins
      * without yielding while it waits for data -- for up to the client's
      * 5s timeout if the phone stalls. That would starve core 0's idle
      * task right up against the task watchdog's own 5s and reset the
      * board mid-upload. Its watch is lifted for the upload's duration
      * instead; the Wi-Fi stack's tasks outrank this one and are
-     * unaffected. */
+     * unaffected.
+     */
     if (!idle_watchdog_off_)
     {
         disableCore0WDT();
@@ -294,9 +310,11 @@ void DashS3Updater::take_bytes(const uint8_t *data, size_t len)
                 return;
         }
 
-        /* Sequential writes: each sector is erased as the image reaches
+        /**
+         * Sequential writes: each sector is erased as the image reaches
          * it, rather than the whole 2MB slot up front -- seconds of
-         * blocking erase before the first byte went down. */
+         * blocking erase before the first byte went down.
+         */
         if (esp_ota_begin(slot_, OTA_WITH_SEQUENTIAL_WRITES, &ota_handle_)
             != ESP_OK)
         {
@@ -348,13 +366,17 @@ void DashS3Updater::end_upload()
 {
     if (result_ == OtaResult::Ok && !ota_begun_)
     {
-        /* Over before there was enough of it to identify. */
+        /**
+         * Over before there was enough of it to identify.
+         */
         result_ = OtaResult::ErrNotFirmware;
     }
     else if (result_ == OtaResult::Ok)
     {
-        /* Checks the image's checksum and appended SHA-256 -- a truncated
-         * or corrupted upload stops here. Frees the handle either way. */
+        /**
+         * Checks the image's checksum and appended SHA-256 -- a truncated
+         * or corrupted upload stops here. Frees the handle either way.
+         */
         esp_err_t err = esp_ota_end(ota_handle_);
         ota_begun_    = false;
         if (err == ESP_OK)
@@ -388,8 +410,10 @@ void DashS3Updater::fail(OtaResult result)
     }
     result_ = result;
 
-    /* The panel only hears of uploads that got past identification, so
-     * only those get a result. */
+    /**
+     * The panel only hears of uploads that got past identification, so
+     * only those get a result.
+     */
     if (ota_begun_)
     {
         esp_ota_abort(ota_handle_);
@@ -421,14 +445,18 @@ void DashS3Updater::commit()
 {
     if (ready_slot_ == nullptr || mode_ != Mode::Armed)
     {
-        /* Nothing verified to boot -- the panel's Ready was stale. */
+        /**
+         * Nothing verified to boot -- the panel's Ready was stale.
+         */
         send_result(OtaResult::ErrFlash);
         return;
     }
 
-    /* Re-verifies the whole image before writing otadata. The new image
+    /**
+     * Re-verifies the whole image before writing otadata. The new image
      * then boots on probation (see dash_s3_firmware.cpp), and the
-     * bootloader falls back to this one if it never proves itself. */
+     * bootloader falls back to this one if it never proves itself.
+     */
     esp_err_t err = esp_ota_set_boot_partition(ready_slot_);
     if (err != ESP_OK)
     {

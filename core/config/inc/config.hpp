@@ -35,10 +35,12 @@ namespace core
         Vertical
     };
 
-    /** How a panel presents its assigned signal — kept in core:: (mirrored
+    /**
+     * How a panel presents its assigned signal — kept in core:: (mirrored
      * by gui::DisplayMode, translated at the gui/bindings boundary like
      * UnitSystem/is_metric already are) since this is persisted config,
-     * not a gui:: concept. */
+     * not a gui:: concept.
+     */
     enum class DisplayMode
     {
         Digital,
@@ -92,18 +94,23 @@ namespace core
             uint8_t day_brightness;
             uint8_t night_brightness;
             uint8_t num_panels; /* 1-6, active count within MAX_PANELS */
-            /* v8. Sits in what was padding before orientation, so the
+            /**
+             * v8. Sits in what was padding before orientation, so the
              * layout didn't move -- but that padding was never guaranteed
              * zero, so v8 still needed a version bump and a migrate()
-             * step that sets it. */
+             * step that sets it.
+             */
             BrightnessMode brightness_mode;
             LayoutOrientation orientation;
-            /* Whether core::Logger records anything. Opt-in: logging is
+            /**
+             * Whether core::Logger records anything. Opt-in: logging is
              * a deliberate "capture this drive" action, not something
              * that should burn flash write-cycles on every commute, so
-             * this defaults off and is toggled from SettingsScreen. */
+             * this defaults off and is toggled from SettingsScreen.
+             */
             bool logging_enabled;
-            /* Whether each layout is turned a further 180 degrees -- the
+            /**
+             * Whether each layout is turned a further 180 degrees -- the
              * panel mounted the other way up. One per layout, since
              * which way is down in one says nothing about the other.
              * Picked on OrientationScreen for whichever layout is active,
@@ -111,23 +118,30 @@ namespace core
              * These and the flag below sit in what was padding before
              * accent_color, so a config saved before they existed reads
              * them as false and every other field stays put -- no
-             * version bump needed. */
+             * version bump needed.
+             */
             bool flipped_horizontal;
             bool flipped_vertical;
-            /* One-shot, not a preference: set just before a layout
+            /**
+             * One-shot, not a preference: set just before a layout
              * change restarts the board, so the next boot lands back on
              * OrientationScreen instead of the dashboard, then cleared by
-             * that boot. */
+             * that boot.
+             */
             bool open_orientation_on_boot;
-            /* Packed 0xRRGGBB — one of gui::ACCENT_PRESETS, picked via
+            /**
+             * Packed 0xRRGGBB — one of gui::ACCENT_PRESETS, picked via
              * SettingsScreen's Theme row. Stored as a raw value rather than
              * an lv_color_t so core:: stays LVGL-free; gui/bindings
-             * converts it at the boundary. */
+             * converts it at the boundary.
+             */
             uint32_t accent_color;
-            /* v9. Auto's brightness slider, 0-100: 50 shows the car's
+            /**
+             * v9. Auto's brightness slider, 0-100: 50 shows the car's
              * dimmer level as it is, either end shifts it by up to
              * AutoBrightness::MAX_SHIFT_PCT. After accent_color, so the
-             * v6-v8 Settings is a prefix of this one. */
+             * v6-v8 Settings is a prefix of this one.
+             */
             uint8_t auto_brightness_pct;
             /**
              * v10. Which set the last capture recorded from, so a dash
@@ -138,8 +152,10 @@ namespace core
             LogSource log_source;
     };
 
-    /** A single priority-ranked signal assignment — see the file doc
-     * comment on Config.priorities[] for what the index means. */
+    /**
+     * A single priority-ranked signal assignment — see the file doc
+     * comment on Config.priorities[] for what the index means.
+     */
     struct PrioritizedSignal
     {
             uint16_t    signal_id;
@@ -172,9 +188,11 @@ namespace core
     struct SignalConfig
     {
             WarningThresholds warn;
-            /* Per-vehicle override of SignalSpec::display_min/max — resolve
+            /**
+             * Per-vehicle override of SignalSpec::display_min/max — resolve
              * through core::resolve_display_range() rather than reading
-             * these directly. */
+             * these directly.
+             */
             bool  use_custom_range = false;
             float custom_min       = 0.0f;
             float custom_max       = 0.0f;

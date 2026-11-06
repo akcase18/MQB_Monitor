@@ -26,7 +26,8 @@
 
 namespace
 {
-    /* Teensyduino gives Serial2 a 64-byte RX ring and a 40-byte TX ring
+    /**
+     * Teensyduino gives Serial2 a 64-byte RX ring and a 40-byte TX ring
      * (SERIAL2_RX_BUFFER_SIZE / SERIAL2_TX_BUFFER_SIZE in
      * cores/teensy4/HardwareSerial2.cpp). Both are far too small here.
      *
@@ -47,7 +48,8 @@ namespace
      * draining RX either.
      *
      * Sized to a whole max frame plus framing overhead so neither direction
-     * depends on how long a loop() pass happens to take. */
+     * depends on how long a loop() pass happens to take.
+     */
     constexpr size_t LINK_BUF_SIZE = remote::protocol::FRAME_MAX_PAYLOAD + 64;
 
     /**
@@ -69,18 +71,22 @@ void TeensySerialLink::begin(uint32_t baud)
     Serial2.begin(baud);
     Serial2.setTimeout(0);
 
-    /* After begin() -- it installs the small default rings, so extending
-     * them first would just be overwritten. */
+    /**
+     * After begin() -- it installs the small default rings, so extending
+     * them first would just be overwritten.
+     */
     Serial2.addMemoryForRead(s_rx_buf, sizeof(s_rx_buf));
     Serial2.addMemoryForWrite(s_tx_buf, sizeof(s_tx_buf));
 }
 
 size_t TeensySerialLink::read(uint8_t *buf, size_t len)
 {
-    /* readBytes() blocks up to Serial2's timeout waiting to fill `len` —
+    /**
+     * readBytes() blocks up to Serial2's timeout waiting to fill `len` —
      * bounding the request to what's already buffered keeps this call
      * non-blocking regardless of timeout config, matching ISerialLink's
-     * contract (poll()-driven, called once per loop() iteration). */
+     * contract (poll()-driven, called once per loop() iteration).
+     */
     size_t avail = static_cast<size_t>(Serial2.available());
     size_t n     = avail < len ? avail : len;
     return n > 0 ? static_cast<size_t>(Serial2.readBytes(buf, n)) : 0;

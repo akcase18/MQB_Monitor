@@ -46,8 +46,10 @@ class SimulatorRelay : public ISerialLink
         size_t read(uint8_t *buf, size_t len) override;
         size_t write(const uint8_t *buf, size_t len) override;
 
-        /** A key pressed in the simulator window, lower-cased -- fed by
-         * SimulatorTouch::read(), which owns the SDL event queue. */
+        /**
+         * A key pressed in the simulator window, lower-cased -- fed by
+         * SimulatorTouch::read(), which owns the SDL event queue.
+         */
         void on_key(char key);
 
     private:
@@ -79,7 +81,9 @@ class SimulatorRelay : public ISerialLink
         bool     ready_         = false;
         uint32_t restart_at_    = 0; /* nonzero: Install was tapped */
 
-        /* The fake config page. */
+        /**
+         * The fake config page.
+         */
         bool                 page_open_       = false;
         bool                 awaiting_state_  = false;
         std::vector<uint8_t> preview_;        /* the last REQ_PREVIEW_CONFIG */

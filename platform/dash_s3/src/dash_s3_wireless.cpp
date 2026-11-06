@@ -29,23 +29,29 @@
 
 namespace
 {
-    /* One max-size frame each way, doubled: RESP_STATE (dash -> relay)
+    /**
+     * One max-size frame each way, doubled: RESP_STATE (dash -> relay)
      * is the largest thing on the link (~2.8KB at 51 signals), and only one request
-     * is ever outstanding, so nothing ever queues behind a full frame. */
+     * is ever outstanding, so nothing ever queues behind a full frame.
+     */
     constexpr size_t PIPE_BYTES
         = 2 * (remote::protocol::FRAME_MAX_PAYLOAD + 8);
 
-    /* A write blocks this long for space before giving up short. In
+    /**
+     * A write blocks this long for space before giving up short. In
      * practice the other side drains every millisecond and the buffer
      * holds two whole frames, so this only matters if the relay task
      * has died; remote::server's write_frame ignores short writes, and
-     * the FrameReader on the far side resyncs on the next FRAME_SYNC. */
+     * the FrameReader on the far side resyncs on the next FRAME_SYNC.
+     */
     constexpr TickType_t WRITE_TIMEOUT = pdMS_TO_TICKS(250);
 
-    /* The C3 runs the same code on an 8KB loopTask; a little more here
+    /**
+     * The C3 runs the same code on an 8KB loopTask; a little more here
      * because the S3 core's WebServer/String paths are the same and there
      * is RAM to spare. Priority 1 matches loopTask; core 0 is where
-     * Wi-Fi already lives. */
+     * Wi-Fi already lives.
+     */
     constexpr uint32_t    RELAY_TASK_STACK = 10240;
     constexpr UBaseType_t RELAY_TASK_PRIO  = 1;
     constexpr BaseType_t  RELAY_TASK_CORE  = 0;
@@ -53,16 +59,22 @@ namespace
     StreamBufferHandle_t s_to_relay = nullptr;
     StreamBufferHandle_t s_to_dash  = nullptr;
 
-    /* When the relay task last came round, once it's past begin(); 0
-     * until then. Written by that task alone. */
+    /**
+     * When the relay task last came round, once it's past begin(); 0
+     * until then. Written by that task alone.
+     */
     volatile uint32_t s_relay_alive_ms = 0;
-    /* Far longer than one pass (a millisecond, or a blocking config
-     * request's few hundred), far shorter than anyone waits for Keep. */
+    /**
+     * Far longer than one pass (a millisecond, or a blocking config
+     * request's few hundred), far shorter than anyone waits for Keep.
+     */
     constexpr uint32_t RELAY_STALL_MS = 2000;
 
-    /* The relay's end of the pipe, in the shape RelayLink wants. peek()
+    /**
+     * The relay's end of the pipe, in the shape RelayLink wants. peek()
      * is implemented for Stream's contract though RelayLink never calls
-     * it. */
+     * it.
+     */
     class PipeStream : public Stream
     {
         public:
@@ -114,8 +126,10 @@ namespace
     void relay_task(void *)
     {
         static PipeStream      pipe;
-        /* The C3 relay plus the dash's firmware updater (dash_s3_ota.hpp),
-         * which the C3 never had. */
+        /**
+         * The C3 relay plus the dash's firmware updater (dash_s3_ota.hpp),
+         * which the C3 never had.
+         */
         static DashS3Updater   updater;
         static esp32::RelayApp app(pipe, &updater);
         app.begin();
@@ -143,8 +157,10 @@ void DashS3Wireless::begin(uint32_t baud)
         return;
     }
 
-    /* Trigger level 1: a reader blocked on the buffer wakes on the first
-     * byte. Neither side blocks on read today, but it costs nothing. */
+    /**
+     * Trigger level 1: a reader blocked on the buffer wakes on the first
+     * byte. Neither side blocks on read today, but it costs nothing.
+     */
     s_to_relay = xStreamBufferCreate(PIPE_BYTES, 1);
     s_to_dash  = xStreamBufferCreate(PIPE_BYTES, 1);
     if (s_to_relay == nullptr || s_to_dash == nullptr)

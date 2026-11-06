@@ -19,17 +19,21 @@ class DashS3Wireless : public ISerialLink
     public:
         static DashS3Wireless &instance();
 
-        /** Creates the pipe and starts the relay task. `baud` is
-         * meaningless here and ignored. */
+        /**
+         * Creates the pipe and starts the relay task. `baud` is
+         * meaningless here and ignored.
+         */
         void   begin(uint32_t baud) override;
         size_t read(uint8_t *buf, size_t len) override;
         size_t write(const uint8_t *buf, size_t len) override;
 
-        /** Whether the relay task has got through start-up -- Wi-Fi
+        /**
+         * Whether the relay task has got through start-up -- Wi-Fi
          * initialised, the config and update pages registered -- and is
          * still coming round. A new firmware isn't kept without it
          * (platform_update_path_ready()): the next update arrives through
-         * it. */
+         * it.
+         */
         bool relay_running() const;
 
     private:

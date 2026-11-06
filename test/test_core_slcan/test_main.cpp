@@ -103,7 +103,9 @@ namespace
         char   out[ENCODED_MAX];
         size_t n = encode(f, true, out);
 
-        /* 'T' + 8 id + dlc + 16 data + 4 ts + CR */
+        /**
+         * 'T' + 8 id + dlc + 16 data + 4 ts + CR
+         */
         TEST_ASSERT_EQUAL(31, n);
         TEST_ASSERT_TRUE(n <= ENCODED_MAX);
         TEST_ASSERT_EQUAL_MEMORY("T1FFFFFFF8", out, 10);
@@ -205,8 +207,10 @@ namespace
         TEST_ASSERT_EQUAL_HEX8(0xAB, port.last_tx.data[0]);
     }
 
-    /* Acked but never put on the bus -- python-can's keep-alives must not
-     * fault a silent tap. Same when the channel isn't open at all. */
+    /**
+     * Acked but never put on the bus -- python-can's keep-alives must not
+     * fault a silent tap. Same when the channel isn't open at all.
+     */
     void test_transmit_swallowed_when_listen_only_or_closed()
     {
         FakePort port;
@@ -274,8 +278,10 @@ namespace
         TEST_ASSERT_FALSE(session.is_open());
         TEST_ASSERT_FALSE(session.timestamps());
 
-        /* Back at the 500k default, and a reset while closed doesn't
-         * close again. */
+        /**
+         * Back at the 500k default, and a reset while closed doesn't
+         * close again.
+         */
         session.reset();
         TEST_ASSERT_EQUAL(1, port.closes);
         send(session, "L");

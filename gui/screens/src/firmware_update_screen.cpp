@@ -12,25 +12,31 @@ namespace gui
     {
         constexpr lv_coord_t HEADER_DIVIDER_Y = 50;
 
-        /* Status line, bar, percent and hint, stacked and centred as one
+        /**
+         * Status line, bar, percent and hint, stacked and centred as one
          * block in the space under the nav bar -- the same centring the
          * Wi-Fi screen's spinner block uses, so it sits right in either
-         * orientation. */
+         * orientation.
+         */
         constexpr lv_coord_t BAR_HEIGHT         = 14;
         constexpr lv_coord_t BAR_SIDE_MARGIN    = 40;
         constexpr lv_coord_t STATUS_SIDE_MARGIN = 16;
         constexpr lv_coord_t STATUS_TO_BAR      = 40;
         constexpr lv_coord_t BAR_TO_PERCENT     = 26;
         constexpr lv_coord_t PERCENT_TO_HINT    = 40;
-        /* No bar while waiting, so the hint closes up under the status
-         * line rather than leaving the bar's gap between them. */
+        /**
+         * No bar while waiting, so the hint closes up under the status
+         * line rather than leaving the bar's gap between them.
+         */
         constexpr lv_coord_t STATUS_TO_HINT_WAITING = 36;
         constexpr lv_coord_t BLOCK_HEIGHT
             = STATUS_TO_BAR + BAR_TO_PERCENT + PERCENT_TO_HINT + 24;
 
-        /* Matches PanelWidget's bar track. A hex value rather than an
+        /**
+         * Matches PanelWidget's bar track. A hex value rather than an
          * lv_color_t global, whose dynamic initializer would land in
-         * ITCM on the Teensy. */
+         * ITCM on the Teensy.
+         */
         constexpr uint32_t TRACK_COLOR = 0x404040;
     } // namespace
 
@@ -65,9 +71,11 @@ namespace gui
         lv_coord_t body_height = theme.metrics.screen_height - HEADER_DIVIDER_Y;
         lv_coord_t top = HEADER_DIVIDER_Y + (body_height - BLOCK_HEIGHT) / 2;
 
-        /* One line, cut short with an ellipsis: a full 31-character
+        /**
+         * One line, cut short with an ellipsis: a full 31-character
          * version runs past Portrait's 320px, and wrapped it would run
-         * into the bar. DOTS only truncates at a fixed height. */
+         * into the bar. DOTS only truncates at a fixed height.
+         */
         status_lbl_ = lv_label_create(screen_);
         lv_obj_set_style_text_color(status_lbl_, theme.palette.fg, 0);
         lv_obj_set_style_text_font(status_lbl_, theme.typography.label_lg, 0);
@@ -97,7 +105,9 @@ namespace gui
                      0,
                      top + STATUS_TO_BAR + BAR_TO_PERCENT);
 
-        /* Placed per phase -- see set_view_model(). */
+        /**
+         * Placed per phase -- see set_view_model().
+         */
         hint_lbl_ = lv_label_create(screen_);
         lv_obj_set_style_text_color(hint_lbl_, theme.palette.panel_border, 0);
         lv_obj_set_style_text_font(hint_lbl_, theme.typography.label_lg, 0);
@@ -125,8 +135,10 @@ namespace gui
 
     FLASHMEM void FirmwareUpdateScreen::open(const FirmwareUpdateViewModel &vm)
     {
-        /* Force a full repaint of the labels, whatever the last update
-         * left behind. */
+        /**
+         * Force a full repaint of the labels, whatever the last update
+         * left behind.
+         */
         last_phase_   = static_cast<FirmwareUpdatePhase>(0xFF);
         last_percent_ = 0xFF;
         set_view_model(vm);
@@ -198,7 +210,9 @@ namespace gui
             const char *hint = "Keep the dash powered on.";
             if (vm.phase == FirmwareUpdatePhase::Waiting)
             {
-                /* Short enough for Portrait's 320px. */
+                /**
+                 * Short enough for Portrait's 320px.
+                 */
                 hint = vm.upload_failed ? "Failed. Try upload again."
                                         : "Upload new firmware file.";
             }
@@ -238,7 +252,9 @@ namespace gui
         }
     }
 
-    /* The X and the popup's Cancel alike. */
+    /**
+     * The X and the popup's Cancel alike.
+     */
     FLASHMEM void FirmwareUpdateScreen::leave_clicked_cb(lv_event_t *e)
     {
         auto *self

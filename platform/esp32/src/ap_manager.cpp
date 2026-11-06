@@ -7,11 +7,13 @@ namespace esp32
 {
     namespace
     {
-        /* How long a joined phone can go silent before the AP drops it
+        /**
+         * How long a joined phone can go silent before the AP drops it
          * (ESP-IDF's default is 300 s, its minimum 10). A phone that
          * walks out of range only leaves the station count this way, and
          * the panel goes back to the QR code when the last one does. A
-         * phone in range, even locked, sends well inside this. */
+         * phone in range, even locked, sends well inside this.
+         */
         constexpr uint16_t STATION_INACTIVE_S = 30;
     } // namespace
 
@@ -19,9 +21,11 @@ namespace esp32
     {
         WiFi.mode(WIFI_AP);
 
-        /* An empty password means "open AP" (see RemoteApController's file
+        /**
+         * An empty password means "open AP" (see RemoteApController's file
          * doc comment on the Teensy side) — pass nullptr explicitly rather
-         * than relying on WiFi.softAP()'s empty-string handling. */
+         * than relying on WiFi.softAP()'s empty-string handling.
+         */
         bool has_password = password != nullptr && password[0] != '\0';
         WiFi.softAP(ssid, has_password ? password : nullptr);
         esp_wifi_set_inactive_time(WIFI_IF_AP, STATION_INACTIVE_S);

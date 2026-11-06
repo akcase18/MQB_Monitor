@@ -39,12 +39,16 @@ namespace core
 
         constexpr uint32_t DEFAULT_BAUD = 500000; /* MQB powertrain CAN */
 
-        /** Longest encoded frame: 'T' + 8 id + 1 dlc + 16 data + 4
-         * timestamp + CR = 31. */
+        /**
+         * Longest encoded frame: 'T' + 8 id + 1 dlc + 16 data + 4
+         * timestamp + CR = 31.
+         */
         constexpr size_t ENCODED_MAX = 32;
 
-        /** Longest host command line, excluding its CR: a 'T' transmit
-         * is 26. */
+        /**
+         * Longest host command line, excluding its CR: a 'T' transmit
+         * is 26.
+         */
         constexpr size_t COMMAND_MAX = 39;
 
         /**
@@ -56,22 +60,30 @@ namespace core
          */
         size_t encode(const SniffFrame &frame, bool timestamps, char *out);
 
-        /** Maps an Sn bitrate index to bits/sec; 0 if unsupported. */
+        /**
+         * Maps an Sn bitrate index to bits/sec; 0 if unsupported.
+         */
         uint32_t baud_for_index(char idx);
 
-        /** What Session drives. Implemented by whoever owns the bus and
-         * the serial port. */
+        /**
+         * What Session drives. Implemented by whoever owns the bus and
+         * the serial port.
+         */
         class IPort
         {
             public:
                 virtual ~IPort() = default;
 
-                /** @returns False if the bus couldn't be opened. */
+                /**
+                 * @returns False if the bus couldn't be opened.
+                 */
                 virtual bool open(uint32_t baud, bool listen_only) = 0;
                 virtual void close()                               = 0;
 
-                /** Only called while open in normal (not listen-only)
-                 * mode. */
+                /**
+                 * Only called while open in normal (not listen-only)
+                 * mode.
+                 */
                 virtual void transmit(const SniffFrame &frame) = 0;
 
                 virtual void write(const char *data, size_t len) = 0;
@@ -82,11 +94,15 @@ namespace core
             public:
                 explicit Session(IPort &port);
 
-                /** One host command line, without its terminating CR. */
+                /**
+                 * One host command line, without its terminating CR.
+                 */
                 void handle(const char *line, size_t len);
 
-                /** Closes the channel (via the port) if open, and returns
-                 * baud/timestamps to their defaults. */
+                /**
+                 * Closes the channel (via the port) if open, and returns
+                 * baud/timestamps to their defaults.
+                 */
                 void reset();
 
                 bool is_open() const

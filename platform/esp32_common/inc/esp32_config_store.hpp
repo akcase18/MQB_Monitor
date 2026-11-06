@@ -39,10 +39,12 @@ class Esp32ConfigStore : public IConfigStore
 
         static Esp32ConfigStore &instance();
 
-        /** Opens the NVS-backed region. Called lazily by read()/write(),
+        /**
+         * Opens the NVS-backed region. Called lazily by read()/write(),
          * so nothing above platform/ has to know this board needs it.
          * Reads and writes fail safely rather than crashing if it has not
-         * succeeded. */
+         * succeeded.
+         */
         bool begin();
 
         bool   read(uint32_t offset, void *buf, size_t len) override;

@@ -39,10 +39,12 @@ static_assert(offsetof(DashS3FirmwareId, layout_tag)
                   == 16 + 16 + FIRMWARE_VERSION_LEN,
               "the layout fields moved -- the update page reads them too");
 
-/* The log ring has to fit the LittleFS partition with room for the
+/**
+ * The log ring has to fit the LittleFS partition with room for the
  * filesystem's own blocks; nothing at run time checks (core::Logger
  * never asks IStorage its capacity). Shrink LOG_CHUNK_COUNT in
- * platformio.ini, or grow the partition, which then needs a USB flash. */
+ * platformio.ini, or grow the partition, which then needs a USB flash.
+ */
 static_assert(static_cast<uint64_t>(LOG_CHUNK_COUNT) * core::CHUNK_SIZE_BYTES
                       + 512u * 1024u
                   <= FW_FS_PARTITION_BYTES,
@@ -51,9 +53,11 @@ static_assert(static_cast<uint64_t>(LOG_CHUNK_COUNT) * core::CHUNK_SIZE_BYTES
 
 namespace
 {
-    /* Right behind esp_app_desc_t -- see the header. Referenced by
+    /**
+     * Right behind esp_app_desc_t -- see the header. Referenced by
      * dash_s3_firmware_id(), which is what keeps --gc-sections from
-     * dropping it (the linker script doesn't KEEP this section). */
+     * dropping it (the linker script doesn't KEEP this section).
+     */
     __attribute__((section(".rodata_custom_desc"), used))
     const DashS3FirmwareId s_firmware_id = {
         "MQB-DASH-S3",
@@ -63,27 +67,33 @@ namespace
         FW_PARTITION_LAYOUT,
     };
 
-    /* The install note: which slot was meant to boot, with what. Its own
-     * namespace, clear of the EEPROM emulation's (Esp32ConfigStore). */
+    /**
+     * The install note: which slot was meant to boot, with what. Its own
+     * namespace, clear of the EEPROM emulation's (Esp32ConfigStore).
+     */
     constexpr const char *NVS_NAMESPACE = "ota";
     constexpr const char *NVS_SLOT      = "slot";
     constexpr const char *NVS_VERSION   = "ver";
 
     bool s_loop_watchdog = false;
 
-    /** Two of DashS3FirmwareId's fixed-width text fields hold the same
-     * string. */
+    /**
+     * Two of DashS3FirmwareId's fixed-width text fields hold the same
+     * string.
+     */
     bool same_text(const char *a, const char *b, size_t len)
     {
         return strncmp(a, b, len) == 0;
     }
 } // namespace
 
-/* Overrides the Arduino core's weak default (esp32-hal-misc.c), which
+/**
+ * Overrides the Arduino core's weak default (esp32-hal-misc.c), which
  * returns false and so has initArduino() mark every image valid before
  * setup() even runs -- leaving rollback nothing to roll back from. With
  * this, a new image stays on probation until platform_firmware_healthy().
- * C linkage, to match the C definition it replaces. */
+ * C linkage, to match the C definition it replaces.
+ */
 extern "C" bool verifyRollbackLater()
 {
     return true;
@@ -181,13 +191,17 @@ void platform_firmware_healthy()
     }
     done = true;
 
-    /* A no-op unless this image is the one on probation. */
+    /**
+     * A no-op unless this image is the one on probation.
+     */
     esp_ota_mark_app_valid_cancel_rollback();
 
-    /* The update took, so the note has served its purpose. Cleared here,
+    /**
+     * The update took, so the note has served its purpose. Cleared here,
      * not when it's first read at boot: an image that crashes after
      * reading it would otherwise take the old firmware's only clue to
-     * the rollback down with it. */
+     * the rollback down with it.
+     */
     const esp_partition_t *running = esp_ota_get_running_partition();
     nvs_handle_t           nvs;
     uint32_t               slot = 0;
@@ -229,8 +243,10 @@ bool platform_take_failed_update(char *version, size_t cap)
     const esp_partition_t *running = esp_ota_get_running_partition();
     if (running != nullptr && running->address == slot)
     {
-        /* Up on the new image, which is still proving itself --
-         * platform_firmware_healthy() clears the note once it has. */
+        /**
+         * Up on the new image, which is still proving itself --
+         * platform_firmware_healthy() clears the note once it has.
+         */
         nvs_close(nvs);
         return false;
     }
@@ -251,10 +267,12 @@ bool platform_take_failed_update(char *version, size_t cap)
 
 void platform_hang_watchdog(bool enabled)
 {
-    /* The Arduino core's loop watchdog: loopTask joins the task watchdog
+    /**
+     * The Arduino core's loop watchdog: loopTask joins the task watchdog
      * (5s, and it panics -- i.e. resets -- per the SDK's sdkconfig) and
      * feeds it on every pass through loop(). Tracked here because
-     * enabling it twice logs an error. */
+     * enabling it twice logs an error.
+     */
     if (enabled == s_loop_watchdog)
     {
         return;

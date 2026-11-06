@@ -17,22 +17,25 @@
 
 namespace
 {
-    /* Deeper than the driver's default of 5 in both directions.
+    /**
+     * Deeper than the driver's default of 5 in both directions.
      *
      * RX: receive() is called from loop() alongside lv_timer_handler(), so
      * the queue has to hold whatever arrives during a full LVGL repaint
      * (tens of milliseconds). With the hardware filter narrowing that to
      * frames on rx_id it is only ever a UDS response and its 0x78
-     * "response pending" predecessors, so 32 is generous.
+     * "response pending" predecessors.
      *
-     * TX: core::SignalPoller keeps one request outstanding at a time. 8
-     * is headroom, not a requirement. */
+     * TX: core::SignalPoller keeps one request outstanding at a time.
+     */
     constexpr uint32_t RX_QUEUE_LEN = 32;
     constexpr uint32_t TX_QUEUE_LEN = 8;
 
-    /* Both payload arrays are 8 bytes (CanFrame::data, twai_message_t::data),
+    /**
+     * Both payload arrays are 8 bytes (CanFrame::data, twai_message_t::data),
      * so this only ever clamps a frame claiming a length longer than a
-     * classic CAN frame can hold. */
+     * classic CAN frame can hold.
+     */
     uint8_t clamped_len(uint8_t len)
     {
         return len > 8 ? 8 : len;
@@ -59,14 +62,15 @@ namespace
         }
     }
 
-    /* Bus-off happens immediately on a bench with no transceiver (every
+    /**
+     * Bus-off happens immediately on a bench with no transceiver (every
      * transmit errors out) and can happen on the car with a bad splice.
      * The driver won't recover on its own: once the controller is
      * bus-off, twai_initiate_recovery() has to be called, and after the
      * recovery completes the driver drops back to the stopped state and
-     * needs twai_start() again. Doing that from receive() -- the one call
-     * that runs every loop pass -- means the bus heals itself once the
-     * wiring is fixed, without a reboot. */
+     * needs twai_start() again. Doing that from receive() means the bus heals
+     * itself once the wiring is fixed without a reboot.
+     */
     void service_bus_state()
     {
         twai_status_info_t status;
@@ -109,32 +113,20 @@ bool DashS3CanBus::begin(uint32_t rx_id_lo, uint32_t rx_id_hi, uint32_t baud)
 
     twai_general_config_t g_cfg = {};
     g_cfg.mode                  = TWAI_MODE_NORMAL;
-    g_cfg.tx_io         = static_cast<gpio_num_t>(DASH_S3_PIN_CAN_TX);
-    g_cfg.rx_io         = static_cast<gpio_num_t>(DASH_S3_PIN_CAN_RX);
-    g_cfg.clkout_io     = TWAI_IO_UNUSED;
-    g_cfg.bus_off_io    = TWAI_IO_UNUSED;
-    g_cfg.tx_queue_len  = TX_QUEUE_LEN;
-    g_cfg.rx_queue_len  = RX_QUEUE_LEN;
-    g_cfg.alerts_enabled = TWAI_ALERT_NONE;
-    g_cfg.clkout_divider = 0;
-    g_cfg.intr_flags     = ESP_INTR_FLAG_LEVEL1;
+    g_cfg.tx_io                 = static_cast<gpio_num_t>(DASH_S3_PIN_CAN_TX);
+    g_cfg.rx_io                 = static_cast<gpio_num_t>(DASH_S3_PIN_CAN_RX);
+    g_cfg.clkout_io             = TWAI_IO_UNUSED;
+    g_cfg.bus_off_io            = TWAI_IO_UNUSED;
+    g_cfg.tx_queue_len          = TX_QUEUE_LEN;
+    g_cfg.rx_queue_len          = RX_QUEUE_LEN;
+    g_cfg.alerts_enabled        = TWAI_ALERT_NONE;
+    g_cfg.clkout_divider        = 0;
+    g_cfg.intr_flags            = ESP_INTR_FLAG_LEVEL1;
 
-    /* Hardware-filter to the response ID, as the Teensy does with its
-     * four mailboxes. core/can filters too, but a 500kbit vehicle bus
-     * carries thousands of frames a second and the RX queue only has to
-     * survive one loop pass if it isn't being filled with all of them.
-     *
-     * Single-filter mode on a standard (11-bit) frame compares the
-     * acceptance code against the ID in the top 11 bits of the 32-bit
-     * word, so the ID shifts up by 21 and everything below it (RTR, the
-     * first two data bytes) is masked off as don't-care. Extended IDs
-     * would shift by 3 instead; this board only ever talks 11-bit OBD
-     * IDs.
-     *
-     * One code/mask pair can't express a range, so every ID bit that
-     * differs anywhere between rx_id_lo and rx_id_hi is don't-care too:
-     * 0x77D..0x7E8 passes all of 0x700..0x7FF, still only diagnostic
-     * traffic. */
+    /**
+     * First-pass hardware filter to ignore most of the extra CAN IDs. Can't
+     * catch all of them, but the rest are filtered in core/can.
+     */
     uint32_t span = 0;
     for (uint32_t diff = rx_id_lo ^ rx_id_hi; diff != 0; diff >>= 1)
     {
@@ -178,7 +170,9 @@ bool DashS3CanBus::send(const CanFrame &frame)
     msg.data_length_code = clamped_len(frame.len);
     memcpy(msg.data, frame.data, msg.data_length_code);
 
-    /* Zero ticks: non-blocking, fails if the TX queue is full. */
+    /**
+     * Zero ticks: non-blocking, fails if the TX queue is full.
+     */
     return twai_transmit(&msg, 0) == ESP_OK;
 }
 
@@ -198,8 +192,9 @@ bool DashS3CanBus::receive(CanFrame &out)
     }
     if (msg.rtr)
     {
-        /* No payload to hand up; the Teensy path never saw these either
-         * since its mailboxes were data-frame filtered. */
+        /**
+         * RTR messages are not supported
+         */
         return false;
     }
 
