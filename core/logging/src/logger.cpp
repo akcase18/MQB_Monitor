@@ -110,7 +110,7 @@ namespace core
         was_enabled_  = false;
         for (uint16_t i = 0; i < SIGNAL_CATALOG_COUNT; i++)
         {
-            in_display_set_[i] = false;
+            in_record_set_[i] = false;
         }
 
         if (!backing_.format())
@@ -299,7 +299,9 @@ namespace core
     }
 
     void Logger::sample(const SignalStore &signals,
-                        const Config      &config,
+                        bool               enabled,
+                        const uint16_t    *ids,
+                        uint8_t            count,
                         uint32_t           now_ms)
     {
         if (!ready_)
@@ -307,25 +309,27 @@ namespace core
             return;
         }
 
-        /* Logging is opt-in (see Settings::logging_enabled). Read live
-         * from config for the same reason the displayed set is -- the
-         * toggle takes effect on the next tick with nothing to keep in
-         * sync -- and checked before anything else so the cost while off
-         * is one bool test per tick. */
-        if (!config.settings.logging_enabled)
+        /**
+         * Logging is opt-in (see Settings::logging_enabled). Passed in
+         * every tick for the same reason the set is -- the toggle takes
+         * effect on the next tick with nothing to keep in sync -- and
+         * checked before anything else so the cost while off is one bool
+         * test per tick.
+         */
+        if (!enabled)
         {
             if (was_enabled_)
             {
                 /* Don't strand whatever was buffered when the user
-                 * switched off. Clearing in_display_set_ makes every
-                 * signal re-prime when logging resumes, so the gap
-                 * doesn't get bridged by a stale pre-pause value.
-                 * flush() first, so end_capture() records the chunk the
-                 * last records actually landed in. */
+                 * switched off. Clearing in_record_set_ makes every
+                 * signal start over from a fresh value when logging
+                 * resumes, so the gap doesn't get bridged by a stale
+                 * pre-pause one. flush() first, so end_capture() records
+                 * the chunk the last records actually landed in. */
                 flush();
                 for (uint16_t i = 0; i < SIGNAL_CATALOG_COUNT; i++)
                 {
-                    in_display_set_[i] = false;
+                    in_record_set_[i] = false;
                 }
                 was_enabled_ = false;
                 end_capture(now_ms);
@@ -343,43 +347,39 @@ namespace core
             begin_capture(now_ms);
         }
 
-        uint8_t panels = config.settings.num_panels;
-        if (panels > MAX_PANELS)
+        if (ids == nullptr)
         {
-            panels = MAX_PANELS; /* defensive -- a corrupt config
-                                  * shouldn't run off the end of
-                                  * priorities[] */
+            count = 0;
         }
 
-        bool now_displayed[SIGNAL_CATALOG_COUNT] = {};
+        bool now_in_set[SIGNAL_CATALOG_COUNT] = {};
 
-        for (uint8_t p = 0; p < panels; p++)
+        for (uint8_t i = 0; i < count; i++)
         {
-            int idx = signal_catalog_find(config.priorities[p].signal_id);
-            if (idx < 0)
+            int idx = signal_catalog_find(ids[i]);
+            if (idx < 0 || now_in_set[idx])
             {
-                continue; /* id not in this build's catalog */
+                continue; /* not in this build's catalog, or a repeat --
+                           * two panels showing one signal log it once */
             }
 
-            now_displayed[idx] = true;
+            now_in_set[idx] = true;
 
             /* Index-keyed: get(id) would re-scan the whole catalog to
              * recover the index signal_catalog_find() just produced, and
-             * this runs for every panel on every sample tick. */
+             * this runs for every signal on every sample tick. */
             const SignalValue &v = signals.get_at(idx);
 
-            if (!in_display_set_[idx])
+            if (!in_record_set_[idx])
             {
-                /* Just came on screen -- take whatever it already holds
-                 * as the baseline to compare against, without writing it.
-                 * That value may be arbitrarily stale (every catalog
-                 * signal is polled whether or not it's displayed), and
-                 * stale data has no business in the log. */
-                if (v.has_data)
-                {
-                    last_seen_ms_[idx] = v.last_update_ms;
-                    last_value_[idx]   = v.value;
-                }
+                /**
+                 * Just entered. Whatever the store holds now was there
+                 * before anything asked for it -- see sample()'s doc
+                 * comment -- so only note when, and wait for a fresher
+                 * value.
+                 */
+                entered_ms_[idx]     = now_ms;
+                awaiting_first_[idx] = true;
                 continue;
             }
 
@@ -388,34 +388,53 @@ namespace core
                 continue;
             }
 
-            /* Rate floor. Also subsumes "hasn't been polled since we last
-             * looked" (elapsed == 0), so no separate freshness check is
-             * needed. Unsigned subtraction, so millis() wraparound is
-             * handled without a special case. */
-            if ((v.last_update_ms - last_seen_ms_[idx]) < LOG_MIN_INTERVAL_MS)
+            if (awaiting_first_[idx])
             {
-                continue;
+                /**
+                 * Signed, so millis() wraparound is handled. Equal counts
+                 * as stale: an update stamped the same millisecond as
+                 * entry may well have landed before it.
+                 */
+                if (static_cast<int32_t>(v.last_update_ms - entered_ms_[idx])
+                    <= 0)
+                {
+                    continue;
+                }
+                awaiting_first_[idx] = false;
+            }
+            else
+            {
+                /**
+                 * Rate floor. Also subsumes "hasn't been polled since we
+                 * last looked" (elapsed == 0), so no separate freshness
+                 * check is needed. Unsigned subtraction, so millis()
+                 * wraparound is handled without a special case.
+                 */
+                if ((v.last_update_ms - last_seen_ms_[idx])
+                    < LOG_MIN_INTERVAL_MS)
+                {
+                    continue;
+                }
+
+                /**
+                 * The actual on-change test -- last_update_ms advances on
+                 * every poll response regardless of whether the value
+                 * moved, so only the value itself can tell a real change
+                 * from a repeat.
+                 */
+                if (v.value == last_value_[idx])
+                {
+                    continue;
+                }
             }
 
-            /* The actual on-change test -- last_update_ms advances on
-             * every poll response regardless of whether the value moved,
-             * so only the value itself can tell a real change from a
-             * repeat. */
-            if (v.value == last_value_[idx])
-            {
-                continue;
-            }
-
-            /* Keyed by catalog position rather than panel slot, so two
-             * panels showing the same signal collapse to one record per
-             * change rather than logging it twice. */
             last_seen_ms_[idx] = v.last_update_ms;
             last_value_[idx]   = v.value;
 
-            /* Silently drops the record if the buffer is somehow already
-             * full (at most MAX_PANELS new records land per tick, far
-             * below BUFFER_CAPACITY -- this is just a defensive bound,
-             * not an expected path). */
+            /**
+             * Defensive bound only: the flush below always leaves room
+             * for a whole tick's worth of records.
+             */
             if (buffer_count_ < BUFFER_CAPACITY)
             {
                 buffer_[buffer_count_++]
@@ -423,10 +442,16 @@ namespace core
             }
         }
 
-        memcpy(in_display_set_, now_displayed, sizeof(in_display_set_));
+        memcpy(in_record_set_, now_in_set, sizeof(in_record_set_));
 
-        bool due = (now_ms - last_flush_ms_) >= FLUSH_INTERVAL_MS;
-        if (buffer_count_ >= BUFFER_CAPACITY || due)
+        /**
+         * Flush while there's still room for another tick of this size,
+         * rather than once the buffer is full: a 16-signal profile can
+         * add 16 records in one tick, and a full buffer would drop them.
+         */
+        bool due  = (now_ms - last_flush_ms_) >= FLUSH_INTERVAL_MS;
+        bool full = buffer_count_ + count > BUFFER_CAPACITY;
+        if (full || due)
         {
             flush();
             last_flush_ms_ = now_ms;

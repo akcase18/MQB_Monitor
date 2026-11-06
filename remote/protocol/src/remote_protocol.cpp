@@ -315,6 +315,8 @@ namespace remote::protocol
         p = put_u8(p, v.unit_type);
         p = put_f32(p, v.display_min);
         p = put_f32(p, v.display_max);
+        p = put_u16(p, v.cycle_time_ms);
+        p = put_u16(p, v.module_tx);
         return p;
     }
 
@@ -326,6 +328,8 @@ namespace remote::protocol
         p = get_u8(p, out.unit_type);
         p = get_f32(p, out.display_min);
         p = get_f32(p, out.display_max);
+        p = get_u16(p, out.cycle_time_ms);
+        p = get_u16(p, out.module_tx);
         return p;
     }
 

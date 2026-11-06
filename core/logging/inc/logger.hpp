@@ -1,13 +1,13 @@
 /**
  * @file logger.hpp
- * @brief Continuous signal-history recorder over IStorage. Records only the
- * signals currently assigned to panels (at most core::MAX_PANELS of the
- * catalog's SIGNAL_CATALOG_COUNT), not the whole catalog -- the log is a
- * black-box trace of what the dashboard was actually showing. (Every
- * catalog signal is still polled over UDS regardless of what's on screen;
- * this is a deliberate scoping of what gets *recorded*, which is also what
- * keeps write volume low enough for a useful retention window -- see
- * core/logging/README.md.) On-change only (see sample()) -- a gap for a
+ * @brief Continuous signal-history recorder over IStorage. Records the set
+ * of signals its caller names each tick -- the panels on screen, or a log
+ * profile set from the phone (see src/main.cpp) -- not the whole catalog.
+ * Only signals something asks for are polled over UDS (core::SignalPoller),
+ * so the caller is also what makes sure the set it names is being polled.
+ * Scoping what gets *recorded* is also what keeps write volume low enough
+ * for a useful retention window -- see core/logging/README.md. On-change
+ * only (see sample()) -- a gap for a
  * given signal simply means it still held its last-logged value, so this loses
  * nothing relative to logging every poll, while using flash/write-cycles
  * proportional to how much is actually happening rather than a fixed tick
@@ -30,7 +30,6 @@
  */
 #pragma once
 
-#include "config.hpp"
 #include "log_record.hpp"
 #include "platform.hpp"
 #include "signal_catalog.hpp"
@@ -146,32 +145,35 @@ namespace core
 
             /**
              * Call once per sample tick (see LOG_SAMPLE_PERIOD_MS in
-             * src/main.cpp). Buffers a record for each currently-displayed
-             * signal (`config.priorities[0..settings.num_panels-1]`, so at
-             * most MAX_PANELS of them) whose SignalValue::last_update_ms
-             * has advanced since it was last sampled, then flushes the
-             * buffer to the current chunk if enough has accumulated or
-             * enough time has passed since the last flush.
+             * src/main.cpp). Buffers a record for each of the `count`
+             * signals in `ids` whose value has changed since it was last
+             * written (no faster than LOG_MIN_INTERVAL_MS), then flushes
+             * the buffer to the current chunk if enough has accumulated or
+             * enough time has passed since the last flush. Ids not in this
+             * build's catalog, and repeats, are ignored.
              *
-             * `config` is re-read every tick rather than latched at
-             * begin() so that reassigning a panel (or changing the panel
-             * count) takes effect on the log immediately, with no separate
-             * "the displayed set changed" notification to keep in sync.
-             * A signal newly brought on screen is *primed* on the first
-             * tick after the change -- its current value is captured as a
-             * baseline but not written -- so a value that had been
-             * sitting in SignalStore since before it was displayed never
-             * lands in the log. The first record for it is the first
-             * genuinely new value to arrive afterwards.
+             * The set is passed every tick rather than latched at begin()
+             * so that a change to it (a panel reassigned while recording
+             * what's on screen) takes effect on the log immediately, with
+             * no separate "the set changed" notification to keep in sync.
+             * A signal entering the set has its first record written
+             * from the first value to arrive *after* it entered --
+             * whatever SignalStore held before may be arbitrarily stale
+             * (nothing polls a signal nobody asks for), so it is never
+             * written, but the first fresh one always is, changed or not.
+             * That gives every signal a starting value in every capture,
+             * including one that never changes.
              *
-             * Does nothing at all unless Settings::logging_enabled is
-             * set -- logging is opt-in (see config.hpp). Switching it off
-             * flushes whatever was buffered and drops every primed
-             * baseline, so resuming re-primes rather than bridging the
-             * pause with a pre-pause value.
+             * Does nothing at all unless `enabled` (Settings::
+             * logging_enabled -- logging is opt-in). Switching it off
+             * flushes whatever was buffered and forgets the set, so
+             * resuming starts every signal over from a fresh value rather
+             * than bridging the pause with a pre-pause one.
              */
             void sample(const SignalStore &signals,
-                        const Config      &config,
+                        bool               enabled,
+                        const uint16_t    *ids,
+                        uint8_t            count,
                         uint32_t           now_ms);
 
             /** Read-only status for a USB/wireless retrieval command to
@@ -296,12 +298,15 @@ namespace core
              * last_value_ starts as NaN, which compares unequal to
              * everything, so a signal's first real value always writes.
              *
-             * in_display_set_ is whether the signal was on a panel during
-             * the previous sample() call -- see sample()'s doc comment on
-             * priming. */
+             * in_record_set_ is whether the signal was in the set during
+             * the previous sample() call. entered_ms_ is when it last
+             * entered, and awaiting_first_ whether a value fresher than
+             * that has been written yet -- see sample()'s doc comment. */
             uint32_t last_seen_ms_[SIGNAL_CATALOG_COUNT] = {};
             float    last_value_[SIGNAL_CATALOG_COUNT];
-            bool     in_display_set_[SIGNAL_CATALOG_COUNT] = {};
+            bool     in_record_set_[SIGNAL_CATALOG_COUNT]  = {};
+            uint32_t entered_ms_[SIGNAL_CATALOG_COUNT]     = {};
+            bool     awaiting_first_[SIGNAL_CATALOG_COUNT] = {};
 
             /* Whether Settings::logging_enabled was set on the previous
              * sample() call -- lets the off-transition be caught once

@@ -12,7 +12,9 @@ namespace core
      * this is what makes that safe. */
     static_assert(offsetof(Settings, brightness_mode) == 3
                       && offsetof(Settings, accent_color) == 12
-                      && offsetof(Settings, auto_brightness_pct) == 16,
+                      && offsetof(Settings, auto_brightness_pct) == 16
+                      && offsetof(Settings, log_source) == 17
+                      && sizeof(Settings) == 20,
                   "Settings layout moved -- bump CURRENT_VERSION");
 
     /* The stored layout for CURRENT_VERSION. Dashes in the field hold
@@ -22,10 +24,12 @@ namespace core
      * old values across. Without the step, load() would reset everyone's
      * settings; without the bump, it would misread them. Update these
      * numbers with it. */
-    static_assert(ConfigStore::CURRENT_VERSION == 9 && sizeof(Config) == 1888
+    static_assert(ConfigStore::CURRENT_VERSION == 10 && sizeof(Config) == 1924
                       && offsetof(Config, settings) == 4
                       && offsetof(Config, priorities) == 24
                       && offsetof(Config, signals) == 96
+                      && offsetof(Config, log_count) == 1888
+                      && offsetof(Config, log_signals) == 1890
                       && sizeof(SignalConfig) == 28
                       && offsetof(SignalConfig, signal_id) == 24,
                   "Config's stored layout changed -- bump CURRENT_VERSION "
@@ -49,6 +53,14 @@ namespace core
          * current SIGNAL_CONFIG_SLOTS id-tagged ones.
          */
         constexpr size_t   OLD_SETTINGS_SIZE     = 16;
+        /**
+         * v9 is v10 up to the end of signals[]: v10 only appended the log
+         * profile and put log_source in what was padding.
+         */
+        constexpr size_t   V9_CONFIG_SIZE        = 1888;
+        static_assert(offsetof(Config, log_count) == V9_CONFIG_SIZE,
+                      "migrate() reads v9 as a prefix of the current "
+                      "layout, which relies on the profile coming last");
         constexpr size_t   OLD_PRIORITIES_OFFSET = 20;
         constexpr size_t   OLD_SIGNALS_OFFSET    = 92;
         constexpr size_t   V6_SIGNAL_CONFIG_SIZE = 24;
@@ -159,6 +171,7 @@ namespace core
         {
             migrate(header.version);
             fix_priorities();
+            fix_log_profile();
             save();
             return;
         }
@@ -182,7 +195,13 @@ namespace core
             config_.settings.auto_brightness_pct = AUTO_BRIGHTNESS_NEUTRAL;
             fixed                                = true;
         }
+        if (config_.settings.log_source > LogSource::Profile)
+        {
+            config_.settings.log_source = LogSource::Screen;
+            fixed                       = true;
+        }
         fixed = fix_priorities() || fixed;
+        fixed = fix_log_profile() || fixed;
         if (sort_signals() || fixed)
         {
             save();
@@ -251,6 +270,17 @@ namespace core
         config_.settings.open_orientation_on_boot = false;
         config_.settings.accent_color
             = 0x4CAF50; /* green, gui::ACCENT_PRESETS[0] */
+        config_.settings.log_source = LogSource::Screen;
+
+        /**
+         * No profile until the phone sets one: LoggingScreen dims its
+         * Profile button while this is empty.
+         */
+        config_.log_count = 0;
+        for (uint8_t i = 0; i < MAX_LOG_SIGNALS; i++)
+        {
+            config_.log_signals[i] = NO_SIGNAL_ID;
+        }
 
         for (uint8_t rank = 0; rank < MAX_PANELS; rank++)
         {
@@ -279,8 +309,24 @@ namespace core
          * converts its layout; the static_assert at the top of this file
          * is what forces the issue.
          */
-        if (old_version < 6 || old_version > 8)
+        if (old_version < 6 || old_version > 9)
         {
+            return;
+        }
+
+        /**
+         * v9 is a prefix of the current layout (see V9_CONFIG_SIZE), so
+         * it reads straight in. log_source's byte was padding there and
+         * could hold anything, and the profile set_defaults() left empty
+         * is already right.
+         */
+        if (old_version == 9)
+        {
+            backing_.read(0, &config_, V9_CONFIG_SIZE);
+            config_.header.magic        = MAGIC_NUMBER;
+            config_.header.version      = CURRENT_VERSION;
+            config_.settings.log_source = LogSource::Screen;
+            sort_signals();
             return;
         }
 
@@ -350,6 +396,52 @@ namespace core
             }
             changed = true;
         }
+        return changed;
+    }
+
+    FLASHMEM bool ConfigStore::fix_log_profile()
+    {
+        bool    changed = false;
+        uint8_t count   = config_.log_count;
+        if (count > MAX_LOG_SIGNALS)
+        {
+            count   = MAX_LOG_SIGNALS;
+            changed = true;
+        }
+
+        /**
+         * Keep the order, drop what this build can't poll (demoted to WIP
+         * or internal, or removed) and any repeat, and pack the rest to
+         * the front. Unlike signals[], nothing is kept for a signal that
+         * might come back: a profile entry is one id, cheap to re-pick,
+         * and a hidden one would still count against the cap.
+         */
+        uint8_t kept = 0;
+        for (uint8_t i = 0; i < count; i++)
+        {
+            uint16_t id   = config_.log_signals[i];
+            bool     keep = signal_catalog_find(id) >= 0;
+            for (uint8_t k = 0; keep && k < kept; k++)
+            {
+                keep = config_.log_signals[k] != id;
+            }
+            if (!keep)
+            {
+                changed = true;
+                continue;
+            }
+            config_.log_signals[kept++] = id;
+        }
+
+        for (uint8_t i = kept; i < MAX_LOG_SIGNALS; i++)
+        {
+            if (config_.log_signals[i] != NO_SIGNAL_ID)
+            {
+                config_.log_signals[i] = NO_SIGNAL_ID;
+                changed                = true;
+            }
+        }
+        config_.log_count = kept;
         return changed;
     }
 

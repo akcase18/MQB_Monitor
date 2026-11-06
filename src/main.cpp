@@ -640,49 +640,129 @@ namespace
         return platform_get().clock.millis();
     }
 
-    /* core::SignalPoller holds a full screen of panels' worth of signals,
-     * which is exactly what core::Config::priorities[] can describe, plus
-     * Dim Ctrl for Auto brightness. If one grows past the other,
-     * sync_active_signals() below would silently stop asking for the
-     * signals past the cut. */
-    static_assert(core::SignalPoller::MAX_ACTIVE_SIGNALS >= core::MAX_PANELS + 1,
-                  "SignalPoller cannot hold every displayable panel");
+    /**
+     * core::SignalPoller holds a full screen of panels, a full log
+     * profile none of which is on screen, and Dim Ctrl for Auto
+     * brightness. If it holds fewer, sync_active_signals() below would
+     * silently stop asking for the signals past the cut.
+     */
+    static_assert(core::SignalPoller::MAX_ACTIVE_SIGNALS
+                      >= core::MAX_PANELS + core::INTERNAL_SIGNAL_COUNT
+                             + core::MAX_LOG_SIGNALS,
+                  "SignalPoller cannot hold the panels plus a log profile");
 
-    /** Points the poller at the signals the dashboard is currently showing
-     * -- `priorities[0..num_panels-1]` -- plus, in Auto brightness, the
-     * cluster's dimming level (core::AutoBrightness). That is the complete
-     * set of live values anything reads (gui::VehicleBinding::
-     * build_view_model() for the panels, core::Logger::sample() for the
-     * log, auto_brightness_task, and nothing else). Every other catalog
-     * entry is dead weight on the bus until the user puts it on a panel.
-     *
-     * Cheap and idempotent: core::SignalPoller::set_active() returns
-     * immediately when the list has not changed, so this is called both
-     * from the config-change callbacks (for immediacy) and from a periodic
-     * backstop task (so a future config path that forgets to call it still
-     * cannot leave the poller asking for the wrong signals). */
-    void sync_active_signals()
+    /**
+     * The ids a Profile capture records: Config::log_signals as it stood
+     * when the capture started. A copy rather than the live profile, so
+     * a phone edit mid-capture (including an unsaved preview) applies to
+     * the next capture instead of changing this one's set halfway.
+     */
+    struct ProfileSnapshot
     {
-        Composition        &app = composition();
-        const core::Config &cfg = app.config_store.get();
+            uint16_t ids[core::MAX_LOG_SIGNALS] = {};
+            uint8_t  count                      = 0;
+    };
 
+    ProfileSnapshot &profile_snapshot()
+    {
+        static ProfileSnapshot snapshot;
+        return snapshot;
+    }
+
+    void take_profile_snapshot()
+    {
+        const core::Config &cfg  = composition().config_store.get();
+        ProfileSnapshot    &snap = profile_snapshot();
+        snap.count = cfg.log_count > core::MAX_LOG_SIGNALS ? core::MAX_LOG_SIGNALS
+                                                           : cfg.log_count;
+        for (uint8_t i = 0; i < snap.count; i++)
+        {
+            snap.ids[i] = cfg.log_signals[i];
+        }
+    }
+
+    /**
+     * Whether a capture recording the profile snapshot is running.
+     */
+    bool recording_profile(const core::Config &cfg)
+    {
+        return cfg.settings.logging_enabled
+               && cfg.settings.log_source == core::LogSource::Profile;
+    }
+
+    /**
+     * The panels on screen, `priorities[0..num_panels-1]`, into `ids`
+     * (room for MAX_PANELS). Returns how many.
+     */
+    uint8_t displayed_ids(const core::Config &cfg, uint16_t *ids)
+    {
         uint8_t count = cfg.settings.num_panels;
         if (count > core::MAX_PANELS)
         {
             count = core::MAX_PANELS;
         }
-
-        uint16_t ids[core::MAX_PANELS + 1];
         for (uint8_t i = 0; i < count; i++)
         {
             ids[i] = cfg.priorities[i].signal_id;
         }
+        return count;
+    }
+
+    /**
+     * Points the poller at everything something reads live: the panels
+     * on screen -- `priorities[0..num_panels-1]` -- plus, in Auto
+     * brightness, the cluster's dimming level (core::AutoBrightness), and
+     * while a Profile capture runs, its snapshot. The readers are
+     * gui::VehicleBinding::build_view_model() for the panels,
+     * core::Logger::sample() for the log, auto_brightness_task, and
+     * nothing else. Every other catalog entry is dead weight on the bus.
+     *
+     * The panels and Dim Ctrl are priority: when the ECU can't keep up,
+     * they are served first and the profile takes what's left, so
+     * logging more never makes the dash itself laggier.
+     *
+     * Cheap and idempotent: core::SignalPoller::set_active() returns
+     * immediately when the list has not changed, so this is called both
+     * from the config-change callbacks (for immediacy) and from a periodic
+     * backstop task (so a future config path that forgets to call it still
+     * cannot leave the poller asking for the wrong signals).
+     */
+    void sync_active_signals()
+    {
+        Composition        &app = composition();
+        const core::Config &cfg = app.config_store.get();
+
+        uint16_t ids[core::MAX_PANELS + core::INTERNAL_SIGNAL_COUNT
+                     + core::MAX_LOG_SIGNALS];
+        uint8_t  count = displayed_ids(cfg, ids);
         if (live_brightness_mode() == core::BrightnessMode::Auto)
         {
             ids[count++] = core::AutoBrightness::DIM_SIGNAL_ID;
         }
+        uint8_t priority_count = count;
 
-        app.uds_poller.set_active(ids, count);
+        if (recording_profile(cfg))
+        {
+            const ProfileSnapshot &snap = profile_snapshot();
+            for (uint8_t i = 0; i < snap.count; i++)
+            {
+                /**
+                 * Already on a panel: polled as priority, so not listed
+                 * again as background.
+                 */
+                bool listed = false;
+                for (uint8_t k = 0; k < priority_count && !listed; k++)
+                {
+                    listed = ids[k] == snap.ids[i];
+                }
+                if (!listed)
+                {
+                    ids[count++] = snap.ids[i];
+                }
+            }
+        }
+
+        app.uds_poller.set_active(ids, count, priority_count);
     }
 
     /**
@@ -756,12 +836,11 @@ namespace
         composition().info_screen.refresh();
     }
 
-    /* Single shared task rather than one per signal (unlike
-     * send_signal_requests_task above) -- core::Scheduler::MAX_TASKS is a
-     * fixed 32-slot table already carrying 22 signal-poll tasks plus a
-     * handful more, so a second one-per-signal registration isn't an
-     * option even before considering that Logger::sample() already walks
-     * the displayed set itself each call. */
+    /**
+     * One shared task: Logger::sample() walks the whole set it's handed
+     * each call -- the panels on screen, or the profile snapshot while a
+     * Profile capture runs.
+     */
     void logging_sample_task(void *ctx)
     {
         (void)ctx;
@@ -775,8 +854,24 @@ namespace
             return;
         }
 
+        const core::Config &cfg = app.config_store.get();
+        uint16_t            panels[core::MAX_PANELS];
+        const uint16_t     *ids   = panels;
+        uint8_t             count = 0;
+        if (recording_profile(cfg))
+        {
+            ids   = profile_snapshot().ids;
+            count = profile_snapshot().count;
+        }
+        else
+        {
+            count = displayed_ids(cfg, panels);
+        }
+
         app.logger.sample(app.signal_store,
-                          app.config_store.get(),
+                          cfg.settings.logging_enabled,
+                          ids,
+                          count,
                           platform_get().clock.millis());
     }
 
@@ -1220,8 +1315,22 @@ namespace
         Composition &app     = composition();
         IStorage    &storage = platform_get().storage;
 
+        const core::Config &cfg = app.config_store.get();
+
         gui::LoggingViewModel vm;
-        vm.recording     = app.config_store.get().settings.logging_enabled;
+        vm.recording     = cfg.settings.logging_enabled;
+        vm.source        = cfg.settings.log_source == core::LogSource::Profile
+                               ? gui::LogSourceVm::Profile
+                               : gui::LogSourceVm::Screen;
+        vm.screen_signals
+            = cfg.settings.num_panels > core::MAX_PANELS ? core::MAX_PANELS
+                                                         : cfg.settings.num_panels;
+        /**
+         * While recording the profile, what it's actually recording --
+         * the phone may have changed the saved one since.
+         */
+        vm.profile_signals = recording_profile(cfg) ? profile_snapshot().count
+                                                    : cfg.log_count;
         vm.storage_ready = app.logger.is_ready();
         vm.log_count     = app.logger.log_count();
         vm.total_logged_min
@@ -1253,21 +1362,36 @@ namespace
         return vm;
     }
 
-    /* Fired the moment LoggingScreen's toggle is tapped. Persisted right
-     * away (same immediate-commit pattern as
-     * orientation_rotate_cb/theme_picker_done_cb) and pushed
-     * straight to InfoScreen's status glyph, which is where the user sees
-     * whether capture is running once this screen is closed.
-     * core::Logger itself needs no notification -- it reads
-     * Settings::logging_enabled live on its next sample() tick, which is
-     * also what opens/closes the capture in its log index. */
-    void logging_toggle_cb(void *ctx, bool enabled)
+    /**
+     * Fired the moment one of LoggingScreen's buttons starts or stops a
+     * capture. Persisted right away (same immediate-commit pattern as
+     * orientation_rotate_cb/theme_picker_done_cb), source included, so a
+     * reboot mid-capture resumes the same one; and pushed straight to
+     * InfoScreen's status glyph, which is where the user sees whether
+     * capture is running once this screen is closed.
+     *
+     * core::Logger itself needs no notification -- logging_sample_task
+     * hands it the flag and the set on its next tick, which is also what
+     * opens/closes the capture in its log index. The poller does: a
+     * Profile capture adds signals to it, and waiting for the backstop
+     * would lose up to its period of the capture's start.
+     */
+    void logging_toggle_cb(void *ctx, bool enabled, gui::LogSourceVm source)
     {
         (void)ctx;
-        Composition &app = composition();
+        Composition  &app = composition();
+        core::Config &cfg = app.config_store.get();
 
-        app.config_store.get().settings.logging_enabled = enabled;
+        if (enabled)
+        {
+            cfg.settings.log_source = source == gui::LogSourceVm::Profile
+                                          ? core::LogSource::Profile
+                                          : core::LogSource::Screen;
+            take_profile_snapshot();
+        }
+        cfg.settings.logging_enabled = enabled;
         app.config_store.save();
+        sync_active_signals();
         app.info_screen.set_logging_active(enabled && app.logger.is_ready());
     }
 
@@ -1307,6 +1431,7 @@ namespace
             app.config_store.get().settings.logging_enabled = false;
             app.config_store.save();
             app.info_screen.set_logging_active(false);
+            sync_active_signals();
         }
 
         erase_logs();
@@ -2620,6 +2745,16 @@ FLASHMEM void setup()
     app.remote_server.set_config_callback(remote_config_event_cb, nullptr);
 
     build_screens();
+
+    /**
+     * A capture left running across a power cycle resumes (logging_enabled
+     * persists). A Profile one resumes on the saved profile -- the copy it
+     * started with lived in RAM.
+     */
+    if (recording_profile(app.config_store.get()))
+    {
+        take_profile_snapshot();
+    }
 
     /* No per-signal scheduler task any more -- core::SignalPoller paces
      * itself from loop() off its own due times and its outstanding

@@ -2,7 +2,8 @@
  * @file test_main.cpp
  * @brief Host-buildable coverage for core/config: defaults on blank
  * storage, full round trip, partial (panel/signal) writes, unknown-version
- * migration fallback, v6-v8 configs carried across to v9, signal records
+ * migration fallback, v6-v9 configs carried across to v10, the log
+ * profile (round trip, unoffered and repeated ids dropped), signal records
  * found by id after the catalog changes underneath them, a panel on a
  * signal this build doesn't offer reset to its default, a newer version left alone after a rollback (and
  * replaced whole, never patched, by the first save), and core/vehicle's
@@ -441,6 +442,125 @@ void test_v8_config_survives_the_upgrade()
     check_v7_or_v8_loaded(backing, core::BrightnessMode::Auto);
 }
 
+void test_v9_config_survives_the_upgrade()
+{
+    FakeConfigStore backing;
+
+    /**
+     * A v9 blob is the current layout up to the end of signals[]. Junk in
+     * log_source's byte (padding in v9) and past the v9 end (whatever the
+     * store held) must not leak into the upgraded config.
+     */
+    core::Config old {};
+    {
+        core::ConfigStore store(backing);
+        store.load();
+        old = store.get();
+    }
+    old.header.version                = 9;
+    old.settings.night_brightness     = 44;
+    old.settings.brightness_mode      = core::BrightnessMode::Auto;
+    old.settings.auto_brightness_pct  = 70;
+    old.priorities[2].signal_id       = 22;
+    int cool                          = core::signal_catalog_find(0);
+    old.signals[cool].warn            = { 3.0f, 60.0f, true, true };
+    backing.write(0, &old, offsetof(core::Config, log_count));
+    uint8_t junk = 0xAB;
+    backing.write(offsetof(core::Config, settings)
+                      + offsetof(core::Settings, log_source),
+                  &junk,
+                  1);
+    uint8_t tail[sizeof(core::Config) - offsetof(core::Config, log_count)];
+    memset(tail, 0x07, sizeof(tail));
+    backing.write(offsetof(core::Config, log_count), tail, sizeof(tail));
+
+    for (int boot = 0; boot < 2; boot++)
+    {
+        core::ConfigStore store(backing);
+        store.load();
+
+        const core::Config &cfg = store.get();
+        TEST_ASSERT_EQUAL_UINT8(core::ConfigStore::CURRENT_VERSION,
+                                cfg.header.version);
+        TEST_ASSERT_EQUAL_UINT8(44, cfg.settings.night_brightness);
+        TEST_ASSERT_TRUE(core::BrightnessMode::Auto
+                         == cfg.settings.brightness_mode);
+        TEST_ASSERT_EQUAL_UINT8(70, cfg.settings.auto_brightness_pct);
+        TEST_ASSERT_EQUAL_UINT16(22, cfg.priorities[2].signal_id);
+        TEST_ASSERT_EQUAL_FLOAT(3.0f, cfg.signals[cool].warn.lo);
+        TEST_ASSERT_TRUE(cfg.signals[cool].warn.use_hi);
+        TEST_ASSERT_TRUE(core::LogSource::Screen == cfg.settings.log_source);
+        TEST_ASSERT_EQUAL_UINT8(0, cfg.log_count);
+        TEST_ASSERT_EQUAL_UINT16(core::NO_SIGNAL_ID, cfg.log_signals[0]);
+    }
+}
+
+void test_log_profile_round_trips()
+{
+    FakeConfigStore backing;
+    {
+        core::ConfigStore store(backing);
+        store.load();
+        TEST_ASSERT_EQUAL_UINT8(0, store.get().log_count);
+        TEST_ASSERT_TRUE(core::LogSource::Screen
+                         == store.get().settings.log_source);
+
+        core::Config &cfg         = store.get();
+        cfg.settings.log_source   = core::LogSource::Profile;
+        cfg.log_count             = 3;
+        cfg.log_signals[0]        = 22;
+        cfg.log_signals[1]        = 7;
+        cfg.log_signals[2]        = core::SIGNAL_CATALOG[0].id;
+        store.save();
+    }
+
+    core::ConfigStore store(backing);
+    store.load();
+    const core::Config &cfg = store.get();
+    TEST_ASSERT_TRUE(core::LogSource::Profile == cfg.settings.log_source);
+    TEST_ASSERT_EQUAL_UINT8(3, cfg.log_count);
+    TEST_ASSERT_EQUAL_UINT16(22, cfg.log_signals[0]);
+    TEST_ASSERT_EQUAL_UINT16(7, cfg.log_signals[1]);
+    TEST_ASSERT_EQUAL_UINT16(core::SIGNAL_CATALOG[0].id, cfg.log_signals[2]);
+}
+
+void test_log_profile_drops_unoffered_and_repeated_ids()
+{
+    FakeConfigStore backing;
+    {
+        core::ConfigStore store(backing);
+        store.load();
+        core::Config &cfg       = store.get();
+        cfg.settings.log_source = static_cast<core::LogSource>(9);
+        /**
+         * An out-of-range count is clamped before anything is read.
+         */
+        cfg.log_count      = 40;
+        cfg.log_signals[0] = 22;
+        cfg.log_signals[1] = 999; /* not in any catalog */
+        cfg.log_signals[2] = 7;
+        cfg.log_signals[3] = 22; /* repeat */
+        cfg.log_signals[4] = core::NO_SIGNAL_ID;
+        for (uint8_t i = 5; i < core::MAX_LOG_SIGNALS; i++)
+        {
+            cfg.log_signals[i] = 999;
+        }
+        store.save();
+    }
+
+    core::ConfigStore store(backing);
+    store.load();
+    const core::Config &cfg = store.get();
+    TEST_ASSERT_TRUE(core::LogSource::Screen == cfg.settings.log_source);
+    TEST_ASSERT_EQUAL_UINT8(2, cfg.log_count);
+    TEST_ASSERT_EQUAL_UINT16(22, cfg.log_signals[0]);
+    TEST_ASSERT_EQUAL_UINT16(7, cfg.log_signals[1]);
+    for (uint8_t i = 2; i < core::MAX_LOG_SIGNALS; i++)
+    {
+        TEST_ASSERT_EQUAL_UINT16(core::NO_SIGNAL_ID, cfg.log_signals[i]);
+    }
+}
+
 void test_out_of_range_brightness_settings_load_as_defaults()
 {
     FakeConfigStore backing;
@@ -628,6 +748,9 @@ int main(int argc, char **argv)
     RUN_TEST(test_v6_config_survives_the_upgrade);
     RUN_TEST(test_v7_config_survives_the_upgrade);
     RUN_TEST(test_v8_config_survives_the_upgrade);
+    RUN_TEST(test_v9_config_survives_the_upgrade);
+    RUN_TEST(test_log_profile_round_trips);
+    RUN_TEST(test_log_profile_drops_unoffered_and_repeated_ids);
     RUN_TEST(test_out_of_range_brightness_settings_load_as_defaults);
     RUN_TEST(test_panel_on_a_signal_not_offered_resets_to_default);
     RUN_TEST(test_signal_records_are_found_by_id);

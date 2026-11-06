@@ -20,6 +20,8 @@
     computeLayout()   gui/screens/src/layout.cpp, plus InfoScreen::rebuild()'s
                       grid tracks
     the dash mock     gui/widgets/src/panel_widget.cpp and THEME_DEFAULT
+    MAX_LOG_SIGNALS   core/config/inc/config.hpp
+    MODULE_NAMES      the request ids in UDS_ECUS (signal_catalog.generated.inc)
   SIGNAL_DESCRIPTIONS and SIGNAL_ENUMS are generated, not mirrored by hand:
   edit the signal in core/vehicle/data/signals.json and run
   tools/gen_catalog.py.
@@ -255,6 +257,21 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .fw a { color: inherit; }
 .fail { text-align: center; padding: 40px 16px; color: var(--muted); }
 .fail button { margin-top: 12px; border: 0; border-radius: 10px; padding: 10px 16px; background: var(--control); }
+/* ---- Log tab. One list of switches, so turning a signal on or off never
+   moves anything around it: the busy line keeps its slot even when empty,
+   buttons disable rather than vanish, and toggles patch rows in place. ---- */
+.busy { margin: 0; min-height: 1.45em; font-size: .8rem; color: var(--danger);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.log-actions { display: flex; gap: 8px; padding: 8px 0 4px; }
+.log-filter { padding: 6px 0 2px; }
+.search {
+  width: 100%; margin: 8px 0 2px; border: 0; border-radius: 10px;
+  padding: 10px 12px; background: var(--control); -webkit-appearance: none; appearance: none;
+}
+.search::placeholder { color: var(--muted); }
+.log-group { display: flex; justify-content: space-between; margin: 16px 0 0;
+             font-size: .74rem; font-weight: 600; color: var(--muted); }
+.log-empty { color: var(--muted); font-size: .9rem; padding: 14px 0; margin: 0; }
 [hidden] { display: none !important; }
 </style>
 </head>
@@ -271,6 +288,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
   <div class="tabs" role="tablist" aria-label="Edit">
     <button type="button" role="tab" id="tab-dash" aria-controls="pane-dash">Dash</button>
     <button type="button" role="tab" id="tab-panel" aria-controls="pane-panel">Panel</button>
+    <button type="button" role="tab" id="tab-log" aria-controls="pane-log">Log</button>
   </div>
 </div>
 
@@ -395,6 +413,27 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 
   </div>
 
+  <div id="pane-log" role="tabpanel" aria-labelledby="tab-log" hidden>
+    <p class="pane-hint">Signals the dash's Profile button records.</p>
+  <section aria-labelledby="h-log">
+    <h2 id="h-log">Profile · <span id="log-count"></span></h2>
+    <p class="busy" id="log-busy" aria-live="polite"></p>
+    <div class="log-actions">
+      <button type="button" class="btn" id="log-add-screen">Add on-screen signals</button>
+      <button type="button" class="btn" id="log-clear">Clear</button>
+    </div>
+    <div class="log-filter">
+      <div class="seg" id="log-filter" role="group" aria-label="Show">
+        <button type="button" data-v="all">All</button>
+        <button type="button" data-v="in">In profile</button>
+      </div>
+    </div>
+    <input class="search" type="search" id="log-search" placeholder="Search signals"
+           aria-label="Search signals" autocomplete="off">
+    <div id="log-list"></div>
+  </section>
+  </div>
+
   <!-- Only the S3 dash takes firmware updates; shown once it answers
        /api/version (platform/dash_s3/src/dash_s3_ota.cpp). -->
   <p class="fw" id="fw" hidden>Firmware <span id="fw-ver"></span> · <a href="/update">Update</a></p>
@@ -516,6 +555,16 @@ const SIGNAL_ENUMS = {
 /* END GENERATED */
 
 const MAX_PANELS = 6;
+const MAX_LOG_SIGNALS = 16;
+/* Grouping for the Log tab, by the module a signal's first request goes to.
+ * An id missing here still groups, under its hex. */
+const MODULE_NAMES = { 0x7E0: "Engine", 0x7E1: "Transmission", 0x70F: "AWD",
+                       0x754: "Headlight Regulation" };
+/* Requests per second the dash itself can handle -- a property of the S3,
+ * not of any one car, since the dash fits several. A placeholder until the
+ * S3 is characterized (see TODO.md); past it, the Log tab warns that some
+ * signals will log slower than their listed rate. */
+const BUS_BUDGET_RPS = 100;
 const RESULT_TEXT = ["", "Signal list mismatch", "Unknown signal", "Invalid setting", "Incomplete request"];
 
 /* ========================================================================
@@ -562,18 +611,23 @@ function decodeState(bytes) {
   const s = {
     settings: { day: r.u8(), night: r.u8(), count: r.u8(), orient: r.u8(), accent: r.u32(),
                 flips: r.u8(), bmode: r.u8(), auto: r.u8() },
-    panels: [], catalog: [], signals: [], previewActive: false, unsaved: false,
+    panels: [], catalog: [], signals: [], log: [], logSource: 0,
+    previewActive: false, unsaved: false,
   };
   const nPanels = r.u8();
   for (let i = 0; i < nPanels; i++) s.panels.push({ id: r.u16(), imperial: r.u8() === 1, mode: r.u8() });
   const nSignals = r.u16();
   for (let i = 0; i < nSignals; i++) {
-    s.catalog.push({ id: r.u16(), name: r.str(24), unit: r.u8(), min: r.f32(), max: r.f32() });
+    s.catalog.push({ id: r.u16(), name: r.str(24), unit: r.u8(), min: r.f32(), max: r.f32(),
+                     cycle: r.u16(), module: r.u16() });
   }
   for (let i = 0; i < nSignals; i++) {
     s.signals.push({ lo: r.f32(), hi: r.f32(), useLo: r.u8() !== 0, useHi: r.u8() !== 0,
                      useCustom: r.u8() !== 0, cmin: r.f32(), cmax: r.f32() });
   }
+  s.logSource = r.u8();
+  const nLog = r.u8();
+  for (let i = 0; i < nLog; i++) s.log.push(r.u16());
   if (r.more()) {
     const flags = r.u8();
     s.previewActive = (flags & 1) !== 0;
@@ -582,7 +636,8 @@ function decodeState(bytes) {
   return s;
 }
 
-/* REQ_APPLY_CONFIG -- RemoteConfigServer::apply_to_live(). With `values`
+/* REQ_APPLY_CONFIG -- RemoteConfigServer::apply_to_live(), then the log
+ * profile (a count and the ids) at the very end. With `values`
  * (metric, one per signal, NaN for none) it's a REQ_PREVIEW_CONFIG, whose
  * values the dash shows in place of live ones. */
 function encodeConfig(s, values) {
@@ -601,6 +656,9 @@ function encodeConfig(s, values) {
     w.u16(values.length);
     for (const v of values) w.f32(v);
   }
+  /* The log profile goes last, after the preview values. */
+  w.u8(s.log.length);
+  for (const id of s.log) w.u16(id);
   return w.bytes();
 }
 
@@ -854,7 +912,9 @@ function drawPanel(box, vm, w, h) {
 
 let state = null;         /* decoded RESP_STATE, edited in place */
 let selected = 0;         /* priority rank being edited */
-let tab = "dash";         /* "dash" or "panel" */
+let tab = "dash";         /* "dash", "panel" or "log" */
+let logFilter = "all";    /* Log tab: "all" or "in" */
+let logPinned = new Set();/* ids "In profile" keeps listed after they're switched off */
 let savedHex = null;      /* the config as last saved; null if unknown */
 const samples = new Map();/* signal index -> metric value the mock (and dash) show */
 
@@ -1094,11 +1154,105 @@ function renderActions() {
 function renderTabs() {
   const name = state.catalog[sigIndex(state.panels[selected].id)].name;
   $("tab-panel").textContent = "Panel · " + name;
-  for (const [id, key] of [["tab-dash", "dash"], ["tab-panel", "panel"]]) {
+  for (const [id, key] of [["tab-dash", "dash"], ["tab-panel", "panel"], ["tab-log", "log"]]) {
     $(id).setAttribute("aria-selected", String(tab === key));
   }
   $("pane-dash").hidden = tab !== "dash";
   $("pane-panel").hidden = tab !== "panel";
+  $("pane-log").hidden = tab !== "log";
+}
+
+/* ---- Log tab ---- */
+
+function rateText(i) {
+  const hz = 1000 / (state.catalog[i].cycle || 1000);
+  return (hz >= 1 ? String(Math.round(hz)) : hz.toFixed(1)) + " Hz";
+}
+
+function moduleName(tx) {
+  return MODULE_NAMES[tx] || "Module " + tx.toString(16).toUpperCase();
+}
+
+/* Requests per second the panels on screen plus the profile ask for, at
+ * their listed rates -- what a Profile capture puts on the bus. */
+function logLoad() {
+  const ids = new Set(state.log);
+  for (let r = 0; r < state.settings.count; r++) ids.add(state.panels[r].id);
+  let rps = 0;
+  for (const id of ids) {
+    const i = sigIndex(id);
+    if (i >= 0) rps += 1000 / (state.catalog[i].cycle || 1000);
+  }
+  return rps;
+}
+
+/* Rebuilds the list: on load, search and filter changes. Toggling a signal
+ * only patches it (renderLog), so the list never shifts under a finger. */
+function buildLogList() {
+  const q = $("log-search").value.trim().toLowerCase();
+  const listed = i => logFilter === "all" || logPinned.has(state.catalog[i].id)
+                      || state.log.includes(state.catalog[i].id);
+  const groups = new Map();
+  state.catalog.forEach((c, i) => {
+    if (!listed(i) || (q && !c.name.toLowerCase().includes(q))) return;
+    if (!groups.has(c.module)) groups.set(c.module, []);
+    groups.get(c.module).push(i);
+  });
+
+  const out = [];
+  for (const [tx, items] of groups) {
+    const head = el("div", "log-group");
+    head.append(el("span", null, moduleName(tx)), el("span", "log-on"));
+    head.dataset.module = String(tx);
+    out.push(head);
+    for (const i of items) {
+      const c = state.catalog[i];
+      const row = el("div", "row");
+      const label = el("label", null, c.name);
+      label.htmlFor = "log-" + c.id;
+      label.append(el("span", "sub", rateText(i)));
+      const sw = el("label", "sw");
+      const input = el("input");
+      input.type = "checkbox"; input.id = "log-" + c.id; input.dataset.id = String(c.id);
+      input.setAttribute("aria-label", c.name);
+      sw.append(input, el("span", "track"));
+      row.append(label, sw);
+      out.push(row);
+    }
+  }
+  if (!out.length) {
+    out.push(el("p", "log-empty", q ? `No signals match “${$("log-search").value.trim()}”.`
+                                    : "Nothing in the profile yet. Pick All and switch signals on."));
+  }
+  $("log-list").replaceChildren(...out);
+  renderLog();
+}
+
+function renderLog() {
+  const n = state.log.length, full = n >= MAX_LOG_SIGNALS;
+  $("log-count").textContent = `${n} / ${MAX_LOG_SIGNALS}`;
+  $("log-busy").textContent = logLoad() > BUS_BUDGET_RPS
+    ? "Busy bus: some signals will log slower." : "";
+  const onScreen = state.panels.slice(0, state.settings.count).map(p => p.id);
+  $("log-add-screen").disabled = full || onScreen.every(id => state.log.includes(id));
+  $("log-clear").disabled = n === 0;
+  setSeg($("log-filter"), logFilter);
+
+  const perModule = new Map();
+  for (const input of $("log-list").querySelectorAll("input[data-id]")) {
+    const id = Number(input.dataset.id);
+    const on = state.log.includes(id);
+    input.checked = on;
+    input.disabled = !on && full;
+    if (on) {
+      const tx = state.catalog[sigIndex(id)].module;
+      perModule.set(tx, (perModule.get(tx) || 0) + 1);
+    }
+  }
+  for (const head of $("log-list").querySelectorAll(".log-group")) {
+    const on = perModule.get(Number(head.dataset.module)) || 0;
+    head.querySelector(".log-on").textContent = on ? on + " on" : "";
+  }
 }
 
 function render() {
@@ -1106,6 +1260,7 @@ function render() {
   renderSettings();
   renderDash();
   renderEditor();
+  renderLog();
   renderActions();
 }
 
@@ -1227,6 +1382,7 @@ async function discard() {
     await flushPreviews();
     await request("POST", "/api/revert", "");
     await load();
+    buildLogList();
     render();
     await sendPreview();
     toast("Changes discarded");
@@ -1305,6 +1461,8 @@ function exportConfig() {
       warnLow: c.useLo, low: f32Text(c.lo), warnHigh: c.useHi, high: f32Text(c.hi),
       customScale: c.useCustom, scaleMin: f32Text(c.cmin), scaleMax: f32Text(c.cmax),
     })),
+    /* Optional, so files from before it load as they always did. */
+    log: state.log.map(id => ({ id, name: state.catalog[sigIndex(id)].name })),
   };
   const blob = new Blob([JSON.stringify(file, null, 2) + "\n"], { type: "application/json" });
   const a = el("a");
@@ -1360,7 +1518,18 @@ function importConfig(text) {
     c.cmin = num(fc.scaleMin, c.cmin);         c.cmax = num(fc.scaleMax, c.cmax);
   }
 
+  if (Array.isArray(f.log)) {
+    const log = [];
+    for (const fl of f.log) {
+      const id = fl && Number.isInteger(fl.id) ? fl.id : -1;
+      if (sigIndex(id) < 0) { skipped++; continue; }
+      if (!log.includes(id) && log.length < MAX_LOG_SIGNALS) log.push(id);
+    }
+    state.log = log;
+  }
+
   if (selected >= s.count) selected = 0;
+  buildLogList();
   changed();
   toast(skipped ? `Loaded, ${skipped} unknown skipped. Save to keep changes.` : "Loaded. Save to keep changes.");
 }
@@ -1412,6 +1581,40 @@ function wire() {
   });
   $("tab-dash").addEventListener("click", () => { tab = "dash"; render(); });
   $("tab-panel").addEventListener("click", () => { tab = "panel"; render(); });
+  $("tab-log").addEventListener("click", () => { tab = "log"; render(); });
+
+  $("log-list").addEventListener("change", e => {
+    const id = Number(e.target.dataset.id);
+    if (!Number.isInteger(id) || !e.target.dataset.id) return;
+    if (e.target.checked) {
+      if (!state.log.includes(id) && state.log.length < MAX_LOG_SIGNALS) state.log.push(id);
+    } else {
+      state.log = state.log.filter(x => x !== id);
+    }
+    changed();
+  });
+  $("log-search").addEventListener("input", buildLogList);
+  $("log-filter").addEventListener("click", e => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    logFilter = b.dataset.v;
+    logPinned = new Set(logFilter === "in" ? state.log : []);
+    buildLogList();
+  });
+  $("log-add-screen").addEventListener("click", () => {
+    const add = state.panels.slice(0, state.settings.count).map(p => p.id)
+      .filter((id, k, all) => !state.log.includes(id) && all.indexOf(id) === k)
+      .slice(0, MAX_LOG_SIGNALS - state.log.length);
+    state.log.push(...add);
+    /* Under "In profile" the new ones need rows; under All they have one. */
+    if (logFilter === "in") { add.forEach(id => logPinned.add(id)); buildLogList(); }
+    changed();
+    toast(add.length === 1 ? "Added 1 signal" : `Added ${add.length} signals`);
+  });
+  $("log-clear").addEventListener("click", () => {
+    state.log = [];
+    changed();
+  });
 
   $("signal").addEventListener("change", e => {
     const id = Number(e.target.value);
@@ -1563,6 +1766,7 @@ async function start() {
   try {
     await load();
     buildStatic();
+    buildLogList();
     document.body.classList.remove("loading");
     render();
     /* Before the first preview, not alongside it: the dash serves one

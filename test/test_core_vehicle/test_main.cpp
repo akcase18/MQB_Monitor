@@ -1347,6 +1347,73 @@ void test_poller_does_not_starve_a_slow_signal_behind_fast_ones()
         20, ecu.responses_for(did::ENGINE_TORQUE[0], did::ENGINE_TORQUE[1]));
 }
 
+void test_poller_serves_priority_signals_first_when_the_ecu_cannot_keep_up()
+{
+    FakeClock          clock;
+    FakeEcu            ecu(clock);
+    core::UdsClient    client(ecu, ENGINE, 1);
+    core::SignalPoller poller(client, clock);
+
+    /**
+     * Two panels and two log-only signals, all 50ms, against an ECU that
+     * manages ~66 req/s of the ~80 asked for. Shared fairly that would be
+     * ~50 readings each over 3s; with the panels first they keep their
+     * full ~60 and the log-only pair split what's left.
+     */
+    ecu.latency_ms = 15;
+
+    const uint16_t active[] = { 7, 8, 12, 4 };
+    poller.set_active(active, 4, 2);
+
+    run_loop(clock, client, poller, 3000);
+
+    uint16_t speed  = ecu.responses_for(did::ENGINE_SPEED[0], did::ENGINE_SPEED[1]);
+    uint16_t torque = ecu.responses_for(did::ENGINE_TORQUE[0], did::ENGINE_TORQUE[1]);
+    uint16_t throttle = ecu.responses_for(did::THROTTLE[0], did::THROTTLE[1]);
+    uint16_t int_pres = ecu.responses_for(did::INT_PRES[0], did::INT_PRES[1]);
+
+    TEST_ASSERT_GREATER_OR_EQUAL_UINT16(55, speed);
+    TEST_ASSERT_GREATER_OR_EQUAL_UINT16(55, torque);
+    TEST_ASSERT_GREATER_THAN_UINT16(throttle, speed);
+    TEST_ASSERT_GREATER_THAN_UINT16(int_pres, torque);
+
+    /**
+     * The log-only pair still gets the leftover bandwidth, evenly.
+     */
+    TEST_ASSERT_GREATER_THAN_UINT16(20, throttle);
+    TEST_ASSERT_GREATER_THAN_UINT16(20, int_pres);
+    TEST_ASSERT_UINT16_WITHIN(3, throttle, int_pres);
+}
+
+void test_poller_still_serves_a_background_signal_the_panels_crowd_out()
+{
+    FakeClock          clock;
+    FakeEcu            ecu(clock);
+    core::UdsClient    client(ecu, ENGINE, 1);
+    core::SignalPoller poller(client, clock);
+
+    /**
+     * Four 50ms panels ask for ~80 req/s from an ECU that manages ~66, so
+     * some panel request is always due and pure priority order would
+     * never send Coolant Temp at all. Past BACKGROUND_STARVATION_MS it
+     * competes on overdue-ness and wins a slot.
+     */
+    ecu.latency_ms = 15;
+
+    const uint16_t active[] = { 7, 8, 12, 4, 0 };
+    poller.set_active(active, 5, 4);
+
+    run_loop(clock, client, poller, 6100);
+
+    /**
+     * About once per 2000ms period + 1000ms floor.
+     */
+    TEST_ASSERT_GREATER_OR_EQUAL_UINT16(
+        2, ecu.responses_for(did::COOL_TEMP[0], did::COOL_TEMP[1]));
+    TEST_ASSERT_GREATER_THAN_UINT16(
+        60, ecu.responses_for(did::ENGINE_SPEED[0], did::ENGINE_SPEED[1]));
+}
+
 void test_poller_recovers_from_an_unanswered_did()
 {
     FakeClock          clock;
@@ -1468,6 +1535,8 @@ int main(int argc, char **argv)
     RUN_TEST(test_poller_deduplicates_a_shared_did);
     RUN_TEST(test_poller_serves_every_signal_when_the_ecu_cannot_keep_up);
     RUN_TEST(test_poller_does_not_starve_a_slow_signal_behind_fast_ones);
+    RUN_TEST(test_poller_serves_priority_signals_first_when_the_ecu_cannot_keep_up);
+    RUN_TEST(test_poller_still_serves_a_background_signal_the_panels_crowd_out);
     RUN_TEST(test_poller_recovers_from_an_unanswered_did);
     RUN_TEST(test_poller_treats_a_rejection_as_the_end_of_a_request);
     RUN_TEST(test_poller_waits_through_a_response_pending);

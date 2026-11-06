@@ -1,7 +1,8 @@
 /**
  * @file logging_screen.hpp
- * @brief The signal-log recorder's own screen: one big on/off toggle, a
- * short status readout (captures saved, where they're going, how much
+ * @brief The signal-log recorder's own screen: two big start/stop
+ * buttons -- record what's on screen, or record the log profile set from
+ * the phone -- a short status readout (captures saved, where they're going, how much
  * room there is, how much has been recorded), and the erase action that
  * reclaims the store once logs have been offloaded.
  *
@@ -14,9 +15,9 @@
  *
  * Like every other gui/screens screen this is driven entirely by a POD
  * view-model and has zero core::/platform:: dependency — main.cpp builds
- * LoggingViewModel from core::Logger and the active IStorage. The toggle
- * fires ToggleCallback immediately rather than on close: it takes effect
- * at once and the button itself shows the result, so there's nothing
+ * LoggingViewModel from core::Logger and the active IStorage. A start or
+ * stop fires ToggleCallback immediately rather than on close: it takes
+ * effect at once and the button itself shows the result, so there's nothing
  * deferred for a Done step to commit. Erase works the same way, behind
  * the shared Cancel/Confirm popup (screen_helpers' create_confirm_popup)
  * that switching the display layout already sits behind — the two changes on this
@@ -42,10 +43,33 @@ namespace gui
 
     constexpr uint8_t LOGGING_STORAGE_LABEL_LEN = 12;
 
+    /**
+     * What a capture records -- mirrors core::LogSource, translated at
+     * the main.cpp boundary like DisplayMode is, so gui/ stays free of
+     * core::Config.
+     */
+    enum class LogSourceVm : uint8_t
+    {
+        Screen,
+        Profile
+    };
+
     struct LoggingViewModel
     {
-            /** Whether a capture is running right now. */
-            bool recording = false;
+            /**
+             * Whether a capture is running right now, and from which
+             * set. `source` means nothing while not recording.
+             */
+            bool        recording = false;
+            LogSourceVm source    = LogSourceVm::Screen;
+
+            /**
+             * How many signals each button would record: the panels on
+             * screen, and the phone-set profile. A Profile button with
+             * nothing to record is dimmed.
+             */
+            uint8_t screen_signals  = 0;
+            uint8_t profile_signals = 0;
 
             /** False if the log store never mounted — the toggle is
              * pointless in that case and the screen says so rather than
@@ -85,10 +109,14 @@ namespace gui
     class LoggingScreen
     {
         public:
-            /** Fired the moment the toggle is tapped, with its new state.
+            /**
+             * Fired the moment a button starts or stops a capture, with
+             * whether recording is now on and which set it records.
              * Persisted by the caller right away — see the file doc
-             * comment. */
-            using ToggleCallback = void (*)(void *ctx, bool enabled);
+             * comment.
+             */
+            using ToggleCallback
+                = void (*)(void *ctx, bool enabled, LogSourceVm source);
 
             /** Fired once the erase popup's Confirm is pressed, never on
              * the press of the Erase button itself. The caller does the
@@ -120,14 +148,38 @@ namespace gui
 
         private:
             static void close_clicked_cb(lv_event_t *e);
-            static void toggle_clicked_cb(lv_event_t *e);
+            static void button_clicked_cb(lv_event_t *e);
             static void erase_clicked_cb(lv_event_t *e);
             static void erase_confirm_cb(lv_event_t *e);
             static void erase_cancel_cb(lv_event_t *e);
 
+            /**
+             * One of the two start/stop buttons. Its address is the
+             * click handler's user data, so `owner` gets back to the
+             * screen.
+             */
+            struct SourceButton
+            {
+                    LoggingScreen *owner  = nullptr;
+                    LogSourceVm    source = LogSourceVm::Screen;
+                    lv_obj_t      *btn    = nullptr;
+                    lv_obj_t      *lbl    = nullptr;
+                    lv_obj_t      *hint   = nullptr;
+            };
+
+            void create_source_button(SourceButton &b,
+                                      LogSourceVm   source,
+                                      lv_coord_t    x,
+                                      lv_coord_t    y,
+                                      lv_coord_t    width,
+                                      lv_coord_t    height);
+
             void set_view_model(const LoggingViewModel &vm);
-            /** Repaints the toggle to match recording_/storage_ready_. */
-            void refresh_toggle();
+            /**
+             * Repaints both buttons to match the recording state.
+             */
+            void refresh_buttons();
+            void refresh_button(SourceButton &b);
             /** Greys the erase button out when there's no store to wipe. */
             void refresh_erase();
 
@@ -138,9 +190,14 @@ namespace gui
             lv_obj_t *screen_        = nullptr;
             lv_obj_t *return_screen_ = nullptr;
 
-            lv_obj_t *toggle_btn_   = nullptr;
-            lv_obj_t *toggle_lbl_   = nullptr;
-            lv_obj_t *toggle_hint_  = nullptr;
+            /**
+             * [0] Screen, [1] Profile, left to right.
+             */
+            SourceButton buttons_[2];
+            /**
+             * Portrait's buttons are too narrow for "RECORDING".
+             */
+            bool portrait_ = false;
 
             lv_obj_t *erase_btn_ = nullptr;
             lv_obj_t *erase_lbl_ = nullptr;
@@ -156,8 +213,11 @@ namespace gui
             lv_obj_t *capacity_value_ = nullptr;
             lv_obj_t *recorded_value_ = nullptr;
 
-            bool recording_     = false;
-            bool storage_ready_ = false;
+            bool        recording_       = false;
+            LogSourceVm source_          = LogSourceVm::Screen;
+            bool        storage_ready_   = false;
+            uint8_t     screen_signals_  = 0;
+            uint8_t     profile_signals_ = 0;
 
             ToggleCallback toggle_cb_  = nullptr;
             void          *toggle_ctx_ = nullptr;

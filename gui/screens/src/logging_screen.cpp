@@ -11,11 +11,15 @@ namespace gui
 
     namespace
     {
-        /* Nav bar, one oversized toggle, the status tiles, then the
-         * erase action. The toggle gets far more room than any control on
-         * SettingsScreen: it's the whole point of the screen and it gets
-         * pressed while driving, so it's sized to be hit without looking
-         * rather than to fit alongside neighbors.
+        /**
+         * Nav bar, the two oversized start/stop buttons, the status
+         * tiles, then the erase action. The buttons get far more room
+         * than any control on SettingsScreen: they're the whole point of
+         * the screen and get pressed while driving, so they're sized to
+         * be hit without looking rather than to fit alongside neighbors.
+         * They split what was one full-width toggle row between them, and
+         * neither moves or resizes when recording starts -- the stop
+         * target is wherever the user just tapped.
          *
          * Landscape's 320px of height can't hold the toggle, four
          * full-width status rows and a button, which is why the tiles sit
@@ -23,7 +27,8 @@ namespace gui
          * instead of four rows is what pays for the erase button.
          * Erase is last on purpose: furthest from the toggle the user
          * actually reaches for, and below the readouts that say whether
-         * there's anything worth keeping. */
+         * there's anything worth keeping.
+         */
         constexpr lv_coord_t HEADER_DIVIDER_Y = 50;
 
         constexpr lv_coord_t TOGGLE_ROW_Y     = 60;
@@ -61,6 +66,7 @@ namespace gui
         constexpr lv_coord_t PORTRAIT_ERASE_HEIGHT    = 52;
 
         constexpr lv_coord_t SCREEN_MARGIN = 20;
+        constexpr lv_coord_t BUTTON_GAP    = 12;
 
         constexpr uint8_t STATUS_ROW_COUNT = 4;
 
@@ -126,38 +132,31 @@ namespace gui
 
         lv_coord_t row_width = theme.metrics.screen_width - 2 * SCREEN_MARGIN;
 
-        /* The toggle is the whole row, not a small control on the right of
-         * a labelled row the way SettingsScreen's toggles are -- there's
-         * nothing else competing for this space, and a full-width target
-         * is far easier to hit in a moving car. */
-        toggle_btn_ = lv_btn_create(screen_);
-        lv_obj_set_size(toggle_btn_,
-                        row_width,
-                        portrait ? PORTRAIT_TOGGLE_HEIGHT : TOGGLE_HEIGHT);
-        lv_obj_align(toggle_btn_,
-                     LV_ALIGN_TOP_LEFT,
-                     SCREEN_MARGIN,
-                     portrait ? PORTRAIT_TOGGLE_ROW_Y : TOGGLE_ROW_Y);
-        lv_obj_set_style_radius(toggle_btn_, 10, 0);
-        lv_obj_set_style_bg_opa(toggle_btn_, LV_OPA_COVER, 0);
-        lv_obj_set_style_border_width(
-            toggle_btn_, theme.metrics.panel_border_width, 0);
-        lv_obj_set_style_border_color(
-            toggle_btn_, theme.palette.panel_border, 0);
-        lv_obj_set_style_shadow_width(toggle_btn_, 0, 0);
-        lv_obj_add_event_cb(
-            toggle_btn_, toggle_clicked_cb, LV_EVENT_CLICKED, this);
-
-        toggle_lbl_ = lv_label_create(toggle_btn_);
-        lv_obj_set_style_text_font(toggle_lbl_, theme.typography.title, 0);
-        lv_obj_align(toggle_lbl_, LV_ALIGN_CENTER, 0, -10);
-
-        /* Second line inside the button: what a press will do next, so
-         * the control states its own affordance instead of relying on
-         * the user remembering what the fill color means. */
-        toggle_hint_ = lv_label_create(toggle_btn_);
-        lv_obj_set_style_text_font(toggle_hint_, theme.typography.label_sm, 0);
-        lv_obj_align(toggle_hint_, LV_ALIGN_CENTER, 0, 14);
+        /**
+         * Two buttons sharing the old toggle's full row, not small
+         * controls on the right of labelled rows the way SettingsScreen's
+         * toggles are -- nothing else competes for this space, and big
+         * targets are far easier to hit in a moving car.
+         */
+        portrait_ = portrait;
+        lv_coord_t button_width
+            = static_cast<lv_coord_t>((row_width - BUTTON_GAP) / 2);
+        lv_coord_t button_y = portrait ? PORTRAIT_TOGGLE_ROW_Y : TOGGLE_ROW_Y;
+        lv_coord_t button_height
+            = portrait ? PORTRAIT_TOGGLE_HEIGHT : TOGGLE_HEIGHT;
+        create_source_button(buttons_[0],
+                             LogSourceVm::Screen,
+                             SCREEN_MARGIN,
+                             button_y,
+                             button_width,
+                             button_height);
+        create_source_button(
+            buttons_[1],
+            LogSourceVm::Profile,
+            static_cast<lv_coord_t>(SCREEN_MARGIN + button_width + BUTTON_GAP),
+            button_y,
+            button_width,
+            button_height);
 
         create_divider(screen_,
                        theme,
@@ -235,8 +234,50 @@ namespace gui
         lv_obj_set_style_text_font(erase_lbl_, theme.typography.ui, 0);
         lv_obj_center(erase_lbl_);
 
-        refresh_toggle();
+        refresh_buttons();
         refresh_erase();
+    }
+
+    FLASHMEM void LoggingScreen::create_source_button(SourceButton &b,
+                                                      LogSourceVm   source,
+                                                      lv_coord_t    x,
+                                                      lv_coord_t    y,
+                                                      lv_coord_t    width,
+                                                      lv_coord_t    height)
+    {
+        const Theme &theme = *theme_;
+
+        b.owner  = this;
+        b.source = source;
+        b.btn    = lv_btn_create(screen_);
+        lv_obj_set_size(b.btn, width, height);
+        lv_obj_align(b.btn, LV_ALIGN_TOP_LEFT, x, y);
+        lv_obj_set_style_radius(b.btn, 10, 0);
+        lv_obj_set_style_bg_opa(b.btn, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(
+            b.btn, theme.metrics.panel_border_width, 0);
+        lv_obj_set_style_border_color(b.btn, theme.palette.panel_border, 0);
+        lv_obj_set_style_shadow_width(b.btn, 0, 0);
+        /**
+         * No content padding: the labels are centered, and Portrait's
+         * 134px buttons need every pixel for "PROFILE".
+         */
+        lv_obj_set_style_pad_all(b.btn, 0, 0);
+        lv_obj_add_event_cb(b.btn, button_clicked_cb, LV_EVENT_CLICKED, &b);
+
+        b.lbl = lv_label_create(b.btn);
+        lv_obj_set_style_text_font(b.lbl, theme.typography.title, 0);
+        lv_obj_align(b.lbl, LV_ALIGN_CENTER, 0, -10);
+
+        /**
+         * Second line inside the button: how many signals it records, or
+         * what a press will do next while recording -- so the control
+         * states its own affordance instead of relying on the user
+         * remembering what the fill color means.
+         */
+        b.hint = lv_label_create(b.btn);
+        lv_obj_set_style_text_font(b.hint, theme.typography.label_sm, 0);
+        lv_obj_align(b.hint, LV_ALIGN_CENTER, 0, 14);
     }
 
     void LoggingScreen::open(const LoggingViewModel &vm,
@@ -254,9 +295,12 @@ namespace gui
 
     void LoggingScreen::set_view_model(const LoggingViewModel &vm)
     {
-        recording_     = vm.recording;
-        storage_ready_ = vm.storage_ready;
-        refresh_toggle();
+        recording_       = vm.recording;
+        source_          = vm.source;
+        storage_ready_   = vm.storage_ready;
+        screen_signals_  = vm.screen_signals;
+        profile_signals_ = vm.profile_signals;
+        refresh_buttons();
         refresh_erase();
 
         char buf[32];
@@ -283,42 +327,64 @@ namespace gui
         lv_label_set_text(recorded_value_, buf);
     }
 
-    void LoggingScreen::refresh_toggle()
+    void LoggingScreen::refresh_buttons()
     {
         if (theme_ == nullptr)
         {
             return;
         }
+        refresh_button(buttons_[0]);
+        refresh_button(buttons_[1]);
+    }
+
+    void LoggingScreen::refresh_button(SourceButton &b)
+    {
+        const Palette &pal     = theme_->palette;
+        bool           profile = b.source == LogSourceVm::Profile;
+        uint8_t        signals = profile ? profile_signals_ : screen_signals_;
+        const char    *name    = profile ? "PROFILE" : "SCREEN";
+
+        char hint[24];
+        snprintf(hint,
+                 sizeof(hint),
+                 signals == 1 ? "%u signal" : "%u signals",
+                 static_cast<unsigned>(signals));
+
+        bool active = recording_ && source_ == b.source;
+        /**
+         * Dimmed: drawn, so the screen still explains its own shape, but
+         * a tap does nothing -- see button_clicked_cb(). No store at all;
+         * the other button's capture running; or a profile nobody has
+         * set up on the phone yet.
+         */
+        bool dim = !storage_ready_ || (recording_ && !active)
+                   || (!recording_ && profile && signals == 0);
 
         if (!storage_ready_)
         {
-            /* No store mounted -- nothing to record onto. Shown as a
-             * disabled-looking button rather than hidden, so the screen
-             * still explains itself instead of just missing its main
-             * control. */
-            lv_obj_set_style_bg_color(toggle_btn_, theme_->palette.bg, 0);
-            lv_obj_set_style_text_color(
-                toggle_lbl_, theme_->palette.panel_border, 0);
-            lv_obj_set_style_text_color(
-                toggle_hint_, theme_->palette.panel_border, 0);
-            lv_label_set_text(toggle_lbl_, "UNAVAILABLE");
-            lv_label_set_text(toggle_hint_, "no log storage");
-            return;
+            name = "N/A";
+            snprintf(hint, sizeof(hint), "no log storage");
+        }
+        else if (active)
+        {
+            name = portrait_ ? "REC" : "RECORDING";
+            snprintf(hint, sizeof(hint), "tap to stop");
+        }
+        else if (dim && !recording_)
+        {
+            snprintf(hint, sizeof(hint), "not set up");
         }
 
         /* Recording reads as a solid accent fill, the same treatment
          * every other checked/active control in this app uses (see
          * screen_helpers' style_flat_matrix()). */
-        lv_obj_set_style_bg_color(toggle_btn_,
-                                  recording_ ? theme_->palette.accent
-                                             : theme_->palette.bg,
-                                  0);
-        lv_obj_set_style_text_color(toggle_lbl_, theme_->palette.fg, 0);
+        lv_obj_set_style_bg_color(b.btn, active ? pal.accent : pal.bg, 0);
         lv_obj_set_style_text_color(
-            toggle_hint_, theme_->palette.panel_border, 0);
-        lv_label_set_text(toggle_lbl_, recording_ ? "RECORDING" : "OFF");
-        lv_label_set_text(toggle_hint_,
-                          recording_ ? "tap to stop" : "tap to start");
+            b.lbl, dim ? pal.panel_border : pal.fg, 0);
+        lv_obj_set_style_text_color(
+            b.hint, active ? pal.fg : pal.panel_border, 0);
+        lv_label_set_text(b.lbl, name);
+        lv_label_set_text(b.hint, hint);
     }
 
     void LoggingScreen::refresh_erase()
@@ -400,22 +466,40 @@ namespace gui
         self->erase_confirm_mbox_ = nullptr;
     }
 
-    void LoggingScreen::toggle_clicked_cb(lv_event_t *e)
+    void LoggingScreen::button_clicked_cb(lv_event_t *e)
     {
-        LoggingScreen *self
-            = static_cast<LoggingScreen *>(lv_event_get_user_data(e));
+        SourceButton *b
+            = static_cast<SourceButton *>(lv_event_get_user_data(e));
+        LoggingScreen *self = b->owner;
 
         if (!self->storage_ready_)
         {
-            return; /* nothing to record onto -- see refresh_toggle() */
+            return; /* nothing to record onto -- see refresh_button() */
         }
 
-        self->recording_ = !self->recording_;
-        self->refresh_toggle();
+        if (self->recording_)
+        {
+            if (self->source_ != b->source)
+            {
+                return; /* the other capture's running; stop it there */
+            }
+            self->recording_ = false;
+        }
+        else
+        {
+            if (b->source == LogSourceVm::Profile
+                && self->profile_signals_ == 0)
+            {
+                return; /* no profile set up on the phone yet */
+            }
+            self->recording_ = true;
+            self->source_    = b->source;
+        }
+        self->refresh_buttons();
 
         if (self->toggle_cb_ != nullptr)
         {
-            self->toggle_cb_(self->toggle_ctx_, self->recording_);
+            self->toggle_cb_(self->toggle_ctx_, self->recording_, b->source);
         }
     }
 

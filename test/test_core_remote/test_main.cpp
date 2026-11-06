@@ -356,6 +356,11 @@ void test_get_state_reports_defaults()
                             entry0.display_min);
     TEST_ASSERT_EQUAL_FLOAT(core::SIGNAL_CATALOG[0].display_max,
                             entry0.display_max);
+    TEST_ASSERT_EQUAL_UINT16(core::SIGNAL_CATALOG[0].cycle_time_ms,
+                             entry0.cycle_time_ms);
+    TEST_ASSERT_EQUAL_UINT16(
+        core::UDS_ECUS[core::SIGNAL_CATALOG[0].requests[0].ecu].tx_id,
+        entry0.module_tx);
     for (size_t i = 1; i < signal_count; i++)
     {
         SignalCatalogEntryWire entry {};
@@ -373,6 +378,16 @@ void test_get_state_reports_defaults()
         SignalConfigWire sig {};
         p = decode_signal_config(p, sig);
     }
+
+    /**
+     * Recording from the screen, and no profile yet.
+     */
+    uint8_t log_source = 0xFF;
+    uint8_t log_count  = 0xFF;
+    p                  = get_u8(p, log_source);
+    p                  = get_u8(p, log_count);
+    TEST_ASSERT_EQUAL_UINT8(0, log_source);
+    TEST_ASSERT_EQUAL_UINT8(0, log_count);
 
     uint8_t preview_active = 0xFF;
     p                      = get_u8(p, preview_active);
@@ -635,6 +650,189 @@ void test_apply_config_rejects_invalid_signal_id()
                             resp[0]);
     TEST_ASSERT_EQUAL_UINT16(
         0, config.get().priorities[0].signal_id); /* untouched */
+}
+
+namespace
+{
+    /**
+     * Appends a log profile block -- a count, then the ids -- at `p`.
+     */
+    size_t append_log_block(uint8_t        *p,
+                            const uint16_t *ids,
+                            uint8_t         count)
+    {
+        uint8_t *start = p;
+        p              = put_u8(p, count);
+        for (uint8_t i = 0; i < count; i++)
+        {
+            p = put_u16(p, ids[i]);
+        }
+        return static_cast<size_t>(p - start);
+    }
+
+    uint8_t apply(RemoteConfigServer &server,
+                  MsgType             type,
+                  const uint8_t      *req,
+                  size_t              len)
+    {
+        uint8_t resp[16] = { 0xFF };
+        MsgType resp_type;
+        server.handle_request(type,
+                              req,
+                              static_cast<uint16_t>(len),
+                              resp,
+                              sizeof(resp),
+                              resp_type);
+        return resp[0];
+    }
+} // namespace
+
+void test_apply_config_sets_and_reports_the_log_profile()
+{
+    FakeConfigStore   backing;
+    core::ConfigStore config(backing);
+    config.load();
+    core::SignalStore signals;
+    RemoteConfigServer server(config, signals);
+
+    uint8_t        req[FRAME_MAX_PAYLOAD];
+    size_t         len   = build_apply_payload(config.get(), req);
+    const uint16_t ids[] = { 22, 7, 42 };
+    len += append_log_block(req + len, ids, 3);
+
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(ApplyResult::Ok),
+        apply(server, MsgType::REQ_APPLY_CONFIG, req, len));
+
+    core::ConfigStore reloaded(backing);
+    reloaded.load();
+    TEST_ASSERT_EQUAL_UINT8(3, reloaded.get().log_count);
+    TEST_ASSERT_EQUAL_UINT16(22, reloaded.get().log_signals[0]);
+    TEST_ASSERT_EQUAL_UINT16(42, reloaded.get().log_signals[2]);
+    TEST_ASSERT_EQUAL_UINT16(core::NO_SIGNAL_ID,
+                             reloaded.get().log_signals[3]);
+
+    /**
+     * RESP_STATE hands it back, just before the flags byte.
+     */
+    uint8_t resp[FRAME_MAX_PAYLOAD];
+    MsgType resp_type;
+    size_t  resp_len = server.handle_request(
+        MsgType::REQ_GET_STATE, nullptr, 0, resp, sizeof(resp), resp_type);
+    const uint8_t *tail = resp + resp_len - 1 - (2 + 3 * 2);
+    uint8_t        source = 0xFF, count = 0;
+    uint16_t       id     = 0;
+    tail                  = get_u8(tail, source);
+    tail                  = get_u8(tail, count);
+    TEST_ASSERT_EQUAL_UINT8(0, source);
+    TEST_ASSERT_EQUAL_UINT8(3, count);
+    tail = get_u16(tail, id);
+    TEST_ASSERT_EQUAL_UINT16(22, id);
+}
+
+void test_apply_config_without_a_log_block_keeps_the_profile()
+{
+    FakeConfigStore   backing;
+    core::ConfigStore config(backing);
+    config.load();
+    config.get().log_count      = 1;
+    config.get().log_signals[0] = 7;
+    config.save();
+    core::SignalStore signals;
+    RemoteConfigServer server(config, signals);
+
+    /**
+     * What a page loaded before the profile existed sends.
+     */
+    uint8_t req[FRAME_MAX_PAYLOAD];
+    size_t  len = build_apply_payload(config.get(), req);
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(ApplyResult::Ok),
+        apply(server, MsgType::REQ_APPLY_CONFIG, req, len));
+    TEST_ASSERT_EQUAL_UINT8(1, config.get().log_count);
+    TEST_ASSERT_EQUAL_UINT16(7, config.get().log_signals[0]);
+}
+
+void test_apply_config_rejects_a_bad_log_profile()
+{
+    FakeConfigStore   backing;
+    core::ConfigStore config(backing);
+    config.load();
+    core::SignalStore signals;
+    RemoteConfigServer server(config, signals);
+
+    uint8_t req[FRAME_MAX_PAYLOAD];
+    size_t  base = build_apply_payload(config.get(), req);
+
+    const uint16_t unknown[] = { 22, 9999 };
+    size_t len = base + append_log_block(req + base, unknown, 2);
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(ApplyResult::ErrInvalidSignal),
+        apply(server, MsgType::REQ_APPLY_CONFIG, req, len));
+
+    const uint16_t repeated[] = { 22, 7, 22 };
+    len = base + append_log_block(req + base, repeated, 3);
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(ApplyResult::ErrInvalidSignal),
+        apply(server, MsgType::REQ_APPLY_CONFIG, req, len));
+
+    uint16_t too_many[core::MAX_LOG_SIGNALS + 1];
+    for (uint8_t i = 0; i <= core::MAX_LOG_SIGNALS; i++)
+    {
+        too_many[i] = core::SIGNAL_CATALOG[i].id;
+    }
+    len = base
+          + append_log_block(
+              req + base, too_many, core::MAX_LOG_SIGNALS + 1);
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(ApplyResult::ErrInvalidSignal),
+        apply(server, MsgType::REQ_APPLY_CONFIG, req, len));
+
+    /**
+     * A count promising more ids than the body holds.
+     */
+    req[base]     = 2;
+    req[base + 1] = 22;
+    req[base + 2] = 0;
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(ApplyResult::ErrTruncated),
+        apply(server, MsgType::REQ_APPLY_CONFIG, req, base + 3));
+
+    /**
+     * None of it landed -- nor the rest of those batches.
+     */
+    TEST_ASSERT_EQUAL_UINT8(0, config.get().log_count);
+}
+
+void test_preview_reads_the_log_block_after_its_values()
+{
+    FakeConfigStore   backing;
+    core::ConfigStore config(backing);
+    config.load();
+    core::SignalStore signals;
+    RemoteConfigServer server(config, signals);
+
+    uint8_t  req[FRAME_MAX_PAYLOAD];
+    size_t   len = build_apply_payload(config.get(), req);
+    uint8_t *p   = req + len;
+    p = put_u16(p, static_cast<uint16_t>(core::SIGNAL_CATALOG_COUNT));
+    for (size_t i = 0; i < core::SIGNAL_CATALOG_COUNT; i++)
+    {
+        p = put_f32(p, NAN);
+    }
+    len                  = static_cast<size_t>(p - req);
+    const uint16_t ids[] = { 38, 39 };
+    len += append_log_block(req + len, ids, 2);
+
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(ApplyResult::Ok),
+        apply(server, MsgType::REQ_PREVIEW_CONFIG, req, len));
+    TEST_ASSERT_EQUAL_UINT8(2, config.get().log_count);
+    TEST_ASSERT_EQUAL_UINT16(39, config.get().log_signals[1]);
+    /**
+     * A profile edit alone is an unsaved change.
+     */
+    TEST_ASSERT_TRUE(server.has_unsaved_changes());
 }
 
 void test_apply_config_clamps_brightness_and_panel_count()
@@ -1593,6 +1791,10 @@ int main(int argc, char **argv)
     RUN_TEST(test_apply_config_round_trips_brightness_settings);
     RUN_TEST(test_apply_config_rejects_signal_count_mismatch);
     RUN_TEST(test_apply_config_rejects_invalid_signal_id);
+    RUN_TEST(test_apply_config_sets_and_reports_the_log_profile);
+    RUN_TEST(test_apply_config_without_a_log_block_keeps_the_profile);
+    RUN_TEST(test_apply_config_rejects_a_bad_log_profile);
+    RUN_TEST(test_preview_reads_the_log_block_after_its_values);
     RUN_TEST(test_apply_config_clamps_brightness_and_panel_count);
     RUN_TEST(test_apply_config_clamps_thresholds_to_effective_range);
     RUN_TEST(test_apply_config_swaps_reversed_thresholds);

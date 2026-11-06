@@ -28,16 +28,23 @@ namespace remote::server
             = HEAD_LEN + core::SIGNAL_CATALOG_COUNT * SIGNAL_BYTES;
 
         /**
+         * The optional log profile block: a count, then the ids.
+         */
+        constexpr size_t LOG_PROFILE_MAX_BYTES = 1 + core::MAX_LOG_SIGNALS * 2;
+
+        /**
          * RESP_STATE: settings, the panel count and panels, the signal
-         * count, a catalog entry and a config per signal, then the flags
-         * byte. See handle_get_state().
+         * count, a catalog entry and a config per signal, the log source
+         * and profile, then the flags byte. See handle_get_state(). This
+         * is the most it can be: the profile is only as long as it is.
          */
         constexpr size_t CATALOG_ENTRY_BYTES
-            = 2 + protocol::WIRE_NAME_LEN + 1 + 4 + 4;
+            = 2 + protocol::WIRE_NAME_LEN + 1 + 4 + 4 + 2 + 2;
         constexpr size_t state_len(size_t signals)
         {
             return SETTINGS_BYTES + 1 + core::MAX_PANELS * PANEL_BYTES + 2
-                   + signals * (CATALOG_ENTRY_BYTES + SIGNAL_BYTES) + 1;
+                   + signals * (CATALOG_ENTRY_BYTES + SIGNAL_BYTES) + 1
+                   + LOG_PROFILE_MAX_BYTES + 1;
         }
 
         /**
@@ -119,6 +126,18 @@ namespace remote::server
                     || (ca.use_custom_range
                         && (ca.custom_min != cb.custom_min
                             || ca.custom_max != cb.custom_max)))
+                {
+                    return false;
+                }
+            }
+            if (a.log_count != b.log_count)
+            {
+                return false;
+            }
+            for (uint8_t i = 0; i < a.log_count && i < core::MAX_LOG_SIGNALS;
+                 i++)
+            {
+                if (a.log_signals[i] != b.log_signals[i])
                 {
                     return false;
                 }
@@ -241,7 +260,21 @@ namespace remote::server
             saved_before_preview_ = config_.get();
         }
 
-        ApplyResult result = apply_to_live(payload, len);
+        /**
+         * The log profile, if the page sent one, comes after everything
+         * else -- past the preview values on a preview, whose own count
+         * says how long they are. A body too short to say is left to
+         * apply_to_live() to reject.
+         */
+        size_t log_at = BATCH_LEN;
+        if (req_type == MsgType::REQ_PREVIEW_CONFIG && len >= BATCH_LEN + 2)
+        {
+            uint16_t values = 0;
+            protocol::get_u16(payload + BATCH_LEN, values);
+            log_at = BATCH_LEN + 2 + static_cast<size_t>(values) * 4;
+        }
+
+        ApplyResult result = apply_to_live(payload, len, log_at);
         if (result != ApplyResult::Ok)
         {
             return result;
@@ -348,8 +381,13 @@ namespace remote::server
             entry.name[protocol::WIRE_NAME_LEN - 1] = '\0';
             entry.unit_type   = static_cast<uint8_t>(spec.unit_type);
             entry.display_min = spec.display_min;
-            entry.display_max = spec.display_max;
-            p                 = protocol::encode_signal_catalog_entry(p, entry);
+            entry.display_max   = spec.display_max;
+            entry.cycle_time_ms = static_cast<uint16_t>(
+                spec.cycle_time_ms > 0xFFFF ? 0xFFFF : spec.cycle_time_ms);
+            entry.module_tx = spec.num_requests > 0
+                                  ? core::UDS_ECUS[spec.requests[0].ecu].tx_id
+                                  : 0;
+            p = protocol::encode_signal_catalog_entry(p, entry);
         }
 
         for (size_t i = 0; i < core::SIGNAL_CATALOG_COUNT; i++)
@@ -367,6 +405,16 @@ namespace remote::server
             p                   = protocol::encode_signal_config(p, sw);
         }
 
+        uint8_t log_count = cfg.log_count > core::MAX_LOG_SIGNALS
+                                ? core::MAX_LOG_SIGNALS
+                                : cfg.log_count;
+        p = protocol::put_u8(p, static_cast<uint8_t>(cfg.settings.log_source));
+        p = protocol::put_u8(p, log_count);
+        for (uint8_t i = 0; i < log_count; i++)
+        {
+            p = protocol::put_u16(p, cfg.log_signals[i]);
+        }
+
         p = protocol::put_u8(
             p,
             static_cast<uint8_t>((preview_active_ ? 1 : 0) | (unsaved_ ? 2 : 0)));
@@ -377,7 +425,8 @@ namespace remote::server
 
     FLASHMEM ApplyResult RemoteConfigServer::apply_to_live(
         const uint8_t *payload,
-        uint16_t       len)
+        uint16_t       len,
+        size_t         log_at)
     {
         /* The batch comes from browser-side JS rather than this
          * firmware's own encoder, so a short one is checked here instead
@@ -440,6 +489,44 @@ namespace remote::server
             p = protocol::decode_signal_config(p, signals[i]);
         }
 
+        /**
+         * The log profile: optional (see REQ_PREVIEW_CONFIG), and held to
+         * the same rules ConfigStore::load() would otherwise fix up --
+         * every id offered by this build, none twice, at most
+         * MAX_LOG_SIGNALS -- so the phone hears about a bad one instead
+         * of the dash quietly dropping it.
+         */
+        bool     has_log = len > log_at;
+        uint8_t  log_count = 0;
+        uint16_t log_ids[core::MAX_LOG_SIGNALS] = {};
+        if (has_log)
+        {
+            const uint8_t *q = protocol::get_u8(payload + log_at, log_count);
+            if (log_count > core::MAX_LOG_SIGNALS)
+            {
+                return ApplyResult::ErrInvalidSignal;
+            }
+            if (len < log_at + 1 + static_cast<size_t>(log_count) * 2)
+            {
+                return ApplyResult::ErrTruncated;
+            }
+            for (uint8_t i = 0; i < log_count; i++)
+            {
+                q = protocol::get_u16(q, log_ids[i]);
+                if (core::signal_catalog_find(log_ids[i]) < 0)
+                {
+                    return ApplyResult::ErrInvalidSignal;
+                }
+                for (uint8_t k = 0; k < i; k++)
+                {
+                    if (log_ids[k] == log_ids[i])
+                    {
+                        return ApplyResult::ErrInvalidSignal;
+                    }
+                }
+            }
+        }
+
         /* Every check above passed — commit. Per signal, resolve the
          * (possibly just-submitted) custom range first, then clamp that
          * signal's thresholds against it, so a range and its thresholds
@@ -462,6 +549,16 @@ namespace remote::server
             = static_cast<core::BrightnessMode>(settings.brightness_mode);
         cfg.settings.auto_brightness_pct
             = clamp_u8(settings.auto_brightness, 0, 100);
+
+        if (has_log)
+        {
+            cfg.log_count = log_count;
+            for (uint8_t i = 0; i < core::MAX_LOG_SIGNALS; i++)
+            {
+                cfg.log_signals[i] = i < log_count ? log_ids[i]
+                                                   : core::NO_SIGNAL_ID;
+            }
+        }
 
         for (uint8_t i = 0; i < core::MAX_PANELS; i++)
         {

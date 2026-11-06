@@ -63,6 +63,24 @@ namespace core
      */
     constexpr uint8_t AUTO_BRIGHTNESS_NEUTRAL = 50;
 
+    /**
+     * What a capture records. Persisted, and its ordinal goes over the
+     * wire to the phone configurator: append only.
+     */
+    enum class LogSource : uint8_t
+    {
+        Screen, /* whatever the panels show, followed live */
+        Profile /* Config::log_signals, copied when the capture starts */
+    };
+
+    /**
+     * How many signals a log profile holds. Every one of them is polled
+     * alongside the panels while a Profile capture runs, so this is
+     * bounded by bus throughput more than by storage. Raising it changes
+     * the stored layout, so it needs a CURRENT_VERSION bump.
+     */
+    constexpr uint8_t MAX_LOG_SIGNALS = 16;
+
     struct ConfigHeader
     {
             uint16_t magic;
@@ -111,6 +129,13 @@ namespace core
              * AutoBrightness::MAX_SHIFT_PCT. After accent_color, so the
              * v6-v8 Settings is a prefix of this one. */
             uint8_t auto_brightness_pct;
+            /**
+             * v10. Which set the last capture recorded from, so a dash
+             * that reboots mid-capture (logging_enabled persists) resumes
+             * the same one. Picked on LoggingScreen, never by the phone.
+             * Sits in what was padding after auto_brightness_pct.
+             */
+            LogSource log_source;
     };
 
     /** A single priority-ranked signal assignment — see the file doc
@@ -173,6 +198,14 @@ namespace core
              * past that hold signals this build doesn't have, or nothing.
              */
             SignalConfig signals[SIGNAL_CONFIG_SLOTS];
+            /**
+             * v10. The log profile: signal ids a Profile capture records,
+             * set from the phone configurator. Ids, not catalog positions,
+             * like priorities[]. Only the first log_count are meaningful;
+             * ConfigStore::load() drops any this build doesn't offer.
+             */
+            uint8_t  log_count;
+            uint16_t log_signals[MAX_LOG_SIGNALS];
     };
 
 } // namespace core

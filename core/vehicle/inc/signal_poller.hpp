@@ -30,16 +30,20 @@ namespace core
     class SignalPoller
     {
         public:
-            /* Sized for a full screen of panels (core::MAX_PANELS) plus
-             * every internal signal the dash reads for itself (Dim Ctrl,
-             * for auto brightness), each owning the catalog maximum of
-             * DIDs, assuming no dedup. The panel count is spelled out here
-             * rather than derived from MAX_PANELS so core/vehicle keeps its
-             * independence from core/config -- main.cpp, which already
+            /**
+             * Sized for a full screen of panels (core::MAX_PANELS), a
+             * full log profile (core::MAX_LOG_SIGNALS) none of which is on
+             * screen, and every internal signal the dash reads for itself
+             * (Dim Ctrl, for auto brightness), each owning the catalog
+             * maximum of DIDs, assuming no dedup. The counts are spelled
+             * out here rather than derived from core/config so core/vehicle
+             * keeps its independence from it -- main.cpp, which already
              * depends on both, is what translates the displayed panel set
-             * into the id list set_active() takes. */
+             * and the profile into the id list set_active() takes, and
+             * static_asserts that it fits.
+             */
             static constexpr uint8_t MAX_ACTIVE_SIGNALS
-                = 6 + INTERNAL_SIGNAL_COUNT;
+                = 6 + 16 + INTERNAL_SIGNAL_COUNT;
             static constexpr uint8_t MAX_ACTIVE_REQUESTS
                 = MAX_ACTIVE_SIGNALS * MAX_REQUESTS_PER_SIGNAL;
 
@@ -70,19 +74,40 @@ namespace core
             static constexpr uint8_t  MISSES_BEFORE_BACKOFF = 3;
             static constexpr uint32_t BACKOFF_PERIOD_MS     = 2000;
 
+            /**
+             * How overdue a background (log-only) request may get before
+             * it competes with the priority ones on equal terms. Priority
+             * requests win the bus otherwise, so the panels stay
+             * responsive while a log profile is being recorded -- but six
+             * 50ms engine signals on screen can keep the ECU busy on their
+             * own, and without this floor a background request would then
+             * never go out at all. Its signal still logs, just no faster
+             * than about once per (its period + this).
+             */
+            static constexpr uint32_t BACKGROUND_STARVATION_MS = 1000;
+
             SignalPoller(UdsClient &uds, IClock &clock);
 
             /**
              * Points the poller at the signals currently worth asking for
-             * — the displayed panel set, plus any internal signal in use.
-             * Ids in neither part of the catalog are skipped; anything past
-             * MAX_ACTIVE_SIGNALS is ignored.
+             * — the displayed panel set and any internal signal in use,
+             * then whatever a log profile adds. Ids in neither part of the
+             * catalog are skipped; anything past MAX_ACTIVE_SIGNALS is
+             * ignored.
+             *
+             * The first `priority_count` ids are priority: when the ECU
+             * can't keep up, their requests go out first, and the rest
+             * (background) take what's left -- see
+             * BACKGROUND_STARVATION_MS. A request two signals share is
+             * priority if either is. The default makes every id priority.
              *
              * Rebuilding the request table costs a full cadence reset, so
              * an unchanged list is a no-op and this is safe to call on a
              * timer as a backstop against a config path that forgets to.
              */
-            void set_active(const uint16_t *signal_ids, uint8_t count);
+            void set_active(const uint16_t *signal_ids,
+                            uint8_t         count,
+                            uint8_t         priority_count = 0xFF);
 
             /**
              * Sends at most one request, and only when nothing is
@@ -114,6 +139,7 @@ namespace core
                     uint32_t period_ms   = 0;
                     uint32_t next_due_ms = 0;
                     uint8_t  misses      = 0;
+                    bool     priority    = true;
             };
 
             int find_request(uint8_t ecu, uint8_t byte1, uint8_t byte2) const;
@@ -128,6 +154,11 @@ namespace core
 
             uint16_t active_ids_[MAX_ACTIVE_SIGNALS] = {};
             uint8_t  active_count_                   = 0;
+            uint8_t  active_priority_count_          = 0;
+            /**
+             * Whether any entry is background -- see tick()'s cadence.
+             */
+            bool     has_background_                 = false;
 
             bool     in_flight_     = false;
             uint8_t  in_flight_idx_ = 0;

@@ -16,6 +16,7 @@
 #include <string>
 #include <vector>
 
+#include "config.hpp"
 #include "logger.hpp"
 #include "signal_store.hpp"
 
@@ -160,8 +161,7 @@ namespace
     }
 
     /** A Config with `ids` assigned to panels, in order, and logging
-     * switched on -- the only parts of Config Logger::sample() reads (see
-     * its doc comment). Everything else is left zeroed. */
+     * switched on. Everything else is left zeroed. */
     core::Config displaying(std::initializer_list<uint16_t> ids)
     {
         core::Config cfg {};
@@ -174,6 +174,24 @@ namespace
             cfg.priorities[i++].signal_id = id;
         }
         return cfg;
+    }
+
+    /**
+     * Logger::sample() for what `cfg` has on screen -- what main.cpp
+     * passes it while recording from the screen.
+     */
+    void sample(core::Logger            &logger,
+                const core::SignalStore &signals,
+                const core::Config      &cfg,
+                uint32_t                 now_ms)
+    {
+        uint16_t ids[core::MAX_PANELS];
+        uint8_t  count = cfg.settings.num_panels;
+        for (uint8_t i = 0; i < count; i++)
+        {
+            ids[i] = cfg.priorities[i].signal_id;
+        }
+        logger.sample(signals, cfg.settings.logging_enabled, ids, count, now_ms);
     }
 } // namespace
 
@@ -206,10 +224,10 @@ void test_begin_writes_nothing_until_there_is_something_to_record()
     uint16_t           id  = core::SIGNAL_CATALOG[0].id;
     core::Config       cfg = displaying({ id });
     signals.set(id, 1.0f, 100);
-    logger.sample(signals, cfg, 100);
+    sample(logger, signals, cfg, 100);
     signals.set(id, 2.0f, 200);
-    logger.sample(signals, cfg, 200);
-    logger.sample(signals, cfg, 5200); // flush
+    sample(logger, signals, cfg, 200);
+    sample(logger, signals, cfg, 5200); // flush
 
     std::vector<uint8_t> bytes = storage.file_bytes(chunk_path_str(0));
     TEST_ASSERT_EQUAL_size_t(
@@ -238,11 +256,11 @@ void test_repeated_boots_without_recording_do_not_evict_anything()
             storage, sizeof(core::ChunkHeader) + sizeof(core::LogRecord), 3);
         logger.begin();
         signals.set(id, 1.0f, 1000);
-        logger.sample(signals, cfg, 1000);
+        sample(logger, signals, cfg, 1000);
         signals.set(id, 2.0f, 61000);
-        logger.sample(signals, cfg, 61000);
+        sample(logger, signals, cfg, 61000);
         cfg.settings.logging_enabled = false;
-        logger.sample(signals, cfg, 61000);
+        sample(logger, signals, cfg, 61000);
         TEST_ASSERT_EQUAL_UINT16(1, logger.log_count());
     }
 
@@ -270,30 +288,146 @@ void test_sample_records_a_changed_value_but_not_a_repeated_one()
     core::Config       cfg = displaying({ id });
 
     signals.set(id, 42.0f, 100);
-    logger.sample(signals, cfg, 100); // primes the baseline, writes nothing
+    sample(logger, signals, cfg, 100); // enters the set; 42.0 may be stale
+
+    /**
+     * The first value to arrive after entering is written whatever it
+     * is -- even the same 42.0 -- so the capture has a starting value.
+     */
+    signals.set(id, 42.0f, 200);
+    sample(logger, signals, cfg, 200);
 
     /* Polled again, far enough past the rate floor, but the value hasn't
      * moved -- SignalValue::last_update_ms advanced anyway, so this is
      * what separates on-change from on-poll. */
-    signals.set(id, 42.0f, 200);
-    logger.sample(signals, cfg, 200);
+    signals.set(id, 42.0f, 300);
+    sample(logger, signals, cfg, 300);
 
-    signals.set(id, 55.0f, 300); // a real change
-    logger.sample(signals, cfg, 300);
+    signals.set(id, 55.0f, 400); // a real change
+    sample(logger, signals, cfg, 400);
 
-    logger.sample(signals, cfg, 5300); // due (>=5000ms) -- flush
+    sample(logger, signals, cfg, 5400); // due (>=5000ms) -- flush
+
+    std::vector<uint8_t> bytes = storage.file_bytes(chunk_path_str(0));
+    TEST_ASSERT_EQUAL_size_t(
+        sizeof(core::ChunkHeader) + 2 * sizeof(core::LogRecord), bytes.size());
+
+    core::LogRecord records[2];
+    memcpy(records, bytes.data() + sizeof(core::ChunkHeader), sizeof(records));
+    TEST_ASSERT_EQUAL_UINT32(200, records[0].timestamp_ms);
+    TEST_ASSERT_EQUAL_FLOAT(42.0f, records[0].value);
+    TEST_ASSERT_EQUAL_UINT32(400, records[1].timestamp_ms);
+    TEST_ASSERT_EQUAL_UINT16(id, records[1].signal_id);
+    TEST_ASSERT_EQUAL_FLOAT(55.0f, records[1].value);
+}
+
+void test_a_constant_signal_is_logged_once_per_capture()
+{
+    FakeStorage storage;
+    storage.begin();
+    core::Logger logger(storage);
+    logger.begin();
+
+    /**
+     * A valve that stays shut, polled every 100ms. On-change alone would
+     * never write it, and the capture would hold no trace of its state.
+     */
+    core::SignalStore signals;
+    uint16_t           id  = core::SIGNAL_CATALOG[0].id;
+    core::Config       cfg = displaying({ id });
+
+    for (uint32_t t = 0; t <= 1000; t += 100)
+    {
+        signals.set(id, 1.0f, t);
+        sample(logger, signals, cfg, t);
+    }
+    sample(logger, signals, cfg, 6000); // flush
 
     std::vector<uint8_t> bytes = storage.file_bytes(chunk_path_str(0));
     TEST_ASSERT_EQUAL_size_t(
         sizeof(core::ChunkHeader) + sizeof(core::LogRecord), bytes.size());
 
     core::LogRecord record;
-    memcpy(&record,
-          bytes.data() + sizeof(core::ChunkHeader),
-          sizeof(record));
-    TEST_ASSERT_EQUAL_UINT32(300, record.timestamp_ms);
-    TEST_ASSERT_EQUAL_UINT16(id, record.signal_id);
-    TEST_ASSERT_EQUAL_FLOAT(55.0f, record.value);
+    memcpy(&record, bytes.data() + sizeof(core::ChunkHeader), sizeof(record));
+    TEST_ASSERT_EQUAL_UINT32(100, record.timestamp_ms);
+    TEST_ASSERT_EQUAL_FLOAT(1.0f, record.value);
+}
+
+void test_sample_records_any_named_set_not_just_the_panels()
+{
+    FakeStorage storage;
+    storage.begin();
+    core::Logger logger(storage);
+    logger.begin();
+
+    /**
+     * What a Profile capture hands it: ids on no panel at all, one of
+     * them repeated, one not in this build's catalog.
+     */
+    core::SignalStore signals;
+    uint16_t           a = core::SIGNAL_CATALOG[2].id;
+    uint16_t           b = core::SIGNAL_CATALOG[3].id;
+    const uint16_t     ids[] = { a, b, a, 0xFFFE };
+
+    logger.sample(signals, true, ids, 4, 100);
+    signals.set(a, 1.0f, 200);
+    signals.set(b, 2.0f, 200);
+    logger.sample(signals, true, ids, 4, 200);
+    logger.sample(signals, true, ids, 4, 5200); // flush
+
+    std::vector<uint8_t> bytes = storage.file_bytes(chunk_path_str(0));
+    TEST_ASSERT_EQUAL_size_t(
+        sizeof(core::ChunkHeader) + 2 * sizeof(core::LogRecord), bytes.size());
+
+    core::LogRecord records[2];
+    memcpy(records, bytes.data() + sizeof(core::ChunkHeader), sizeof(records));
+    TEST_ASSERT_EQUAL_UINT16(a, records[0].signal_id);
+    TEST_ASSERT_EQUAL_UINT16(b, records[1].signal_id);
+}
+
+void test_a_full_tick_is_never_dropped_at_the_buffer_edge()
+{
+    FakeStorage storage;
+    storage.begin();
+    core::Logger logger(storage);
+    logger.begin();
+
+    /**
+     * Sixteen signals all changing every 50ms -- a busy profile. Each
+     * tick adds sixteen records, which doesn't divide the buffer evenly,
+     * so a flush only once it's full would drop part of a tick.
+     */
+    constexpr uint8_t N = 16;
+    uint16_t          ids[N];
+    for (uint8_t i = 0; i < N; i++)
+    {
+        ids[i] = core::SIGNAL_CATALOG[i].id;
+    }
+
+    core::SignalStore signals;
+    logger.sample(signals, true, ids, N, 0);
+    uint32_t ticks = 0;
+    for (uint32_t t = 50; t <= 3000; t += 50, ticks++)
+    {
+        for (uint8_t i = 0; i < N; i++)
+        {
+            signals.set(ids[i], static_cast<float>(t + i), t);
+        }
+        logger.sample(signals, true, ids, N, t);
+    }
+    logger.sample(signals, false, ids, N, 3000); // stop -- flushes
+
+    size_t total = 0;
+    for (uint16_t c = 0; c < core::CHUNK_COUNT; c++)
+    {
+        std::vector<uint8_t> bytes = storage.file_bytes(chunk_path_str(c));
+        if (!bytes.empty())
+        {
+            total += (bytes.size() - sizeof(core::ChunkHeader))
+                     / sizeof(core::LogRecord);
+        }
+    }
+    TEST_ASSERT_EQUAL_size_t(static_cast<size_t>(ticks) * N, total);
 }
 
 void test_a_fast_signal_is_rate_floored_to_the_minimum_interval()
@@ -321,15 +455,15 @@ void test_a_fast_signal_is_rate_floored_to_the_minimum_interval()
     constexpr uint32_t expected_records = 5;
 
     signals.set(id, 0.0f, 0);
-    logger.sample(signals, cfg, 0); // primes
+    sample(logger, signals, cfg, 0); // enters the set; 0.0 may be stale
 
     for (uint32_t t = arrival; t <= arrival * expected_records * 2; t += arrival)
     {
         signals.set(id, static_cast<float>(t), t);
-        logger.sample(signals, cfg, t);
+        sample(logger, signals, cfg, t);
     }
 
-    logger.sample(signals, cfg, 5200); // flush
+    sample(logger, signals, cfg, 5200); // flush
 
     std::vector<uint8_t> bytes = storage.file_bytes(chunk_path_str(0));
     TEST_ASSERT_EQUAL_size_t(
@@ -338,13 +472,17 @@ void test_a_fast_signal_is_rate_floored_to_the_minimum_interval()
         bytes.size());
 
     /* Every other arrival, i.e. exactly LOG_MIN_INTERVAL_MS apart -- not
-     * the rate it arrived at, and not coarser. */
+     * the rate it arrived at, and not coarser. 2x records' worth of
+     * arrivals gives exactly expected_records. */
     core::LogRecord records[expected_records];
     memcpy(records, bytes.data() + sizeof(core::ChunkHeader),
            sizeof(records));
     for (uint32_t i = 0; i < expected_records; i++)
     {
-        TEST_ASSERT_EQUAL_UINT32(core::LOG_MIN_INTERVAL_MS * (i + 1),
+        /**
+         * The first fresh arrival opens the series, floor or not.
+         */
+        TEST_ASSERT_EQUAL_UINT32(arrival + core::LOG_MIN_INTERVAL_MS * i,
                                  records[i].timestamp_ms);
     }
 }
@@ -361,7 +499,7 @@ void test_a_slower_signal_is_logged_at_its_own_arrival_cadence()
     core::Config       cfg = displaying({ id });
 
     signals.set(id, 0.0f, 0);
-    logger.sample(signals, cfg, 0); // primes
+    sample(logger, signals, cfg, 0); // primes
 
     /* 100ms arrivals, sampled at 20ms. The floor is a floor, not a target
      * rate: every arrival past it gets its own record, so this signal is
@@ -372,10 +510,10 @@ void test_a_slower_signal_is_logged_at_its_own_arrival_cadence()
         {
             signals.set(id, static_cast<float>(t), t);
         }
-        logger.sample(signals, cfg, t);
+        sample(logger, signals, cfg, t);
     }
 
-    logger.sample(signals, cfg, 5500); // flush
+    sample(logger, signals, cfg, 5500); // flush
 
     std::vector<uint8_t> bytes = storage.file_bytes(chunk_path_str(0));
     TEST_ASSERT_EQUAL_size_t(
@@ -401,7 +539,7 @@ void test_sample_before_begin_or_without_data_is_a_no_op()
     core::Config       cfg = displaying({ id });
     signals.set(id, 1.0f, 100);
 
-    logger.sample(signals, cfg, 100);
+    sample(logger, signals, cfg, 100);
     TEST_ASSERT_FALSE(logger.is_ready());
     TEST_ASSERT_FALSE(storage.exists(chunk_path_str(0).c_str()));
 }
@@ -422,14 +560,14 @@ void test_sample_records_only_the_signals_currently_on_screen()
     signals.set(hidden, 22.0f, 100);
 
     core::Config cfg = displaying({ shown });
-    logger.sample(signals, cfg, 100); // primes `shown`
+    sample(logger, signals, cfg, 100); // `shown` enters the set
 
     /* Both keep updating -- only the one on a panel may be recorded. */
     signals.set(shown, 12.0f, 200);
     signals.set(hidden, 23.0f, 200);
-    logger.sample(signals, cfg, 200);
+    sample(logger, signals, cfg, 200);
 
-    logger.sample(signals, cfg, 5200); // due -- flush
+    sample(logger, signals, cfg, 5200); // due -- flush
 
     std::vector<uint8_t> bytes = storage.file_bytes(chunk_path_str(0));
     TEST_ASSERT_EQUAL_size_t(
@@ -442,7 +580,7 @@ void test_sample_records_only_the_signals_currently_on_screen()
     TEST_ASSERT_EQUAL_UINT16(shown, record.signal_id);
 }
 
-void test_a_reassigned_panels_new_signal_is_primed_not_logged_stale()
+void test_a_reassigned_panels_stale_value_is_not_logged()
 {
     FakeStorage storage;
     storage.begin();
@@ -460,21 +598,23 @@ void test_a_reassigned_panels_new_signal_is_primed_not_logged_stale()
     signals.set(second, 22.0f, 100);
 
     core::Config cfg = displaying({ first });
-    logger.sample(signals, cfg, 100); // primes `first`
+    sample(logger, signals, cfg, 100); // `first` enters the set
 
     signals.set(first, 12.0f, 200);
-    logger.sample(signals, cfg, 200); // records `first` = 12.0
+    sample(logger, signals, cfg, 200); // records `first` = 12.0
 
-    /* User reassigns the panel to `second`. Its stale 22.0 from t=100 is
-     * taken as a baseline only -- no record. */
+    /**
+     * User reassigns the panel to `second`. Its stale 22.0 from t=100
+     * predates it entering the set -- no record.
+     */
     cfg.priorities[0].signal_id = second;
-    logger.sample(signals, cfg, 240);
-    logger.sample(signals, cfg, 300);
+    sample(logger, signals, cfg, 240);
+    sample(logger, signals, cfg, 300);
 
     signals.set(second, 33.0f, 400); // first genuinely new value
-    logger.sample(signals, cfg, 400);
+    sample(logger, signals, cfg, 400);
 
-    logger.sample(signals, cfg, 5400); // due -- flush
+    sample(logger, signals, cfg, 5400); // due -- flush
 
     std::vector<uint8_t> bytes = storage.file_bytes(chunk_path_str(0));
     TEST_ASSERT_EQUAL_size_t(
@@ -508,10 +648,10 @@ void test_sample_records_nothing_while_logging_is_disabled()
     cfg.settings.logging_enabled = false;
 
     signals.set(id, 11.0f, 100);
-    logger.sample(signals, cfg, 100);
+    sample(logger, signals, cfg, 100);
     signals.set(id, 22.0f, 200);
-    logger.sample(signals, cfg, 200);
-    logger.sample(signals, cfg, 5200); // would flush, if anything were buffered
+    sample(logger, signals, cfg, 200);
+    sample(logger, signals, cfg, 5200); // would flush, if anything were buffered
 
     /* Not even a chunk header: chunks are created by the first flush that
      * has content, and there was none. */
@@ -530,14 +670,14 @@ void test_turning_logging_off_flushes_and_back_on_reprimes()
     core::Config       cfg = displaying({ id });
 
     signals.set(id, 11.0f, 100);
-    logger.sample(signals, cfg, 100); // primes
+    sample(logger, signals, cfg, 100); // primes
     signals.set(id, 22.0f, 200);
-    logger.sample(signals, cfg, 200); // buffers a record, not yet flushed
+    sample(logger, signals, cfg, 200); // buffers a record, not yet flushed
 
     /* Switching off must not strand that buffered record waiting for a
      * flush interval that will never come while logging is off. */
     cfg.settings.logging_enabled = false;
-    logger.sample(signals, cfg, 240);
+    sample(logger, signals, cfg, 240);
 
     std::vector<uint8_t> after_off = storage.file_bytes(chunk_path_str(0));
     TEST_ASSERT_EQUAL_size_t(
@@ -547,14 +687,14 @@ void test_turning_logging_off_flushes_and_back_on_reprimes()
     /* Values keep moving while logging is off -- none of that may appear
      * once it resumes. */
     signals.set(id, 99.0f, 300);
-    logger.sample(signals, cfg, 300);
+    sample(logger, signals, cfg, 300);
 
     cfg.settings.logging_enabled = true;
-    logger.sample(signals, cfg, 340); // re-primes on 99.0, writes nothing
+    sample(logger, signals, cfg, 340); // re-primes on 99.0, writes nothing
 
     signals.set(id, 77.0f, 400); // first genuinely new value since resuming
-    logger.sample(signals, cfg, 400);
-    logger.sample(signals, cfg, 5400); // flush
+    sample(logger, signals, cfg, 400);
+    sample(logger, signals, cfg, 5400); // flush
 
     std::vector<uint8_t> bytes = storage.file_bytes(chunk_path_str(0));
     TEST_ASSERT_EQUAL_size_t(
@@ -590,12 +730,12 @@ void test_each_on_off_cycle_counts_as_its_own_log()
 
         cfg.settings.logging_enabled = true;
         signals.set(id, static_cast<float>(i), t);
-        logger.sample(signals, cfg, t);          // opens capture i
+        sample(logger, signals, cfg, t);          // opens capture i
         signals.set(id, static_cast<float>(i) + 0.5f, t + 60000);
-        logger.sample(signals, cfg, t + 60000);  // 60s of recording
+        sample(logger, signals, cfg, t + 60000);  // 60s of recording
 
         cfg.settings.logging_enabled = false;
-        logger.sample(signals, cfg, t + 60000);  // closes capture i
+        sample(logger, signals, cfg, t + 60000);  // closes capture i
     }
 
     TEST_ASSERT_EQUAL_UINT16(3, logger.log_count());
@@ -619,11 +759,11 @@ void test_erase_clears_the_store_and_the_capture_count()
     /* One complete capture, so there's both a chunk and an index entry
      * to destroy. */
     signals.set(id, 1.0f, 1000);
-    logger.sample(signals, cfg, 1000);
+    sample(logger, signals, cfg, 1000);
     signals.set(id, 2.0f, 61000);
-    logger.sample(signals, cfg, 61000);
+    sample(logger, signals, cfg, 61000);
     cfg.settings.logging_enabled = false;
-    logger.sample(signals, cfg, 61000);
+    sample(logger, signals, cfg, 61000);
 
     TEST_ASSERT_EQUAL_UINT16(1, logger.log_count());
     TEST_ASSERT_TRUE(storage.exists(chunk_path_str(0).c_str()));
@@ -659,9 +799,9 @@ void test_erase_mid_capture_does_not_let_buffered_records_survive()
      * (main.cpp's logging_erase_cb clears logging_enabled, but the
      * Logger's own tick hasn't run yet). */
     signals.set(id, 1.0f, 1000);
-    logger.sample(signals, cfg, 1000);
+    sample(logger, signals, cfg, 1000);
     signals.set(id, 2.0f, 1100);
-    logger.sample(signals, cfg, 1100);
+    sample(logger, signals, cfg, 1100);
 
     TEST_ASSERT_TRUE(logger.is_capturing());
 
@@ -674,7 +814,7 @@ void test_erase_mid_capture_does_not_let_buffered_records_survive()
     TEST_ASSERT_EQUAL_UINT16(0, logger.log_count());
 
     cfg.settings.logging_enabled = false;
-    logger.sample(signals, cfg, 1200);
+    sample(logger, signals, cfg, 1200);
 
     TEST_ASSERT_EQUAL_UINT16(0, logger.log_count());
     TEST_ASSERT_FALSE(storage.exists(chunk_path_str(0).c_str()));
@@ -692,9 +832,9 @@ void test_recording_after_an_erase_starts_a_fresh_capture()
     core::Config      cfg = displaying({ id });
 
     signals.set(id, 1.0f, 1000);
-    logger.sample(signals, cfg, 1000);
+    sample(logger, signals, cfg, 1000);
     cfg.settings.logging_enabled = false;
-    logger.sample(signals, cfg, 2000);
+    sample(logger, signals, cfg, 2000);
 
     TEST_ASSERT_TRUE(logger.erase());
 
@@ -703,13 +843,13 @@ void test_recording_after_an_erase_starts_a_fresh_capture()
      * writes nothing, and the first record is the next genuinely new
      * value. */
     cfg.settings.logging_enabled = true;
-    logger.sample(signals, cfg, 3000);
+    sample(logger, signals, cfg, 3000);
     TEST_ASSERT_EQUAL_UINT16(1, logger.log_count()); /* capture opened */
 
     signals.set(id, 9.0f, 4000);
-    logger.sample(signals, cfg, 4000);
+    sample(logger, signals, cfg, 4000);
     cfg.settings.logging_enabled = false;
-    logger.sample(signals, cfg, 5000);
+    sample(logger, signals, cfg, 5000);
 
     TEST_ASSERT_EQUAL_UINT16(1, logger.log_count());
     TEST_ASSERT_EQUAL_UINT32(1, logger.session_id()); /* no reboot involved */
@@ -738,11 +878,11 @@ void test_log_count_survives_a_reboot()
         core::Logger logger(storage);
         logger.begin();
         signals.set(id, 1.0f, 1000);
-        logger.sample(signals, cfg, 1000);
+        sample(logger, signals, cfg, 1000);
         signals.set(id, 2.0f, 61000);
-        logger.sample(signals, cfg, 61000);
+        sample(logger, signals, cfg, 61000);
         cfg.settings.logging_enabled = false;
-        logger.sample(signals, cfg, 61000);
+        sample(logger, signals, cfg, 61000);
         TEST_ASSERT_EQUAL_UINT16(1, logger.log_count());
     }
 
@@ -780,12 +920,12 @@ void test_logs_drop_out_of_the_count_once_the_ring_laps_past_them()
 
         cfg.settings.logging_enabled = true;
         signals.set(id, static_cast<float>(i + 1), t);
-        logger.sample(signals, cfg, t);
+        sample(logger, signals, cfg, t);
         signals.set(id, static_cast<float>(i + 1) * 10.0f, t + 10000);
-        logger.sample(signals, cfg, t + 10000);
+        sample(logger, signals, cfg, t + 10000);
 
         cfg.settings.logging_enabled = false;
-        logger.sample(signals, cfg, t + 10000); /* flush -> rotate */
+        sample(logger, signals, cfg, t + 10000); /* flush -> rotate */
     }
 
     /* The count is bounded by what the ring can still hold, not by how
@@ -850,8 +990,8 @@ void test_used_bytes_climbs_to_capacity_and_pins_there()
     {
         uint32_t t = 1000 + i * 10000;
         signals.set(id, static_cast<float>(i + 1), t);
-        logger.sample(signals, cfg, t);
-        logger.sample(signals, cfg, t + 6000); // due -> flush -> rotate
+        sample(logger, signals, cfg, t);
+        sample(logger, signals, cfg, t + 6000); // due -> flush -> rotate
 
         uint64_t used = logger.used_bytes();
         TEST_ASSERT_TRUE(used >= previous);                      /* monotonic */
@@ -884,7 +1024,7 @@ void test_chunk_rotation_advances_through_all_slots_then_wraps()
      * and leave each loop iteration below a clean one-record-one-rotation
      * step. */
     signals.set(id, -1.0f, 100);
-    logger.sample(signals, cfg, 100);
+    sample(logger, signals, cfg, 100);
 
     /* Each iteration: one changed value (forces a buffered record) then a
      * big enough time jump to guarantee a flush -- fills chunk i to
@@ -892,8 +1032,8 @@ void test_chunk_rotation_advances_through_all_slots_then_wraps()
     for (uint32_t i = 0; i < 5; i++)
     {
         signals.set(id, static_cast<float>(i), 1000 + i * 10000);
-        logger.sample(signals, cfg, 1000 + i * 10000);
-        logger.sample(signals, cfg, 1000 + i * 10000 + 6000); // due -> flush
+        sample(logger, signals, cfg, 1000 + i * 10000);
+        sample(logger, signals, cfg, 1000 + i * 10000 + 6000); // due -> flush
     }
 
     /* begin() writes chunk_seq 0 into slot 0; the 5 loop iterations each
@@ -936,11 +1076,11 @@ void test_begin_self_heals_from_corrupt_chunk_and_recovers_max_seq()
     core::Config      cfg = displaying({ id });
     TEST_ASSERT_TRUE(seed.begin());
     signals.set(id, 1.0f, 100);
-    seed.sample(signals, cfg, 100);
+    sample(seed, signals, cfg, 100);
     signals.set(id, 2.0f, 200);
-    seed.sample(signals, cfg, 200);
+    sample(seed, signals, cfg, 200);
     cfg.settings.logging_enabled = false;
-    seed.sample(signals, cfg, 200); // flush -> chunk_seq 0 exists
+    sample(seed, signals, cfg, 200); // flush -> chunk_seq 0 exists
 
     /* Slot 3 gets garbage instead of a real header -- begin() must skip
      * it (wrong/missing magic) rather than misreading it as a
@@ -969,11 +1109,14 @@ int main(int argc, char **argv)
     RUN_TEST(test_begin_writes_nothing_until_there_is_something_to_record);
     RUN_TEST(test_repeated_boots_without_recording_do_not_evict_anything);
     RUN_TEST(test_sample_records_a_changed_value_but_not_a_repeated_one);
+    RUN_TEST(test_a_constant_signal_is_logged_once_per_capture);
+    RUN_TEST(test_sample_records_any_named_set_not_just_the_panels);
+    RUN_TEST(test_a_full_tick_is_never_dropped_at_the_buffer_edge);
     RUN_TEST(test_a_fast_signal_is_rate_floored_to_the_minimum_interval);
     RUN_TEST(test_a_slower_signal_is_logged_at_its_own_arrival_cadence);
     RUN_TEST(test_sample_before_begin_or_without_data_is_a_no_op);
     RUN_TEST(test_sample_records_only_the_signals_currently_on_screen);
-    RUN_TEST(test_a_reassigned_panels_new_signal_is_primed_not_logged_stale);
+    RUN_TEST(test_a_reassigned_panels_stale_value_is_not_logged);
     RUN_TEST(test_sample_records_nothing_while_logging_is_disabled);
     RUN_TEST(test_turning_logging_off_flushes_and_back_on_reprimes);
     RUN_TEST(test_each_on_off_cycle_counts_as_its_own_log);

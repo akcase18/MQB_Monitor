@@ -128,9 +128,12 @@ namespace remote::server
             /** Validates `payload` as a whole batch and, only if all of
              * it passes, writes it into the live config. Shared by
              * REQ_PREVIEW_CONFIG and REQ_APPLY_CONFIG, which differ only
-             * in what happens afterwards. */
+             * in what happens afterwards. `log_at` is where the optional
+             * log profile would start; a body that ends there leaves the
+             * profile alone. */
             protocol::ApplyResult apply_to_live(const uint8_t *payload,
-                                                uint16_t       len);
+                                                uint16_t       len,
+                                                size_t         log_at);
             /** Reads the preview values that follow a REQ_PREVIEW_CONFIG's
              * config batch into preview_values_. */
             void read_preview_values(const uint8_t *p, size_t len);

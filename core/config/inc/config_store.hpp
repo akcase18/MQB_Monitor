@@ -28,9 +28,11 @@ namespace core
              * fixed table of id-tagged records instead of one positional
              * record per catalog entry. v8: added Settings::
              * brightness_mode. v9: added Settings::auto_brightness_pct,
-             * growing Settings by 4 bytes. migrate() carries v6-v8
-             * across; anything older resets to defaults. */
-            static constexpr uint8_t CURRENT_VERSION = 9;
+             * growing Settings by 4 bytes. v10: added Settings::
+             * log_source (in padding) and the log profile after signals[].
+             * migrate() carries v6-v9 across; anything older resets to
+             * defaults. */
+            static constexpr uint8_t CURRENT_VERSION = 10;
 
             explicit ConfigStore(IConfigStore &backing);
 
@@ -83,6 +85,11 @@ namespace core
              * anything changed.
              */
             bool fix_priorities();
+            /**
+             * Drops log profile ids this build doesn't offer, and repeats,
+             * keeping the rest in order. True if anything changed.
+             */
+            bool fix_log_profile();
 
             IConfigStore &backing_;
             Config        config_ {};

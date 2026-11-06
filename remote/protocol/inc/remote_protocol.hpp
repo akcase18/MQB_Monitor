@@ -44,15 +44,16 @@ namespace remote::protocol
 
     constexpr uint8_t FRAME_SYNC = 0xA5;
     /**
-     * RESP_STATE is the largest payload: 54 bytes of catalog entry and
-     * config per active signal on top of a 39-byte head, so 3495 bytes for
-     * the 64 signals core::SIGNAL_CONFIG_SLOTS allows.
+     * RESP_STATE is the largest payload: 58 bytes of catalog entry and
+     * config per active signal on top of a 39-byte head and up to 35 bytes
+     * of log profile and flags, so 3786 bytes for the 64 signals
+     * core::SIGNAL_CONFIG_SLOTS allows.
      * remote_config_server.cpp static_asserts that it fits.
      */
     constexpr uint16_t FRAME_MAX_PAYLOAD = 4096;
     /**
      * A whole frame must arrive within this. ~3x a full 64-signal
-     * RESP_STATE (~304 ms) at the C3 link's 115200 baud.
+     * RESP_STATE (~330 ms) at the C3 link's 115200 baud.
      */
     constexpr uint32_t FRAME_TIMEOUT_MS = 1000;
 
@@ -80,7 +81,15 @@ namespace remote::protocol
          * live without ending the session, and REQ_REVERT_PREVIEW (or the
          * AP going down) restores the last save and ends it. Both answer
          * with RESP_APPLY_RESULT. RESP_STATE's trailing byte reports the
-         * session: bit 0 = active, bit 1 = unsaved changes. */
+         * session: bit 0 = active, bit 1 = unsaved changes.
+         *
+         * Both may end with the log profile: a u8 count (at most
+         * core::MAX_LOG_SIGNALS) and that many u16 signal ids. It comes
+         * after everything else, the preview values included, so a body
+         * without it (a page loaded before it existed) still parses and
+         * leaves the profile as it was. RESP_STATE carries the same
+         * block, preceded by a u8 core::LogSource, just before its
+         * trailing byte. */
         REQ_PREVIEW_CONFIG = 0x06, /* C3 -> Teensy */
         /* C3 -> Teensy. Empty: the page's Discard. One byte,
          * REVERT_PAGE_LEFT: the page is going away (closed, switched
@@ -300,6 +309,16 @@ namespace remote::protocol
             uint8_t  unit_type           = 0;
             float    display_min         = 0.0f;
             float    display_max         = 0.0f;
+            /**
+             * SignalSpec::cycle_time_ms: how often the dash asks for it,
+             * which is the fastest it can log.
+             */
+            uint16_t cycle_time_ms       = 0;
+            /**
+             * Request CAN id of the module its first request goes to
+             * (0x7E0 engine, ...), for grouping on the phone page.
+             */
+            uint16_t module_tx           = 0;
     };
     uint8_t       *encode_signal_catalog_entry(uint8_t                      *p,
                                                const SignalCatalogEntryWire &v);
