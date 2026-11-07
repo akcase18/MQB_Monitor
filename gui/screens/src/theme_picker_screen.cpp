@@ -10,23 +10,18 @@ namespace gui
     {
         constexpr lv_coord_t HEADER_DIVIDER_Y = 50;
         /**
-         * 3x3 for ACCENT_PRESET_COUNT=9 — smaller than the original 4x2's
-         * swatches since a 3rd row has to fit in the same screen height.
+         * 3x3 for ACCENT_PRESET_COUNT=9
          */
-        constexpr lv_coord_t SWATCH_SIZE = 76;
-        constexpr lv_coord_t GRID_GAP    = 12;
-        constexpr uint8_t    GRID_COLS   = 3;
-        constexpr uint8_t    GRID_ROWS   = 3;
-        /**
-         * Thicker than the unselected outline so the current pick reads
-         * clearly at a glance against 8 otherwise-identical swatches.
-         */
+        constexpr lv_coord_t SWATCH_SIZE           = 76;
+        constexpr lv_coord_t GRID_GAP              = 12;
+        constexpr uint8_t    GRID_COLS             = 3;
+        constexpr uint8_t    GRID_ROWS             = 3;
         constexpr lv_coord_t SELECTED_BORDER_WIDTH = 4;
     } // namespace
 
     FLASHMEM void ThemePickerScreen::init(const Theme &theme,
-                                 DoneCallback done_cb,
-                                 void        *ctx)
+                                          DoneCallback done_cb,
+                                          void        *ctx)
     {
         theme_    = &theme;
         done_cb_  = done_cb;
@@ -48,10 +43,7 @@ namespace gui
 
         /**
          * Vertically center the grid within whatever height is actually
-         * available below the header divider, rather than a fixed
-         * GRID_START_Y tuned only for Landscape's 270px — Portrait's 430px
-         * left the grid stranded near the top with a large dead zone
-         * below it.
+         * available below the header divider.
          */
         lv_coord_t grid_height
             = GRID_ROWS * SWATCH_SIZE + (GRID_ROWS - 1) * GRID_GAP;
@@ -115,10 +107,7 @@ namespace gui
 
         /**
          * Unlike SignalPickerScreen, navigation after a pick is done_cb_'s
-         * job (matching ConfiguratorScreen's pattern), not this screen's —
-         * applying an accent color means rebuilding every other screen
-         * against the new color (see main.cpp), which can't safely happen
-         * synchronously from inside this very button's own click handler.
+         * job (matching ConfiguratorScreen's pattern), not this screen's.
          */
         for (uint8_t i = 0; i < ACCENT_PRESET_COUNT; i++)
         {

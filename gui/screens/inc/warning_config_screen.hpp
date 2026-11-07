@@ -1,18 +1,10 @@
 /**
  * @file warning_config_screen.hpp
- * @brief Signal-scoped warning threshold editor. Ported from the old
- * WarningConfig, but actually wired to persistence this time — the old
- * screen's Done button never saved anything (see the plan's "known bugs"
- * list); this one calls DoneCallback with the final thresholds, and
- * gui/bindings::VehicleBinding::apply_warning_change persists them. Exit
- * is via an X close button in a top nav bar (not the bottom-right
- * checkmark gui/screens/screen_helpers.hpp's other screens use) — that
- * bar also holds the signal name, freeing the rest of the screen for the
- * two threshold rows without the close control colliding with them.
+ * @brief Signal-scoped warning threshold editor.
  *
  * Thresholds are edited/compared in whichever unit system the panel that
  * opened this screen currently displays the signal in (lo/hi/min_value/
- * max_value/step are all already converted) — VehicleBinding converts back
+ * max_value/step are all already converted). VehicleBinding converts back
  * to the signal's native (metric) storage/comparison unit using
  * `is_metric` before persisting, so this screen itself never needs to know
  * about core::UnitType conversions.
@@ -38,9 +30,7 @@ namespace gui
 
             /**
              * Bounds/step for the +/- editor, from the signal's
-             * SignalSpec::display_min/max and core::warning_step() —
-             * already converted to whichever unit system `is_metric`
-             * says, same as lo/hi.
+             * SignalSpec::display_min/max and core::warning_step().
              */
             float   min_value = 0.0f;
             float   max_value = 100.0f;
@@ -82,11 +72,11 @@ namespace gui
 
         private:
             /**
-             * Shared by all 4 +/- buttons — each one steps its own row's
-             * value by +/-step, on both a short tap (CLICKED) and every
-             * tick of a held long press (LONG_PRESSED_REPEAT). CLICKED
-             * still fires after a long press releases, so `stepped_by_hold`
-             * tells that trailing CLICKED not to double-step.
+             * Shared by all 4 +/- buttons.
+             *
+             * Each one steps its own row's value by +/-step, on both a short
+             * tap (CLICKED) and every tick of a held long press
+             * (LONG_PRESSED_REPEAT).
              */
             struct StepButtonCtx
             {
@@ -137,9 +127,7 @@ namespace gui
 
             /**
              * Carried from the opening WarningThresholdViewModel through
-             * to refresh_value_labels() (unit suffix) and done_cb_handler()
-             * (so apply_warning_change() knows which unit system to convert
-             * lo/hi back from).
+             * to refresh_value_labels() (unit suffix) and done_cb_handler().
              */
             char unit_label_[WARNING_UNIT_LABEL_LEN] = "";
             bool is_metric_                          = true;

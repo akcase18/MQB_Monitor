@@ -1,12 +1,7 @@
 /**
  * @file vehicle_binding.hpp
- * @brief The sole bridge between core:: and gui/widgets: translates
- * core::SignalStore/core::ConfigStore data into PanelViewModels, and
- * routes gui/screens callbacks (panel reassignment, warning threshold
- * edits) back into core::ConfigStore persistence. `rank` throughout this
- * class means priority rank (Config.priorities[] index, 0 = most
- * important) — callers resolve which on-screen slot a rank occupies via
- * gui::compute_prominence_ranks(), not here.
+ * @brief Bridge between core:: and gui/widgets. Translates configuration data
+ * into panels, and callbacks back to configuration data.
  */
 #pragma once
 
@@ -20,11 +15,9 @@ namespace gui
 {
 
     /**
-     * The core::DisplayMode <-> gui::DisplayMode translation. gui/bindings
-     * is the declared core::/gui:: boundary (see the file doc comment), so
-     * these live here rather than being re-implemented by each caller --
-     * the composition root needs the gui:: direction too, to hand
-     * ConfiguratorScreen the mode a tapped panel is currently in.
+     * The core::DisplayMode <-> gui::DisplayMode translation. gui/bindings is
+     * the declared core::/gui:: boundary (see the file doc comment), so these
+     * live here rather than being re-implemented by each caller.
      */
     DisplayMode       to_gui_display_mode(core::DisplayMode mode);
     core::DisplayMode to_core_display_mode(DisplayMode mode);
@@ -59,30 +52,21 @@ namespace gui
 
             /**
              * Reads signal_id's current warning thresholds, for opening
-             * WarningConfigScreen. `is_metric` is the unit system of the
-             * panel that's opening the editor — lo/hi/min_value/max_value/
-             * step come back already converted to that unit system, since
-             * editing e.g. a Fahrenheit-displayed signal's threshold in its
-             * native Celsius storage unit would show a confusingly wrong
-             * number.
+             * WarningConfigScreen.
              */
             WarningThresholdViewModel read_warning_thresholds(
                 uint16_t signal_id, bool is_metric) const;
 
             /**
-             * Updates signal_id's warning thresholds, persisted immediately.
-             * `vm.lo`/`vm.hi` are converted from `vm.is_metric`'s unit
-             * system back to the signal's native (metric) storage unit
-             * before saving.
+             * Updates signal_id's warning thresholds.
              */
             void apply_warning_change(uint16_t signal_id,
                                       const WarningThresholdViewModel &vm);
 
             /**
              * Shows `values` on every panel in place of the live store, or
-             * the live store again for nullptr. For the phone's preview
-             * session, whose mock shows sample values the panel should
-             * match rather than contradict.
+             * the live store again for nullptr. Used for phone configurator's
+             * "live preview".
              */
             void set_value_override(const core::SignalStore *values)
             {
@@ -92,7 +76,7 @@ namespace gui
         private:
             core::SignalStore       &signals_;
             const core::SignalStore *override_ = nullptr;
-            core::ConfigStore &config_;
+            core::ConfigStore       &config_;
     };
 
 } // namespace gui

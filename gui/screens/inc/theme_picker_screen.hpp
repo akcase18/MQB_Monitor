@@ -1,13 +1,8 @@
 /**
  * @file theme_picker_screen.hpp
- * @brief Accent-color picker: a grid of gui::ACCENT_PRESETS swatches,
+ * @brief Accent-color picker. A grid of gui::ACCENT_PRESETS swatches,
  * opened from SettingsScreen's Theme row. Tapping a swatch fires
- * DoneCallback immediately (no separate Done step) rather than requiring
- * a second confirmation — there's nothing to review before committing to
- * a color choice. Navigation after a pick is DoneCallback's own job
- * (matching ConfiguratorScreen, not SignalPickerScreen) since applying a
- * new accent means rebuilding every other screen against it, which the
- * composition root has to defer outside this screen's own click handler.
+ * DoneCallback immediately.
  */
 #pragma once
 

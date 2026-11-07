@@ -38,13 +38,6 @@ namespace gui
                          sizeof(vm.url_text),
                          "http://%s",
                          ap_.ip_text());
-                /**
-                 * The QR opens the config site, not a Wi-Fi join — the AP
-                 * has no password (see RemoteApController's file doc
-                 * comment) so joining is just picking the SSID by hand;
-                 * the QR's job is the second step, once already on the
-                 * network. Reuse url_text rather than re-deriving it.
-                 */
                 snprintf(
                     vm.qr_payload, sizeof(vm.qr_payload), "%s", vm.url_text);
                 break;
@@ -52,12 +45,8 @@ namespace gui
             case ApState::Activating:
             case ApState::Deactivating:
                 /**
-                 * Deactivating folds into Activating's "please wait" view
-                 * rather than getting its own phase — it's brief (<=
-                 * AP_DISABLE_GRACE_MS) and only ever entered by the user's
-                 * own close (X) tap, which WirelessSetupScreen answers by
-                 * returning to Settings immediately rather than waiting
-                 * around to watch it finish.
+                 * Deactivating is the same state as Activating since it's just
+                 * a transition state.
                  */
                 vm.phase = WirelessSetupPhase::Activating;
                 break;
@@ -71,7 +60,8 @@ namespace gui
         return vm;
     }
 
-    FLASHMEM FirmwareUpdateViewModel RemoteBinding::build_update_view_model() const
+    FLASHMEM FirmwareUpdateViewModel
+    RemoteBinding::build_update_view_model() const
     {
         FirmwareUpdateViewModel vm;
         vm.percent = ota_.percent();

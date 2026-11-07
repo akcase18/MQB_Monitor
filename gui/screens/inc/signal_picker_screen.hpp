@@ -1,13 +1,7 @@
 /**
  * @file signal_picker_screen.hpp
  * @brief Full-screen signal picker, opened from ConfiguratorScreen's Signal
- * row. Originally the roller lived inline on ConfiguratorScreen itself, but
- * lv_roller_set_visible_row_count()'s auto-sizing reserves extra height
- * beyond N literal rows (for the partial-row fade above/below the selected
- * band) — a "3 visible rows" roller came out far taller than expected and
- * spilled into the section below it. A dedicated screen gives the roller
- * all the room it wants without fighting the rest of ConfiguratorScreen's
- * layout for space.
+ * row.
  */
 #pragma once
 
@@ -24,8 +18,7 @@ namespace gui
             using DoneCallback = void (*)(void *ctx, uint16_t signal_id);
 
             /**
-             * @param signal_names Signal names, indexed by catalog position
-             * (not signal id) — populates the roller.
+             * @param signal_names Signal names, indexed by catalog position.
              * @param signal_ids   Parallel array of catalog signal ids.
              * @param num_signals  Length of both arrays.
              */

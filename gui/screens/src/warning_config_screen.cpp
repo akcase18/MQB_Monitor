@@ -14,65 +14,26 @@ namespace gui
         constexpr lv_coord_t STEP_BTN_HEIGHT = 56;
         constexpr lv_coord_t ROW_GAP         = 20;
         /**
-         * Fixed, not LV_SIZE_CONTENT — the value label's text length varies
-         * per signal/unit ("32 °F" vs "7000 rpm"), and a content-sized
-         * label would resize the row around it, shifting the +/- buttons
-         * left/right. A fixed width keeps both buttons at the same on-
-         * screen position for every row and every signal; wide enough for
-         * the longest realistic case ("369 lb-ft").
+         * Fixed size to prevent strange resizing with different values/units.
          */
         constexpr lv_coord_t VALUE_LBL_WIDTH = 170;
 
-        /**
-         * Landscape's [-][value][+] row (2*STEP_BTN_WIDTH + 2*ROW_GAP +
-         * VALUE_LBL_WIDTH = 338px) fits comfortably in 480px but overflows
-         * Portrait's 320 — the + button was getting clipped off the right
-         * edge entirely. Rather than just shrinking that row to fit,
-         * Portrait restructures it: the value sits on its own centered
-         * line above the buttons (not sandwiched between them, which is
-         * what made the row so wide), and the two buttons — closer
-         * together than Landscape's spread, since they no longer need to
-         * flank a 170px-wide label — sit centered below it.
-         */
         constexpr lv_coord_t PORTRAIT_STEP_BTN_WIDTH = 56;
-        constexpr lv_coord_t PORTRAIT_BUTTON_GAP      = 32;
+        constexpr lv_coord_t PORTRAIT_BUTTON_GAP     = 32;
 
-        /**
-         * Layout is a top nav bar (name + close) freeing the rest of the
-         * screen for two identical sections — the old bottom-right
-         * checkmark button could collide with the low-warning row's plus
-         * button once the row's true fixed width was known (see
-         * VALUE_LBL_WIDTH's comment); moving exit into the header removes
-         * that bottom-right hazard entirely.
-         *
-         * section_divider_y (computed in init(), not a constant here) sits
-         * exactly halfway between HEADER_DIVIDER_Y and the screen's bottom
-         * edge, so the High and Low sections are equal-height boxes
-         * ([header, divider] and [divider, bottom]) regardless of
-         * screen_height. Low mirrors High's internal rhythm via the same
-         * offsets, just measured from section_divider_y instead of
-         * HEADER_DIVIDER_Y — both sections' content sits at the top of
-         * their own box rather than centered in it, Portrait included
-         * (Portrait's sections are taller, but nothing here scales with
-         * that — see PORTRAIT_VALUE_Y/PORTRAIT_BUTTONS_Y below, which are
-         * just as top-anchored as Landscape's own offsets).
-         */
-        constexpr lv_coord_t HEADER_DIVIDER_Y  = 50;
-        constexpr lv_coord_t HI_LABEL_Y        = 64;
-        constexpr lv_coord_t HI_SWITCH_Y       = 66;
-        constexpr lv_coord_t HI_ROW_Y          = 102;
+        constexpr lv_coord_t HEADER_DIVIDER_Y = 50;
+        constexpr lv_coord_t HI_LABEL_Y       = 64;
+        constexpr lv_coord_t HI_SWITCH_Y      = 66;
+        constexpr lv_coord_t HI_ROW_Y         = 102;
 
-        /**
-         * Portrait's own top-anchored rhythm — label/switch offsets
-         * mirror Landscape's (14/16 from section top), then value and
-         * buttons stack below rather than sharing Landscape's single row.
-         */
         constexpr lv_coord_t PORTRAIT_LABEL_Y   = 14;
         constexpr lv_coord_t PORTRAIT_SWITCH_Y  = 16;
         constexpr lv_coord_t PORTRAIT_VALUE_Y   = 60;
         constexpr lv_coord_t PORTRAIT_BUTTONS_Y = 112;
 
-        FLASHMEM void style_step_button(lv_obj_t *btn, const Theme &theme, lv_coord_t width)
+        FLASHMEM void style_step_button(lv_obj_t    *btn,
+                                        const Theme &theme,
+                                        lv_coord_t   width)
         {
             lv_obj_set_size(btn, width, STEP_BTN_HEIGHT);
             lv_obj_set_style_bg_color(btn, theme.palette.bg, 0);
@@ -87,8 +48,8 @@ namespace gui
         }
 
         FLASHMEM lv_obj_t *create_control_row(lv_obj_t  *parent,
-                                     lv_coord_t y_offset,
-                                     lv_coord_t gap)
+                                              lv_coord_t y_offset,
+                                              lv_coord_t gap)
         {
             lv_obj_t *row = lv_obj_create(parent);
             lv_obj_remove_style_all(row);
@@ -105,18 +66,14 @@ namespace gui
     } // namespace
 
     FLASHMEM void WarningConfigScreen::init(const Theme &theme,
-                                   DoneCallback done_cb,
-                                   void        *ctx)
+                                            DoneCallback done_cb,
+                                            void        *ctx)
     {
         done_cb_  = done_cb;
         done_ctx_ = ctx;
 
         screen_ = create_screen(theme);
 
-        /**
-         * Nav bar: signal name + close, standing in for the bottom-right
-         * checkmark every other screen uses (see the file doc comment).
-         */
         name_lbl_ = create_nav_title(screen_, theme, nullptr);
 
         DoneButton close = create_close_button(screen_, theme);
@@ -137,40 +94,31 @@ namespace gui
 
         hi_label_ = lv_label_create(screen_);
         lv_label_set_text(hi_label_, "High Warning");
-        lv_obj_align(
-            hi_label_,
-            LV_ALIGN_TOP_LEFT,
-            20,
-            portrait ? HEADER_DIVIDER_Y + PORTRAIT_LABEL_Y : HI_LABEL_Y);
+        lv_obj_align(hi_label_,
+                     LV_ALIGN_TOP_LEFT,
+                     20,
+                     portrait ? HEADER_DIVIDER_Y + PORTRAIT_LABEL_Y
+                              : HI_LABEL_Y);
         lv_obj_set_style_text_color(hi_label_, theme.palette.fg, 0);
         lv_obj_set_style_text_font(hi_label_, theme.typography.ui, 0);
 
         hi_sel_ = lv_switch_create(screen_);
-        lv_obj_align(
-            hi_sel_,
-            LV_ALIGN_TOP_RIGHT,
-            -20,
-            portrait ? HEADER_DIVIDER_Y + PORTRAIT_SWITCH_Y : HI_SWITCH_Y);
+        lv_obj_align(hi_sel_,
+                     LV_ALIGN_TOP_RIGHT,
+                     -20,
+                     portrait ? HEADER_DIVIDER_Y + PORTRAIT_SWITCH_Y
+                              : HI_SWITCH_Y);
         lv_obj_set_style_bg_color(hi_sel_,
                                   theme.palette.accent,
                                   LV_PART_INDICATOR | LV_STATE_CHECKED);
         lv_obj_add_event_cb(
             hi_sel_, hi_toggle_cb, LV_EVENT_VALUE_CHANGED, this);
 
-        /**
-         * Portrait: the value sits on its own centered line above the
-         * button row (see PORTRAIT_STEP_BTN_WIDTH's comment) — created as
-         * a direct child of screen_, not hi_row, and given no fixed width
-         * since LV_ALIGN_TOP_MID centers by the label's own (content-
-         * sized) bounds. Landscape keeps the value inside hi_row, between
-         * the buttons, as before.
-         */
         if (portrait)
         {
             hi_value_lbl_ = lv_label_create(screen_);
             lv_obj_set_style_text_color(hi_value_lbl_, theme.palette.fg, 0);
-            lv_obj_set_style_text_font(
-                hi_value_lbl_, theme.typography.ui, 0);
+            lv_obj_set_style_text_font(hi_value_lbl_, theme.typography.ui, 0);
             lv_obj_align(hi_value_lbl_,
                          LV_ALIGN_TOP_MID,
                          0,
@@ -181,7 +129,7 @@ namespace gui
             screen_,
             portrait ? HEADER_DIVIDER_Y + PORTRAIT_BUTTONS_Y : HI_ROW_Y,
             row_gap);
-        hi_minus_btn_    = lv_btn_create(hi_row);
+        hi_minus_btn_ = lv_btn_create(hi_row);
         style_step_button(hi_minus_btn_, theme, step_btn_width);
         lv_obj_t *hi_minus_lbl = lv_label_create(hi_minus_btn_);
         lv_obj_set_style_text_font(hi_minus_lbl, theme.typography.symbol_lg, 0);
@@ -192,14 +140,9 @@ namespace gui
         {
             hi_value_lbl_ = lv_label_create(hi_row);
             lv_obj_set_style_text_color(hi_value_lbl_, theme.palette.fg, 0);
-            /**
-             * Not data_sm — that's a digits-only font (see theme.hpp) and
-             * this label's text includes a unit suffix (e.g. "80 °F").
-             */
-            lv_obj_set_style_text_font(
-                hi_value_lbl_, theme.typography.ui, 0);
-            lv_obj_set_style_text_align(
-                hi_value_lbl_, LV_TEXT_ALIGN_CENTER, 0);
+
+            lv_obj_set_style_text_font(hi_value_lbl_, theme.typography.ui, 0);
+            lv_obj_set_style_text_align(hi_value_lbl_, LV_TEXT_ALIGN_CENTER, 0);
             lv_obj_set_width(hi_value_lbl_, VALUE_LBL_WIDTH);
         }
 
@@ -222,11 +165,10 @@ namespace gui
         lv_obj_set_style_text_font(lo_label_, theme.typography.ui, 0);
 
         lo_sel_ = lv_switch_create(screen_);
-        lv_obj_align(
-            lo_sel_,
-            LV_ALIGN_TOP_RIGHT,
-            -20,
-            section_divider_y + (portrait ? PORTRAIT_SWITCH_Y : 16));
+        lv_obj_align(lo_sel_,
+                     LV_ALIGN_TOP_RIGHT,
+                     -20,
+                     section_divider_y + (portrait ? PORTRAIT_SWITCH_Y : 16));
         lv_obj_set_style_bg_color(lo_sel_,
                                   theme.palette.accent,
                                   LV_PART_INDICATOR | LV_STATE_CHECKED);
@@ -237,8 +179,7 @@ namespace gui
         {
             lo_value_lbl_ = lv_label_create(screen_);
             lv_obj_set_style_text_color(lo_value_lbl_, theme.palette.fg, 0);
-            lv_obj_set_style_text_font(
-                lo_value_lbl_, theme.typography.ui, 0);
+            lv_obj_set_style_text_font(lo_value_lbl_, theme.typography.ui, 0);
             lv_obj_align(lo_value_lbl_,
                          LV_ALIGN_TOP_MID,
                          0,
@@ -249,7 +190,7 @@ namespace gui
             screen_,
             section_divider_y + (portrait ? PORTRAIT_BUTTONS_Y : 52),
             row_gap);
-        lo_minus_btn_    = lv_btn_create(lo_row);
+        lo_minus_btn_ = lv_btn_create(lo_row);
         style_step_button(lo_minus_btn_, theme, step_btn_width);
         lv_obj_t *lo_minus_lbl = lv_label_create(lo_minus_btn_);
         lv_obj_set_style_text_font(lo_minus_lbl, theme.typography.symbol_lg, 0);
@@ -260,10 +201,8 @@ namespace gui
         {
             lo_value_lbl_ = lv_label_create(lo_row);
             lv_obj_set_style_text_color(lo_value_lbl_, theme.palette.fg, 0);
-            lv_obj_set_style_text_font(
-                lo_value_lbl_, theme.typography.ui, 0);
-            lv_obj_set_style_text_align(
-                lo_value_lbl_, LV_TEXT_ALIGN_CENTER, 0);
+            lv_obj_set_style_text_font(lo_value_lbl_, theme.typography.ui, 0);
+            lv_obj_set_style_text_align(lo_value_lbl_, LV_TEXT_ALIGN_CENTER, 0);
             lv_obj_set_width(lo_value_lbl_, VALUE_LBL_WIDTH);
         }
 
@@ -412,9 +351,8 @@ namespace gui
         else if (code == LV_EVENT_CLICKED)
         {
             /**
-             * CLICKED still fires on release even after a long press —
-             * only take it as a step if the hold path didn't already step
-             * this press cycle (see the struct's doc comment).
+             * Only count release as a "step" press if the count didn't step
+             * recently.
              */
             if (!ctx->stepped_by_hold)
             {

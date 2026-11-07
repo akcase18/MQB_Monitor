@@ -54,14 +54,10 @@ namespace gui
         if (count == 5 && orientation == LayoutOrientation::Vertical)
         {
             /**
-             * A straight transpose of Horizontal's 5 (3 small over 2
-             * large) stacks 3 skinny panels in one column and 2 in the
-             * other -- reads poorly on a narrow portrait screen. Instead:
-             * Vertical's 6-panel 3-row x 2-col grid (see below) with the
-             * bottom row's two cells merged into one wider, higher-
-             * priority panel. Units here are a plain 2-wide x 3-tall
-             * grid, not BAND_UNITS -- InfoScreen::rebuild() special-cases
-             * its grid descriptors to match.
+             * 3 rows:
+             * - Row 1: 2 small panels
+             * - Row 2: 2 small panels
+             * - Row 3: 1 larger panel
              */
             out[0] = { 0, 0, 1, 1, false };
             out[1] = { 1, 0, 1, 1, false };
@@ -86,9 +82,9 @@ namespace gui
         else if (count == 3)
         {
             /**
-             * Two stacked minors on the left, one wide hero on the right —
-             * lower indices are the smaller panels, matching the small-
-             * band-first convention used by the count > 3 case below.
+             * 2 columns:
+             * - Column 1: Narrow, 2 stacked small panels
+             * - Column 2: Wider, 1 large, full-height panel
              */
             out[0] = { 0, 0, STACK_COLSPAN, 1, false };
             out[1] = { 0, 1, STACK_COLSPAN, 1, false };
@@ -96,17 +92,14 @@ namespace gui
         }
         else
         {
-            uint8_t small_count
-                = static_cast<uint8_t>((count + 1) / 2); /* ceil */
+            uint8_t small_count = static_cast<uint8_t>((count + 1) / 2);
             uint8_t large_count = static_cast<uint8_t>(count - small_count);
 
             fill_band(out, 0, small_count, 0, false);
             fill_band(out, small_count, large_count, 1, true);
 
             /**
-             * 4 and 6 are even splits where every cell is the same size —
-             * unlike 5 (today's fixed layout, kept as-is), there's no
-             * small/large distinction to preserve here.
+             * 4 and 6 are even splits where every cell is the same size.
              */
             if (count == 4)
             {
@@ -135,16 +128,15 @@ namespace gui
     bool is_hero_slot(const PanelSlot &slot)
     {
         /**
-         * transpose() (above) swaps colspan/rowspan wholesale for Vertical
-         * orientation, so a check pinned to one field (e.g. "rowspan ==
-         * 2") only recognizes hero slots in Horizontal. The unordered
-         * pair {colspan, rowspan} is transpose-invariant, so compare by
-         * min/max instead of by axis.
+         * transpose() swaps colspan/rowspan wholesale for Vertical orientation,
+         * so a check pinned to one field (e.g. "rowspan == 2") only recognizes
+         * hero slots in Horizontal. The unordered pair {colspan, rowspan} is
+         * transpose-invariant, so compare by min/max instead of by axis.
          */
-        uint8_t span_max = slot.colspan > slot.rowspan ? slot.colspan
-                                                        : slot.rowspan;
-        uint8_t span_min = slot.colspan > slot.rowspan ? slot.rowspan
-                                                        : slot.colspan;
+        uint8_t span_max
+            = slot.colspan > slot.rowspan ? slot.colspan : slot.rowspan;
+        uint8_t span_min
+            = slot.colspan > slot.rowspan ? slot.rowspan : slot.colspan;
         return span_min == 2 && span_max >= 4;
     }
 
@@ -158,7 +150,7 @@ namespace gui
          * Pass 0: hero. Pass 1: large-but-not-hero. Pass 2: everything
          * else (small). Within a pass, slots are visited in their
          * existing index order, which compute_layout() already produces
-         * left-to-right/top-to-bottom — no sort required.
+         * left-to-right/top-to-bottom.
          */
         for (uint8_t pass = 0; pass < 3; pass++)
         {

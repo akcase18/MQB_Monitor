@@ -62,7 +62,7 @@ namespace
      * IDs, ported from the old can_handler.cpp. Real-vehicle validation is a
      * Phase 7 hardware-flash-test concern.
      */
-    constexpr uint32_t CAN_BAUD  = 500000;
+    constexpr uint32_t CAN_BAUD = 500000;
 
     /**
      * Teensy<->ESP32-C3 wireless-configuration link. See remote/protocol
@@ -739,8 +739,9 @@ namespace
     {
         const core::Config &cfg  = composition().config_store.get();
         ProfileSnapshot    &snap = profile_snapshot();
-        snap.count = cfg.log_count > core::MAX_LOG_SIGNALS ? core::MAX_LOG_SIGNALS
-                                                           : cfg.log_count;
+        snap.count               = cfg.log_count > core::MAX_LOG_SIGNALS
+                                       ? core::MAX_LOG_SIGNALS
+                                       : cfg.log_count;
         for (uint8_t i = 0; i < snap.count; i++)
         {
             snap.ids[i] = cfg.log_signals[i];
@@ -841,8 +842,8 @@ namespace
     FLASHMEM void set_live_brightness_mode(core::BrightnessMode mode,
                                            uint8_t              slider_pct)
     {
-        bool entering_auto = mode == core::BrightnessMode::Auto
-                             && live_brightness_mode() != mode;
+        bool entering_auto     = mode == core::BrightnessMode::Auto
+                                 && live_brightness_mode() != mode;
         live_brightness_mode() = mode;
         if (mode != core::BrightnessMode::Auto)
         {
@@ -875,7 +876,7 @@ namespace
             return;
         }
 
-        Composition &app = composition();
+        Composition     &app = composition();
         static const int dim_idx
             = core::signal_table_find(core::AutoBrightness::DIM_SIGNAL_ID);
         uint8_t pct = auto_brightness().update(
@@ -1058,9 +1059,9 @@ namespace
     FLASHMEM void sync_wifi_indicator()
     {
         Composition &app = composition();
-        app.wifi_indicator.set_state(
-            app.remote_ap.state() == remote::server::ApState::Active,
-            app.remote_ap.station_count() > 0);
+        app.wifi_indicator.set_state(app.remote_ap.state()
+                                         == remote::server::ApState::Active,
+                                     app.remote_ap.station_count() > 0);
     }
 
     /**
@@ -1262,9 +1263,9 @@ namespace
      * either value) is actually useful mid-drive, not just a setting
      * that takes effect after leaving Settings.
      */
-    void settings_preview_brightness_cb(void                *ctx,
-                                        gui::BrightnessMode  mode,
-                                        uint8_t              brightness_pct)
+    void settings_preview_brightness_cb(void               *ctx,
+                                        gui::BrightnessMode mode,
+                                        uint8_t             brightness_pct)
     {
         (void)ctx;
         set_live_brightness_mode(gui::to_core_brightness_mode(mode),
@@ -1303,8 +1304,8 @@ namespace
          * Orientation isn't touched here — OrientationScreen persists
          * its own changes (see the orientation_* callbacks below).
          */
-        settings.day_brightness   = day_brightness_pct;
-        settings.night_brightness = night_brightness_pct;
+        settings.day_brightness      = day_brightness_pct;
+        settings.night_brightness    = night_brightness_pct;
         settings.auto_brightness_pct = auto_brightness_pct;
         settings.brightness_mode
             = gui::to_core_brightness_mode(brightness_mode);
@@ -1456,28 +1457,27 @@ namespace
         const core::Config &cfg = app.config_store.get();
 
         gui::LoggingViewModel vm;
-        vm.recording     = cfg.settings.logging_enabled;
-        vm.source        = cfg.settings.log_source == core::LogSource::Profile
-                               ? gui::LogSourceVm::Profile
-                               : gui::LogSourceVm::Screen;
-        vm.screen_signals
-            = cfg.settings.num_panels > core::MAX_PANELS ? core::MAX_PANELS
-                                                         : cfg.settings.num_panels;
+        vm.recording      = cfg.settings.logging_enabled;
+        vm.source         = cfg.settings.log_source == core::LogSource::Profile
+                                ? gui::LogSourceVm::Profile
+                                : gui::LogSourceVm::Screen;
+        vm.screen_signals = cfg.settings.num_panels > core::MAX_PANELS
+                                ? core::MAX_PANELS
+                                : cfg.settings.num_panels;
         /**
          * While recording the profile, what it's actually recording --
          * the phone may have changed the saved one since.
          */
-        vm.profile_signals = recording_profile(cfg) ? profile_snapshot().count
-                                                    : cfg.log_count;
+        vm.profile_signals
+            = recording_profile(cfg) ? profile_snapshot().count : cfg.log_count;
         vm.storage_ready = app.logger.is_ready();
         vm.log_count     = app.logger.log_count();
         /**
          * Whole minutes, no hour rollover -- see the view model.
          */
-        vm.total_logged_min
-            = app.logger.total_logged_ms() / 60000u;
+        vm.total_logged_min    = app.logger.total_logged_ms() / 60000u;
         vm.ring_capacity_bytes = app.logger.ring_capacity_bytes();
-        vm.used_bytes          = app.logger.used_bytes();
+        vm.ring_used_bytes     = app.logger.ring_used_bytes();
 
         /**
          * The one place platform::StorageMedium is translated for gui/,
@@ -2328,7 +2328,7 @@ namespace
             settings.auto_brightness_pct,
             gui::to_gui_brightness_mode(settings.brightness_mode),
             settings.num_panels,
-                                       settings.accent_color);
+            settings.accent_color);
 
         /**
          * The phone's own edits (and its Discard) land on the dashboard,
@@ -2339,8 +2339,8 @@ namespace
          * values with no sign of why. The panel's X ends it too, but stays
          * put: it's already on its way back to Settings.
          */
-        bool phone_gone = reverting_for_lost_phone()
-                          || event == Event::PageLeft;
+        bool phone_gone
+            = reverting_for_lost_phone() || event == Event::PageLeft;
         bool to_dashboard
             = !phone_gone
               && (!reverting_locally()
@@ -2349,8 +2349,7 @@ namespace
                                : to_dashboard ? RebuildTarget::Dashboard
                                               : RebuildTarget::Settings;
 
-        app.info_screen.set_preview_banner(
-            app.remote_server.preview_active());
+        app.info_screen.set_preview_banner(app.remote_server.preview_active());
 
         if (settings.accent_color != built_accent())
         {
@@ -2707,27 +2706,27 @@ namespace
                                       signal_picker_done_cb,
                                       nullptr);
         app.warning_screen.init(theme, warning_done_cb, nullptr);
-        app.settings_screen.init(theme,
-                                 platform_firmware_version(),
-                                 settings.day_brightness,
-                                 settings.night_brightness,
-                                 settings.auto_brightness_pct,
-                                 gui::to_gui_brightness_mode(
-                                     settings.brightness_mode),
-                                 settings.num_panels,
-                                 settings.accent_color,
-                                 settings_commit_cb,
-                                 nullptr,
-                                 settings_done_cb,
-                                 nullptr,
-                                 settings_preview_brightness_cb,
-                                 nullptr,
-                                 settings_pick_theme_cb,
-                                 nullptr,
-                                 settings_pick_wireless_cb,
-                                 nullptr,
-                                 settings_pick_orientation_cb,
-                                 nullptr);
+        app.settings_screen.init(
+            theme,
+            platform_firmware_version(),
+            settings.day_brightness,
+            settings.night_brightness,
+            settings.auto_brightness_pct,
+            gui::to_gui_brightness_mode(settings.brightness_mode),
+            settings.num_panels,
+            settings.accent_color,
+            settings_commit_cb,
+            nullptr,
+            settings_done_cb,
+            nullptr,
+            settings_preview_brightness_cb,
+            nullptr,
+            settings_pick_theme_cb,
+            nullptr,
+            settings_pick_wireless_cb,
+            nullptr,
+            settings_pick_orientation_cb,
+            nullptr);
         app.logging_screen.init(
             theme, logging_toggle_cb, nullptr, logging_erase_cb, nullptr);
         app.theme_picker_screen.init(theme, theme_picker_done_cb, nullptr);

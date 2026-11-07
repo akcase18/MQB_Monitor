@@ -1,6 +1,6 @@
 /**
  * @file layout.hpp
- * @brief Pure grid-slot placement for 1-6 panels — no LVGL, no core::, so
+ * @brief Pure grid-slot placement for 1-6 panels without LVGL or core::, so
  * it's cheap to unit test and easy to swap for a different algorithm
  * later without touching InfoScreen.
  */
@@ -52,12 +52,11 @@ namespace gui
      *
      * 1: one full-screen panel.
      * 2: two equal full-height columns.
-     * 3: a wide hero (large) plus two stacked minors (small) — not three
-     *    narrow columns.
+     * 3: a wide hero (large) plus two stacked minors (small).
      * 4: an even 2x2, all panels the same size (large).
-     * 5: Horizontal — 3 small panels over 2 large ones, matching the old
-     *    fixed layout. Vertical — its own 2x2 of small panels over one
-     *    wider, higher-priority panel (not a transpose of Horizontal's).
+     * 5: Horizontal: 3 small panels over 2 large ones.
+     *    Vertical: its own 2x2 of small panels over one wider, higher-priority
+     *              panel.
      * 6: an even 2x3, all panels the same size (small).
      *
      * @returns The number of slots written to `out` (the clamped count).
@@ -67,8 +66,7 @@ namespace gui
                            PanelSlot         out[MAX_PANELS]);
 
     /**
-     * True for the truly roomy full-height slots — count 1's panel and
-     * count 3's hero — not count 2's narrower full-height columns.
+     * True for the truly roomy full-height slots.
      */
     bool is_hero_slot(const PanelSlot &slot);
 
@@ -76,9 +74,7 @@ namespace gui
      * For each of the `count` slots compute_layout() just produced, which
      * priority rank (0 = most important) should be displayed there.
      * Prominence order is hero > large > small; within a tier, existing
-     * slot index order (already left-to-right/top-to-bottom by
-     * construction, see fill_band() in layout.cpp) — three passes over
-     * [0,count), no sort needed.
+     * slot index order.
      */
     void compute_prominence_ranks(const PanelSlot slots[MAX_PANELS],
                                   uint8_t         count,

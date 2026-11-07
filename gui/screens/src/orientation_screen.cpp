@@ -8,11 +8,6 @@ namespace gui
 
     namespace
     {
-        /**
-         * Same rhythm as SettingsScreen: Landscape puts each label beside
-         * its control on one row; Portrait gives each label a line of its
-         * own above a full-width control.
-         */
         constexpr lv_coord_t HEADER_DIVIDER_Y = 50;
         constexpr lv_coord_t ROW_HEIGHT       = 46;
         constexpr lv_coord_t SCREEN_MARGIN    = 20;
@@ -52,11 +47,12 @@ namespace gui
         }
     } // namespace
 
-    FLASHMEM void OrientationScreen::init(const Theme          &theme,
-                                          LayoutConfirmCallback layout_confirm_cb,
-                                          void                 *layout_confirm_ctx,
-                                          RotateCallback        rotate_cb,
-                                          void                 *rotate_ctx)
+    FLASHMEM void OrientationScreen::init(
+        const Theme          &theme,
+        LayoutConfirmCallback layout_confirm_cb,
+        void                 *layout_confirm_ctx,
+        RotateCallback        rotate_cb,
+        void                 *rotate_ctx)
     {
         theme_              = &theme;
         layout_confirm_cb_  = layout_confirm_cb;
@@ -66,7 +62,8 @@ namespace gui
 
         screen_ = create_screen(theme);
 
-        bool portrait = theme.metrics.screen_height > theme.metrics.screen_width;
+        bool portrait
+            = theme.metrics.screen_height > theme.metrics.screen_width;
 
         create_nav_title(screen_, theme, "Orientation");
 
@@ -83,8 +80,7 @@ namespace gui
 
         /**
          * Landscape: both controls start just past the wider of the two
-         * labels (measured, not guessed -- see SettingsScreen's
-         * brightness label), so they line up as one column.
+         * labels, so they line up as one column.
          */
         lv_coord_t control_x = 0;
         if (!portrait)
@@ -135,16 +131,14 @@ namespace gui
                                    / 2);
         }
 
-        static const char *const layout_map[] = { "Horizontal", "Vertical", "" };
+        static const char *const layout_map[]
+            = { "Horizontal", "Vertical", "" };
         layout_matrix_ = lv_buttonmatrix_create(screen_);
-        /**
-         * Portrait's half-width cells are too narrow for "Horizontal" in
-         * the full UI font.
-         */
-        lv_obj_set_style_text_font(
-            layout_matrix_,
-            portrait ? theme.typography.label_lg : theme.typography.ui,
-            0);
+
+        lv_obj_set_style_text_font(layout_matrix_,
+                                   portrait ? theme.typography.label_lg
+                                            : theme.typography.ui,
+                                   0);
         lv_obj_set_size(layout_matrix_, control_width, ROW_HEIGHT);
         lv_obj_align(layout_matrix_,
                      LV_ALIGN_TOP_LEFT,
@@ -153,12 +147,8 @@ namespace gui
         lv_buttonmatrix_set_map(layout_matrix_, layout_map);
         lv_buttonmatrix_set_one_checked(layout_matrix_, true);
         /**
-         * CLICK_TRIG moves VALUE_CHANGED from press to release. Without
-         * it the event fires before the matrix toggles its checked state
-         * (that happens on release), so the handler saw no change, and
-         * the release then flipped the check with no popup. Firing on
-         * release also keeps the modal popup from appearing under a
-         * finger that's still down.
+         * VALUE_CHANGED occurs on release instead of press. This prevents
+         * double-taps or unwanted behavior.
          */
         lv_buttonmatrix_set_button_ctrl_all(
             layout_matrix_,
@@ -166,20 +156,12 @@ namespace gui
                 LV_BUTTONMATRIX_CTRL_CHECKABLE
                 | LV_BUTTONMATRIX_CTRL_CLICK_TRIG));
         style_flat_matrix(layout_matrix_, theme, MATRIX_ITEM_PAD);
-        lv_obj_add_event_cb(layout_matrix_,
-                            layout_changed_cb,
-                            LV_EVENT_VALUE_CHANGED,
-                            this);
+        lv_obj_add_event_cb(
+            layout_matrix_, layout_changed_cb, LV_EVENT_VALUE_CHANGED, this);
 
         create_divider(
             screen_, theme, portrait ? PORTRAIT_DIVIDER1_Y : DIVIDER1_Y);
 
-        /**
-         * Styled like SettingsScreen's Day/Night toggle -- a plain bordered
-         * button, accent only while pressed. Not checkable: it's an
-         * action, not a state, and the screen turning over under the
-         * user's finger already shows it worked.
-         */
         lv_obj_t *rotate_btn = lv_btn_create(screen_);
         lv_obj_set_size(rotate_btn, control_width, ROW_HEIGHT);
         lv_obj_align(rotate_btn,
@@ -207,7 +189,7 @@ namespace gui
     }
 
     FLASHMEM void OrientationScreen::open(LayoutOrientation orientation,
-                                 lv_obj_t         *return_screen)
+                                          lv_obj_t         *return_screen)
     {
         orientation_   = orientation;
         return_screen_ = return_screen;
@@ -230,8 +212,7 @@ namespace gui
             = static_cast<OrientationScreen *>(lv_event_get_user_data(e));
 
         /**
-         * Which button was tapped, from the event itself -- not the
-         * checked state, which one_checked has already moved to it.
+         * Which button was tapped, from the event itself.
          */
         uint32_t tapped = *static_cast<uint32_t *>(lv_event_get_param(e));
         LayoutOrientation picked = tapped == BTN_VERTICAL
@@ -243,7 +224,7 @@ namespace gui
         }
 
         /**
-         * Put the check back until the popup is answered -- the matrix
+         * Put the check back until the popup is answered. The matrix
          * shouldn't claim a layout that a Cancel is about to throw away.
          */
         self->sync_layout_matrix();

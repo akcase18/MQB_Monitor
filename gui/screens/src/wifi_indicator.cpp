@@ -46,18 +46,17 @@ namespace gui
         }
     }
 
-    FLASHMEM void WifiIndicator::set_state(bool active, bool phone_joined)
+    FLASHMEM void WifiIndicator::set_state(bool active, bool joined)
     {
         if (icon_ == nullptr)
         {
             return;
         }
         lv_obj_set_hidden(icon_, !active);
-        if (phone_joined != shows_joined_)
+        if (joined != shows_joined_)
         {
-            shows_joined_ = phone_joined;
-            lv_obj_set_style_text_color(
-                icon_, phone_joined ? joined_ : idle_, 0);
+            shows_joined_ = joined;
+            lv_obj_set_style_text_color(icon_, joined ? joined_ : idle_, 0);
         }
     }
 

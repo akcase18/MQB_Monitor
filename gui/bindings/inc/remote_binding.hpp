@@ -1,12 +1,9 @@
 /**
  * @file remote_binding.hpp
- * @brief The bridge between remote::server's controllers and the screens
- * they drive -- RemoteApController to gui::WirelessSetupScreen, and
- * RemoteOtaController to gui::FirmwareUpdateScreen. Same role
- * VehicleBinding has for core::/gui::widgets, just for the phone link
- * instead of vehicle data. Neither screen includes remote/, matching
- * every other gui/screens screen's "driven by fabricated view-models"
- * discipline.
+ * @brief Bridge between remote::server's controllers and the related screens.
+ *
+ * RemoteApController --> gui::WirelessSetupScreen
+ * RemoteOtaController --> gui::FirmwareUpdateScreen
  */
 #pragma once
 

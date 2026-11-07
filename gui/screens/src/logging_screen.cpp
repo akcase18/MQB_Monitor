@@ -11,52 +11,25 @@ namespace gui
 
     namespace
     {
-        /**
-         * Nav bar, the two oversized start/stop buttons, the status
-         * tiles, then the erase action. The buttons get far more room
-         * than any control on SettingsScreen: they're the whole point of
-         * the screen and get pressed while driving, so they're sized to
-         * be hit without looking rather than to fit alongside neighbors.
-         * They split what was one full-width toggle row between them, and
-         * neither moves or resizes when recording starts -- the stop
-         * target is wherever the user just tapped.
-         *
-         * Landscape's 320px of height can't hold the toggle, four
-         * full-width status rows and a button, which is why the tiles sit
-         * two-up here (see the header comment) -- two rows of tiles
-         * instead of four rows is what pays for the erase button.
-         * Erase is last on purpose: furthest from the toggle the user
-         * actually reaches for, and below the readouts that say whether
-         * there's anything worth keeping.
-         */
         constexpr lv_coord_t HEADER_DIVIDER_Y = 50;
 
         constexpr lv_coord_t TOGGLE_ROW_Y     = 60;
         constexpr lv_coord_t TOGGLE_HEIGHT    = 58;
         constexpr lv_coord_t TOGGLE_DIVIDER_Y = 130;
 
-        constexpr lv_coord_t STAT_FIRST_Y   = 140;
-        constexpr lv_coord_t STAT_HEIGHT    = 50;
-        constexpr lv_coord_t STAT_STEP      = 54;
+        constexpr lv_coord_t STAT_FIRST_Y = 140;
+        constexpr lv_coord_t STAT_HEIGHT  = 50;
+        constexpr lv_coord_t STAT_STEP    = 54;
         /**
-         * Landscape only -- Portrait stacks all four in one column.
+         * Landscape only. Portrait stacks all four in one column.
          */
-        constexpr uint8_t    STAT_COLUMNS   = 2;
+        constexpr uint8_t    STAT_COLUMNS    = 2;
         constexpr lv_coord_t STAT_COLUMN_GAP = 16;
 
         constexpr lv_coord_t ERASE_DIVIDER_Y = 252;
         constexpr lv_coord_t ERASE_ROW_Y     = 260;
         constexpr lv_coord_t ERASE_HEIGHT    = 44;
 
-        /**
-         * Portrait has ~160px more height to spend, so everything gets
-         * taller and further apart rather than sitting in a cluster at
-         * the top -- the same treatment SettingsScreen's Portrait pass
-         * applies for the same reason. The four tiles stay in one column
-         * (a 2x2 grid at 320px wide would leave the usage figure a cell
-         * too narrow), and there's still room for the erase button under
-         * them.
-         */
         constexpr lv_coord_t PORTRAIT_TOGGLE_ROW_Y     = 66;
         constexpr lv_coord_t PORTRAIT_TOGGLE_HEIGHT    = 78;
         constexpr lv_coord_t PORTRAIT_TOGGLE_DIVIDER_Y = 158;
@@ -74,20 +47,6 @@ namespace gui
 
         constexpr uint8_t STATUS_ROW_COUNT = 4;
 
-        /**
-         * Formats `used`/`total` as "4.2 / 13.0 MB" into `out`.
-         *
-         * Both numbers share one unit, chosen from `total` and printed
-         * once at the end. Giving each its own unit reads worse when
-         * they differ ("999.9 KB / 13.0 MB") and, at the value font,
-         * overran the caption in Portrait's 280px row -- the same
-         * overflow that killed the earlier two-number capacity format.
-         * The unit steps MB -> GB because the ring spans a 13MB flash
-         * budget to a potentially multi-gigabyte card (see TODO.md).
-         *
-         * A `used` under ~0.05 of the unit prints as "0.0", which is
-         * honest: at that point essentially nothing has been recorded.
-         */
         void format_usage(uint64_t used,
                           uint64_t total,
                           char    *out,
@@ -115,11 +74,11 @@ namespace gui
                                       EraseCallback  erase_cb,
                                       void          *erase_ctx)
     {
-        theme_       = &theme;
-        toggle_cb_   = toggle_cb;
-        toggle_ctx_  = toggle_ctx;
-        erase_cb_    = erase_cb;
-        erase_ctx_   = erase_ctx;
+        theme_      = &theme;
+        toggle_cb_  = toggle_cb;
+        toggle_ctx_ = toggle_ctx;
+        erase_cb_   = erase_cb;
+        erase_ctx_  = erase_ctx;
 
         screen_ = create_screen(theme);
 
@@ -136,12 +95,6 @@ namespace gui
 
         lv_coord_t row_width = theme.metrics.screen_width - 2 * SCREEN_MARGIN;
 
-        /**
-         * Two buttons sharing the old toggle's full row, not small
-         * controls on the right of labelled rows the way SettingsScreen's
-         * toggles are -- nothing else competes for this space, and big
-         * targets are far easier to hit in a moving car.
-         */
         portrait_ = portrait;
         lv_coord_t button_width
             = static_cast<lv_coord_t>((row_width - BUTTON_GAP) / 2);
@@ -164,34 +117,25 @@ namespace gui
 
         create_divider(screen_,
                        theme,
-                       portrait ? PORTRAIT_TOGGLE_DIVIDER_Y
-                                : TOGGLE_DIVIDER_Y);
+                       portrait ? PORTRAIT_TOGGLE_DIVIDER_Y : TOGGLE_DIVIDER_Y);
 
-        lv_coord_t first_y
-            = portrait ? PORTRAIT_STAT_FIRST_Y : STAT_FIRST_Y;
-        lv_coord_t step   = portrait ? PORTRAIT_STAT_STEP : STAT_STEP;
-        lv_coord_t height = portrait ? PORTRAIT_STAT_HEIGHT : STAT_HEIGHT;
+        lv_coord_t first_y = portrait ? PORTRAIT_STAT_FIRST_Y : STAT_FIRST_Y;
+        lv_coord_t step    = portrait ? PORTRAIT_STAT_STEP : STAT_STEP;
+        lv_coord_t height  = portrait ? PORTRAIT_STAT_HEIGHT : STAT_HEIGHT;
 
-        /**
-         * One column in Portrait, two in Landscape -- so the same four
-         * tiles walk down a single column or fill a 2x2 grid without two
-         * separate placement loops.
-         */
         uint8_t    columns = portrait ? 1 : STAT_COLUMNS;
         lv_coord_t tile_width
-            = portrait
-                  ? row_width
-                  : static_cast<lv_coord_t>((row_width - STAT_COLUMN_GAP)
-                                            / STAT_COLUMNS);
+            = portrait ? row_width
+                       : static_cast<lv_coord_t>((row_width - STAT_COLUMN_GAP)
+                                                 / STAT_COLUMNS);
         lv_coord_t column_step
             = static_cast<lv_coord_t>(tile_width + STAT_COLUMN_GAP);
 
         const char *captions[STATUS_ROW_COUNT]
             = { "Logs Saved", "Storage", "Used", "Recorded" };
-        lv_obj_t **values[STATUS_ROW_COUNT] = { &count_value_,
-                                                &storage_value_,
-                                                &capacity_value_,
-                                                &recorded_value_ };
+        lv_obj_t **values[STATUS_ROW_COUNT] = {
+            &count_value_, &storage_value_, &capacity_value_, &recorded_value_
+        };
 
         for (uint8_t i = 0; i < STATUS_ROW_COUNT; i++)
         {
@@ -212,12 +156,6 @@ namespace gui
                        theme,
                        portrait ? PORTRAIT_ERASE_DIVIDER_Y : ERASE_DIVIDER_Y);
 
-        /**
-         * Same full-width shape as the toggle, deliberately not the same
-         * weight: bordered in warn_hi rather than filled, so it reads as
-         * the one destructive control on the screen without competing
-         * with the control the user actually came here for.
-         */
         erase_btn_ = lv_btn_create(screen_);
         lv_obj_set_size(erase_btn_,
                         row_width,
@@ -266,10 +204,6 @@ namespace gui
             b.btn, theme.metrics.panel_border_width, 0);
         lv_obj_set_style_border_color(b.btn, theme.palette.panel_border, 0);
         lv_obj_set_style_shadow_width(b.btn, 0, 0);
-        /**
-         * No content padding: the labels are centered, and Portrait's
-         * 134px buttons need every pixel for "PROFILE".
-         */
         lv_obj_set_style_pad_all(b.btn, 0, 0);
         lv_obj_add_event_cb(b.btn, button_clicked_cb, LV_EVENT_CLICKED, &b);
 
@@ -279,9 +213,7 @@ namespace gui
 
         /**
          * Second line inside the button: how many signals it records, or
-         * what a press will do next while recording -- so the control
-         * states its own affordance instead of relying on the user
-         * remembering what the fill color means.
+         * what a press will do next while recording.
          */
         b.hint = lv_label_create(b.btn);
         lv_obj_set_style_text_font(b.hint, theme.typography.label_sm, 0);
@@ -327,7 +259,8 @@ namespace gui
          * oldest chunk each time around. A countdown-to-zero would sit
          * at zero for the life of the device.
          */
-        format_usage(vm.used_bytes, vm.ring_capacity_bytes, buf, sizeof(buf));
+        format_usage(
+            vm.ring_used_bytes, vm.ring_capacity_bytes, buf, sizeof(buf));
         lv_label_set_text(capacity_value_, buf);
 
         snprintf(buf,
@@ -362,10 +295,8 @@ namespace gui
 
         bool active = recording_ && source_ == b.source;
         /**
-         * Dimmed: drawn, so the screen still explains its own shape, but
-         * a tap does nothing -- see button_clicked_cb(). No store at all;
-         * the other button's capture running; or a profile nobody has
-         * set up on the phone yet.
+         * Dimmed: drawn, so the screen still explains its own shape, but a tap
+         * does nothing.
          */
         bool dim = !storage_ready_ || (recording_ && !active)
                    || (!recording_ && profile && signals == 0);
@@ -385,14 +316,8 @@ namespace gui
             snprintf(hint, sizeof(hint), "not set up");
         }
 
-        /**
-         * Recording reads as a solid accent fill, the same treatment
-         * every other checked/active control in this app uses (see
-         * screen_helpers' style_flat_matrix()).
-         */
         lv_obj_set_style_bg_color(b.btn, active ? pal.accent : pal.bg, 0);
-        lv_obj_set_style_text_color(
-            b.lbl, dim ? pal.panel_border : pal.fg, 0);
+        lv_obj_set_style_text_color(b.lbl, dim ? pal.panel_border : pal.fg, 0);
         lv_obj_set_style_text_color(
             b.hint, active ? pal.fg : pal.panel_border, 0);
         lv_label_set_text(b.lbl, name);
@@ -407,19 +332,15 @@ namespace gui
         }
 
         /**
-         * Nothing mounted means nothing to wipe. Dimmed rather than
-         * hidden, for the same reason the toggle is: the screen should
-         * still explain its own shape when storage is missing, not lose
-         * half its controls.
+         * Button dimmed if there is nothing to erase.
          */
         lv_color_t tone = storage_ready_ ? theme_->palette.warn_hi
                                          : theme_->palette.panel_border;
         lv_obj_set_style_border_color(erase_btn_, tone, 0);
-        lv_obj_set_style_text_color(erase_lbl_,
-                                    storage_ready_
-                                        ? theme_->palette.fg
-                                        : theme_->palette.panel_border,
-                                    0);
+        lv_obj_set_style_text_color(
+            erase_lbl_,
+            storage_ready_ ? theme_->palette.fg : theme_->palette.panel_border,
+            0);
     }
 
     void LoggingScreen::erase_clicked_cb(lv_event_t *e)
@@ -429,16 +350,12 @@ namespace gui
 
         if (!self->storage_ready_ || self->theme_ == nullptr)
         {
-            return; /* nothing to erase -- see refresh_erase() */
+            return; /* nothing to erase */
         }
 
         /**
          * Unlike the toggle, this is not undoable by pressing again, so
-         * it asks first -- the same Cancel/Confirm popup rotating the
-         * display sits behind. The body names the one surprising side
-         * effect: the caller stops recording as part of erasing, rather
-         * than wiping the store out from under a capture still writing
-         * into it.
+         * it asks first.
          */
         ConfirmPopup popup = create_confirm_popup(*self->theme_,
                                                   "Erase all logs?",
@@ -465,9 +382,7 @@ namespace gui
         /**
          * No local state is touched here. The caller wipes the store and
          * pushes a fresh view-model straight back through refresh(),
-         * which is what zeroes the readouts and drops the toggle to OFF
-         * -- guessing at the result locally could only disagree with what
-         * actually happened.
+         * which is what zeroes the readouts and drops the toggle to OFF.
          */
         if (self->erase_cb_ != nullptr)
         {
@@ -492,14 +407,14 @@ namespace gui
 
         if (!self->storage_ready_)
         {
-            return; /* nothing to record onto -- see refresh_button() */
+            return; /* nothing to record onto */
         }
 
         if (self->recording_)
         {
             if (self->source_ != b->source)
             {
-                return; /* the other capture's running; stop it there */
+                return;
             }
             self->recording_ = false;
         }
@@ -528,9 +443,6 @@ namespace gui
 
         if (self->return_screen_ != nullptr)
         {
-            /**
-             * No slide out, matching Settings: the screen just goes.
-             */
             lv_screen_load(self->return_screen_);
         }
     }

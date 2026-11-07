@@ -18,8 +18,7 @@ namespace gui
         /**
          * Spinner(56) + gap(16) + status label, measured off Landscape's
          * original SPINNER_Y=120 (each exactly reproduced by the formula
-         * below at screen_height=320) -- same centering technique as
-         * QR_BLOCK_HEIGHT below, see its comment.
+         * below at screen_height=320).
          */
         constexpr lv_coord_t CONNECTING_BLOCK_HEIGHT = 130;
 
@@ -29,17 +28,14 @@ namespace gui
          * Landscape's original QR_Y=92/ACTIVE_SSID_Y=234/ACTIVE_URL_Y=256
          * (each exactly reproduced by the formula below at
          * screen_height=320). Used to vertically center the whole block
-         * within active_group_'s height (screen_height - HEADER_DIVIDER_Y)
-         * — a symmetric margin above the QR and below the URL line, rather
-         * than the block sitting flush against the header divider,
-         * however tall that group actually is.
+         * within active_group_'s height.
          */
         constexpr lv_coord_t QR_BLOCK_HEIGHT = 186;
     } // namespace
 
     FLASHMEM void WirelessSetupScreen::init(const Theme       &theme,
-                                   DeactivateCallback deactivate_cb,
-                                   void              *deactivate_ctx)
+                                            DeactivateCallback deactivate_cb,
+                                            void              *deactivate_ctx)
     {
         deactivate_cb_  = deactivate_cb;
         deactivate_ctx_ = deactivate_ctx;
@@ -55,12 +51,12 @@ namespace gui
         create_divider(screen_, theme, HEADER_DIVIDER_Y);
 
         /**
-         * Connecting group: spinner + status label — covers Idle (opening
-         * this screen activates the AP immediately, see the file doc
-         * comment, so Idle is only ever momentarily true if at all),
-         * Activating, and Deactivating (see RemoteBinding::build_view_
-         * model()). No Activate button — there's nothing left for the
-         * user to tap here.
+         * Connecting group: spinner + status label.
+         *
+         * Handles Idle (opening this screen activates the AP immediately, see
+         * the file doc comment, so Idle is only ever momentarily true if at
+         * all), Activating, and Deactivating (see RemoteBinding::build_view_
+         * model()). No Activate button, activates on open.
          */
         connecting_group_ = lv_obj_create(screen_);
         lv_obj_remove_style_all(connecting_group_);
@@ -92,8 +88,7 @@ namespace gui
 
         /**
          * Active group: QR code + credentials fallback. Deactivating is
-         * the close (X) button's job (see the file doc comment) — no
-         * separate control needed here.
+         * handled by the close button.
          */
         active_group_ = lv_obj_create(screen_);
         lv_obj_remove_style_all(active_group_);
@@ -118,8 +113,7 @@ namespace gui
         ssid_lbl_ = lv_label_create(active_group_);
         lv_obj_set_style_text_color(ssid_lbl_, theme.palette.fg, 0);
         lv_obj_set_style_text_font(ssid_lbl_, theme.typography.label_lg, 0);
-        lv_obj_align(
-            ssid_lbl_, LV_ALIGN_TOP_MID, 0, ssid_y - HEADER_DIVIDER_Y);
+        lv_obj_align(ssid_lbl_, LV_ALIGN_TOP_MID, 0, ssid_y - HEADER_DIVIDER_Y);
 
         url_lbl_ = lv_label_create(active_group_);
         lv_obj_set_style_text_color(
@@ -133,9 +127,8 @@ namespace gui
     {
         return_screen_ = return_screen;
         /**
-         * Force set_view_model() to touch the QR widget even if the phase
-         * happens to match last_phase_ from a previous session (e.g.
-         * reopening while still Active from before).
+         * Force set_view_model() to update the QR widget even if the phase
+         * hasn't changed.
          */
         last_phase_ = static_cast<WirelessSetupPhase>(0xFF);
         set_view_model(vm);
@@ -151,13 +144,6 @@ namespace gui
     {
         if (vm.phase != last_phase_)
         {
-            /**
-             * Idle and Activating share one visual (see the file doc
-             * comment) — only Active gets its own. Un-hide before touching
-             * the QR canvas below: lv_qrcode_update()'s internal
-             * lv_obj_invalidate() is a no-op while the parent is still
-             * hidden.
-             */
             bool active = vm.phase == WirelessSetupPhase::Active;
             lv_obj_set_hidden(connecting_group_, active);
             lv_obj_set_hidden(active_group_, !active);
@@ -188,8 +174,8 @@ namespace gui
         }
 
         /**
-         * Optimistic: don't wait around to watch ApState reach Idle (see
-         * the file doc comment) — back out to Settings immediately.
+         * Optimistic: don't wait around to watch ApState reach Idle before
+         * backing out to settings.
          */
         if (self->return_screen_ != nullptr)
         {

@@ -2,9 +2,7 @@
  * @file sniffer_screen.hpp
  * @brief What the panel shows while the dash is standing in as a USB CAN
  * sniffer for tools/monitor: the channel state, frame rate, total and
- * dropped frames, and one full-width Stop button. The gauges are paused
- * for the duration (see main.cpp's sniffer mode), so this is the only
- * thing on screen.
+ * dropped frames, and one full-width Stop button.
  *
  * Unlike every other screen this one is not built at boot. Sniffing is a
  * rare bench/debug session, so the screen is created on entry and deleted
@@ -27,10 +25,6 @@ namespace gui
 
     enum class SnifferChannel : uint8_t
     {
-        /**
-         * Confirmed on the panel, but the host hasn't sent SLCAN's
-         * open (L/O) yet -- or has closed it again.
-         */
         Closed,
         ListenOnly,
         Normal
@@ -42,23 +36,12 @@ namespace gui
 
             uint32_t frames_per_sec = 0;
             uint32_t total_frames   = 0;
-
-            /**
-             * Frames lost because the host fell behind. Any nonzero
-             * value means the capture has gaps, so it's painted in
-             * warn_hi.
-             */
             uint32_t dropped_frames = 0;
     };
 
     class SnifferScreen
     {
         public:
-            /**
-             * Fired when Stop is pressed. Runs inside the button's own
-             * click handler, so the caller must not destroy() from it
-             * directly -- defer with lv_async_call().
-             */
             using StopCallback = void (*)(void *ctx);
 
             /**

@@ -13,11 +13,7 @@ namespace gui
         constexpr lv_coord_t ROW_HEIGHT = 36;
 
         /**
-         * A compact settings-list layout, not a set of stretched equal-
-         * height sections like WarningConfigScreen/SettingsScreen — every
-         * row here is a single line, so there's no natural content to
-         * spread across extra vertical space the way a slider or a
-         * roller would use it.
+         * A compact settings-list layout for Landscape
          */
         constexpr lv_coord_t HEADER_DIVIDER_Y = 50;
         constexpr lv_coord_t SIGNAL_ROW_Y     = 64;
@@ -29,22 +25,12 @@ namespace gui
         constexpr lv_coord_t WARN_ROW_Y       = 244;
 
         /**
-         * Portrait (320 wide) doesn't have the width for units_matrix_
-         * (240px) or mode_matrix_ (360px, wider than the whole row) to sit
-         * beside their row's label the way Landscape does -- mode_matrix_
-         * would overflow off the left edge entirely. Portrait has plenty
-         * of *height* to spare (480 vs 320) instead, so those two rows
-         * stack their label above a full-row-width matrix rather than
-         * shrinking the matrix to fit -- and since that height is going
-         * spare anyway, the matrix itself gets taller too
-         * (PORTRAIT_MATRIX_HEIGHT, vs Landscape's ROW_HEIGHT+8), rather
-         * than reusing Landscape's compact button height and just leaving
-         * the extra room empty below Warning Thresholds.
+         * Narrower but talled settings-list layout for Portrait.
          */
-        constexpr lv_coord_t PORTRAIT_UNITS_LABEL_Y  = 124;
-        constexpr lv_coord_t PORTRAIT_UNITS_MATRIX_Y = 154;
-        constexpr lv_coord_t PORTRAIT_MATRIX_HEIGHT   = 48;
-        constexpr lv_coord_t PORTRAIT_DIVIDER2_Y      = 232;
+        constexpr lv_coord_t PORTRAIT_UNITS_LABEL_Y    = 124;
+        constexpr lv_coord_t PORTRAIT_UNITS_MATRIX_Y   = 154;
+        constexpr lv_coord_t PORTRAIT_MATRIX_HEIGHT    = 48;
+        constexpr lv_coord_t PORTRAIT_DIVIDER2_Y       = 232;
         constexpr lv_coord_t PORTRAIT_DISPLAY_LABEL_Y  = 246;
         constexpr lv_coord_t PORTRAIT_DISPLAY_MATRIX_Y = 276;
         constexpr lv_coord_t PORTRAIT_DIVIDER3_Y       = 354;
@@ -53,23 +39,23 @@ namespace gui
         /**
          * ConfiguratorScreen's matrices carry word labels ("Imperial",
          * "Digital"), so they set an explicit item padding rather than
-         * keeping LVGL's default -- see screen_helpers.hpp's
-         * style_flat_matrix().
+         * keeping LVGL's default.
          */
         constexpr lv_coord_t MATRIX_ITEM_PAD = 8;
     } // namespace
 
-    FLASHMEM void ConfiguratorScreen::init(const Theme             &theme,
-                                  const char *const *const signal_names,
-                                  const uint16_t          *signal_ids,
-                                  const bool              *signal_is_state,
-                                  uint16_t                 num_signals,
-                                  DoneCallback             done_cb,
-                                  void                    *done_ctx,
-                                  SettingsCallback         settings_cb,
-                                  void                    *settings_ctx,
-                                  PickSignalCallback       pick_signal_cb,
-                                  void                    *pick_signal_ctx)
+    FLASHMEM void ConfiguratorScreen::init(
+        const Theme             &theme,
+        const char *const *const signal_names,
+        const uint16_t          *signal_ids,
+        const bool              *signal_is_state,
+        uint16_t                 num_signals,
+        DoneCallback             done_cb,
+        void                    *done_ctx,
+        SettingsCallback         settings_cb,
+        void                    *settings_ctx,
+        PickSignalCallback       pick_signal_cb,
+        void                    *pick_signal_ctx)
     {
         signal_names_    = signal_names;
         signal_ids_      = signal_ids;
@@ -85,8 +71,7 @@ namespace gui
         screen_ = create_screen(theme);
 
         /**
-         * Nav bar: title + close, standing in for the bottom-right
-         * checkmark other screens use (see the file doc comment).
+         * Nav bar: title + close.
          */
         create_nav_title(screen_, theme, "Change Signal");
 
@@ -96,8 +81,7 @@ namespace gui
         create_divider(screen_, theme, HEADER_DIVIDER_Y);
 
         /**
-         * Signal row: tappable, hands off to SignalPickerScreen rather
-         * than embedding a roller here (see the file doc comment).
+         * Signal row: tappable, hands off to SignalPickerScreen.
          */
         ListRow signal_row = create_list_row(screen_, theme, "Signal");
         lv_obj_set_size(
@@ -107,19 +91,7 @@ namespace gui
             signal_row.btn, pick_signal_cb_handler, LV_EVENT_CLICKED, this);
         signal_chevron_ = signal_row.chevron;
 
-        /**
-         * Text (and therefore width) isn't known until refresh_signal_row_
-         * label() sets it in open()/set_selected_signal() — aligning here
-         * with the label still empty bakes in a position that's wrong
-         * once real text arrives, so alignment is redone there instead of
-         * once here (see refresh_signal_row_label()).
-         */
         signal_value_lbl_ = lv_label_create(signal_row.btn);
-        /**
-         * Slightly darkened, not the plain fg every other label on this
-         * screen uses — sets the current value apart from the row's
-         * static "Signal" label at a glance.
-         */
         lv_obj_set_style_text_color(
             signal_value_lbl_, lv_color_darken(theme.palette.fg, 60), 0);
         lv_obj_set_style_text_font(
@@ -127,29 +99,24 @@ namespace gui
 
         create_divider(screen_, theme, DIVIDER1_Y);
 
-        bool portrait = theme.metrics.screen_height > theme.metrics.screen_width;
+        bool portrait
+            = theme.metrics.screen_height > theme.metrics.screen_width;
         lv_coord_t row_width = theme.metrics.screen_width - 40;
 
         /**
-         * Units section — Landscape: a single row, label left / segmented
-         * control right, rather than a second stacked sub-row (Imperial
-         * vs Metric doesn't need the extra room a +/- control would).
-         * Portrait: label above a full-row-width matrix instead (see
-         * PORTRAIT_UNITS_LABEL_Y's comment above) — units_matrix_'s fixed
-         * 240px width doesn't leave enough of a 280px-ish portrait row for
-         * the label beside it. Label and matrix are both LEFT_MID/
-         * RIGHT_MID (or TOP_LEFT/below, in Portrait) children of one row
-         * container so they vertically center against each other
-         * regardless of font size or matrix height — a fixed TOP_LEFT
-         * label offset tuned for one font looked visibly off-center
-         * against the (taller) matrix once the label's font changed.
+         * Units section.
+         *
+         * Landscape: a single row, label left / segmented control right.
+         *
+         * Portrait: label above a full-row-width matrix.
          */
         lv_obj_t *units_row = lv_obj_create(screen_);
         lv_obj_remove_style_all(units_row);
         lv_obj_set_size(units_row,
                         row_width,
-                        portrait ? (PORTRAIT_DIVIDER2_Y - PORTRAIT_UNITS_LABEL_Y)
-                                 : ROW_HEIGHT + 8);
+                        portrait
+                            ? (PORTRAIT_DIVIDER2_Y - PORTRAIT_UNITS_LABEL_Y)
+                            : ROW_HEIGHT + 8);
         lv_obj_align(units_row,
                      LV_ALIGN_TOP_MID,
                      0,
@@ -185,28 +152,22 @@ namespace gui
             screen_, theme, portrait ? PORTRAIT_DIVIDER2_Y : DIVIDER2_Y);
 
         /**
-         * Display section — same shape as Units above (single row in
+         * Display section. Same shape as Units above (single row in
          * Landscape, stacked in Portrait), just with a 3rd segment.
          */
         lv_obj_t *display_row = lv_obj_create(screen_);
         lv_obj_remove_style_all(display_row);
-        lv_obj_set_size(
-            display_row,
-            row_width,
-            portrait ? (PORTRAIT_DIVIDER3_Y - PORTRAIT_DISPLAY_LABEL_Y)
-                     : ROW_HEIGHT + 8);
+        lv_obj_set_size(display_row,
+                        row_width,
+                        portrait
+                            ? (PORTRAIT_DIVIDER3_Y - PORTRAIT_DISPLAY_LABEL_Y)
+                            : ROW_HEIGHT + 8);
         lv_obj_align(display_row,
                      LV_ALIGN_TOP_MID,
                      0,
                      portrait ? PORTRAIT_DISPLAY_LABEL_Y : DISPLAY_ROW_Y - 6);
 
         lv_obj_t *display_label = lv_label_create(display_row);
-        /**
-         * "Mode", not "Display" — the shorter label leaves the 3-segment
-         * matrix room for the same per-button breathing room the 2-segment
-         * Units matrix above it has ("Digital" is nearly as wide as
-         * "Imperial", but there's a 3rd segment to fit in the same row).
-         */
         lv_label_set_text(display_label, "Mode");
         lv_obj_set_style_text_color(display_label, theme.palette.fg, 0);
         lv_obj_set_style_text_font(display_label, theme.typography.label_lg, 0);
@@ -221,11 +182,12 @@ namespace gui
         lv_obj_set_size(mode_matrix_,
                         portrait ? row_width : 360,
                         portrait ? PORTRAIT_MATRIX_HEIGHT : ROW_HEIGHT + 8);
-        lv_obj_align(
-            mode_matrix_,
-            portrait ? LV_ALIGN_TOP_LEFT : LV_ALIGN_RIGHT_MID,
-            0,
-            portrait ? PORTRAIT_DISPLAY_MATRIX_Y - PORTRAIT_DISPLAY_LABEL_Y : 0);
+        lv_obj_align(mode_matrix_,
+                     portrait ? LV_ALIGN_TOP_LEFT : LV_ALIGN_RIGHT_MID,
+                     0,
+                     portrait
+                         ? PORTRAIT_DISPLAY_MATRIX_Y - PORTRAIT_DISPLAY_LABEL_Y
+                         : 0);
         lv_buttonmatrix_set_map(mode_matrix_, mode_map);
         lv_buttonmatrix_set_one_checked(mode_matrix_, true);
         lv_buttonmatrix_set_button_ctrl_all(mode_matrix_,
@@ -236,9 +198,8 @@ namespace gui
             screen_, theme, portrait ? PORTRAIT_DIVIDER3_Y : DIVIDER3_Y);
 
         /**
-         * Warning Thresholds row: the whole row is the tap target (not
-         * just a small corner icon), label left / chevron right — a
-         * settings-list-style row instead of a floating gear button.
+         * Warning Thresholds row: the whole row is the tap target, label left /
+         * chevron right.
          */
         ListRow warn_row
             = create_list_row(screen_, theme, "Warning Thresholds");
@@ -263,7 +224,7 @@ namespace gui
         refresh_signal_row_label();
 
         /**
-         * units_map is { "Imperial", "Metric" } — index 1 is Metric.
+         * units_map is { "Imperial", "Metric" }.
          */
         lv_buttonmatrix_set_button_ctrl(
             units_matrix_, is_metric ? 1 : 0, LV_BUTTONMATRIX_CTRL_CHECKED);
@@ -354,12 +315,6 @@ namespace gui
         }
         lv_label_set_text(signal_value_lbl_, name);
 
-        /**
-         * Re-align every time, not just once at creation — the label's
-         * width depends on its text, so a stale alignment from a shorter
-         * (or empty) previous string would leave it overlapping
-         * signal_chevron_ once a longer name is set (see init()).
-         */
         lv_obj_align_to(
             signal_value_lbl_, signal_chevron_, LV_ALIGN_OUT_LEFT_MID, -8, 0);
     }
@@ -375,8 +330,7 @@ namespace gui
 
         /**
          * has_button_ctrl scans for the actually-checked button rather than
-         * trusting get_selected_button(), which only tracks focus/last-press
-         * — same reasoning as SettingsScreen's panel-count matrix.
+         * trusting get_selected_button(), which only tracks focus/last-press.
          */
         bool is_metric = lv_buttonmatrix_has_button_ctrl(
             self->units_matrix_, 1, LV_BUTTONMATRIX_CTRL_CHECKED);

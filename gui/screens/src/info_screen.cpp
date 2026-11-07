@@ -8,37 +8,17 @@ namespace gui
 
     namespace
     {
-        /**
-         * Small enough to sit unobtrusively over the panel grid's top-
-         * right corner without covering a reading, large enough to catch
-         * the eye when it blinks.
-         */
-        constexpr lv_coord_t LOGGING_LED_SIZE   = 12;
-        /**
-         * Inset from the top-right corner, applied on both axes (so it
-         * moves the LED left and down together). Sits on top of
-         * screen_'s own small pad_all, so the visible gap is a little
-         * larger than this alone.
-         */
-        constexpr lv_coord_t LOGGING_LED_MARGIN = 8;
-        /**
-         * Half-period: lit this long, dark this long. Slow enough to
-         * read as a deliberate recording light rather than an alarm.
-         */
-        constexpr uint32_t LOGGING_LED_BLINK_MS = 700;
-        /**
-         * The strip the preview banner takes off the top of the grid --
-         * room for one line of label_lg. The panels size their contents
-         * to what's left (see PanelWidget).
-         */
+        constexpr lv_coord_t LOGGING_LED_SIZE      = 12;
+        constexpr lv_coord_t LOGGING_LED_MARGIN    = 8;
+        constexpr uint32_t   LOGGING_LED_BLINK_MS  = 700;
         constexpr lv_coord_t PREVIEW_BANNER_HEIGHT = 26;
     } // namespace
 
     FLASHMEM void InfoScreen::init(const Theme       &theme,
-                          ViewModelBuilder   builder,
-                          void              *builder_ctx,
-                          PanelPressCallback press_cb,
-                          void              *press_ctx)
+                                   ViewModelBuilder   builder,
+                                   void              *builder_ctx,
+                                   PanelPressCallback press_cb,
+                                   void              *press_ctx)
     {
         theme_       = &theme;
         builder_     = builder;
@@ -63,18 +43,6 @@ namespace gui
                                 &click_ctx_[i]);
         }
 
-        /**
-         * Capture indicator: a small blinking red LED, the convention
-         * every recording device uses, rather than the static SD-card
-         * glyph this started as -- that one sat muted grey over a dense
-         * panel grid and was easy to miss entirely, which is the one
-         * thing a "you are recording" cue must not be.
-         *
-         * LV_OBJ_FLAG_IGNORE_LAYOUT excludes it from screen_'s grid
-         * layout (see rebuild() below) -- without it, the grid would try
-         * to place this as a normal cell child and collide with panel 0.
-         * Hidden until set_logging_active(true).
-         */
         logging_led_ = lv_led_create(screen_);
         lv_obj_add_flag(logging_led_, LV_OBJ_FLAG_IGNORE_LAYOUT);
         lv_obj_set_size(logging_led_, LOGGING_LED_SIZE, LOGGING_LED_SIZE);
@@ -89,8 +57,7 @@ namespace gui
          * Out of the grid like the LED. Not clickable, so a tap on it
          * reaches the screen, which main.cpp listens on. Aligned against
          * the content area, which starts under the banner's strip once
-         * it's shown -- hence the negative offset. Hidden until
-         * set_preview_banner(true).
+         * it's shown. Hidden until set_preview_banner(true).
          */
         preview_lbl_ = lv_label_create(screen_);
         lv_obj_add_flag(preview_lbl_, LV_OBJ_FLAG_IGNORE_LAYOUT);
@@ -128,7 +95,7 @@ namespace gui
         /**
          * Vertical's 5-panel layout (see layout.cpp) is a plain 2-col x
          * 3-row grid, not the fine-6-unit-axis/2-band-split scheme every
-         * other count uses -- its grid descriptors are set up directly
+         * other count uses. Its grid descriptors are set up directly
          * rather than through band_dsc/split_dsc below.
          */
         if (count == 5 && orientation == LayoutOrientation::Vertical)
@@ -146,7 +113,7 @@ namespace gui
         {
             /**
              * The fine 6-unit axis always has 6 divisions and the
-             * band-split axis always has 2 -- transpose() (see
+             * band-split axis always has 2. transpose() (see
              * layout.cpp) swaps which physical axis (row vs col) carries
              * which range, not the ranges themselves, so band_axis_len
              * must stay BAND_UNITS regardless of orientation.
@@ -164,10 +131,9 @@ namespace gui
 
             /**
              * Only the fixed Horizontal 5-panel layout keeps the
-             * small/large band split — every other count either has no
+             * small/large band split. Every other count either has no
              * meaningful row split (1/2, both rows fully spanned) or
-             * wants equal-sized cells (3/4/6), so it splits 50/50
-             * instead of pulling the theme's legacy sm/lg fractions.
+             * wants equal-sized cells (3/4/6), so it splits 50/50.
              */
             float sm_pct = 0.5f;
             float lg_pct = 0.5f;
@@ -231,14 +197,10 @@ namespace gui
             lv_obj_remove_flag(logging_led_, LV_OBJ_FLAG_HIDDEN);
 
             /**
-             * A hard on/off blink, not a fade: lv_anim_path_step holds
-             * the start value for the whole duration then jumps, so the
-             * LED sits lit for BLINK_PERIOD_MS and dark for the same,
-             * forever. Driven by an animation rather than an lv_timer so
-             * its lifetime is tied to the object -- lv_obj_delete()
-             * calls lv_anim_delete() on its target, so a screen rebuild
-             * (see main.cpp's destroy_screens()) can't leave a timer
-             * pointing at freed memory.
+             * A hard on/off blink, not a fade.
+             *
+             * Driven by an animation rather than an lv_timer so its lifetime is
+             * tied to the object.
              */
             lv_anim_t anim;
             lv_anim_init(&anim);
@@ -271,16 +233,11 @@ namespace gui
             return;
         }
         lv_obj_set_hidden(preview_lbl_, !shown);
-        lv_obj_set_style_pad_top(
-            screen_,
-            theme_->metrics.screen_margin
-                + (shown ? PREVIEW_BANNER_HEIGHT : 0),
-            0);
+        lv_obj_set_style_pad_top(screen_,
+                                 theme_->metrics.screen_margin
+                                     + (shown ? PREVIEW_BANNER_HEIGHT : 0),
+                                 0);
 
-        /**
-         * Every panel just changed height: re-place their contents, as
-         * rebuild() does (see PanelWidget::set_visible()).
-         */
         for (uint8_t i = 0; i < num_panels_; i++)
         {
             panels_[i].set_visible(true);
@@ -293,10 +250,8 @@ namespace gui
         /**
          * LVGL fires CLICKED on release whenever no ancestor actually
          * scrolled, even if the press traveled far enough to also fire a
-         * GESTURE (this screen doesn't scroll, so a swipe-to-open-Settings
-         * that starts on a panel would otherwise open that panel too).
-         * gesture_dir stays set for the rest of this press once a gesture
-         * fires, so this reliably tells a real tap from a swipe that
+         * GESTURE. gesture_dir stays set for the rest of this press once a
+         * gesture fires, so this reliably tells a real tap from a swipe that
          * happened to start on a panel.
          */
         if (lv_indev_get_gesture_dir(lv_indev_active()) != LV_DIR_NONE)

@@ -11,11 +11,7 @@ namespace gui
     namespace
     {
         /**
-         * Nav bar, the four status tiles, then Stop. Same tile geometry as
-         * LoggingScreen -- 2x2 in Landscape, one column in Portrait -- so
-         * the two read as siblings. Stop sits at the bottom where
-         * LoggingScreen's erase does, but at the toggle's weight: it's the
-         * only control here.
+         * Nav bar, the four status tiles, then Stop button.
          */
         constexpr lv_coord_t HEADER_DIVIDER_Y = 50;
 
@@ -55,8 +51,9 @@ namespace gui
         }
     } // namespace
 
-    FLASHMEM void
-    SnifferScreen::create(const Theme &theme, StopCallback stop_cb, void *ctx)
+    FLASHMEM void SnifferScreen::create(const Theme &theme,
+                                        StopCallback stop_cb,
+                                        void        *ctx)
     {
         theme_    = &theme;
         stop_cb_  = stop_cb;
@@ -74,10 +71,9 @@ namespace gui
 
         uint8_t    columns = portrait ? 1 : STAT_COLUMNS;
         lv_coord_t tile_width
-            = portrait
-                  ? row_width
-                  : static_cast<lv_coord_t>((row_width - STAT_COLUMN_GAP)
-                                            / STAT_COLUMNS);
+            = portrait ? row_width
+                       : static_cast<lv_coord_t>((row_width - STAT_COLUMN_GAP)
+                                                 / STAT_COLUMNS);
         lv_coord_t column_step
             = static_cast<lv_coord_t>(tile_width + STAT_COLUMN_GAP);
         lv_coord_t first_y = portrait ? PORTRAIT_STAT_FIRST_Y : STAT_FIRST_Y;
@@ -103,8 +99,9 @@ namespace gui
                 STAT_HEIGHT);
         }
 
-        create_divider(
-            screen_, theme, portrait ? PORTRAIT_STOP_DIVIDER_Y : STOP_DIVIDER_Y);
+        create_divider(screen_,
+                       theme,
+                       portrait ? PORTRAIT_STOP_DIVIDER_Y : STOP_DIVIDER_Y);
 
         lv_obj_t *stop_btn = lv_btn_create(screen_);
         lv_obj_set_size(
@@ -134,7 +131,7 @@ namespace gui
         lv_obj_set_style_text_color(stop_hint, theme.palette.fg, 0);
         lv_obj_align(stop_hint, LV_ALIGN_CENTER, 0, 14);
 
-        refresh(SnifferViewModel{});
+        refresh(SnifferViewModel {});
     }
 
     FLASHMEM void SnifferScreen::destroy()

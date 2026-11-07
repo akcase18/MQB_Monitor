@@ -83,8 +83,8 @@ namespace core
             has_any = true;
         }
 
-        session_id_           = max_session_id + 1;
-        next_chunk_seq_        = has_any ? max_chunk_seq + 1 : 0;
+        session_id_     = max_session_id + 1;
+        next_chunk_seq_ = has_any ? max_chunk_seq + 1 : 0;
         current_chunk_index_
             = static_cast<uint16_t>(next_chunk_seq_ % chunk_count_);
 
@@ -242,10 +242,9 @@ namespace core
             return;
         }
 
-        LogIndexHeader header { LOG_INDEX_MAGIC,
-                                LOG_INDEX_VERSION,
-                                next_log_id_,
-                                entry_count_ };
+        LogIndexHeader header {
+            LOG_INDEX_MAGIC, LOG_INDEX_VERSION, next_log_id_, entry_count_
+        };
         backing_.write(&header, sizeof(header));
         if (entry_count_ > 0)
         {
@@ -271,11 +270,9 @@ namespace core
             entry_count_--;
         }
 
-        entries_[entry_count_++] = { next_log_id_++,
-                                     session_id_,
-                                     next_chunk_seq_,
-                                     next_chunk_seq_,
-                                     0 };
+        entries_[entry_count_++] = {
+            next_log_id_++, session_id_, next_chunk_seq_, next_chunk_seq_, 0
+        };
         active_capture_start_ms_ = now_ms;
         last_index_save_ms_      = now_ms;
         save_index();
@@ -292,7 +289,7 @@ namespace core
         save_index();
     }
 
-    uint64_t Logger::used_bytes() const
+    uint64_t Logger::ring_used_bytes() const
     {
         uint64_t capacity = ring_capacity_bytes();
 
@@ -506,9 +503,9 @@ namespace core
          */
         if (entry_count_ > 0)
         {
-            LogIndexEntry &active  = entries_[entry_count_ - 1];
-            active.last_chunk_seq  = next_chunk_seq_;
-            active.duration_ms     = now_ms - active_capture_start_ms_;
+            LogIndexEntry &active = entries_[entry_count_ - 1];
+            active.last_chunk_seq = next_chunk_seq_;
+            active.duration_ms    = now_ms - active_capture_start_ms_;
         }
 
         if ((now_ms - last_index_save_ms_) >= INDEX_SAVE_INTERVAL_MS)

@@ -260,7 +260,7 @@ namespace core
              * is no room left and recording continues anyway, dropping
              * the oldest chunk each time around.
              */
-            uint64_t used_bytes() const;
+            uint64_t ring_used_bytes() const;
 
         private:
             /**

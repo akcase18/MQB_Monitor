@@ -15,12 +15,13 @@ namespace gui
         constexpr lv_coord_t HEADER_DIVIDER_Y = 50;
     } // namespace
 
-    FLASHMEM void SignalPickerScreen::init(const Theme             &theme,
-                                  const char *const *const signal_names,
-                                  const uint16_t          *signal_ids,
-                                  uint16_t                 num_signals,
-                                  DoneCallback             done_cb,
-                                  void                    *ctx)
+    FLASHMEM void SignalPickerScreen::init(
+        const Theme             &theme,
+        const char *const *const signal_names,
+        const uint16_t          *signal_ids,
+        uint16_t                 num_signals,
+        DoneCallback             done_cb,
+        void                    *ctx)
     {
         signal_ids_  = signal_ids;
         num_signals_ = num_signals;
@@ -37,12 +38,7 @@ namespace gui
         create_divider(screen_, theme, HEADER_DIVIDER_Y);
 
         /**
-         * A plain content_group (full width/height below the header
-         * divider) purely so the roller — self-sized from its row count,
-         * see the comment below — can be lv_obj_center()'d within
-         * whatever space is actually available instead of pinned to a
-         * fixed Y that leaves a growing dead zone below it as the screen
-         * gets taller (Portrait's 430px vs Landscape's 270px).
+         * Plain object to center signal picker roller in.
          */
         lv_obj_t *content_group = lv_obj_create(screen_);
         lv_obj_remove_style_all(content_group);
@@ -55,26 +51,11 @@ namespace gui
         lv_obj_set_style_text_font(roller_, theme.typography.ui, 0);
         lv_obj_set_width(roller_, theme.metrics.screen_width - 40);
         lv_obj_center(roller_);
-        /**
-         * An even row count reads more clearly as "a scrollable strip"
-         * than an odd one — with an odd count the selected row falls
-         * exactly in the visual center, which can look like a fixed list
-         * rather than something you scroll. No explicit set_height() here
-         * — this screen (unlike the cramped inline roller this replaced,
-         * see the file doc comment) has plenty of room, so just let this
-         * size itself from the row count instead of fighting it with a
-         * fixed height that ignores how many rows were asked for. Portrait
-         * gets more rows than Landscape (430px of available height below
-         * the header divider vs 270px) — 4 rows looked lost/out of place
-         * in all that extra room.
-         */
-        bool portrait = theme.metrics.screen_height > theme.metrics.screen_width;
+
+        bool portrait
+            = theme.metrics.screen_height > theme.metrics.screen_width;
         lv_roller_set_visible_row_count(roller_, portrait ? 8 : 4);
 
-        /**
-         * Default LVGL theming is a light-mode card — restyle to match
-         * this app's dark, flat, bordered treatment.
-         */
         lv_obj_set_style_bg_color(roller_, theme.palette.bg, 0);
         lv_obj_set_style_bg_opa(roller_, LV_OPA_COVER, 0);
         lv_obj_set_style_text_color(roller_, theme.palette.fg, 0);

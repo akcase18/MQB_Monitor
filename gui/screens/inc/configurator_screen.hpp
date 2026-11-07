@@ -2,22 +2,15 @@
  * @file configurator_screen.hpp
  * @brief Panel reassignment: pick a different signal and unit system for
  * whichever panel opened this screen, or jump to WarningConfigScreen for
- * that signal's thresholds. Ported from the old Configurator, with the
- * runtime Info* list replaced by a caller-supplied signal name/id table
- * (gui/screens has no core:: — gui/bindings supplies that table from
- * core::SIGNAL_CATALOG).
+ * that signal's thresholds.
  *
  * Layout follows WarningConfigScreen/SettingsScreen's pattern: a top nav
  * bar (title + X close) over stacked sections separated by full-width
- * dividers — Signal, Units (a 2-segment Imperial/Metric matrix, replacing
- * the old two independent checkboxes), Display (a 3-segment Digital/Bar/
- * Gauge matrix), and Warning Thresholds. Signal and Warning Thresholds are
- * both tappable rows (label + chevron) that hand off to another screen
- * rather than embedding their picker inline — a roller embedded directly
- * here (the original design) came out far taller than expected (see
- * SignalPickerScreen's doc comment) and spilled into the section below
- * it; a full screen has all the room a roller needs without fighting the
- * rest of this screen's layout for space.
+ * dividers: Signal, Units (a 2-segment Imperial/Metric matrix), Display (a
+ * 3-segment Digital/Bar/Gauge matrix), and Warning Thresholds.
+ *
+ * Signal and Warning Thresholds are both tappable rows (label + chevron) that
+ * hand off to another screen rather than embedding their picker inline.
  */
 #pragma once
 
@@ -40,7 +33,7 @@ namespace gui
             using SettingsCallback
                 = void (*)(void *ctx, uint8_t rank, uint16_t signal_id);
             /**
-             * Fired when the Signal row is tapped — `current_signal_id` is
+             * Fired when the Signal row is tapped. `current_signal_id` is
              * the pending selection (not necessarily what the panel was
              * opened with, if the user already picked a different one and
              * came back).
@@ -50,14 +43,14 @@ namespace gui
 
             /**
              * @param signal_names Signal names, indexed by catalog position
-             * (not signal id) — used to display the Signal row's current
+             * (not signal id). Used to display the Signal row's current
              * value and to resolve SignalPickerScreen's chosen index back
              * to a signal id.
              * @param signal_ids   Parallel array of catalog signal ids.
              * @param signal_is_state Parallel array: true for a signal
-             * shown as a state label (an Enum) -- Digital only, with no
-             * warning thresholds, so Bar/Gauge and the Warning Thresholds
-             * row are disabled while one is selected.
+             * shown as a state label (an Enum). Digital only, with no warning
+             * thresholds, so Bar/Gauge and the Warning Thresholds row are
+             * disabled while one is selected.
              * @param num_signals  Length of the arrays.
              */
             void init(const Theme             &theme,
@@ -83,7 +76,7 @@ namespace gui
 
             /**
              * Updates the pending signal selection and the Signal row's
-             * displayed name — called after SignalPickerScreen returns,
+             * displayed name. Called after SignalPickerScreen returns,
              * before this screen is shown again.
              */
             void set_selected_signal(uint16_t signal_id);
@@ -113,10 +106,10 @@ namespace gui
             lv_obj_t *mode_matrix_      = nullptr;
             lv_obj_t *warn_row_         = nullptr;
 
-            const char *const *signal_names_ = nullptr;
-            const uint16_t    *signal_ids_   = nullptr;
+            const char *const *signal_names_    = nullptr;
+            const uint16_t    *signal_ids_      = nullptr;
             const bool        *signal_is_state_ = nullptr;
-            uint16_t           num_signals_  = 0;
+            uint16_t           num_signals_     = 0;
 
             uint8_t  current_rank_      = 0;
             uint16_t opened_signal_id_  = 0;

@@ -38,12 +38,11 @@ namespace gui
         {
             auto     *img   = static_cast<lv_obj_t *>(a->var);
             lv_obj_t *trans = lv_obj_get_screen(img);
-            auto     *t     = static_cast<Transition *>(
-                lv_obj_get_user_data(trans));
+            auto *t = static_cast<Transition *>(lv_obj_get_user_data(trans));
 
             /**
-             * Something else loaded a screen mid-slide (a remote event,
-             * say): that load wins, and this one just cleans up.
+             * Something else loaded a screen mid-slide (ex. a remote event).
+             * That load has priority.
              */
             if (lv_screen_active() == trans)
             {
@@ -64,7 +63,7 @@ namespace gui
         const int32_t w = lv_display_get_horizontal_resolution(nullptr);
         const int32_t h = lv_display_get_vertical_resolution(nullptr);
 
-        int32_t           from = 0;
+        int32_t            from = 0;
         lv_anim_exec_xcb_t exec = nullptr;
         switch (anim)
         {
@@ -117,12 +116,7 @@ namespace gui
         exec(img, from);
 
         /**
-         * Load without redrawing: the panel still holds the outgoing
-         * screen, and every area the slide invalidates from here on is
-         * one the image covers. The layout pass has to happen in here
-         * too -- left to the next refresh, sizing the screen and the
-         * image invalidates the whole screen, and `trans` has no
-         * background, so that frame comes out white.
+         * Load without redrawing. This speeds up the animation.
          */
         lv_display_enable_invalidation(nullptr, false);
         lv_screen_load(trans);

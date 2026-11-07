@@ -115,7 +115,7 @@ namespace
                     return 0;
                 }
                 std::vector<uint8_t> &data = files_[current_];
-                const uint8_t *p = static_cast<const uint8_t *>(buf);
+                const uint8_t        *p    = static_cast<const uint8_t *>(buf);
                 data.insert(data.end(), p, p + len);
                 return len;
             }
@@ -149,12 +149,12 @@ namespace
             }
 
         private:
-            bool                                          present_ = false;
-            bool                                           open_   = false;
-            StorageFileMode                                mode_ = StorageFileMode::Read;
-            std::string                                    current_;
-            size_t                                         read_pos_ = 0;
-            std::map<std::string, std::vector<uint8_t>>    files_;
+            bool            present_ = false;
+            bool            open_    = false;
+            StorageFileMode mode_    = StorageFileMode::Read;
+            std::string     current_;
+            size_t          read_pos_ = 0;
+            std::map<std::string, std::vector<uint8_t>> files_;
     };
 
     std::string chunk_path_str(uint16_t index)
@@ -197,7 +197,8 @@ namespace
         {
             ids[i] = cfg.priorities[i].signal_id;
         }
-        logger.sample(signals, cfg.settings.logging_enabled, ids, count, now_ms);
+        logger.sample(
+            signals, cfg.settings.logging_enabled, ids, count, now_ms);
     }
 } // namespace
 
@@ -231,8 +232,8 @@ void test_begin_writes_nothing_until_there_is_something_to_record()
      * all.
      */
     core::SignalStore signals;
-    uint16_t           id  = core::SIGNAL_CATALOG[0].id;
-    core::Config       cfg = displaying({ id });
+    uint16_t          id  = core::SIGNAL_CATALOG[0].id;
+    core::Config      cfg = displaying({ id });
     signals.set(id, 1.0f, 100);
     sample(logger, signals, cfg, 100);
     signals.set(id, 2.0f, 200);
@@ -257,8 +258,8 @@ void test_repeated_boots_without_recording_do_not_evict_anything()
     storage.begin();
 
     core::SignalStore signals;
-    uint16_t           id  = core::SIGNAL_CATALOG[0].id;
-    core::Config       cfg = displaying({ id });
+    uint16_t          id  = core::SIGNAL_CATALOG[0].id;
+    core::Config      cfg = displaying({ id });
 
     /**
      * One capture into a 3-slot ring...
@@ -298,8 +299,8 @@ void test_sample_records_a_changed_value_but_not_a_repeated_one()
     logger.begin();
 
     core::SignalStore signals;
-    uint16_t           id  = core::SIGNAL_CATALOG[0].id;
-    core::Config       cfg = displaying({ id });
+    uint16_t          id  = core::SIGNAL_CATALOG[0].id;
+    core::Config      cfg = displaying({ id });
 
     signals.set(id, 42.0f, 100);
     sample(logger, signals, cfg, 100); // enters the set; 42.0 may be stale
@@ -349,8 +350,8 @@ void test_a_constant_signal_is_logged_once_per_capture()
      * never write it, and the capture would hold no trace of its state.
      */
     core::SignalStore signals;
-    uint16_t           id  = core::SIGNAL_CATALOG[0].id;
-    core::Config       cfg = displaying({ id });
+    uint16_t          id  = core::SIGNAL_CATALOG[0].id;
+    core::Config      cfg = displaying({ id });
 
     for (uint32_t t = 0; t <= 1000; t += 100)
     {
@@ -381,9 +382,9 @@ void test_sample_records_any_named_set_not_just_the_panels()
      * them repeated, one not in this build's catalog.
      */
     core::SignalStore signals;
-    uint16_t           a = core::SIGNAL_CATALOG[2].id;
-    uint16_t           b = core::SIGNAL_CATALOG[3].id;
-    const uint16_t     ids[] = { a, b, a, 0xFFFE };
+    uint16_t          a     = core::SIGNAL_CATALOG[2].id;
+    uint16_t          b     = core::SIGNAL_CATALOG[3].id;
+    const uint16_t    ids[] = { a, b, a, 0xFFFE };
 
     logger.sample(signals, true, ids, 4, 100);
     signals.set(a, 1.0f, 200);
@@ -454,8 +455,8 @@ void test_a_fast_signal_is_rate_floored_to_the_minimum_interval()
     logger.begin();
 
     core::SignalStore signals;
-    uint16_t           id  = core::SIGNAL_CATALOG[0].id;
-    core::Config       cfg = displaying({ id });
+    uint16_t          id  = core::SIGNAL_CATALOG[0].id;
+    core::Config      cfg = displaying({ id });
 
     /**
      * A signal arriving twice as fast as the floor allows, with a
@@ -469,13 +470,14 @@ void test_a_fast_signal_is_rate_floored_to_the_minimum_interval()
      * already, and hardcoding either just means editing this test again
      * next time.
      */
-    constexpr uint32_t arrival = core::LOG_MIN_INTERVAL_MS / 2;
+    constexpr uint32_t arrival          = core::LOG_MIN_INTERVAL_MS / 2;
     constexpr uint32_t expected_records = 5;
 
     signals.set(id, 0.0f, 0);
     sample(logger, signals, cfg, 0); // enters the set; 0.0 may be stale
 
-    for (uint32_t t = arrival; t <= arrival * expected_records * 2; t += arrival)
+    for (uint32_t t = arrival; t <= arrival * expected_records * 2;
+         t += arrival)
     {
         signals.set(id, static_cast<float>(t), t);
         sample(logger, signals, cfg, t);
@@ -484,10 +486,9 @@ void test_a_fast_signal_is_rate_floored_to_the_minimum_interval()
     sample(logger, signals, cfg, 5200); // flush
 
     std::vector<uint8_t> bytes = storage.file_bytes(chunk_path_str(0));
-    TEST_ASSERT_EQUAL_size_t(
-        sizeof(core::ChunkHeader)
-            + expected_records * sizeof(core::LogRecord),
-        bytes.size());
+    TEST_ASSERT_EQUAL_size_t(sizeof(core::ChunkHeader)
+                                 + expected_records * sizeof(core::LogRecord),
+                             bytes.size());
 
     /**
      * Every other arrival, i.e. exactly LOG_MIN_INTERVAL_MS apart -- not
@@ -495,8 +496,7 @@ void test_a_fast_signal_is_rate_floored_to_the_minimum_interval()
      * arrivals gives exactly expected_records.
      */
     core::LogRecord records[expected_records];
-    memcpy(records, bytes.data() + sizeof(core::ChunkHeader),
-           sizeof(records));
+    memcpy(records, bytes.data() + sizeof(core::ChunkHeader), sizeof(records));
     for (uint32_t i = 0; i < expected_records; i++)
     {
         /**
@@ -515,8 +515,8 @@ void test_a_slower_signal_is_logged_at_its_own_arrival_cadence()
     logger.begin();
 
     core::SignalStore signals;
-    uint16_t           id  = core::SIGNAL_CATALOG[0].id;
-    core::Config       cfg = displaying({ id });
+    uint16_t          id  = core::SIGNAL_CATALOG[0].id;
+    core::Config      cfg = displaying({ id });
 
     signals.set(id, 0.0f, 0);
     sample(logger, signals, cfg, 0); // primes
@@ -539,12 +539,10 @@ void test_a_slower_signal_is_logged_at_its_own_arrival_cadence()
 
     std::vector<uint8_t> bytes = storage.file_bytes(chunk_path_str(0));
     TEST_ASSERT_EQUAL_size_t(
-        sizeof(core::ChunkHeader) + 5 * sizeof(core::LogRecord),
-        bytes.size());
+        sizeof(core::ChunkHeader) + 5 * sizeof(core::LogRecord), bytes.size());
 
     core::LogRecord records[5];
-    memcpy(records, bytes.data() + sizeof(core::ChunkHeader),
-           sizeof(records));
+    memcpy(records, bytes.data() + sizeof(core::ChunkHeader), sizeof(records));
     for (uint32_t i = 0; i < 5; i++)
     {
         TEST_ASSERT_EQUAL_UINT32(100 * (i + 1), records[i].timestamp_ms);
@@ -553,12 +551,12 @@ void test_a_slower_signal_is_logged_at_its_own_arrival_cadence()
 
 void test_sample_before_begin_or_without_data_is_a_no_op()
 {
-    FakeStorage        storage;
+    FakeStorage storage;
     storage.begin();
-    core::Logger       logger(storage); // begin() never called
-    core::SignalStore  signals;
-    uint16_t           id  = core::SIGNAL_CATALOG[0].id;
-    core::Config       cfg = displaying({ id });
+    core::Logger      logger(storage); // begin() never called
+    core::SignalStore signals;
+    uint16_t          id  = core::SIGNAL_CATALOG[0].id;
+    core::Config      cfg = displaying({ id });
     signals.set(id, 1.0f, 100);
 
     sample(logger, signals, cfg, 100);
@@ -578,8 +576,8 @@ void test_sample_records_only_the_signals_currently_on_screen()
      * a panel -- the second must not reach the log at all.
      */
     core::SignalStore signals;
-    uint16_t           shown  = core::SIGNAL_CATALOG[0].id;
-    uint16_t           hidden = core::SIGNAL_CATALOG[1].id;
+    uint16_t          shown  = core::SIGNAL_CATALOG[0].id;
+    uint16_t          hidden = core::SIGNAL_CATALOG[1].id;
     signals.set(shown, 11.0f, 100);
     signals.set(hidden, 22.0f, 100);
 
@@ -600,9 +598,7 @@ void test_sample_records_only_the_signals_currently_on_screen()
         sizeof(core::ChunkHeader) + sizeof(core::LogRecord), bytes.size());
 
     core::LogRecord record;
-    memcpy(&record,
-           bytes.data() + sizeof(core::ChunkHeader),
-           sizeof(record));
+    memcpy(&record, bytes.data() + sizeof(core::ChunkHeader), sizeof(record));
     TEST_ASSERT_EQUAL_UINT16(shown, record.signal_id);
 }
 
@@ -614,8 +610,8 @@ void test_a_reassigned_panels_stale_value_is_not_logged()
     logger.begin();
 
     core::SignalStore signals;
-    uint16_t           first  = core::SIGNAL_CATALOG[0].id;
-    uint16_t           second = core::SIGNAL_CATALOG[1].id;
+    uint16_t          first  = core::SIGNAL_CATALOG[0].id;
+    uint16_t          second = core::SIGNAL_CATALOG[1].id;
 
     /**
      * `second` has been polled all along despite never being displayed,
@@ -646,13 +642,10 @@ void test_a_reassigned_panels_stale_value_is_not_logged()
 
     std::vector<uint8_t> bytes = storage.file_bytes(chunk_path_str(0));
     TEST_ASSERT_EQUAL_size_t(
-        sizeof(core::ChunkHeader) + 2 * sizeof(core::LogRecord),
-        bytes.size());
+        sizeof(core::ChunkHeader) + 2 * sizeof(core::LogRecord), bytes.size());
 
     core::LogRecord records[2];
-    memcpy(records,
-           bytes.data() + sizeof(core::ChunkHeader),
-           sizeof(records));
+    memcpy(records, bytes.data() + sizeof(core::ChunkHeader), sizeof(records));
     TEST_ASSERT_EQUAL_UINT16(first, records[0].signal_id);
     TEST_ASSERT_EQUAL_FLOAT(12.0f, records[0].value);
 
@@ -673,15 +666,16 @@ void test_sample_records_nothing_while_logging_is_disabled()
     logger.begin();
 
     core::SignalStore signals;
-    uint16_t           id  = core::SIGNAL_CATALOG[0].id;
-    core::Config       cfg = displaying({ id });
+    uint16_t          id         = core::SIGNAL_CATALOG[0].id;
+    core::Config      cfg        = displaying({ id });
     cfg.settings.logging_enabled = false;
 
     signals.set(id, 11.0f, 100);
     sample(logger, signals, cfg, 100);
     signals.set(id, 22.0f, 200);
     sample(logger, signals, cfg, 200);
-    sample(logger, signals, cfg, 5200); // would flush, if anything were buffered
+    sample(
+        logger, signals, cfg, 5200); // would flush, if anything were buffered
 
     /**
      * Not even a chunk header: chunks are created by the first flush that
@@ -698,8 +692,8 @@ void test_turning_logging_off_flushes_and_back_on_reprimes()
     logger.begin();
 
     core::SignalStore signals;
-    uint16_t           id  = core::SIGNAL_CATALOG[0].id;
-    core::Config       cfg = displaying({ id });
+    uint16_t          id  = core::SIGNAL_CATALOG[0].id;
+    core::Config      cfg = displaying({ id });
 
     signals.set(id, 11.0f, 100);
     sample(logger, signals, cfg, 100); // primes
@@ -715,8 +709,7 @@ void test_turning_logging_off_flushes_and_back_on_reprimes()
 
     std::vector<uint8_t> after_off = storage.file_bytes(chunk_path_str(0));
     TEST_ASSERT_EQUAL_size_t(
-        sizeof(core::ChunkHeader) + sizeof(core::LogRecord),
-        after_off.size());
+        sizeof(core::ChunkHeader) + sizeof(core::LogRecord), after_off.size());
 
     /**
      * Values keep moving while logging is off -- none of that may appear
@@ -734,12 +727,10 @@ void test_turning_logging_off_flushes_and_back_on_reprimes()
 
     std::vector<uint8_t> bytes = storage.file_bytes(chunk_path_str(0));
     TEST_ASSERT_EQUAL_size_t(
-        sizeof(core::ChunkHeader) + 2 * sizeof(core::LogRecord),
-        bytes.size());
+        sizeof(core::ChunkHeader) + 2 * sizeof(core::LogRecord), bytes.size());
 
     core::LogRecord records[2];
-    memcpy(records, bytes.data() + sizeof(core::ChunkHeader),
-           sizeof(records));
+    memcpy(records, bytes.data() + sizeof(core::ChunkHeader), sizeof(records));
     TEST_ASSERT_EQUAL_FLOAT(22.0f, records[0].value);
     /**
      * 99.0 -- the value that arrived while off -- is absent.
@@ -757,8 +748,8 @@ void test_each_on_off_cycle_counts_as_its_own_log()
     TEST_ASSERT_EQUAL_UINT16(0, logger.log_count());
 
     core::SignalStore signals;
-    uint16_t           id  = core::SIGNAL_CATALOG[0].id;
-    core::Config       cfg = displaying({ id });
+    uint16_t          id  = core::SIGNAL_CATALOG[0].id;
+    core::Config      cfg = displaying({ id });
 
     /**
      * Three captures, all within one "power cycle" (one Logger, one
@@ -770,12 +761,12 @@ void test_each_on_off_cycle_counts_as_its_own_log()
 
         cfg.settings.logging_enabled = true;
         signals.set(id, static_cast<float>(i), t);
-        sample(logger, signals, cfg, t);          // opens capture i
+        sample(logger, signals, cfg, t); // opens capture i
         signals.set(id, static_cast<float>(i) + 0.5f, t + 60000);
-        sample(logger, signals, cfg, t + 60000);  // 60s of recording
+        sample(logger, signals, cfg, t + 60000); // 60s of recording
 
         cfg.settings.logging_enabled = false;
-        sample(logger, signals, cfg, t + 60000);  // closes capture i
+        sample(logger, signals, cfg, t + 60000); // closes capture i
     }
 
     TEST_ASSERT_EQUAL_UINT16(3, logger.log_count());
@@ -818,7 +809,7 @@ void test_erase_clears_the_store_and_the_capture_count()
     TEST_ASSERT_TRUE(logger.is_ready());
     TEST_ASSERT_EQUAL_UINT16(0, logger.log_count());
     TEST_ASSERT_EQUAL_UINT32(0, logger.total_logged_ms());
-    TEST_ASSERT_EQUAL_UINT64(0, logger.used_bytes());
+    TEST_ASSERT_EQUAL_UINT64(0, logger.ring_used_bytes());
     TEST_ASSERT_FALSE(storage.exists(chunk_path_str(0).c_str()));
 
     /**
@@ -909,7 +900,7 @@ void test_recording_after_an_erase_starts_a_fresh_capture()
 
 void test_erase_on_a_missing_store_leaves_the_logger_inert()
 {
-    FakeStorage storage; /* never begin()'d -- nothing mounted */
+    FakeStorage  storage; /* never begin()'d -- nothing mounted */
     core::Logger logger(storage);
 
     TEST_ASSERT_FALSE(logger.begin());
@@ -923,8 +914,8 @@ void test_log_count_survives_a_reboot()
     storage.begin();
 
     core::SignalStore signals;
-    uint16_t           id  = core::SIGNAL_CATALOG[0].id;
-    core::Config       cfg = displaying({ id });
+    uint16_t          id  = core::SIGNAL_CATALOG[0].id;
+    core::Config      cfg = displaying({ id });
 
     {
         core::Logger logger(storage);
@@ -964,8 +955,8 @@ void test_logs_drop_out_of_the_count_once_the_ring_laps_past_them()
     logger.begin();
 
     core::SignalStore signals;
-    uint16_t           id  = core::SIGNAL_CATALOG[0].id;
-    core::Config       cfg = displaying({ id });
+    uint16_t          id  = core::SIGNAL_CATALOG[0].id;
+    core::Config      cfg = displaying({ id });
 
     /**
      * Five short captures. Each writes one record, filling its chunk and
@@ -1013,7 +1004,8 @@ void test_a_corrupt_index_self_heals_to_an_empty_one()
     storage.begin();
 
     storage.open(core::LOG_INDEX_PATH, StorageFileMode::Write);
-    uint8_t garbage[9] = { 0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0x02, 0x03, 0x04, 0x05 };
+    uint8_t garbage[9]
+        = { 0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0x02, 0x03, 0x04, 0x05 };
     storage.write(garbage, sizeof(garbage));
     storage.close();
 
@@ -1044,15 +1036,15 @@ void test_used_bytes_climbs_to_capacity_and_pins_there()
     /**
      * Nothing written yet -- and begin() creates no chunk.
      */
-    TEST_ASSERT_EQUAL_UINT64(0, logger.used_bytes());
+    TEST_ASSERT_EQUAL_UINT64(0, logger.ring_used_bytes());
 
     core::SignalStore signals;
-    uint16_t           id  = core::SIGNAL_CATALOG[0].id;
-    core::Config       cfg = displaying({ id });
+    uint16_t          id  = core::SIGNAL_CATALOG[0].id;
+    core::Config      cfg = displaying({ id });
 
     /**
      * Fill the ring one chunk at a time, then keep going well past it.
-     * used_bytes() must climb and then stop at capacity rather than
+     * ring_used_bytes() must climb and then stop at capacity rather than
      * running away -- rotation overwrites, it doesn't add space.
      */
     uint64_t previous = 0;
@@ -1063,19 +1055,19 @@ void test_used_bytes_climbs_to_capacity_and_pins_there()
         sample(logger, signals, cfg, t);
         sample(logger, signals, cfg, t + 6000); // due -> flush -> rotate
 
-        uint64_t used = logger.used_bytes();
-        TEST_ASSERT_TRUE(used >= previous);                      /* monotonic */
-        TEST_ASSERT_TRUE(used <= logger.ring_capacity_bytes());  /* capped   */
+        uint64_t used = logger.ring_used_bytes();
+        TEST_ASSERT_TRUE(used >= previous);                     /* monotonic */
+        TEST_ASSERT_TRUE(used <= logger.ring_capacity_bytes()); /* capped   */
         previous = used;
     }
 
     TEST_ASSERT_EQUAL_UINT64(logger.ring_capacity_bytes(),
-                             logger.used_bytes());
+                             logger.ring_used_bytes());
 }
 
 void test_chunk_rotation_advances_through_all_slots_then_wraps()
 {
-    FakeStorage  storage;
+    FakeStorage storage;
     storage.begin();
 
     /**
@@ -1088,8 +1080,8 @@ void test_chunk_rotation_advances_through_all_slots_then_wraps()
     TEST_ASSERT_EQUAL_UINT16(0, logger.current_chunk_index());
 
     core::SignalStore signals;
-    uint16_t           id  = core::SIGNAL_CATALOG[0].id;
-    core::Config       cfg = displaying({ id });
+    uint16_t          id  = core::SIGNAL_CATALOG[0].id;
+    core::Config      cfg = displaying({ id });
 
     /**
      * The first sample after a signal comes on screen only primes its
