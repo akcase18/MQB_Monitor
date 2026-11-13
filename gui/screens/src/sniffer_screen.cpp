@@ -53,7 +53,8 @@ namespace gui
 
     FLASHMEM void SnifferScreen::create(const Theme &theme,
                                         StopCallback stop_cb,
-                                        void        *ctx)
+                                        void        *ctx,
+                                        const char  *title)
     {
         theme_    = &theme;
         stop_cb_  = stop_cb;
@@ -64,7 +65,7 @@ namespace gui
         bool portrait
             = theme.metrics.screen_height > theme.metrics.screen_width;
 
-        create_nav_title(screen_, theme, "CAN Sniffer");
+        create_nav_title(screen_, theme, title);
         create_divider(screen_, theme, HEADER_DIVIDER_Y);
 
         lv_coord_t row_width = theme.metrics.screen_width - 2 * SCREEN_MARGIN;
@@ -156,7 +157,9 @@ namespace gui
             return;
         }
 
-        lv_label_set_text(channel_value_, channel_text(vm.channel));
+        lv_label_set_text(channel_value_,
+                          vm.mode_text != nullptr ? vm.mode_text
+                                                  : channel_text(vm.channel));
 
         char buf[16];
 

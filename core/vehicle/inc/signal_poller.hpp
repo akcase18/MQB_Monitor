@@ -90,6 +90,42 @@ namespace core
              */
             static constexpr uint32_t BACKGROUND_STARVATION_MS = 1000;
 
+            /**
+             * Counters since construction or the last reset_stats(), for
+             * the POLLSTATS serial command (see THROUGHPUT_TEST_PLAN.md).
+             * `nrcs` counts final negative answers; `pending` counts
+             * 0x78 response-pending ones, which keep a request open.
+             */
+            struct Stats
+            {
+                    uint32_t since_ms = 0;
+                    uint32_t sent     = 0;
+                    uint32_t answered = 0;
+                    uint32_t timeouts = 0;
+                    uint32_t nrcs     = 0;
+                    uint32_t pending  = 0;
+            };
+
+            /**
+             * One request-table entry's cadence since the last
+             * reset_stats() or set_active() rebuild: the answers it got
+             * and the intervals between them. `answers` answers make
+             * `answers - 1` intervals, so the mean is
+             * interval_sum_ms / (answers - 1).
+             */
+            struct EntryStats
+            {
+                    uint8_t  ecu             = 0;
+                    uint8_t  byte1           = 0;
+                    uint8_t  byte2           = 0;
+                    bool     priority        = true;
+                    uint8_t  misses          = 0;
+                    uint32_t period_ms       = 0;
+                    uint32_t answers         = 0;
+                    uint32_t interval_sum_ms = 0;
+                    uint32_t interval_max_ms = 0;
+            };
+
             SignalPoller(UdsClient &uds, IClock &clock);
 
             /**
@@ -134,6 +170,39 @@ namespace core
              */
             void on_negative_response(uint8_t ecu, uint8_t service, uint8_t nrc);
 
+            /**
+             * Flood mode, for measuring the dash's ceiling: every entry
+             * is due again the moment it's answered, so requests go out
+             * back to back. Entries in back-off keep their slow retry.
+             * RAM only; never persisted.
+             */
+            void set_flood(bool on)
+            {
+                flood_ = on;
+            }
+
+            bool flood() const
+            {
+                return flood_;
+            }
+
+            const Stats &stats() const
+            {
+                return stats_;
+            }
+
+            /**
+             * Entries in the request table, for entry_stats().
+             */
+            uint8_t request_count() const
+            {
+                return count_;
+            }
+
+            EntryStats entry_stats(uint8_t index) const;
+
+            void reset_stats();
+
         private:
             struct Entry
             {
@@ -144,6 +213,15 @@ namespace core
                     uint32_t next_due_ms = 0;
                     uint8_t  misses      = 0;
                     bool     priority    = true;
+
+                    /**
+                     * Cadence bookkeeping for entry_stats(); 0 in
+                     * last_answer_ms means no answer since the reset.
+                     */
+                    uint32_t last_answer_ms  = 0;
+                    uint32_t answers         = 0;
+                    uint32_t interval_sum_ms = 0;
+                    uint32_t interval_max_ms = 0;
             };
 
             int find_request(uint8_t ecu, uint8_t byte1, uint8_t byte2) const;
@@ -167,6 +245,9 @@ namespace core
             bool     in_flight_     = false;
             uint8_t  in_flight_idx_ = 0;
             uint32_t sent_at_ms_    = 0;
+
+            bool  flood_ = false;
+            Stats stats_ {};
     };
 
 } // namespace core

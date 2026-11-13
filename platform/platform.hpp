@@ -41,6 +41,42 @@ struct SniffFrame
 constexpr uint8_t SNIFF_FLAG_EXTENDED = 0x01;
 constexpr uint8_t SNIFF_FLAG_REMOTE   = 0x02;
 
+/**
+ * Bench mode's interrupt-context callbacks -- see ICanBus::bench_begin().
+ */
+class IBenchSink
+{
+    public:
+        virtual ~IBenchSink() = default;
+
+        virtual void on_bench_frame(const CanFrame &frame, uint32_t t_us) = 0;
+        virtual void on_bench_tick(uint32_t t_us)                         = 0;
+};
+
+/**
+ * Period of IBenchSink::on_bench_tick().
+ */
+constexpr uint32_t BENCH_TICK_US = 50;
+
+struct CanBusStats
+{
+        bool supported = false;
+
+        /**
+         * Frames lost because the driver's RX queue was full: loop() didn't
+         * drain it in time.
+         */
+        uint32_t rx_missed = 0;
+
+        /**
+         * Frames lost in the controller's hardware FIFO.
+         */
+        uint32_t rx_overrun = 0;
+
+        uint32_t bus_errors = 0;
+        uint32_t tx_failed  = 0;
+};
+
 struct SniffStats
 {
         /**
@@ -143,6 +179,58 @@ class ICanBus
         virtual SniffStats sniff_stats() const
         {
             return SniffStats { 0, 0 };
+        }
+
+        /**
+         * Bench mode (THROUGHPUT_TEST_PLAN.md) -- the v4 dash only; every
+         * default below reports "unsupported". Like sniffer mode,
+         * send()/receive() must not be used between bench_begin() and
+         * bench_end(), which puts back exactly what begin() set up.
+         *
+         * bench_begin() accepts every frame and hands each to the sink's
+         * on_bench_frame() from the receive interrupt, stamped with
+         * bench_micros(); on_bench_tick() runs every BENCH_TICK_US from a
+         * timer at the same interrupt priority, so the two never nest.
+         *
+         * @param listen_only True never ACKs or transmits.
+         *
+         * @returns False if this board has no bench mode.
+         */
+        virtual bool bench_begin(uint32_t baud, bool listen_only, IBenchSink *sink)
+        {
+            (void)baud;
+            (void)listen_only;
+            (void)sink;
+            return false;
+        }
+
+        virtual void bench_end()
+        {
+        }
+
+        /**
+         * Callable from the sink's callbacks, or from loop() with
+         * interrupts off. Frames go out in the order sent.
+         */
+        virtual bool bench_send(const CanFrame &frame)
+        {
+            (void)frame;
+            return false;
+        }
+
+        virtual uint32_t bench_micros() const
+        {
+            return 0;
+        }
+
+        /**
+         * The controller's own error counters, cumulative since begin(),
+         * for the LOOPSTATS serial command. A board that doesn't track
+         * them reports `supported = false`.
+         */
+        virtual CanBusStats bus_stats() const
+        {
+            return CanBusStats {};
         }
 };
 

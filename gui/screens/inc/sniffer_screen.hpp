@@ -34,6 +34,11 @@ namespace gui
     {
             SnifferChannel channel = SnifferChannel::Closed;
 
+            /**
+             * Shown in place of the channel when set -- bench mode's role.
+             */
+            const char *mode_text = nullptr;
+
             uint32_t frames_per_sec = 0;
             uint32_t total_frames   = 0;
             uint32_t dropped_frames = 0;
@@ -46,8 +51,13 @@ namespace gui
 
             /**
              * Builds the screen. Does not load it.
+             *
+             * @param title Bench mode reuses this screen as "CAN Bench".
              */
-            void create(const Theme &theme, StopCallback stop_cb, void *ctx);
+            void create(const Theme &theme,
+                        StopCallback stop_cb,
+                        void        *ctx,
+                        const char  *title = "CAN Sniffer");
 
             /**
              * Deletes the screen. It must not be the loaded screen.

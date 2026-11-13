@@ -204,3 +204,20 @@ bool DashS3CanBus::receive(CanFrame &out)
 
     return true;
 }
+
+CanBusStats DashS3CanBus::bus_stats() const
+{
+    CanBusStats out;
+    twai_status_info_t status;
+    if (!started_ || twai_get_status_info(&status) != ESP_OK)
+    {
+        return out;
+    }
+
+    out.supported  = true;
+    out.rx_missed  = status.rx_missed_count;
+    out.rx_overrun = status.rx_overrun_count;
+    out.bus_errors = status.bus_error_count;
+    out.tx_failed  = status.tx_failed_count;
+    return out;
+}

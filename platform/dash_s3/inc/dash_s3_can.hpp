@@ -16,6 +16,8 @@ class DashS3CanBus : public ICanBus
         bool send(const CanFrame &frame) override;
         bool receive(CanFrame &out) override;
 
+        CanBusStats bus_stats() const override;
+
     private:
         DashS3CanBus() = default;
 

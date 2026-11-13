@@ -24,7 +24,7 @@
       "name": "Cool Temp",
       "description": "Engine coolant temperature.",
       "unit": "Temp",
-      "cycle_time_ms": 2000,
+      "cycle_time_ms": 1000,
       "transform": "default",
       "display_min": -40.0,
       "display_max": 130.0,
@@ -43,14 +43,14 @@
       "status": "active",
       "notes": "",
       "samples": [],
-      "updated_at": 1793400552.742086
+      "updated_at": 1794444402.797042
     },
     {
       "id": 1,
       "name": "Eng Oil Temp",
       "description": "Engine oil temperature, measured by the oil temperature sensor in the oil pan.",
       "unit": "Temp",
-      "cycle_time_ms": 1000,
+      "cycle_time_ms": 5000,
       "transform": "default",
       "display_min": -40.0,
       "display_max": 150.0,
@@ -69,14 +69,14 @@
       "status": "active",
       "notes": "",
       "samples": [],
-      "updated_at": 1793400575.8750012
+      "updated_at": 1794444396.474904
     },
     {
       "id": 2,
       "name": "Int Air Temp",
       "description": "Temperature of the air going into the engine.",
       "unit": "Temp",
-      "cycle_time_ms": 100,
+      "cycle_time_ms": 500,
       "transform": "default",
       "display_min": -40.0,
       "display_max": 80.0,
@@ -95,7 +95,7 @@
       "status": "active",
       "notes": "",
       "samples": [],
-      "updated_at": 1793400587.254048
+      "updated_at": 1794444416.747694
     },
     {
       "id": 3,
@@ -154,7 +154,7 @@
       "name": "Amb Pres",
       "description": "Outside air (barometric) pressure. Drops as altitude rises.",
       "unit": "Pressure",
-      "cycle_time_ms": 1000,
+      "cycle_time_ms": 5000,
       "transform": "default",
       "display_min": 0.8,
       "display_max": 1.1,
@@ -173,7 +173,7 @@
       "status": "active",
       "notes": "",
       "samples": [],
-      "updated_at": 1793400602.354615
+      "updated_at": 1794444423.742066
     },
     {
       "id": 22,
@@ -268,7 +268,7 @@
       "name": "Speed",
       "description": "Vehicle speed, as the engine computer reports it.",
       "unit": "Speed",
-      "cycle_time_ms": 100,
+      "cycle_time_ms": 500,
       "transform": "default",
       "display_min": 0.0,
       "display_max": 300.0,
@@ -287,7 +287,7 @@
       "status": "active",
       "notes": "",
       "samples": [],
-      "updated_at": 1793400620.104702
+      "updated_at": 1794444437.292064
     },
     {
       "id": 10,
@@ -663,7 +663,7 @@
       "name": "Rad Out Temp",
       "description": "Coolant temperature at the radiator outlet.",
       "unit": "Temp",
-      "cycle_time_ms": 2000,
+      "cycle_time_ms": 1000,
       "transform": "default",
       "display_min": 0.0,
       "display_max": 100.0,
@@ -685,7 +685,7 @@
         "020f",
         "020e"
       ],
-      "updated_at": 1793400710.1718988,
+      "updated_at": 1794444465.259711,
       "points": [
         {
           "payload": "004c",
@@ -715,7 +715,7 @@
       "name": "Engine Outlet Coolant Temp",
       "description": "The coolant temperature the engine computer is targeting at the engine outlet.",
       "unit": "Temp",
-      "cycle_time_ms": 100,
+      "cycle_time_ms": 1000,
       "transform": "default",
       "display_min": 0.0,
       "display_max": 100.0,
@@ -737,7 +737,7 @@
         "0430",
         "0429"
       ],
-      "updated_at": 1793400715.044874,
+      "updated_at": 1794444475.775892,
       "points": [
         {
           "payload": "fe88",
@@ -767,7 +767,7 @@
       "name": "Cool Temp Delta",
       "description": "How much hotter the coolant is leaving the engine than leaving the radiator: the heat the radiator is taking out.",
       "unit": "TempDelta",
-      "cycle_time_ms": 2000,
+      "cycle_time_ms": 1000,
       "transform": "default",
       "display_min": 0.0,
       "display_max": 100.0,
@@ -789,7 +789,7 @@
         "0249",
         "017f"
       ],
-      "updated_at": 1793400720.472029,
+      "updated_at": 1794444483.076428,
       "points": [
         {
           "payload": "0249",
@@ -1140,7 +1140,7 @@
       "samples": [
         "0008"
       ],
-      "updated_at": 1793635581.8743749,
+      "updated_at": 1794444498.942528,
       "enum": [
         {
           "value": 0,
@@ -1181,7 +1181,7 @@
       "name": "EGT",
       "description": "Exhaust gas temperature ahead of the catalytic converter.",
       "unit": "Temp",
-      "cycle_time_ms": 500,
+      "cycle_time_ms": 1000,
       "transform": "default",
       "display_min": 0.0,
       "display_max": 100.0,
@@ -1205,7 +1205,7 @@
         "0e14",
         "0e13"
       ],
-      "updated_at": 1793400765.355697,
+      "updated_at": 1794444505.5820282,
       "points": [
         {
           "payload": "1111",
@@ -1365,7 +1365,7 @@
       "name": "Trans Fluid Temp",
       "description": "Transmission (DSG) fluid temperature. Not supported on MT cars.",
       "unit": "Temp",
-      "cycle_time_ms": 1000,
+      "cycle_time_ms": 2000,
       "transform": "default",
       "display_min": 0.0,
       "display_max": 100.0,
@@ -1395,7 +1395,7 @@
         "1100",
         "1111"
       ],
-      "updated_at": 1793400785.656033,
+      "updated_at": 1794444515.3264792,
       "points": [
         {
           "payload": "0000",
@@ -1434,10 +1434,10 @@
       "name": "Clutch 1 Torque",
       "description": "Specified torque at clutch 1 (odd gears).",
       "unit": "Torque",
-      "cycle_time_ms": 50,
+      "cycle_time_ms": 100,
       "transform": "default",
-      "display_min": 0.0,
-      "display_max": 100.0,
+      "display_min": -700.0,
+      "display_max": 700.0,
       "requests": [
         {
           "byte1": "0x38",
@@ -1464,7 +1464,7 @@
         "1000",
         "1020"
       ],
-      "updated_at": 1793400840.79421,
+      "updated_at": 1794444548.3131242,
       "points": [
         {
           "payload": "1111",
@@ -1511,10 +1511,10 @@
       "name": "Clutch 2 Torque",
       "description": "Specified torque at clutch 2 (even gears, reverse).",
       "unit": "Torque",
-      "cycle_time_ms": 50,
+      "cycle_time_ms": 100,
       "transform": "default",
-      "display_min": 0.0,
-      "display_max": 100.0,
+      "display_min": -700.0,
+      "display_max": 700.0,
       "requests": [
         {
           "byte1": "0x38",
@@ -1538,7 +1538,7 @@
       "samples": [
         "20d1"
       ],
-      "updated_at": 1793400862.823304,
+      "updated_at": 1794444564.560846,
       "points": [
         {
           "payload": "0000",
@@ -1653,7 +1653,7 @@
       "name": "Clutch 2 Pres",
       "description": "Hydraulic pressure on DSG clutch 2 (even gears, reverse).",
       "unit": "Pressure",
-      "cycle_time_ms": 50,
+      "cycle_time_ms": 100,
       "transform": "default",
       "display_min": 0.0,
       "display_max": 100.0,
@@ -1681,7 +1681,7 @@
         "0000",
         "0100"
       ],
-      "updated_at": 1793400868.023196,
+      "updated_at": 1794444577.116242,
       "points": [
         {
           "payload": "0000",
@@ -1718,7 +1718,7 @@
       "name": "Clutch 1 Pres",
       "description": "Hydraulic pressure on DSG clutch 1 (odd gears).",
       "unit": "Pressure",
-      "cycle_time_ms": 50,
+      "cycle_time_ms": 100,
       "transform": "default",
       "display_min": 0.0,
       "display_max": 100.0,
@@ -1745,7 +1745,7 @@
       "samples": [
         "0000"
       ],
-      "updated_at": 1793400870.7558029,
+      "updated_at": 1794444583.8440351,
       "points": [
         {
           "payload": "0000",
@@ -2051,7 +2051,7 @@
       "name": "AWD Ctrl Temp",
       "description": "Temperature of the Haldex control module.",
       "unit": "Temp",
-      "cycle_time_ms": 500,
+      "cycle_time_ms": 1000,
       "transform": "default",
       "display_min": 0.0,
       "display_max": 100.0,
@@ -2077,7 +2077,7 @@
       "samples": [
         "6300"
       ],
-      "updated_at": 1793400886.745711,
+      "updated_at": 1794444594.560489,
       "points": [
         {
           "payload": "6300",
@@ -2163,7 +2163,7 @@
       "name": "AWD Clutch Temp",
       "description": "Haldex clutch temperature.",
       "unit": "Temp",
-      "cycle_time_ms": 500,
+      "cycle_time_ms": 1000,
       "transform": "default",
       "display_min": 0.0,
       "display_max": 100.0,
@@ -2190,7 +2190,7 @@
       "samples": [
         "5b6a"
       ],
-      "updated_at": 1793400892.123301,
+      "updated_at": 1794444606.444294,
       "points": [
         {
           "payload": "0004",

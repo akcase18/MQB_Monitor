@@ -21,6 +21,11 @@ class TeensyCanBus : public ICanBus
         bool       sniff_send(const SniffFrame &frame) override;
         SniffStats sniff_stats() const override;
 
+        bool     bench_begin(uint32_t baud, bool listen_only, IBenchSink *sink) override;
+        void     bench_end() override;
+        bool     bench_send(const CanFrame &frame) override;
+        uint32_t bench_micros() const override;
+
     private:
         TeensyCanBus() = default;
 
@@ -33,4 +38,5 @@ class TeensyCanBus : public ICanBus
 
         bool sniffing_    = false;
         bool listen_only_ = true;
+        bool benching_    = false;
 };

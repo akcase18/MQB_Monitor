@@ -237,3 +237,164 @@ SniffStats TeensyCanBus::sniff_stats() const
 {
     return SniffStats{s_rx, s_dropped};
 }
+
+/*==============================================================================
+ * Bench mode
+ *
+ * The v4 dash as THROUGHPUT_TEST_PLAN.md's instrument. Every frame comes
+ * off the FIFO interrupt straight into the sink (core::bench::BenchEngine,
+ * via src/main.cpp), stamped with micros() there and then, and a PIT timer
+ * ticks the sink every BENCH_TICK_US. Both interrupts run at the same NVIC
+ * priority, so neither preempts the other and the engine needs no locks
+ * between them. The timer is PIT channel 0 programmed directly, not
+ * IntervalTimer, whose code would land in ITCM; nothing else in this
+ * firmware uses the PIT.
+ *
+ * Transmits go through FlexCAN_T4's sequential path (`seq = 1`): one
+ * mailbox, the rest queued in order and fed from that mailbox's
+ * transmit-complete interrupt. With several mailboxes free, two frames
+ * with the same id could leave in either order, and ISO-TP consecutive
+ * frames can't tolerate that.
+ *
+ * All of it lives in flash: RAM1 code sits a few hundred bytes under a
+ * 32 KB ITCM block boundary, and this only ever runs with the dashboard
+ * paused.
+ =============================================================================*/
+
+namespace
+{
+    #define BENCH_FLASHMEM __attribute__((section(".flashmem.bench")))
+
+    constexpr uint8_t BENCH_IRQ_PRIORITY = 128;
+
+    /**
+     * The PIT counts the 24 MHz peripheral clock.
+     */
+    constexpr uint32_t PIT_CYCLES_PER_US = 24;
+
+    IBenchSink *s_bench_sink = nullptr;
+
+    BENCH_FLASHMEM void bench_isr(const CAN_message_t &msg)
+    {
+        uint32_t t_us = micros();
+        if (s_bench_sink == nullptr)
+        {
+            return;
+        }
+
+        CanFrame frame;
+        frame.id  = msg.id;
+        frame.len = clamped_len(msg.len);
+        memcpy(frame.data, msg.buf, sizeof(frame.data));
+        s_bench_sink->on_bench_frame(frame, t_us);
+    }
+
+    BENCH_FLASHMEM void bench_tick_isr()
+    {
+        PIT_TFLG0 = 1;
+        asm volatile("dsb"); /* clear the flag before returning, or it re-fires */
+
+        if (s_bench_sink != nullptr)
+        {
+            s_bench_sink->on_bench_tick(micros());
+        }
+    }
+
+    BENCH_FLASHMEM void bench_timer_start()
+    {
+        CCM_CCGR1 |= CCM_CCGR1_PIT(CCM_CCGR_ON);
+        PIT_MCR    = 0;
+        PIT_TCTRL0 = 0;
+        PIT_TFLG0  = 1;
+        PIT_LDVAL0 = BENCH_TICK_US * PIT_CYCLES_PER_US - 1;
+        attachInterruptVector(IRQ_PIT, bench_tick_isr);
+        NVIC_SET_PRIORITY(IRQ_PIT, BENCH_IRQ_PRIORITY);
+        NVIC_ENABLE_IRQ(IRQ_PIT);
+        PIT_TCTRL0 = PIT_TCTRL_TIE | PIT_TCTRL_TEN;
+    }
+
+    BENCH_FLASHMEM void bench_timer_stop()
+    {
+        PIT_TCTRL0 = 0;
+        PIT_TFLG0  = 1;
+        NVIC_DISABLE_IRQ(IRQ_PIT);
+    }
+} // namespace
+
+BENCH_FLASHMEM bool TeensyCanBus::bench_begin(uint32_t    baud,
+                                              bool        listen_only,
+                                              IBenchSink *sink)
+{
+    if (sniffing_ || benching_ || sink == nullptr)
+    {
+        return false;
+    }
+
+    s_bench_sink = sink;
+
+    s_bus.begin();
+    s_bus.setBaudRate(baud, listen_only ? LISTEN_ONLY : TX);
+    s_bus.setMBFilter(REJECT_ALL);
+    s_bus.enableFIFO();
+    s_bus.setFIFOFilter(ACCEPT_ALL);
+    s_bus.onReceive(bench_isr);
+    s_bus.enableFIFOInterrupt();
+
+    /**
+     * Mailbox interrupts on, straight into the mask registers: MB0-7 are
+     * the FIFO and its filter table, and the receive mailboxes past them
+     * reject everything, so in practice this is the transmit mailboxes'
+     * completion interrupt -- what drains the sequential transmit queue.
+     * Not enableMBInterrupts(): it calls a FLASHMEM template member that
+     * doesn't inline here, which lands in the same "section type
+     * conflict" begin()'s setMBFilterRange note describes.
+     */
+    FLEXCANb_IMASK1(CAN3) |= 0xFFFFFF00u;
+    FLEXCANb_IMASK2(CAN3) = 0xFFFFFFFFu;
+
+    NVIC_SET_PRIORITY(IRQ_CAN3, BENCH_IRQ_PRIORITY);
+    bench_timer_start();
+
+    benching_    = true;
+    listen_only_ = listen_only;
+    return true;
+}
+
+BENCH_FLASHMEM void TeensyCanBus::bench_end()
+{
+    if (!benching_)
+    {
+        return;
+    }
+
+    bench_timer_stop();
+    FLEXCANb_IMASK1(CAN3) = 0;
+    FLEXCANb_IMASK2(CAN3) = 0;
+    s_bus.onReceive(nullptr);
+    s_bench_sink = nullptr;
+    benching_    = false;
+
+    begin(rx_id_lo_, rx_id_hi_, baud_);
+}
+
+BENCH_FLASHMEM bool TeensyCanBus::bench_send(const CanFrame &frame)
+{
+    if (!benching_ || listen_only_)
+    {
+        return false;
+    }
+
+    CAN_message_t msg;
+    msg.id             = frame.id;
+    msg.len            = clamped_len(frame.len);
+    msg.flags.extended = frame.id > 0x7FF;
+    msg.seq            = 1;
+    memcpy(msg.buf, frame.data, msg.len);
+
+    return s_bus.write(msg) != 0;
+}
+
+BENCH_FLASHMEM uint32_t TeensyCanBus::bench_micros() const
+{
+    return micros();
+}

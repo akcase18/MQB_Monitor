@@ -1574,6 +1574,123 @@ void test_poller_waits_through_a_response_pending()
     TEST_ASSERT_EQUAL_UINT16(1, total);
 }
 
+
+void test_poller_flood_sends_back_to_back()
+{
+    FakeClock          clock;
+    FakeEcu            ecu(clock);
+    core::UdsClient    client(ecu, ENGINE, 1);
+    core::SignalPoller poller(client, clock);
+
+    /**
+     * Coolant Temp alone, a 2000ms signal: one request a second at most
+     * normally, but back to back in flood mode -- every 1ms answer frees
+     * the slot for the next request a loop pass later.
+     */
+    const uint16_t active[] = { 0 };
+    poller.set_active(active, 1);
+    run_loop(clock, client, poller, 1000);
+    uint16_t normal = ecu.requests_for(did::COOL_TEMP[0], did::COOL_TEMP[1]);
+    TEST_ASSERT_LESS_OR_EQUAL_UINT16(2, normal);
+
+    poller.set_flood(true);
+    run_loop(clock, client, poller, 1000);
+    uint16_t flooded
+        = ecu.requests_for(did::COOL_TEMP[0], did::COOL_TEMP[1]) - normal;
+    TEST_ASSERT_GREATER_THAN_UINT16(300, flooded);
+}
+
+void test_poller_flood_keeps_a_dead_did_backed_off()
+{
+    FakeClock          clock;
+    FakeEcu            ecu(clock);
+    core::UdsClient    client(ecu, ENGINE, 1);
+    core::SignalPoller poller(client, clock);
+
+    ecu.stay_silent_on(did::THROTTLE[0], did::THROTTLE[1]);
+    poller.set_flood(true);
+
+    const uint16_t active[] = { 7, 12 };
+    poller.set_active(active, 2);
+    run_loop(clock, client, poller, 3000);
+
+    /**
+     * Its first misses, then the slow retry -- not a timeout's worth of
+     * bus every other request.
+     */
+    TEST_ASSERT_LESS_OR_EQUAL_UINT16(
+        core::SignalPoller::MISSES_BEFORE_BACKOFF + 2,
+        ecu.requests_for(did::THROTTLE[0], did::THROTTLE[1]));
+    TEST_ASSERT_GREATER_THAN_UINT16(
+        500, ecu.requests_for(did::ENGINE_SPEED[0], did::ENGINE_SPEED[1]));
+}
+
+void test_poller_counts_sent_answered_timeouts_and_rejections()
+{
+    FakeClock          clock;
+    FakeEcu            ecu(clock);
+    core::UdsClient    client(ecu, ENGINE, 1);
+    core::SignalPoller poller(client, clock);
+
+    ecu.stay_silent_on(did::THROTTLE[0], did::THROTTLE[1]);
+
+    const uint16_t active[] = { 7, 12 };
+    poller.set_active(active, 2);
+    run_loop(clock, client, poller, 1000);
+
+    const core::SignalPoller::Stats &stats = poller.stats();
+    TEST_ASSERT_EQUAL_UINT32(ecu.total_requests(), stats.sent);
+    TEST_ASSERT_EQUAL_UINT32(
+        ecu.responses_for(did::ENGINE_SPEED[0], did::ENGINE_SPEED[1]),
+        stats.answered);
+    /**
+     * Every request to the silent DID times out, bar one still in flight.
+     */
+    uint16_t silent = ecu.requests_for(did::THROTTLE[0], did::THROTTLE[1]);
+    TEST_ASSERT_GREATER_THAN_UINT32(0, stats.timeouts);
+    TEST_ASSERT_UINT32_WITHIN(1, silent, stats.timeouts);
+    TEST_ASSERT_EQUAL_UINT32(0, stats.nrcs);
+
+    poller.reset_stats();
+    TEST_ASSERT_EQUAL_UINT32(0, poller.stats().sent);
+    TEST_ASSERT_EQUAL_UINT32(clock.now_ms, poller.stats().since_ms);
+
+    ecu.reply_with_nrc(0x31);
+    run_loop(clock, client, poller, 200);
+    TEST_ASSERT_GREATER_THAN_UINT32(0, poller.stats().nrcs);
+    TEST_ASSERT_EQUAL_UINT32(0, poller.stats().answered);
+}
+
+void test_poller_reports_each_entrys_achieved_interval()
+{
+    FakeClock          clock;
+    FakeEcu            ecu(clock);
+    core::UdsClient    client(ecu, ENGINE, 1);
+    core::SignalPoller poller(client, clock);
+
+    /**
+     * Engine Speed alone, 50ms, against a 1ms ECU: answered on cadence.
+     */
+    const uint16_t active[] = { 7 };
+    poller.set_active(active, 1);
+    run_loop(clock, client, poller, 1000);
+
+    TEST_ASSERT_EQUAL_UINT8(1, poller.request_count());
+    core::SignalPoller::EntryStats entry = poller.entry_stats(0);
+    TEST_ASSERT_EQUAL_UINT8(did::ENGINE_SPEED[0], entry.byte1);
+    TEST_ASSERT_EQUAL_UINT8(did::ENGINE_SPEED[1], entry.byte2);
+    TEST_ASSERT_EQUAL_UINT32(50, entry.period_ms);
+    TEST_ASSERT_GREATER_OR_EQUAL_UINT32(19, entry.answers);
+
+    uint32_t mean = entry.interval_sum_ms / (entry.answers - 1);
+    TEST_ASSERT_UINT32_WITHIN(2, 50, mean);
+    TEST_ASSERT_LESS_OR_EQUAL_UINT32(52, entry.interval_max_ms);
+
+    poller.reset_stats();
+    TEST_ASSERT_EQUAL_UINT32(0, poller.entry_stats(0).answers);
+    TEST_ASSERT_EQUAL_UINT32(0, poller.entry_stats(0).interval_max_ms);
+}
+
 int main(int argc, char **argv)
 {
     (void)argc;
@@ -1618,5 +1735,9 @@ int main(int argc, char **argv)
     RUN_TEST(test_poller_recovers_from_an_unanswered_did);
     RUN_TEST(test_poller_treats_a_rejection_as_the_end_of_a_request);
     RUN_TEST(test_poller_waits_through_a_response_pending);
+    RUN_TEST(test_poller_flood_sends_back_to_back);
+    RUN_TEST(test_poller_flood_keeps_a_dead_did_backed_off);
+    RUN_TEST(test_poller_counts_sent_answered_timeouts_and_rejections);
+    RUN_TEST(test_poller_reports_each_entrys_achieved_interval);
     return UNITY_END();
 }

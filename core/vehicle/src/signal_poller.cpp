@@ -1,5 +1,7 @@
 #include "signal_poller.hpp"
 
+#include "mem_placement.hpp"
+
 namespace core
 {
 
@@ -46,7 +48,11 @@ namespace core
                                                    : BACKOFF_PERIOD_MS;
     }
 
-    void SignalPoller::set_active(const uint16_t *signal_ids,
+    /**
+     * FLASHMEM: runs on a config change or the periodic backstop, which
+     * bails at the unchanged-list check below, never per request.
+     */
+    FLASHMEM void SignalPoller::set_active(const uint16_t *signal_ids,
                                   uint8_t         count,
                                   uint8_t         priority_count)
     {
@@ -151,6 +157,11 @@ namespace core
                 entry.period_ms = spec.cycle_time_ms;
                 entry.misses    = 0;
                 entry.priority  = priority;
+
+                entry.last_answer_ms  = 0;
+                entry.answers         = 0;
+                entry.interval_sum_ms = 0;
+                entry.interval_max_ms = 0;
                 /**
                  * Due immediately: a freshly displayed panel should fill
                  * in as fast as the ECU will answer rather than sitting
@@ -259,6 +270,7 @@ namespace core
                 entry.misses++;
             }
             in_flight_ = false;
+            stats_.timeouts++;
         }
 
         int idx = pick_due(now);
@@ -274,6 +286,7 @@ namespace core
         request.byte1 = entry.byte1;
         request.byte2 = entry.byte2;
         uds_.send(request);
+        stats_.sent++;
 
         /**
          * `now + period`, not `next_due += period`. Under saturation the
@@ -294,7 +307,9 @@ namespace core
          * this is limited to when there is background traffic to absorb
          * at all.
          */
-        uint32_t period   = effective_period(entry);
+        uint32_t period = flood_ && entry.misses < MISSES_BEFORE_BACKOFF
+                              ? 0
+                              : effective_period(entry);
         uint32_t anchored = entry.next_due_ms + period;
         bool     keep_phase
             = entry.priority && has_background_
@@ -326,6 +341,20 @@ namespace core
 
         entry.misses = 0;
         in_flight_   = false;
+        stats_.answered++;
+
+        uint32_t now = clock_.millis();
+        if (entry.last_answer_ms != 0)
+        {
+            uint32_t interval = now - entry.last_answer_ms;
+            entry.interval_sum_ms += interval;
+            if (interval > entry.interval_max_ms)
+            {
+                entry.interval_max_ms = interval;
+            }
+        }
+        entry.last_answer_ms = now == 0 ? 1 : now;
+        entry.answers++;
     }
 
     void SignalPoller::on_negative_response(uint8_t ecu,
@@ -347,6 +376,7 @@ namespace core
              * still composing this one's answer.
              */
             sent_at_ms_ = clock_.millis();
+            stats_.pending++;
             return;
         }
 
@@ -363,6 +393,43 @@ namespace core
             entry.misses++;
         }
         in_flight_ = false;
+        stats_.nrcs++;
+    }
+
+    FLASHMEM SignalPoller::EntryStats SignalPoller::entry_stats(
+        uint8_t index) const
+    {
+        EntryStats out;
+        if (index >= count_)
+        {
+            return out;
+        }
+
+        const Entry &entry  = entries_[index];
+        out.ecu             = entry.ecu;
+        out.byte1           = entry.byte1;
+        out.byte2           = entry.byte2;
+        out.priority        = entry.priority;
+        out.misses          = entry.misses;
+        out.period_ms       = entry.period_ms;
+        out.answers         = entry.answers;
+        out.interval_sum_ms = entry.interval_sum_ms;
+        out.interval_max_ms = entry.interval_max_ms;
+        return out;
+    }
+
+    FLASHMEM void SignalPoller::reset_stats()
+    {
+        stats_          = Stats {};
+        stats_.since_ms = clock_.millis();
+
+        for (uint8_t i = 0; i < count_; i++)
+        {
+            entries_[i].last_answer_ms  = 0;
+            entries_[i].answers         = 0;
+            entries_[i].interval_sum_ms = 0;
+            entries_[i].interval_max_ms = 0;
+        }
     }
 
 } // namespace core

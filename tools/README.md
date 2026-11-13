@@ -87,6 +87,13 @@ support firmware development but don't ship on any board.
   whole path works with nothing plugged in. See its
   [README](log_export/README.md).
 
+- **[`bench/`](bench/)** — runs and analyzes the throughput tests in
+  [THROUGHPUT_TEST_PLAN.md](../THROUGHPUT_TEST_PLAN.md): the v4 dash in
+  bench mode fakes the car for the v5 dash, or fakes the dash for the car,
+  and streams every frame with a microsecond timestamp; `run.py` turns the
+  log into each module's answered/s and the requester's and responder's
+  share of every cycle. See its [README](bench/README.md).
+
 ## The two-stage registry loop
 
 ```

@@ -22,6 +22,18 @@
 #include "slcan.hpp"
 #include "uds_client.hpp"
 
+#if defined(PLATFORM_TEENSY)
+    /**
+     * Bench mode (THROUGHPUT_TEST_PLAN.md) is v4-only internal tooling.
+     */
+    #define HAS_CAN_BENCH 1
+    #include "bench_engine.hpp"
+    #include <new>
+    #include <stdlib.h>
+#else
+    #define HAS_CAN_BENCH 0
+#endif
+
 #include "remote_ap_controller.hpp"
 #include "remote_config_link.hpp"
 #include "remote_config_server.hpp"
@@ -1673,6 +1685,207 @@ namespace
     }
 
     /*==========================================================================
+     * Throughput stats -- see THROUGHPUT_TEST_PLAN.md
+     *
+     * Host line protocol, answered whenever sniffer mode is off:
+     *
+     *   POLLSTATS   -> one POLLSTATS summary line, an E line per request-
+     *                  table entry, then END
+     *   LOOPSTATS   -> one LOOPSTATS line
+     *   STATSRESET  -> OK; zeroes both, and takes the CAN counters' new
+     *                  baseline
+     *   POLLFLOOD 1 -> OK; every request due again the moment it's
+     *   POLLFLOOD 0    answered (SignalPoller::set_flood). RAM only.
+     *
+     * Every value is key=value so tools/bench can parse it. Format strings
+     * are PROGMEM: string literals otherwise land in RAM1 on the Teensy.
+     *========================================================================*/
+
+    /**
+     * Upper bounds, in microseconds, of LOOPSTATS' loop-period histogram
+     * buckets; the last bucket is everything past the final bound.
+     */
+    constexpr uint32_t LOOP_BUCKET_US[] = { 1000, 2000, 5000, 10000, 20000, 50000, 100000 };
+    constexpr uint8_t  LOOP_BUCKETS     = sizeof(LOOP_BUCKET_US) / sizeof(LOOP_BUCKET_US[0]) + 1;
+
+    struct LoopStats
+    {
+            uint32_t since_ms                = 0;
+            uint32_t loops                   = 0;
+            uint32_t last_start_us           = 0;
+            uint32_t period_max_us           = 0;
+            uint32_t sched_max_us            = 0;
+            uint32_t lvgl_max_us             = 0;
+            uint32_t buckets[LOOP_BUCKETS]   = {};
+            CanBusStats can_base {};
+    };
+
+    LoopStats s_loop_stats;
+
+    /**
+     * Called once per loop() with that pass's start time and the two
+     * slices most likely to stall it: the scheduler (logger flushes ride
+     * on it) and LVGL. noinline + FLASHMEM: loop() is in ITCM, which sits
+     * a few bytes under a 32 KB block boundary on the Teensy.
+     */
+    FLASHMEM __attribute__((noinline)) void record_loop(uint32_t start_us,
+                                                        uint32_t sched_us,
+                                                        uint32_t lvgl_us)
+    {
+        LoopStats &st = s_loop_stats;
+        if (st.loops > 0)
+        {
+            uint32_t period = start_us - st.last_start_us;
+            if (period > st.period_max_us)
+            {
+                st.period_max_us = period;
+            }
+            uint8_t b = 0;
+            while (b < LOOP_BUCKETS - 1 && period >= LOOP_BUCKET_US[b])
+            {
+                b++;
+            }
+            st.buckets[b]++;
+        }
+        st.last_start_us = start_us;
+        st.loops++;
+
+        if (sched_us > st.sched_max_us)
+        {
+            st.sched_max_us = sched_us;
+        }
+        if (lvgl_us > st.lvgl_max_us)
+        {
+            st.lvgl_max_us = lvgl_us;
+        }
+    }
+
+    FLASHMEM void reset_throughput_stats()
+    {
+        Composition &app = composition();
+        app.uds_poller.reset_stats();
+
+        s_loop_stats          = LoopStats {};
+        s_loop_stats.since_ms = platform_get().clock.millis();
+        s_loop_stats.can_base = platform_get().can.bus_stats();
+    }
+
+    FLASHMEM void print_poll_stats()
+    {
+        static const char SUMMARY[] PROGMEM
+            = "POLLSTATS elapsed_ms=%lu sent=%lu answered=%lu timeouts=%lu "
+              "nrcs=%lu pending=%lu flood=%u entries=%u\r\n";
+        static const char ENTRY[] PROGMEM
+            = "E ecu=%03X did=%02X%02X prio=%u period_ms=%lu answers=%lu "
+              "interval_sum_ms=%lu interval_max_ms=%lu misses=%u\r\n";
+
+        const core::SignalPoller        &poller = composition().uds_poller;
+        const core::SignalPoller::Stats &st     = poller.stats();
+
+        char line[160];
+        snprintf(line,
+                 sizeof(line),
+                 SUMMARY,
+                 (unsigned long)(platform_get().clock.millis() - st.since_ms),
+                 (unsigned long)st.sent,
+                 (unsigned long)st.answered,
+                 (unsigned long)st.timeouts,
+                 (unsigned long)st.nrcs,
+                 (unsigned long)st.pending,
+                 poller.flood() ? 1u : 0u,
+                 (unsigned)poller.request_count());
+        Serial.print(line);
+
+        for (uint8_t i = 0; i < poller.request_count(); i++)
+        {
+            core::SignalPoller::EntryStats e = poller.entry_stats(i);
+            uint16_t tx_id = e.ecu < core::UDS_ECU_COUNT ? core::UDS_ECUS[e.ecu].tx_id : 0;
+            snprintf(line,
+                     sizeof(line),
+                     ENTRY,
+                     (unsigned)tx_id,
+                     (unsigned)e.byte1,
+                     (unsigned)e.byte2,
+                     e.priority ? 1u : 0u,
+                     (unsigned long)e.period_ms,
+                     (unsigned long)e.answers,
+                     (unsigned long)e.interval_sum_ms,
+                     (unsigned long)e.interval_max_ms,
+                     (unsigned)e.misses);
+            Serial.print(line);
+        }
+        Serial.print(F("END\r\n"));
+    }
+
+    FLASHMEM void print_loop_stats()
+    {
+        static const char LINE[] PROGMEM
+            = "LOOPSTATS elapsed_ms=%lu loops=%lu period_max_us=%lu "
+              "sched_max_us=%lu lvgl_max_us=%lu hist=%lu,%lu,%lu,%lu,%lu,%lu,"
+              "%lu,%lu can=%u rx_missed=%lu rx_overrun=%lu bus_errors=%lu "
+              "tx_failed=%lu\r\n";
+        static_assert(LOOP_BUCKETS == 8, "LINE prints eight buckets");
+
+        const LoopStats &st  = s_loop_stats;
+        CanBusStats      can = platform_get().can.bus_stats();
+
+        char line[256];
+        snprintf(line,
+                 sizeof(line),
+                 LINE,
+                 (unsigned long)(platform_get().clock.millis() - st.since_ms),
+                 (unsigned long)st.loops,
+                 (unsigned long)st.period_max_us,
+                 (unsigned long)st.sched_max_us,
+                 (unsigned long)st.lvgl_max_us,
+                 (unsigned long)st.buckets[0],
+                 (unsigned long)st.buckets[1],
+                 (unsigned long)st.buckets[2],
+                 (unsigned long)st.buckets[3],
+                 (unsigned long)st.buckets[4],
+                 (unsigned long)st.buckets[5],
+                 (unsigned long)st.buckets[6],
+                 (unsigned long)st.buckets[7],
+                 can.supported ? 1u : 0u,
+                 (unsigned long)(can.rx_missed - st.can_base.rx_missed),
+                 (unsigned long)(can.rx_overrun - st.can_base.rx_overrun),
+                 (unsigned long)(can.bus_errors - st.can_base.bus_errors),
+                 (unsigned long)(can.tx_failed - st.can_base.tx_failed));
+        Serial.print(line);
+    }
+
+    /**
+     * @returns False if `cmd` isn't one of the stats commands.
+     */
+    FLASHMEM bool handle_stats_command(const char *cmd, size_t len)
+    {
+        if (len == 9 && memcmp(cmd, "POLLSTATS", 9) == 0)
+        {
+            print_poll_stats();
+        }
+        else if (len == 9 && memcmp(cmd, "LOOPSTATS", 9) == 0)
+        {
+            print_loop_stats();
+        }
+        else if (len == 10 && memcmp(cmd, "STATSRESET", 10) == 0)
+        {
+            reset_throughput_stats();
+            Serial.print(F("OK\r\n"));
+        }
+        else if (len == 11 && memcmp(cmd, "POLLFLOOD ", 10) == 0
+                 && (cmd[10] == '0' || cmd[10] == '1'))
+        {
+            composition().uds_poller.set_flood(cmd[10] == '1');
+            Serial.print(F("OK\r\n"));
+        }
+        else
+        {
+            return false;
+        }
+        return true;
+    }
+
+    /*==========================================================================
      * CAN sniffer mode
      *
      * Lets tools/monitor use this dash as its USB CAN sniffer, in place of
@@ -1696,6 +1909,10 @@ namespace
      *   SNIFFSTOP <- sent unasked when Stop is tapped on the panel
      *
      * SLCAN commands are answered only while active, BELL otherwise.
+     *
+     * Bench mode (v4 only, see the block below) shares all of this --
+     * the ask, the pause, every way out -- with BENCH in place of SNIFF
+     * in each of those words, and its own commands in place of SLCAN.
      *========================================================================*/
 
     constexpr uint32_t SNIFF_CONFIRM_TIMEOUT_MS = 10000;
@@ -1740,6 +1957,17 @@ namespace
     DashSniffPort        s_sniff_port;
     core::slcan::Session s_sniff_session(s_sniff_port);
 
+    enum class UsbMode : uint8_t
+    {
+        Sniffer,
+        Bench
+    };
+
+    /**
+     * Which mode the popup is asking for, or is active.
+     */
+    UsbMode s_usb_mode = UsbMode::Sniffer;
+
     SniffState s_sniff_state      = SniffState::Off;
     lv_obj_t  *s_sniff_popup      = nullptr;
     lv_obj_t  *s_sniff_ring       = nullptr; /* popup's countdown */
@@ -1762,6 +1990,539 @@ namespace
         Serial.write(core::slcan::CR);
     }
 
+    /**
+     * SNIFF<suffix> or BENCH<suffix>, by the mode in play.
+     */
+    FLASHMEM void usb_status(const char *suffix)
+    {
+        Serial.print(s_usb_mode == UsbMode::Bench ? F("BENCH") : F("SNIFF"));
+        usb_reply(suffix);
+    }
+
+#if HAS_CAN_BENCH
+    /*==========================================================================
+     * Bench mode -- the v4 dash as THROUGHPUT_TEST_PLAN.md's instrument
+     *
+     * core::bench::BenchEngine runs from the CAN receive interrupt and a
+     * timer (ICanBus::bench_begin()); loop() only streams its frame log to
+     * the host and refreshes the screen. The engine and its log are
+     * allocated on entry and freed on exit, so a dash that never benches
+     * pays nothing for them. Numbers are hex for ids, DIDs and bytes,
+     * decimal for everything else.
+     *
+     *   BC                     clear the configuration
+     *   BM <tx> <rx>           add a module
+     *   BD <tx> <did> <len>    responder: a DID's data length
+     *   BDL <len>              responder: length for DIDs with none
+     *   BFL <len>              responder: force every length (0 = off)
+     *   BL <us> [<us> ...]     responder: append answer latencies
+     *   BPEND <n> / BDROP <n>  responder: 0x78 / no answer every nth
+     *   BFC <bs> <stmin>       tester: flow control it sends
+     *   BT <ms> / BGAP <us>    tester: answer timeout / pause between
+     *   BJ <lane> <tx> <did>.. tester: add a 1-6 DID read to a lane
+     *   BS R|T|L               start as responder, tester or listen-only
+     *   BH                     halt (the bus goes back to the dash's)
+     *   BR <id> <hex bytes>    send one frame as is (running, not L)
+     *   BQ                     counters
+     *
+     * Configuration only while halted. Each answers OK or ERR; BQ answers
+     * a BQ line. Every frame on the bus streams out unasked as
+     *   F <t_us> R|T <id> <data>
+     * all hex, R for a frame received and T for one this end sent.
+     *========================================================================*/
+
+    constexpr uint32_t BENCH_LOG_SIZE = 4096; /* frames; 80 KB of RAM2 */
+    constexpr uint32_t BENCH_BAUD     = 500000;
+
+    class DashBenchBus : public core::bench::IBenchBus
+    {
+        public:
+            FLASHMEM bool send(const CanFrame &frame) override
+            {
+                return platform_get().can.bench_send(frame);
+            }
+
+            FLASHMEM uint32_t micros() const override
+            {
+                return platform_get().can.bench_micros();
+            }
+    };
+
+    class DashBenchSink : public IBenchSink
+    {
+        public:
+            FLASHMEM void on_bench_frame(const CanFrame &frame,
+                                         uint32_t        t_us) override
+            {
+                if (engine != nullptr)
+                {
+                    engine->on_frame(frame, t_us);
+                }
+            }
+
+            FLASHMEM void on_bench_tick(uint32_t t_us) override
+            {
+                if (engine != nullptr)
+                {
+                    engine->on_tick(t_us);
+                }
+            }
+
+            core::bench::BenchEngine *volatile engine = nullptr;
+    };
+
+    DashBenchBus  s_bench_bus;
+    DashBenchSink s_bench_sink;
+
+    core::bench::BenchEngine *s_bench     = nullptr;
+    core::bench::BenchFrame  *s_bench_log = nullptr;
+
+    /**
+     * Whether the bus is in bench mode -- only while running.
+     */
+    bool s_bench_open = false;
+
+    uint32_t s_bench_rate_ms     = 0;
+    uint32_t s_bench_rate_frames = 0;
+
+    /**
+     * malloc and placement new, not plain new: on the Teensy the nothrow
+     * operator new drags the C++ exception runtime into ITCM (~8 KB),
+     * which would cost a whole 32 KB block of RAM1.
+     */
+    FLASHMEM bool bench_enter()
+    {
+        s_bench_log = static_cast<core::bench::BenchFrame *>(
+            malloc(sizeof(core::bench::BenchFrame) * BENCH_LOG_SIZE));
+        void *engine = malloc(sizeof(core::bench::BenchEngine));
+        if (s_bench_log == nullptr || engine == nullptr)
+        {
+            free(s_bench_log);
+            free(engine);
+            s_bench_log = nullptr;
+            return false;
+        }
+        s_bench = new (engine)
+            core::bench::BenchEngine(s_bench_bus, s_bench_log, BENCH_LOG_SIZE);
+        s_bench->clear();
+        return true;
+    }
+
+    FLASHMEM void bench_halt()
+    {
+        if (s_bench_open)
+        {
+            platform_get().can.bench_end();
+            s_bench_open = false;
+        }
+        s_bench_sink.engine = nullptr;
+        if (s_bench != nullptr)
+        {
+            s_bench->stop();
+        }
+    }
+
+    FLASHMEM void bench_exit()
+    {
+        bench_halt();
+        if (s_bench != nullptr)
+        {
+            s_bench->~BenchEngine();
+        }
+        free(s_bench);
+        free(s_bench_log);
+        s_bench     = nullptr;
+        s_bench_log = nullptr;
+    }
+
+    FLASHMEM bool bench_start(core::bench::Role role)
+    {
+        bench_halt();
+        s_bench->start(role);
+        s_bench_sink.engine = s_bench;
+
+        bool listen_only = role == core::bench::Role::Listen;
+        if (!platform_get().can.bench_begin(BENCH_BAUD, listen_only, &s_bench_sink))
+        {
+            bench_halt();
+            return false;
+        }
+        s_bench_open = true;
+        return true;
+    }
+
+    FLASHMEM core::bench::Counters bench_counters()
+    {
+        noInterrupts();
+        core::bench::Counters c = s_bench->counters();
+        interrupts();
+        return c;
+    }
+
+    FLASHMEM const char *bench_role_text(core::bench::Role role)
+    {
+        switch (role)
+        {
+            case core::bench::Role::Responder:
+                return "Responder";
+            case core::bench::Role::Tester:
+                return "Tester";
+            case core::bench::Role::Listen:
+                return "Listen-only";
+            case core::bench::Role::Idle:
+            default:
+                return "Halted";
+        }
+    }
+
+    /**
+     * @returns The digit's value in `base` (10 or 16), or -1.
+     */
+    FLASHMEM int bench_digit(char c, int base)
+    {
+        int v = c >= '0' && c <= '9'   ? c - '0'
+                : c >= 'A' && c <= 'F' ? c - 'A' + 10
+                : c >= 'a' && c <= 'f' ? c - 'a' + 10
+                                       : -1;
+        return v < base ? v : -1;
+    }
+
+    /**
+     * Reads one space-separated number in `base`. Not strtoul(): on the
+     * Teensy, libc's lands in ITCM.
+     */
+    FLASHMEM bool bench_number(const char *&p, int base, uint32_t &out)
+    {
+        while (*p == ' ')
+        {
+            p++;
+        }
+
+        const char *start = p;
+        uint32_t    value = 0;
+        int         d     = 0;
+        while ((d = bench_digit(*p, base)) >= 0)
+        {
+            value = value * static_cast<uint32_t>(base) + static_cast<uint32_t>(d);
+            p++;
+        }
+        if (p == start || (*p != ' ' && *p != '\0'))
+        {
+            return false;
+        }
+        out = value;
+        return true;
+    }
+
+    FLASHMEM bool bench_at_end(const char *p)
+    {
+        while (*p == ' ')
+        {
+            p++;
+        }
+        return *p == '\0';
+    }
+
+    FLASHMEM bool bench_configure(const char *word, const char *p)
+    {
+        core::bench::BenchEngine &e = *s_bench;
+        uint32_t                  a = 0;
+        uint32_t                  b = 0;
+        uint32_t                  c = 0;
+
+        if (strcmp(word, "BC") == 0)
+        {
+            e.clear();
+            return true;
+        }
+        if (strcmp(word, "BM") == 0)
+        {
+            return bench_number(p, 16, a) && bench_number(p, 16, b)
+                   && bench_at_end(p)
+                   && e.add_module(static_cast<uint16_t>(a), static_cast<uint16_t>(b));
+        }
+        if (strcmp(word, "BD") == 0)
+        {
+            return bench_number(p, 16, a) && bench_number(p, 16, b)
+                   && bench_number(p, 10, c) && bench_at_end(p) && c <= 255
+                   && e.set_did_length(static_cast<uint16_t>(a),
+                                       static_cast<uint16_t>(b),
+                                       static_cast<uint8_t>(c));
+        }
+        if (strcmp(word, "BDL") == 0 || strcmp(word, "BFL") == 0)
+        {
+            if (!bench_number(p, 10, a) || !bench_at_end(p) || a > 255)
+            {
+                return false;
+            }
+            if (word[2] == 'D')
+            {
+                e.set_default_length(static_cast<uint8_t>(a));
+            }
+            else
+            {
+                e.set_forced_length(static_cast<uint8_t>(a));
+            }
+            return true;
+        }
+        if (strcmp(word, "BL") == 0)
+        {
+            bool any = false;
+            while (bench_number(p, 10, a))
+            {
+                if (!e.add_latency_us(a))
+                {
+                    return false;
+                }
+                any = true;
+            }
+            return any && bench_at_end(p);
+        }
+        if (strcmp(word, "BPEND") == 0 || strcmp(word, "BDROP") == 0)
+        {
+            if (!bench_number(p, 10, a) || !bench_at_end(p) || a > 0xFFFF)
+            {
+                return false;
+            }
+            if (word[1] == 'P')
+            {
+                e.set_pending_every(static_cast<uint16_t>(a));
+            }
+            else
+            {
+                e.set_drop_every(static_cast<uint16_t>(a));
+            }
+            return true;
+        }
+        if (strcmp(word, "BFC") == 0)
+        {
+            if (!bench_number(p, 10, a) || !bench_number(p, 16, b)
+                || !bench_at_end(p) || a > 255 || b > 255)
+            {
+                return false;
+            }
+            e.set_flow_control(static_cast<uint8_t>(a), static_cast<uint8_t>(b));
+            return true;
+        }
+        if (strcmp(word, "BT") == 0 || strcmp(word, "BGAP") == 0)
+        {
+            if (!bench_number(p, 10, a) || !bench_at_end(p))
+            {
+                return false;
+            }
+            if (word[1] == 'T')
+            {
+                e.set_timeout_ms(a);
+            }
+            else
+            {
+                e.set_gap_us(a);
+            }
+            return true;
+        }
+        if (strcmp(word, "BJ") == 0)
+        {
+            uint16_t dids[core::bench::BenchEngine::MAX_DIDS_PER_JOB];
+            uint8_t  n = 0;
+            if (!bench_number(p, 10, a) || !bench_number(p, 16, b) || a > 255)
+            {
+                return false;
+            }
+            while (n < core::bench::BenchEngine::MAX_DIDS_PER_JOB
+                   && bench_number(p, 16, c))
+            {
+                dids[n++] = static_cast<uint16_t>(c);
+            }
+            return bench_at_end(p)
+                   && e.add_job(static_cast<uint8_t>(a),
+                                static_cast<uint16_t>(b),
+                                dids,
+                                n);
+        }
+        return false;
+    }
+
+    FLASHMEM bool bench_raw(const char *p)
+    {
+        uint32_t id = 0;
+        if (!s_bench_open || !bench_number(p, 16, id))
+        {
+            return false;
+        }
+        while (*p == ' ')
+        {
+            p++;
+        }
+
+        CanFrame frame {};
+        frame.id = id;
+        while (p[0] != '\0' && p[1] != '\0' && frame.len < 8)
+        {
+            int hi = bench_digit(p[0], 16);
+            int lo = bench_digit(p[1], 16);
+            if (hi < 0 || lo < 0)
+            {
+                return false;
+            }
+            frame.data[frame.len++] = static_cast<uint8_t>((hi << 4) | lo);
+            p += 2;
+        }
+        if (frame.len == 0 || !bench_at_end(p))
+        {
+            return false;
+        }
+
+        noInterrupts();
+        bool ok = s_bench->send_raw(frame);
+        interrupts();
+        return ok;
+    }
+
+    FLASHMEM void bench_print_counters()
+    {
+        static const char LINE[] PROGMEM
+            = "BQ role=%s rx=%lu tx=%lu exchanges=%lu timeouts=%lu nrcs=%lu "
+              "pending=%lu log_drops=%lu";
+
+        core::bench::Counters c = bench_counters();
+        char                  line[160];
+        snprintf(line,
+                 sizeof(line),
+                 LINE,
+                 bench_role_text(s_bench->role()),
+                 (unsigned long)c.rx,
+                 (unsigned long)c.tx,
+                 (unsigned long)c.exchanges,
+                 (unsigned long)c.timeouts,
+                 (unsigned long)c.nrcs,
+                 (unsigned long)c.pending,
+                 (unsigned long)c.log_drops);
+        usb_reply(line);
+    }
+
+    FLASHMEM void handle_bench_command(const char *cmd, size_t len)
+    {
+        if (len == 0)
+        {
+            return;
+        }
+
+        char line[core::slcan::COMMAND_MAX + 1];
+        if (len > core::slcan::COMMAND_MAX || s_bench == nullptr)
+        {
+            usb_reply("ERR");
+            return;
+        }
+        memcpy(line, cmd, len);
+        line[len] = '\0';
+
+        /**
+         * Split off the command word.
+         */
+        char       *rest = strchr(line, ' ');
+        const char *args = "";
+        if (rest != nullptr)
+        {
+            *rest = '\0';
+            args  = rest + 1;
+        }
+
+        bool ok = false;
+        if (strcmp(line, "BQ") == 0)
+        {
+            bench_print_counters();
+            return;
+        }
+        else if (strcmp(line, "BH") == 0)
+        {
+            bench_halt();
+            ok = true;
+        }
+        else if (strcmp(line, "BS") == 0)
+        {
+            char which = args[0];
+            core::bench::Role role
+                = which == 'R'   ? core::bench::Role::Responder
+                  : which == 'T' ? core::bench::Role::Tester
+                  : which == 'L' ? core::bench::Role::Listen
+                                 : core::bench::Role::Idle;
+            ok = role != core::bench::Role::Idle && args[1] == '\0'
+                 && bench_start(role);
+        }
+        else if (strcmp(line, "BR") == 0)
+        {
+            ok = bench_raw(args);
+        }
+        else if (s_bench->role() == core::bench::Role::Idle)
+        {
+            ok = bench_configure(line, args);
+        }
+
+        usb_reply(ok ? "OK" : "ERR");
+    }
+
+    /**
+     * Per-loop while active: the frame log out to USB, as much as its
+     * transmit buffer takes without blocking (see pump_sniff()).
+     */
+    FLASHMEM void pump_bench()
+    {
+        static const char HEAD[] PROGMEM = "F %08lX %c %lX ";
+        constexpr size_t  BENCH_LINE_MAX = 48;
+
+        if (s_bench == nullptr)
+        {
+            return;
+        }
+
+        core::bench::BenchFrame f;
+        while (Serial.availableForWrite() >= static_cast<int>(BENCH_LINE_MAX)
+               && s_bench->read_log(f))
+        {
+            char line[BENCH_LINE_MAX];
+            int  n = snprintf(line,
+                             sizeof(line),
+                             HEAD,
+                             (unsigned long)f.t_us,
+                             f.dir == core::bench::DIR_TX ? 'T' : 'R',
+                             (unsigned long)f.id);
+            for (uint8_t i = 0; i < f.len && n < static_cast<int>(BENCH_LINE_MAX) - 3; i++)
+            {
+                static const char HEX_DIGITS[] PROGMEM = "0123456789ABCDEF";
+                line[n++] = HEX_DIGITS[f.data[i] >> 4];
+                line[n++] = HEX_DIGITS[f.data[i] & 0x0F];
+            }
+            line[n++] = core::slcan::CR;
+            Serial.write(reinterpret_cast<const uint8_t *>(line), n);
+        }
+    }
+
+    FLASHMEM void refresh_bench_screen(uint32_t now)
+    {
+        if (s_bench == nullptr)
+        {
+            return;
+        }
+
+        core::bench::Counters c       = bench_counters();
+        uint32_t              frames  = c.rx + c.tx;
+        uint32_t              elapsed = now - s_bench_rate_ms;
+
+        gui::SnifferViewModel vm;
+        vm.mode_text = bench_role_text(s_bench->role());
+        vm.frames_per_sec
+            = elapsed == 0 || frames < s_bench_rate_frames
+                  ? 0
+                  : (frames - s_bench_rate_frames) * 1000u / elapsed;
+        vm.total_frames   = frames;
+        vm.dropped_frames = c.log_drops;
+        composition().sniffer_screen.refresh(vm);
+
+        s_bench_rate_ms     = now;
+        s_bench_rate_frames = frames;
+    }
+#endif
+
     FLASHMEM void close_sniff_popup()
     {
         if (s_sniff_popup != nullptr)
@@ -1776,7 +2537,7 @@ namespace
     {
         close_sniff_popup();
         s_sniff_state = SniffState::Off;
-        usb_reply("SNIFFNO");
+        usb_status("NO");
     }
 
     FLASHMEM void sniff_stop_cb(void *ctx);
@@ -1785,16 +2546,31 @@ namespace
     {
         Composition &app = composition();
 
+        const char *title = "CAN Sniffer";
+#if HAS_CAN_BENCH
+        if (s_usb_mode == UsbMode::Bench)
+        {
+            if (!bench_enter())
+            {
+                decline_sniff();
+                return;
+            }
+            s_bench_rate_ms     = platform_get().clock.millis();
+            s_bench_rate_frames = 0;
+            title               = "CAN Bench";
+        }
+#endif
+
         close_sniff_popup();
         s_sniff_session.reset();
         s_sniff_state   = SniffState::Active;
         s_sniff_rate_ms = platform_get().clock.millis();
         s_sniff_rate_rx = 0;
 
-        app.sniffer_screen.create(runtime_theme(), sniff_stop_cb, nullptr);
+        app.sniffer_screen.create(runtime_theme(), sniff_stop_cb, nullptr, title);
         lv_screen_load(app.sniffer_screen.screen());
 
-        usb_reply("SNIFFOK");
+        usb_status("OK");
     }
 
     FLASHMEM void exit_sniff()
@@ -1803,8 +2579,15 @@ namespace
 
         /**
          * Closing the SLCAN channel is what calls sniff_end(), which puts
-         * the bus back exactly as begin() left it at boot.
+         * the bus back exactly as begin() left it at boot; bench_end()
+         * does the same for bench mode.
          */
+#if HAS_CAN_BENCH
+        if (s_usb_mode == UsbMode::Bench)
+        {
+            bench_exit();
+        }
+#endif
         s_sniff_session.reset();
         s_sniff_state = SniffState::Off;
 
@@ -1825,7 +2608,7 @@ namespace
              * left streaming from a dash that quietly went back to the
              * gauges.
              */
-            usb_reply("SNIFFSTOP");
+            usb_status("STOP");
         }
     }
 
@@ -1858,19 +2641,29 @@ namespace
         }
     }
 
-    FLASHMEM void request_sniff()
+    FLASHMEM void request_sniff(UsbMode mode)
     {
         Composition &app = composition();
 
+        if (s_sniff_state != SniffState::Off && s_usb_mode != mode)
+        {
+            /**
+             * The other mode is up or being asked for.
+             */
+            Serial.print(mode == UsbMode::Bench ? F("BENCH") : F("SNIFF"));
+            usb_reply("BUSY");
+            return;
+        }
         if (s_sniff_state == SniffState::Active)
         {
-            usb_reply("SNIFFOK"); /* a reconnecting host -- already on */
+            usb_status("OK"); /* a reconnecting host -- already on */
             return;
         }
         if (s_sniff_state == SniffState::Pending)
         {
             return; /* the popup's already asking */
         }
+        s_usb_mode = mode;
 
         /**
          * Only from the gauges. Pulling the panel out from under
@@ -1880,15 +2673,15 @@ namespace
          */
         if (lv_screen_active() != app.info_screen.screen())
         {
-            usb_reply("SNIFFBUSY");
+            usb_status("BUSY");
             return;
         }
 
-        gui::ConfirmPopup popup
-            = gui::create_confirm_popup(runtime_theme(),
-                                        "Start CAN sniffer?",
-                                        "Gauges will pause.",
-                                        "Start");
+        gui::ConfirmPopup popup = gui::create_confirm_popup(
+            runtime_theme(),
+            mode == UsbMode::Bench ? "Start CAN bench?" : "Start CAN sniffer?",
+            "Gauges will pause.",
+            "Start");
         lv_obj_add_event_cb(
             popup.confirm_btn, sniff_confirm_cb, LV_EVENT_CLICKED, nullptr);
         lv_obj_add_event_cb(
@@ -1905,7 +2698,7 @@ namespace
          * Tells the host a person is being asked, so it can tell this
          * wait apart from a plain SLCAN device that will never answer.
          */
-        usb_reply("SNIFFWAIT");
+        usb_status("WAIT");
     }
 
     FLASHMEM void refresh_sniffer_screen(uint32_t now)
@@ -2024,6 +2817,19 @@ namespace
             return false;
         }
 
+#if HAS_CAN_BENCH
+        if (s_usb_mode == UsbMode::Bench)
+        {
+            pump_bench();
+            if (now - s_sniff_rate_ms >= SNIFF_SCREEN_REFRESH_MS)
+            {
+                s_sniff_rate_ms = now;
+                refresh_bench_screen(now);
+            }
+            return true;
+        }
+#endif
+
         pump_sniff();
 
         if (now - s_sniff_rate_ms >= SNIFF_SCREEN_REFRESH_MS)
@@ -2038,23 +2844,41 @@ namespace
     {
         bool log_cmd = len >= 3 && memcmp(cmd, "LOG", 3) == 0;
 
-        if (len == 8 && memcmp(cmd, "SNIFFREQ", 8) == 0)
+        bool sniff_word = len == 8 && memcmp(cmd, "SNIFF", 5) == 0;
+#if HAS_CAN_BENCH
+        bool bench_word = len == 8 && memcmp(cmd, "BENCH", 5) == 0;
+#else
+        bool bench_word = false;
+#endif
+        UsbMode word_mode = bench_word ? UsbMode::Bench : UsbMode::Sniffer;
+
+        if ((sniff_word || bench_word) && memcmp(cmd + 5, "REQ", 3) == 0)
         {
-            request_sniff();
+            request_sniff(word_mode);
         }
-        else if (len == 8 && memcmp(cmd, "SNIFFEND", 8) == 0)
+        else if ((sniff_word || bench_word) && memcmp(cmd + 5, "END", 3) == 0)
         {
-            if (s_sniff_state == SniffState::Active)
+            if (s_sniff_state != SniffState::Off && s_usb_mode == word_mode)
             {
-                exit_sniff();
-            }
-            else if (s_sniff_state == SniffState::Pending)
-            {
-                close_sniff_popup();
-                s_sniff_state = SniffState::Off;
+                if (s_sniff_state == SniffState::Active)
+                {
+                    exit_sniff();
+                }
+                else
+                {
+                    close_sniff_popup();
+                    s_sniff_state = SniffState::Off;
+                }
             }
             Serial.write(core::slcan::CR);
         }
+#if HAS_CAN_BENCH
+        else if (s_sniff_state == SniffState::Active
+                 && s_usb_mode == UsbMode::Bench)
+        {
+            handle_bench_command(cmd, len);
+        }
+#endif
         else if (s_sniff_state == SniffState::Active && !log_cmd)
         {
             /**
@@ -2066,6 +2890,10 @@ namespace
         else if (s_sniff_state == SniffState::Off && log_cmd)
         {
             handle_log_command(cmd, len);
+        }
+        else if (s_sniff_state == SniffState::Off
+                 && handle_stats_command(cmd, len))
+        {
         }
         else
         {
@@ -3094,7 +3922,15 @@ void loop()
     }
 #endif
 
+#ifdef ARDUINO
+    uint32_t start_us = micros();
+#endif
+
     app.scheduler.tick();
+
+#ifdef ARDUINO
+    uint32_t sched_us = micros() - start_us;
+#endif
 
     /**
      * Drain first, send second: a response landing this iteration frees
@@ -3107,7 +3943,13 @@ void loop()
 
     app.remote_link.poll(remote_evt_cb, nullptr, platform_get().clock.millis());
 
+#ifdef ARDUINO
+    uint32_t lvgl_start_us = micros();
     lv_timer_handler();
+    record_loop(start_us, sched_us, micros() - lvgl_start_us);
+#else
+    lv_timer_handler();
+#endif
 }
 
 #if !defined(ARDUINO) && !defined(UNIT_TEST)

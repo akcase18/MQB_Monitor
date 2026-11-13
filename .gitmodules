@@ -1,3 +1,6 @@
 [submodule "lib/lvgl"]
 	path = lib/lvgl
 	url = https://github.com/lvgl/lvgl
+[submodule "MQB_Monitor_Hardware"]
+	path = MQB_Monitor_Hardware
+	url = git@github.com:akcase18/MQB_Monitor_Hardware.git
